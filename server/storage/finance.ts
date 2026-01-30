@@ -5,6 +5,9 @@ import {
     factures, lignesFactures, modelesFactures, caisses, clients, agences, caisseAssignations, users,
     dureesSuggerees, mouvementsFinanciers, evenementsOutbox, coffresForts, produitsCompte
   } from "@shared/schema";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Finance');
 
 // State Machine Guards for Credit & Demande Workflow
 import {
@@ -20,6 +23,7 @@ import {
 import {
   StatutCompte,
   StatutCredit,
+  type StatutCreditType,
   StatutDemande,
   FrequenceRemboursement,
   TypeCompte,
@@ -100,10 +104,30 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
   
 
+  // ============================================================================
+  // ENRICHED CREDIT TYPES
+  // ============================================================================
+
+  export interface EnrichedCreditClient {
+    nom?: string | null;
+    prenom?: string | null;
+    telephone?: string | null;
+    photoProfile?: string | null;
+  }
+
+  export type EnrichedCredit = Credit & {
+    numero_credit: string;
+    montant_principal: number;
+    nombre_echeances_total: number;
+    nombre_echeances_payees: number;
+    jours_retard: number;
+    clients?: EnrichedCreditClient;
+  };
+
   /**
    * Enrich credit data with calculated fields (installments, delays, etc.)
    */
-  export function enrichCreditData(credit: Credit, client?: any): any {
+  export function enrichCreditData(credit: Credit, client?: EnrichedCreditClient): EnrichedCredit {
     let jours_retard = 0;
     let nombre_echeances_payees = 0;
 
@@ -125,7 +149,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     // Calcul du retard uniquement pour les crédits actifs non soldés
     // Calcul du retard uniquement pour les crédits actifs non soldés
-    if (credit.dateDebut && [StatutCredit.ACTIVE, StatutCredit.LATE].includes(credit.statut as any)) {
+    if (credit.dateDebut && (credit.statut === StatutCredit.ACTIVE || credit.statut === StatutCredit.LATE)) {
         // Normaliser les dates à minuit pour éviter les problèmes de timezone
         const start = new Date(credit.dateDebut);
         start.setHours(0, 0, 0, 0);
@@ -133,7 +157,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         const now = new Date();
         now.setHours(0, 0, 0, 0);
 
-        // Convertir la fréquence en jours
+        // Convertir la fréquence en jours (approximation pour calcul de retard)
+        // BI_MONTHLY = bimensuel = 2x/mois ≈ 15 jours
         let frequencyDays = 30; // Par défaut Mensuel
         switch (credit.echeance) {
           case FrequenceRemboursement.DAILY:
@@ -141,7 +166,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
           case FrequenceRemboursement.WEEKLY:
             frequencyDays = 7; break;
           case FrequenceRemboursement.BI_MONTHLY:
-            frequencyDays = 60; break;
+            frequencyDays = 15; break;
           case FrequenceRemboursement.QUARTERLY:
             frequencyDays = 90; break;
         }
@@ -168,7 +193,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     // Calcul de la prochaine échéance si manquante
     let prochaine_echeance_calc = credit.prochaineEcheance;
-    if (!prochaine_echeance_calc && credit.dateDebut && [StatutCredit.ACTIVE, StatutCredit.LATE].includes(credit.statut as any)) {
+    if (!prochaine_echeance_calc && credit.dateDebut && (credit.statut === StatutCredit.ACTIVE || credit.statut === StatutCredit.LATE)) {
         const start = new Date(credit.dateDebut);
         start.setHours(0, 0, 0, 0);
 
@@ -179,7 +204,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
           case FrequenceRemboursement.WEEKLY:
             frequencyDays = 7; break;
           case FrequenceRemboursement.BI_MONTHLY:
-            frequencyDays = 60; break;
+            frequencyDays = 15; break; // bimensuel = 2x/mois
           case FrequenceRemboursement.QUARTERLY:
             frequencyDays = 90; break;
         }
@@ -231,7 +256,22 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return results.map(credit => enrichCreditData(credit));
   }
   
-  export async function getAllCredits(filter: { agence?: string, clientId?: string } = {}): Promise<Credit[]> {
+  export interface PaginatedCredits {
+    data: EnrichedCredit[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }
+
+  export async function getAllCredits(
+    filter: { agence?: string; clientId?: string } = {},
+    options: { search?: string; page?: number; limit?: number; statut?: string } = {}
+  ): Promise<PaginatedCredits> {
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
+    const offset = (page - 1) * limit;
+
     const conditions = [];
 
     if (filter.agence && filter.agence !== "all") {
@@ -241,8 +281,39 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     if (filter.clientId) {
       conditions.push(eq(credits.clientId, filter.clientId));
     }
-    
-    let baseQuery = db.select({
+
+    if (options.statut) {
+      conditions.push(eq(credits.statut, options.statut as StatutCreditType));
+    }
+
+    if (options.search && options.search.trim()) {
+      const searchTerm = `%${options.search.trim().toLowerCase()}%`;
+      conditions.push(
+        or(
+          sql`LOWER(${users.nom}) LIKE ${searchTerm}`,
+          sql`LOWER(${users.prenom}) LIKE ${searchTerm}`,
+          sql`LOWER(${credits.numeroCredit}) LIKE ${searchTerm}`,
+          sql`LOWER(${users.telephone}) LIKE ${searchTerm}`
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Count total
+    const countQuery = db.select({ count: count() })
+      .from(credits)
+      .leftJoin(clients, eq(credits.clientId, clients.id))
+      .leftJoin(users, eq(clients.userId, users.id));
+
+    const countResult = whereClause
+      ? await countQuery.where(whereClause)
+      : await countQuery;
+
+    const total = countResult[0]?.count || 0;
+
+    // Fetch data with pagination
+    let dataQuery = db.select({
       credit: credits,
       client: clients,
       user: users
@@ -250,14 +321,33 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     .from(credits)
     .leftJoin(clients, eq(credits.clientId, clients.id))
     .leftJoin(users, eq(clients.userId, users.id))
+    .orderBy(desc(credits.createdAt))
+    .limit(limit)
+    .offset(offset)
     .$dynamic();
-    
-    if (conditions.length > 0) {
-      baseQuery = baseQuery.where(and(...conditions));
+
+    if (whereClause) {
+      dataQuery = dataQuery.where(whereClause);
     }
-    
-    const results = await baseQuery.orderBy(desc(credits.createdAt));
-    return results.map(({ credit, client, user }) => enrichCreditData(credit, { ...client, nom: user?.nom, prenom: user?.prenom, telephone: user?.telephone, photoProfile: user?.photoProfile }));
+
+    const results = await dataQuery;
+    const data = results.map(({ credit, client, user }) =>
+      enrichCreditData(credit, {
+        ...client,
+        nom: user?.nom,
+        prenom: user?.prenom,
+        telephone: user?.telephone,
+        photoProfile: user?.photoProfile,
+      })
+    );
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
   
   export async function createCredit(insertCredit: InsertCredit): Promise<Credit> {
@@ -306,7 +396,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
 
   export async function deleteCreditPlan(id: string): Promise<boolean> {
-    const result = await db.delete(creditPlans).where(eq(creditPlans.id, id)).returning();
+    const result = await db.update(creditPlans).set({ actif: false }).where(eq(creditPlans.id, id)).returning();
     return result.length > 0;
   }
   
@@ -316,8 +406,37 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     if (!includeDeleted) {
       conditions.push(sql`${demandesCredit.deletedAt} IS NULL`);
     }
-    const [demande] = await db.select().from(demandesCredit).where(and(...conditions));
-    return demande || undefined;
+
+    const results = await db.select({
+      demande: demandesCredit,
+      client: clients,
+      user: users,
+      agence: agences
+    })
+    .from(demandesCredit)
+    .leftJoin(clients, eq(demandesCredit.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
+    .leftJoin(agences, eq(clients.agenceId, agences.id))
+    .where(and(...conditions));
+
+    if (!results.length) return undefined;
+
+    const { demande, client, user, agence } = results[0];
+    return {
+      ...demande,
+      clients: client ? {
+        id: client.id,
+        nom: user?.nom,
+        prenom: user?.prenom,
+        email: user?.email,
+        phone: user?.telephone,
+        photo_url: user?.photoProfile,
+        taux_remboursement: Number(client.tauxRemboursement) || 0,
+        credit_total: Number(client.creditTotal) || 0,
+        agence: agence?.nom,
+        agenceId: client.agenceId,
+      } : undefined
+    } as DemandeCredit;
   }
   
   export async function getDemandesByClient(clientId: string): Promise<DemandeCredit[]> {
@@ -336,7 +455,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     if (filter.agence && filter.agence !== "all") {
       conditions.push(eq(clients.agenceId, filter.agence));
     }
-    
+
     let baseQuery = db.select({
       demande: demandesCredit,
       client: clients,
@@ -352,7 +471,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     if (conditions.length > 0) {
       baseQuery = baseQuery.where(and(...conditions));
     }
-    
+
     const results = await baseQuery.orderBy(desc(demandesCredit.createdAt));
 
     return results.map(({ demande, client, user, agence }) => ({
@@ -402,9 +521,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       scoreCredit = scoringResult.score;
 
       // Mettre à jour le score du client également
-      await mettreAJourScoreClient(insertDemande.clientId).catch(console.error);
+      await mettreAJourScoreClient(insertDemande.clientId).catch((err) => logger.error({ err }, 'Error updating client score'));
     } catch (error) {
-      console.error('Erreur calcul score crédit:', error);
+      logger.error({ err: error }, 'Error calculating credit score');
       // Continuer sans score en cas d'erreur
     }
 
@@ -774,6 +893,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
       // 3. Create Initial Transaction if needed
       if (data.soldeInitial > 0) {
+        const typePaiement = typeCompteEnum === TypeCompte.CURRENT ? "DEPOSIT_CURRENT" : "DEPOSIT_SAVINGS";
         await tx.insert(transactionsCompte).values({
           compteId: compte.id,
           // typeTransaction removed as it does not exist in schema
@@ -781,7 +901,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
           methodePaiement: (data.methodePaiement || MethodePaiement.CASH) as any,
           observations: 'Solde initial à la création',
           createdBy: userId,
-          typePaiement: typeCompteEnum === TypeCompte.CURRENT ? "DEPOSIT_CURRENT" : "DEPOSIT_SAVINGS",
+          typePaiement,
+          sens: "CREDIT", // Initial deposit is always a credit
         });
       }
 
@@ -855,7 +976,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
   
   export async function deleteObjectifEpargne(id: string): Promise<boolean> {
-    const result = await db.delete(objectifsEpargne).where(eq(objectifsEpargne.id, id));
+    await db.update(objectifsEpargne).set({ actif: false }).where(eq(objectifsEpargne.id, id));
     return true;
   }
 
@@ -1021,6 +1142,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       reversedAt: operationsCaisse.reversedAt,
       updatedAt: operationsCaisse.updatedAt,
       deletedAt: operationsCaisse.deletedAt,
+      reversalOfId: operationsCaisse.reversalOfId,
+      reversalReason: operationsCaisse.reversalReason,
+      reversedByUserId: operationsCaisse.reversedByUserId,
       // Client info (nom/prenom/telephone sont dans la table users, pas clients)
       client_nom: users.nom,
       client_prenom: users.prenom,
@@ -1096,6 +1220,68 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return db.select().from(operationsCaisse)
       .where(and(gte(operationsCaisse.createdAt, start), lte(operationsCaisse.createdAt, end)))
       .orderBy(desc(operationsCaisse.createdAt));
+  }
+
+  /**
+   * Get today's operations for a specific caisse (all sessions)
+   * Returns operations with client info, filtered by today's date
+   */
+  export async function getOperationsCaisseToday(caisseId: string) {
+    // Get start of today (midnight)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get all sessions for this caisse
+    const sessionsForCaisse = await db.select({ id: sessionsCaisse.id })
+      .from(sessionsCaisse)
+      .where(eq(sessionsCaisse.caisseId, caisseId));
+
+    const sessionIds = sessionsForCaisse.map(s => s.id);
+
+    if (sessionIds.length === 0) {
+      return [];
+    }
+
+    // Query operations with client info, filtering by today and caisse sessions
+    const results = await db.select({
+      id: operationsCaisse.id,
+      sessionId: operationsCaisse.sessionId,
+      mouvementId: operationsCaisse.mouvementId,
+      typeOperation: operationsCaisse.typeOperation,
+      statut: operationsCaisse.statut,
+      montant: operationsCaisse.montant,
+      methodePaiement: operationsCaisse.methodePaiement,
+      reference: operationsCaisse.reference,
+      idempotencyKey: operationsCaisse.idempotencyKey,
+      description: operationsCaisse.description,
+      clientId: operationsCaisse.clientId,
+      presenceVerification: operationsCaisse.presenceVerification,
+      metadata: operationsCaisse.metadata,
+      createdBy: operationsCaisse.createdBy,
+      createdAt: operationsCaisse.createdAt,
+      annulledAt: operationsCaisse.annulledAt,
+      reversedAt: operationsCaisse.reversedAt,
+      updatedAt: operationsCaisse.updatedAt,
+      deletedAt: operationsCaisse.deletedAt,
+      reversalOfId: operationsCaisse.reversalOfId,
+      reversalReason: operationsCaisse.reversalReason,
+      reversedByUserId: operationsCaisse.reversedByUserId,
+      // Client info
+      client_nom: users.nom,
+      client_prenom: users.prenom,
+      client_telephone: users.telephone,
+    })
+    .from(operationsCaisse)
+    .leftJoin(clients, eq(operationsCaisse.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
+    .where(and(
+      inArray(operationsCaisse.sessionId, sessionIds),
+      gte(operationsCaisse.createdAt, today),
+      isNull(operationsCaisse.deletedAt)
+    ))
+    .orderBy(desc(operationsCaisse.createdAt));
+
+    return results;
   }
 
   // Helper for accurate balance calculation using Ledger Sens
@@ -1261,8 +1447,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     // 2. Clear assignments
     await db.delete(caisseAssignations).where(eq(caisseAssignations.caisseId, id));
 
-    // 3. Delete Caisse
-    const result = await db.delete(caisses).where(eq(caisses.id, id)).returning();
+    // 3. Soft delete Caisse (preserve audit trail)
+    const result = await db.update(caisses).set({ deletedAt: new Date() }).where(eq(caisses.id, id)).returning();
     return result.length > 0;
   }
 
@@ -1608,7 +1794,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     }
 
     export async function deleteDureeSuggeree(id: string): Promise<boolean> {
-        const result = await db.delete(dureesSuggerees).where(eq(dureesSuggerees.id, id));
+        await db.update(dureesSuggerees).set({ actif: false }).where(eq(dureesSuggerees.id, id));
         return true;
     }
 
@@ -1711,6 +1897,7 @@ export async function createTransactionCompteWithLedger(data: {
         compteId: data.compteId,
         mouvementId: mouvement.id,
         typePaiement,
+        sens,
         montant: data.montant,
         soldeApres: nouveauSolde,
         methodePaiement: data.methodePaiement as any,
@@ -2478,7 +2665,7 @@ export async function provisionCoffreWithLedger(data: {
                 typePaiement: 'SAFE_SUPPLY',
             });
         } catch (e) {
-            console.error("[BROADCAST] Erreur broadcast provision coffre:", e);
+            logger.error({ err: e }, 'Error broadcasting coffre supply');
         }
         return { mouvement };
     });
@@ -2556,6 +2743,7 @@ export async function createDecaissementWithLedger(data: {
                  compteId: data.compteId,
                  mouvementId: mouvement.id,
                  typePaiement: "CREDIT_DISBURSEMENT",
+                 sens: "CREDIT", // Loan disbursement is money coming in
                  montant: data.montant,
                  soldeApres: nouveauSoldeCompte,
                  methodePaiement: "TRANSFER",
@@ -2585,7 +2773,7 @@ export async function createDecaissementWithLedger(data: {
                 typePaiement: 'CREDIT_DISBURSEMENT',
             });
         } catch (e) {
-            console.error("[BROADCAST] Erreur broadcast décaissement coffre:", e);
+            logger.error({ err: e }, 'Error broadcasting coffre disbursement');
         }
         return { credit: result, mouvement };
     });
@@ -2762,7 +2950,7 @@ export async function processLoanCashPayout(data: {
                 typePaiement: 'LOAN_DISBURSEMENT',
             });
         } catch (e) {
-            console.error("[BROADCAST] Erreur broadcast décaissement caisse coffre:", e);
+            logger.error({ err: e }, 'Error broadcasting caisse coffre disbursement');
         }
         return {
             credit: result as Credit,
@@ -3058,6 +3246,7 @@ export async function createCashTransactionWithLedger(data: {
           compteId: data.compteId,
           mouvementId: mouvement.id,
           typePaiement: transType,
+          sens: accountDelta > 0 ? "CREDIT" : "DEBIT",
           montant: data.montant,
           soldeApres: nouveauSoldeCompte,
           methodePaiement: data.methodePaiement as any,

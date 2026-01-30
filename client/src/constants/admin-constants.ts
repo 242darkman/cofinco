@@ -50,7 +50,8 @@ export const ADMIN_TABS = [
   { id: 'updates', label: 'Version', icon: 'Package', permission: 'admin.settings' },
   { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound', permission: 'caisse.manage' },
   { id: 'regularisation', label: 'Régularisation', icon: 'AlertTriangle', permission: 'admin.manage' },
-  { id: 'client-credentials', label: 'Accès Clients', icon: 'Key', permission: 'admin.manage' }
+  { id: 'client-credentials', label: 'Accès Clients', icon: 'Key', permission: 'admin.manage' },
+  { id: 'product-rates', label: 'Taux Produits', icon: 'Percent', permission: 'admin.manage' }
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];

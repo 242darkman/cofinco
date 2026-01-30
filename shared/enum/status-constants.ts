@@ -557,6 +557,13 @@ export const TypeCompte = {
 
 export type TypeCompteType = (typeof TypeCompte)[keyof typeof TypeCompte];
 
+/** Labels FR pour l'UI des types de compte */
+export const TYPE_COMPTE_LABELS: Record<TypeCompteType, string> = {
+  [TypeCompte.CURRENT]: "Compte Courant",
+  [TypeCompte.SAVINGS]: "Compte Épargne",
+  [TypeCompte.BLOCKED]: "Compte Bloqué",
+};
+
 // ============================================
 // DUREE UNITE
 // ============================================
@@ -1176,7 +1183,9 @@ export const FrequenceVirement = {
   ONCE: "ONCE",
   DAILY: "DAILY",
   WEEKLY: "WEEKLY",
+  BI_MONTHLY: "BI_MONTHLY",     // 2×/mois (1er ↔ 15)
   MONTHLY: "MONTHLY",
+  QUARTERLY: "QUARTERLY",
 } as const;
 
 export type FrequenceVirementType = (typeof FrequenceVirement)[keyof typeof FrequenceVirement];
@@ -1186,7 +1195,9 @@ export const FREQUENCE_VIREMENT_LABELS: Record<FrequenceVirementType, string> = 
   [FrequenceVirement.ONCE]: "Une fois",
   [FrequenceVirement.DAILY]: "Journalier",
   [FrequenceVirement.WEEKLY]: "Hebdomadaire",
+  [FrequenceVirement.BI_MONTHLY]: "Bimensuel (2×/mois)",
   [FrequenceVirement.MONTHLY]: "Mensuel",
+  [FrequenceVirement.QUARTERLY]: "Trimestriel",
 };
 
 /** Options de fréquence pour les selects de l'UI */
@@ -1357,7 +1368,7 @@ export const FREQUENCE_REMBOURSEMENT_LABELS: Record<FrequenceRemboursementType, 
   [FrequenceRemboursement.DAILY]: "Journalier",
   [FrequenceRemboursement.WEEKLY]: "Hebdomadaire",
   [FrequenceRemboursement.MONTHLY]: "Mensuel",
-  [FrequenceRemboursement.BI_MONTHLY]: "Bimestriel (60j)",
+  [FrequenceRemboursement.BI_MONTHLY]: "Bimensuel (2x/mois)",
   [FrequenceRemboursement.QUARTERLY]: "Trimestriel",
 };
 
@@ -1390,7 +1401,38 @@ export function normalizeFrequenceRemboursement(freq: string | undefined | null)
   return FREQUENCE_FR_TO_EN[freq] || FrequenceRemboursement.MONTHLY;
 }
 
+// ============================================
+// FINANCIAL FREQUENCY (Unified superset)
+// ============================================
 
+/**
+ * Unified financial frequency that merges FrequenceRemboursement and FrequenceTontine.
+ * Use this in shared schedule logic (schedule-generator, reminder services, etc.).
+ *
+ * Subsets for domain-specific usage:
+ *  - FrequenceRemboursement: DAILY, WEEKLY, BI_MONTHLY, MONTHLY, QUARTERLY
+ *  - FrequenceTontine:       DAILY, WEEKLY, BIWEEKLY, MONTHLY
+ */
+export const FinancialFrequency = {
+  DAILY: "DAILY",
+  WEEKLY: "WEEKLY",
+  BIWEEKLY: "BIWEEKLY",         // Tontine: every 2 weeks (14 days)
+  BI_MONTHLY: "BI_MONTHLY",     // Credit: 2×/month (1st ↔ 15th)
+  MONTHLY: "MONTHLY",
+  QUARTERLY: "QUARTERLY",       // Credit only
+} as const;
+
+export type FinancialFrequencyType = (typeof FinancialFrequency)[keyof typeof FinancialFrequency];
+
+/** Labels FR for all financial frequencies */
+export const FINANCIAL_FREQUENCY_LABELS: Record<FinancialFrequencyType, string> = {
+  [FinancialFrequency.DAILY]: "Journalier",
+  [FinancialFrequency.WEEKLY]: "Hebdomadaire",
+  [FinancialFrequency.BIWEEKLY]: "Bihebdomadaire (2 sem.)",
+  [FinancialFrequency.BI_MONTHLY]: "Bimensuel (2×/mois)",
+  [FinancialFrequency.MONTHLY]: "Mensuel",
+  [FinancialFrequency.QUARTERLY]: "Trimestriel",
+};
 
 // ============================================
 // STATUT CONGE (Demandes de congés HR)
@@ -1424,6 +1466,7 @@ export const StatutCandidature = {
   INTERVIEW: "INTERVIEW",
   ACCEPTED: "ACCEPTED",
   REJECTED: "REJECTED",
+  HIRED: "HIRED", // Converti en employé via onboarding
 } as const;
 
 export type StatutCandidatureType = (typeof StatutCandidature)[keyof typeof StatutCandidature];
@@ -1434,6 +1477,7 @@ export const STATUT_CANDIDATURE_LABELS: Record<StatutCandidatureType, string> = 
   [StatutCandidature.INTERVIEW]: "Entretien",
   [StatutCandidature.ACCEPTED]: "Accepté",
   [StatutCandidature.REJECTED]: "Refusé",
+  [StatutCandidature.HIRED]: "Embauché",
 };
 
 

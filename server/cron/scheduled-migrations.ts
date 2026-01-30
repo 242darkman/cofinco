@@ -1,5 +1,8 @@
 import cron, { ScheduledTask } from "node-cron";
 import { agencyMigrationService } from "../services/agency-migration";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Cron:ScheduledMigrations');
 
 let scheduledMigrationsCron: ScheduledTask | null = null;
 
@@ -9,42 +12,42 @@ let scheduledMigrationsCron: ScheduledTask | null = null;
  */
 export function startScheduledMigrationsCron() {
   if (scheduledMigrationsCron) {
-    console.log("[ScheduledMigrations] Cron already running");
+    logger.info('Cron already running');
     return;
   }
 
-  console.log("[ScheduledMigrations] Starting cron job (every 5 minutes)");
+  logger.info('Starting cron job (every 5 minutes)');
 
   // Exécution toutes les 5 minutes
   scheduledMigrationsCron = cron.schedule("*/5 * * * *", async () => {
-    console.log("[ScheduledMigrations] Checking for scheduled migrations...");
+    logger.info('Checking for scheduled migrations');
 
     try {
       const migrationsToExecute = await agencyMigrationService.getScheduledMigrationsToExecute();
 
       if (migrationsToExecute.length === 0) {
-        console.log("[ScheduledMigrations] No migrations to execute");
+        logger.info('No migrations to execute');
         return;
       }
 
-      console.log(`[ScheduledMigrations] Found ${migrationsToExecute.length} migration(s) to execute`);
+      logger.info({ count: migrationsToExecute.length }, `Found ${migrationsToExecute.length} migration(s) to execute`);
 
       for (const migration of migrationsToExecute) {
-        console.log(`[ScheduledMigrations] Executing migration ${migration.reference} (${migration.id})`);
+        logger.info({ migrationId: migration.id, reference: migration.reference }, `Executing migration ${migration.reference}`);
 
         try {
           // Exécuter la migration de manière asynchrone (fire & forget avec logging)
           agencyMigrationService.processMigration(migration.id).catch((error) => {
-            console.error(`[ScheduledMigrations] Migration ${migration.id} failed:`, error);
+            logger.error({ err: error, migrationId: migration.id }, `Migration ${migration.id} failed`);
           });
 
-          console.log(`[ScheduledMigrations] Migration ${migration.reference} started`);
+          logger.info({ migrationId: migration.id, reference: migration.reference }, `Migration ${migration.reference} started`);
         } catch (error: any) {
-          console.error(`[ScheduledMigrations] Failed to start migration ${migration.id}:`, error);
+          logger.error({ err: error, migrationId: migration.id }, `Failed to start migration ${migration.id}`);
         }
       }
     } catch (error: any) {
-      console.error("[ScheduledMigrations] Error checking scheduled migrations:", error);
+      logger.error({ err: error }, 'Error checking scheduled migrations');
     }
   });
 
@@ -56,7 +59,7 @@ export function stopScheduledMigrationsCron() {
   if (scheduledMigrationsCron) {
     scheduledMigrationsCron.stop();
     scheduledMigrationsCron = null;
-    console.log("[ScheduledMigrations] Cron stopped");
+    logger.info('Cron stopped');
   }
 }
 
@@ -64,33 +67,33 @@ export function stopScheduledMigrationsCron() {
  * Exécution manuelle de la vérification
  */
 export async function runScheduledMigrationsCheck() {
-  console.log("[ScheduledMigrations] Manual check triggered");
+  logger.info('Manual check triggered');
 
   try {
     const migrationsToExecute = await agencyMigrationService.getScheduledMigrationsToExecute();
 
     if (migrationsToExecute.length === 0) {
-      console.log("[ScheduledMigrations] No migrations to execute");
+      logger.info('No migrations to execute');
       return { executed: 0 };
     }
 
-    console.log(`[ScheduledMigrations] Found ${migrationsToExecute.length} migration(s) to execute`);
+    logger.info({ count: migrationsToExecute.length }, `Found ${migrationsToExecute.length} migration(s) to execute`);
 
     let executedCount = 0;
     for (const migration of migrationsToExecute) {
       try {
         agencyMigrationService.processMigration(migration.id).catch((error) => {
-          console.error(`[ScheduledMigrations] Migration ${migration.id} failed:`, error);
+          logger.error({ err: error, migrationId: migration.id }, `Migration ${migration.id} failed`);
         });
         executedCount++;
       } catch (error: any) {
-        console.error(`[ScheduledMigrations] Failed to start migration ${migration.id}:`, error);
+        logger.error({ err: error, migrationId: migration.id }, `Failed to start migration ${migration.id}`);
       }
     }
 
     return { executed: executedCount };
   } catch (error: any) {
-    console.error("[ScheduledMigrations] Error:", error);
+    logger.error({ err: error }, 'Error');
     return { executed: 0, error: error.message };
   }
 }

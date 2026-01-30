@@ -20,6 +20,9 @@ import {
 import { eq, and, sql, desc } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { MethodePaiement } from "@shared/enum/status-constants";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('CreditAllocation');
 
 // Type for transaction context
 type TxContext = PgTransaction<any, any, any>;
@@ -227,11 +230,15 @@ export async function allocateCreditRepayment(
     .values(allocationData)
     .returning();
 
-  console.log(
-    `[Credit Allocation] Allocated ${montant} to credit ${creditId}: ` +
-    `penalties=${penalitesPaid}, interest=${interetsPaid}, principal=${principalPaid}, ` +
-    `balance: ${soldeAvant} -> ${nouveauSolde}`
-  );
+  logger.info({
+    creditId,
+    montant,
+    penalitesPaid,
+    interetsPaid,
+    principalPaid,
+    soldeAvant,
+    nouveauSolde,
+  }, 'Allocated payment to credit');
 
   return {
     allocationId: allocation.id,

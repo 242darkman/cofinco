@@ -3,7 +3,7 @@ import { X, Save, DollarSign, Briefcase, FileText, Camera, Upload, MapPin, Trend
 import CameraCapture from '../../shared/CameraCapture';
 import GpsCapture from '../../shared/GpsCapture';
 import { GpsSignalQuality } from '../../../hooks/useGeolocation';
-import { db } from '../../../lib/offline-db';
+import { saveEnqueteOffline } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 import { LocationDisplay } from '../../common/LocationDisplay';
 import { formatClientName } from '../../../lib/format';
@@ -25,6 +25,7 @@ interface EnqueteCreditFormProps {
   initialData?: any;
   onClose: () => void;
   onSave: (enquete: any) => void;
+  readOnly?: boolean; // When true, form is in view-only mode
 }
 
 // Haversine formula to calculate distance in meters
@@ -61,7 +62,7 @@ interface GeoLocation {
   };
 }
 
-export default function EnqueteCreditForm({ clientId, clientNom, initialData, onClose, onSave }: EnqueteCreditFormProps) {
+export default function EnqueteCreditForm({ clientId, clientNom, initialData, onClose, onSave, readOnly = false }: EnqueteCreditFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -79,6 +80,9 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   // Seniority state (value + unit)
   const [seniorityValue, setSeniorityValue] = useState<string>('');
   const [seniorityUnit, setSeniorityUnit] = useState<'days' | 'months' | 'years'>('months');
+
+  // Saving state
+  const [isSaving, setIsSaving] = useState(false);
 
   // Calculate initial revenue values from demande
   const getInitialRevenuMensuel = () => {
@@ -99,7 +103,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   };
 
   const [formData, setFormData] = useState({
-    demandeId: initialData?.id || '',
+    demandeId: initialData?.demandeId || initialData?.id || '',
     client_id: clientId || initialData?.client_id || '',
     montant_demande: initialData?.montant_demande || '',
     categorie_activite: initialData?.categorie_activite || '',
@@ -115,6 +119,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     autres_credits: [] as any[],
     garanties_proposees: [] as any[],
     photos_activite: [] as string[],
+    photos_geotagged: [] as { url: string; latitude?: number; longitude?: number; accuracy?: number; timestamp?: string }[],
     documents_justificatifs: [] as string[],
   });
 
@@ -452,10 +457,25 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
       const url = await uploadActivityPhoto(file);
       if (url) {
+        // Ajouter l'URL à photos_activite pour la compatibilité
         setFormData(prev => ({
           ...prev,
-          photos_activite: [...prev.photos_activite, url]
+          photos_activite: [...prev.photos_activite, url],
+          // Ajouter aussi aux photos géotaggées si on a une position GPS
+          photos_geotagged: geoLocation.latitude && geoLocation.longitude
+            ? [...prev.photos_geotagged, {
+                url,
+                latitude: geoLocation.latitude,
+                longitude: geoLocation.longitude,
+                accuracy: geoLocation.accuracy || undefined,
+                timestamp: new Date().toISOString(),
+              }]
+            : prev.photos_geotagged
         }));
+
+        if (geoLocation.latitude && geoLocation.longitude) {
+          toast.success('Photo géotaggée capturée!');
+        }
       }
     } catch (e) {
       console.error("Upload capture failed", e);
@@ -464,17 +484,22 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   };
 
   // Check if form is valid for enabling submit button (real-time validation)
-  const isFormValid = (): boolean => {
-    const MIN_DESC_LENGTH = 10;
-    const hasClient = !!formData.client_id;
-    const hasMontant = formData.montant_demande && parseFloat(formData.montant_demande) > 0;
-    const hasCategorie = !!formData.categorie_activite;
-    const hasTypeActivite = !!formData.type_activite;
-    const hasAnciennete = !!formData.anciennete_activite || !!seniorityValue;
-    const hasDescription = formData.description_activite && formData.description_activite.trim().length >= MIN_DESC_LENGTH;
-    const hasRevenu = formData.revenu_mensuel_declare && parseFloat(formData.revenu_mensuel_declare) > 0;
+  const MIN_DESC_LENGTH = 10;
 
-    return !!(hasClient && hasMontant && hasCategorie && hasTypeActivite && hasAnciennete && hasDescription && hasRevenu);
+  const getMissingFields = (): string[] => {
+    const missing: string[] = [];
+    if (!formData.client_id) missing.push('Client');
+    if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) missing.push('Montant');
+    if (!formData.categorie_activite) missing.push('Catégorie d\'activité');
+    if (!formData.type_activite) missing.push('Type d\'activité');
+    if (!formData.anciennete_activite && !seniorityValue) missing.push('Ancienneté');
+    if (!formData.description_activite || formData.description_activite.trim().length < MIN_DESC_LENGTH) missing.push('Description');
+    if (!formData.revenu_mensuel_declare || parseFloat(formData.revenu_mensuel_declare) <= 0) missing.push('Revenu mensuel');
+    return missing;
+  };
+
+  const isFormValid = (): boolean => {
+    return getMissingFields().length === 0;
   };
 
   const validateForm = (): boolean => {
@@ -500,7 +525,6 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       newErrors.anciennete_activite = 'L\'ancienneté est requise';
     }
 
-    const MIN_DESC_LENGTH = 10;
     if (!formData.description_activite || formData.description_activite.trim().length < MIN_DESC_LENGTH) {
       newErrors.description_activite = `Ajoutez quelques détails (minimum ${MIN_DESC_LENGTH} caractères)`;
     }
@@ -515,16 +539,25 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
+    const isValid = validateForm();
+    if (!isValid) {
+      toast.error('Formulaire incomplet', { description: 'Veuillez remplir tous les champs obligatoires' });
+      return;
+    }
+    if (isValid) {
       // Map French UI values to English enum values
       const typeRevenuMapping: Record<string, string> = {
         'Journalier': 'DAILY',
         'Mensuel': 'MONTHLY'
       };
 
+      // Debug: log demandeId before sending
+      console.log('[EnqueteCreditForm] formData.demandeId:', formData.demandeId);
+      console.log('[EnqueteCreditForm] initialData:', initialData);
+
       const payload = {
         clientId: formData.client_id,
-        demandeId: formData.demandeId || undefined,
+        demandeId: formData.demandeId && formData.demandeId.trim() !== '' ? formData.demandeId : undefined,
         // Montant et objet
         montantDemande: formData.montant_demande,
         objetCredit: formData.description_activite,
@@ -543,6 +576,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
         autresCredits: formData.autres_credits,
         garantiesProposees: formData.garanties_proposees,
         photosActivite: formData.photos_activite,
+        photosGeotagged: formData.photos_geotagged,
         documentsJustificatifs: formData.documents_justificatifs,
         // Geo data
         geoLatitude: geoLocation.latitude,
@@ -555,11 +589,12 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       // Offline Check
       if (!navigator.onLine) {
          try {
-             await db.enquetes_offline.add({
-                 clientId: formData.client_id,
-                 data: payload,
-                 timestamp: new Date(),
-                 synced: 0
+             await saveEnqueteOffline(formData.client_id, payload, {
+               demandeId: formData.demandeId || undefined,
+               photos: formData.photos_activite,
+               gpsCoordinates: geoLocation.latitude && geoLocation.longitude
+                 ? { lat: geoLocation.latitude, lng: geoLocation.longitude }
+                 : undefined,
              });
              toast.success('Enquête sauvegardée HORS-LIGNE. Elle sera synchronisée ultérieurement.', { icon: <WifiOff /> });
              onClose();
@@ -570,7 +605,18 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
          return;
       }
 
-      onSave(payload);
+      // Save online
+      setIsSaving(true);
+      try {
+        await onSave(payload);
+      } catch (err) {
+        console.error('Erreur lors de la sauvegarde:', err);
+        toast.error('Erreur lors de la sauvegarde', {
+          description: err instanceof Error ? err.message : 'Une erreur est survenue'
+        });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -580,9 +626,12 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
         <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-lg font-bold text-white">Enquête de Crédit</h2>
+            <h2 className="text-lg font-bold text-white">
+              {readOnly ? 'Détails de l\'Enquête' : 'Enquête de Crédit'}
+            </h2>
             <p className="text-slate-400 text-xs">
               Client : {clientNom || (selectedClient ? formatClientName(selectedClient.nom, (selectedClient as any).prenom) : 'Non sélectionné')}
+              {readOnly && <span className="ml-2 text-emerald-400">(Lecture seule)</span>}
             </p>
           </div>
           <button
@@ -595,6 +644,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <fieldset disabled={readOnly} className="space-y-4">
           {!clientId && (
             <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -1083,27 +1133,56 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </div>
           </div>
 
+          </fieldset>
+
+          {/* Missing fields indicator - only show in edit mode */}
+          {!readOnly && !isFormValid() && getMissingFields().length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+              <p className="text-amber-400 text-xs font-medium flex items-center gap-1.5">
+                <AlertCircle size={14} />
+                Champs obligatoires manquants :
+              </p>
+              <p className="text-amber-300/80 text-xs mt-1">
+                {getMissingFields().join(' • ')}
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium text-sm transition"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={!isFormValid()}
-              className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition flex items-center justify-center gap-1.5 ${
-                isFormValid()
-                  ? 'bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-              }`}
-              data-testid="button-submit-enquete"
-            >
-              <Save size={16} />
-              Enregistrer
-            </button>
+            {readOnly ? (
+              // Read-only mode: only show close button
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium text-sm transition"
+              >
+                Fermer
+              </button>
+            ) : (
+              // Edit mode: show cancel and save buttons
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium text-sm transition"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isFormValid() || isSaving}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition flex items-center justify-center gap-1.5 ${
+                    isFormValid() && !isSaving
+                      ? 'bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer'
+                      : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  }`}
+                  data-testid="button-submit-enquete"
+                >
+                  {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              </>
+            )}
           </div>
         </form>
       </div>

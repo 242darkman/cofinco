@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Users, MapPin, CreditCard, PiggyBank, ChevronLeft } from 'lucide-react';
+import { Users, MapPin, CreditCard, PiggyBank } from 'lucide-react';
 import { formatClientName } from '../../lib/format';
 import { requestAllPages } from '../../lib/api-client';
 
@@ -40,7 +41,7 @@ const getMarkerIcon = (segment: string) => {
     'Nouveau': '#3b82f6',
   };
   const color = colors[segment] || '#6b7280';
-  
+
   return L.divIcon({
     className: 'custom-marker',
     html: `<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
@@ -55,16 +56,33 @@ const getMarkerIcon = (segment: string) => {
   });
 };
 
+const createClusterIcon = (cluster: any) => {
+  const count = cluster.getChildCount();
+  let size = 'small';
+  let bgColor = '#22c55e';
+  if (count >= 50) { size = 'large'; bgColor = '#ef4444'; }
+  else if (count >= 20) { size = 'medium'; bgColor = '#f59e0b'; }
+
+  const dim = size === 'large' ? 50 : size === 'medium' ? 40 : 30;
+
+  return L.divIcon({
+    html: `<div style="background-color: ${bgColor}; width: ${dim}px; height: ${dim}px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: ${size === 'large' ? '16' : size === 'medium' ? '14' : '12'}px;">${count}</div>`,
+    className: 'custom-cluster-icon',
+    iconSize: L.point(dim, dim),
+    iconAnchor: [dim / 2, dim / 2],
+  });
+};
+
 function MapController({ clients }: { clients: ClientLocation[] }) {
   const map = useMap();
-  
+
   useEffect(() => {
     if (clients.length > 0) {
       const bounds = L.latLngBounds(clients.map(c => [c.latitude, c.longitude]));
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [clients, map]);
-  
+
   return null;
 }
 
@@ -109,8 +127,8 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
     }
   };
 
-  const filteredClients = filter === 'all' 
-    ? clients 
+  const filteredClients = filter === 'all'
+    ? clients
     : clients.filter(c => c.segment === filter);
 
   const segments = ['all', ...Array.from(new Set(clients.map(c => c.segment)))];
@@ -148,7 +166,7 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
       {showStats && (
         <div className="px-3 py-2 sm:px-4 sm:py-3 border-b border-slate-700 bg-slate-800 shrink-0">
           <div className="flex flex-col gap-2">
-            
+
             {/* Header Top: Title & Count */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-white">
@@ -165,8 +183,8 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
                     onClick={() => setFilter(seg)}
                     className={`
                       whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border
-                      ${filter === seg 
-                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-100' 
+                      ${filter === seg
+                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-100'
                         : 'bg-slate-700/50 border-slate-600 text-slate-400 hover:bg-slate-700 hover:border-slate-500'
                       }
                     `}
@@ -194,53 +212,62 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          
+
           {filteredClients.length > 0 && <MapController clients={filteredClients} />}
-          
-          {filteredClients.map((client) => (
-            <Marker
-              key={client.id}
-              position={[client.latitude, client.longitude]}
-              icon={getMarkerIcon(client.segment)}
-            >
-              <Popup>
-                <div className="min-w-[200px]">
-                  <div className="font-bold text-lg text-slate-800 mb-2">
-                    {formatClientName(client.nom, client.prenom)}
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <MapPin size={14} />
-                      <span>{client.ville || 'Non spécifié'}</span>
+
+          <MarkerClusterGroup
+            chunkedLoading
+            iconCreateFunction={createClusterIcon}
+            maxClusterRadius={60}
+            spiderfyOnMaxZoom
+            showCoverageOnHover={false}
+            disableClusteringAtZoom={17}
+          >
+            {filteredClients.map((client) => (
+              <Marker
+                key={client.id}
+                position={[client.latitude, client.longitude]}
+                icon={getMarkerIcon(client.segment)}
+              >
+                <Popup>
+                  <div className="min-w-[200px]">
+                    <div className="font-bold text-lg text-slate-800 mb-2">
+                      {formatClientName(client.nom, client.prenom)}
                     </div>
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <span className="font-medium">Segment:</span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        client.segment === 'Premium' ? 'bg-amber-100 text-amber-700' :
-                        client.segment === 'Gold' ? 'bg-yellow-100 text-yellow-700' :
-                        client.segment === 'Standard' ? 'bg-green-100 text-green-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {client.segment}
-                      </span>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <MapPin size={14} />
+                        <span>{client.ville || 'Non spécifié'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <span className="font-medium">Segment:</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          client.segment === 'Premium' ? 'bg-amber-100 text-amber-700' :
+                          client.segment === 'Gold' ? 'bg-yellow-100 text-yellow-700' :
+                          client.segment === 'Standard' ? 'bg-green-100 text-green-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {client.segment}
+                        </span>
+                      </div>
+                      {client.creditTotal !== undefined && client.creditTotal > 0 && (
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <CreditCard size={14} />
+                          <span>Crédit: {client.creditTotal.toLocaleString()} FCFA</span>
+                        </div>
+                      )}
+                      {client.epargneTotal !== undefined && client.epargneTotal > 0 && (
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <PiggyBank size={14} />
+                          <span>Épargne: {client.epargneTotal.toLocaleString()} FCFA</span>
+                        </div>
+                      )}
                     </div>
-                    {client.creditTotal !== undefined && client.creditTotal > 0 && (
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <CreditCard size={14} />
-                        <span>Crédit: {client.creditTotal.toLocaleString()} FCFA</span>
-                      </div>
-                    )}
-                    {client.epargneTotal !== undefined && client.epargneTotal > 0 && (
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <PiggyBank size={14} />
-                        <span>Épargne: {client.epargneTotal.toLocaleString()} FCFA</span>
-                      </div>
-                    )}
                   </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+                </Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
         </MapContainer>
       </div>
 

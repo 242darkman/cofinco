@@ -6,7 +6,6 @@ export { default as CreditEcheancier } from './CreditEcheancier';
 export { default as CreditRemboursement } from './CreditRemboursement';
 export { default as CreditRequestForm } from './CreditRequestForm';
 export { default as EnqueteCreditForm } from './EnqueteCreditForm';
-export { default as EnqueteCreditValidation } from './EnqueteCreditValidation';
 export { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
 export { ReevaluationModal } from './ReevaluationModal';
 export { ReevaluationList } from './ReevaluationList';

@@ -9,9 +9,12 @@ import { db } from "./db";
 import { sessionsCaisse, operationsCaisse } from "@shared/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { StatutSessionCaisse } from "@shared/enum/status-constants";
+import { createLogger } from "./lib/logger";
+
+const logger = createLogger('TransferOperations');
 
 async function transferOperations() {
-  console.log("\n🔄 Transfert des opérations vers la session correcte\n");
+  logger.info('Starting transfer of operations to correct session');
 
   try {
     // 1. Session actuelle
@@ -21,13 +24,15 @@ async function transferOperations() {
     });
 
     if (!currentSession) {
-      console.log("❌ Aucune session ouverte");
+      logger.error('No open session found');
       process.exit(1);
     }
 
-    console.log(`📊 Session cible: ${currentSession.id}`);
-    console.log(`   Ouverte le: ${currentSession.openedAt?.toLocaleString('fr-FR')}`);
-    console.log(`   Solde actuel: ${Number(currentSession.montantFermetureTheorique).toLocaleString('fr-FR')} FCFA`);
+    logger.info({
+      sessionId: currentSession.id,
+      openedAt: currentSession.openedAt?.toLocaleString('fr-FR'),
+      balance: Number(currentSession.montantFermetureTheorique)
+    }, 'Target session identified');
 
     // 2. Trouver les opérations de la session zombie
     const zombieSessionId = "3bec5a84-6c6f-49fc-b196-729d7bd621bb";
@@ -36,7 +41,7 @@ async function transferOperations() {
       where: eq(operationsCaisse.sessionId, zombieSessionId)
     });
 
-    console.log(`\n📋 Opérations à transférer: ${opsToTransfer.length}`);
+    logger.info({ count: opsToTransfer.length }, 'Operations to transfer');
 
     // Filtrer celles créées APRÈS l'ouverture de la nouvelle session
     const currentSessionOpenedAt = currentSession.openedAt!;
@@ -44,21 +49,19 @@ async function transferOperations() {
       return op.createdAt && op.createdAt > currentSessionOpenedAt;
     });
 
-    console.log(`   Éligibles (après ${currentSessionOpenedAt.toLocaleString('fr-FR')}): ${eligibleOps.length}`);
+    logger.info({ eligibleCount: eligibleOps.length, sessionOpenedAt: currentSessionOpenedAt.toLocaleString('fr-FR') }, 'Eligible operations after session opened');
 
     if (eligibleOps.length === 0) {
-      console.log("\n⚠️  Aucune opération à transférer");
-      console.log("   Les opérations ont été créées AVANT l'ouverture de la session actuelle.");
-      console.log("\n   Options:");
-      console.log("   1. Ces opérations appartiennent à l'ancienne session (correct)");
-      console.log("   2. Forcer le transfert de toutes les opérations récentes\n");
+      logger.warn('No operations to transfer - operations were created BEFORE current session');
 
-      // Montrer les opérations pour décider
-      console.log("Opérations de l'ancienne session:");
+      // Log les opérations pour décider
       for (const op of opsToTransfer) {
-        console.log(`   - ${op.typeOperation}: ${Number(op.montant).toLocaleString('fr-FR')} FCFA`);
-        console.log(`     Créée: ${op.createdAt?.toLocaleString('fr-FR')}`);
-        console.log(`     Référence: ${op.reference}`);
+        logger.debug({
+          typeOperation: op.typeOperation,
+          montant: Number(op.montant),
+          createdAt: op.createdAt?.toLocaleString('fr-FR'),
+          reference: op.reference
+        }, 'Old session operation');
       }
 
       // Forcer le transfert de la cotisation tontine qui a été créée aujourd'hui
@@ -69,7 +72,7 @@ async function transferOperations() {
       );
 
       if (tontineOp) {
-        console.log(`\n🔧 Transfert forcé de la cotisation tontine d'aujourd'hui...`);
+        logger.info('Force transferring today\'s tontine contribution');
 
         await db.update(operationsCaisse)
           .set({ sessionId: currentSession.id })
@@ -84,14 +87,14 @@ async function transferOperations() {
           })
           .where(eq(sessionsCaisse.id, currentSession.id));
 
-        console.log(`✅ Cotisation tontine transférée (+${montant.toLocaleString('fr-FR')} FCFA)`);
+        logger.info({ montant }, 'Tontine contribution transferred');
       }
 
       process.exit(0);
     }
 
     // 3. Transférer les opérations éligibles
-    console.log("\n🔧 Transfert en cours...");
+    logger.info('Transfer in progress');
 
     let totalDelta = 0;
     const typesEntrees = [
@@ -115,7 +118,7 @@ async function transferOperations() {
       const delta = isEntree ? montant : -montant;
       totalDelta += delta;
 
-      console.log(`   ✅ ${op.typeOperation}: ${delta > 0 ? '+' : ''}${delta.toLocaleString('fr-FR')} FCFA`);
+      logger.info({ typeOperation: op.typeOperation, delta }, 'Operation transferred');
     }
 
     // 4. Mettre à jour le solde
@@ -127,7 +130,7 @@ async function transferOperations() {
         })
         .where(eq(sessionsCaisse.id, currentSession.id));
 
-      console.log(`\n✅ Solde mis à jour: ${totalDelta > 0 ? '+' : ''}${totalDelta.toLocaleString('fr-FR')} FCFA`);
+      logger.info({ totalDelta }, 'Balance updated');
     }
 
     // 5. Vérification finale
@@ -135,19 +138,17 @@ async function transferOperations() {
       where: eq(sessionsCaisse.id, currentSession.id)
     });
 
-    console.log(`\n📊 Session après correction:`);
-    console.log(`   Solde: ${Number(updatedSession?.montantFermetureTheorique).toLocaleString('fr-FR')} FCFA`);
-
     const finalOps = await db.query.operationsCaisse.findMany({
       where: eq(operationsCaisse.sessionId, currentSession.id)
     });
-    console.log(`   Opérations: ${finalOps.length}`);
 
-    console.log("\n✅ Transfert terminé!\n");
+    logger.info({
+      balance: Number(updatedSession?.montantFermetureTheorique),
+      operationsCount: finalOps.length
+    }, 'Transfer completed - session after correction');
 
   } catch (error: any) {
-    console.error("\n❌ Erreur:", error.message);
-    console.error(error);
+    logger.error({ err: error }, 'Transfer operations failed');
     process.exit(1);
   }
 

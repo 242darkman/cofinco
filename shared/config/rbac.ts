@@ -459,6 +459,12 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
   'Communications': [
     { name: 'Voir les communications', code: 'communications.view', description: 'Accès au module communications' },
     { name: 'Envoyer des messages', code: 'communications.send', description: 'Envoyer des messages' },
+    { name: 'Créer communication', code: 'communications.create', description: 'Créer une nouvelle communication' },
+    { name: 'Modifier communication', code: 'communications.edit', description: 'Modifier une communication' },
+    { name: 'Supprimer communication', code: 'communications.delete', description: 'Supprimer une communication' },
+    { name: 'Diffusion en masse', code: 'communications.broadcast', description: 'Diffuser des messages à plusieurs destinataires' },
+    { name: 'Programmer envoi', code: 'communications.schedule', description: 'Programmer des envois différés' },
+    { name: 'Archiver communication', code: 'communications.archive', description: 'Archiver et restaurer des communications' },
   ],
   'Bourse': [
     { name: 'Voir les portefeuilles', code: 'bourse.view', description: 'Accès au module Bourse' },
@@ -523,6 +529,10 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Modifier récompense', code: 'loyalty.edit', description: 'Modifier une récompense' },
     { name: 'Supprimer récompense', code: 'loyalty.delete', description: 'Supprimer une récompense' },
     { name: 'Gérer fidélité', code: 'loyalty.manage', description: 'Gérer le programme de fidélité' },
+    { name: 'Échanger des points', code: 'loyalty.redeem', description: 'Échanger des points contre des récompenses' },
+    { name: 'Attribuer des points', code: 'loyalty.award', description: 'Attribuer des points bonus à un client' },
+    { name: 'Ajuster les points', code: 'loyalty.adjust', description: 'Ajuster manuellement le solde de points' },
+    { name: 'Expirer les points', code: 'loyalty.expire', description: 'Faire expirer les points d\'un client' },
   ],
   'Régularisation': [
     { name: 'Voir régularisations', code: 'regularisation.view', description: 'Accès aux régularisations' },
@@ -601,8 +611,12 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     // Virements Programmés
     'virements_programmes.view', 'virements_programmes.edit',
     // Communications
-    'communications.view',
+    'communications.view', 'communications.create', 'communications.edit', 'communications.delete',
+    'communications.broadcast', 'communications.schedule', 'communications.archive',
     'messages.view', 'messages.send',
+    // Fidélité
+    'loyalty.view', 'loyalty.create', 'loyalty.edit', 'loyalty.delete', 'loyalty.manage',
+    'loyalty.redeem', 'loyalty.award', 'loyalty.adjust', 'loyalty.expire',
     // New CASL modules
     'employes.view', 'employes.create', 'employes.edit',
     'agences.view',
@@ -616,6 +630,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'comptabilite.view', 'comptabilite.create', 'comptabilite.edit', 'comptabilite.export',
     'rapports.view', 'rapports.export',
     'communications.view',
+    'loyalty.view',
     'rh.view',
     // CASL additions
     'regularisation.view',
@@ -628,6 +643,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'remboursements.view', 'remboursements.create',
     'rapports.view', 'rapports.export',
     'communications.view',
+    'loyalty.view',
     'rh.view',
   ],
   [SystemRole.SUPERVISEUR]: [
@@ -637,7 +653,8 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'tontines.view', 'tontines.manage',
     'caisseagent.view', 'caisseagent.approve', 'caisseagent.reject',
     'rapports.view',
-    'communications.view',
+    'communications.view', 'communications.broadcast', 'communications.schedule', 'communications.archive',
+    'loyalty.view',
     'rh.view',
   ],
   [SystemRole.CAISSIER]: [
@@ -648,6 +665,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'remboursements.view', 'remboursements.create',
     'virements_programmes.view', 'virements_programmes.edit',
     'communications.view',
+    'loyalty.view', 'loyalty.redeem',
     'rh.view',
   ],
   [SystemRole.AGENT_TERRAIN]: [
@@ -660,6 +678,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'visites.view', 'visites.create',
     'paiements.view', 'paiements.create',
     'communications.view',
+    'loyalty.view', 'loyalty.redeem',
     'rh.view',
   ],
   [SystemRole.CLIENT]: []

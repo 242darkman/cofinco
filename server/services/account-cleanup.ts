@@ -5,6 +5,9 @@ import { eq, and, lte, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
 import * as cron from "node-cron";
 import { StatutCompte } from "@shared/enum/status-constants";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('AccountCleanup');
 
 /**
  * Service de nettoyage des comptes en attente de paiement
@@ -28,21 +31,21 @@ export class AccountCleanupService {
      */
     public start() {
         if (this.job) {
-            console.log("Account cleanup job already running");
+            logger.info('Account cleanup job already running');
             return;
         }
-        
+
         // Run every day at midnight: "0 0 * * *"
         this.job = cron.schedule("0 0 * * *", async () => {
-             console.log("[CRON] Starting account cleanup job...");
+             logger.info('Starting account cleanup job');
              try {
                  await this.cleanupPendingAccounts();
              } catch (error) {
-                 console.error("[CRON] Error during account cleanup:", error);
+                 logger.error({ err: error }, 'Error during account cleanup');
              }
         });
-        
-        console.log("Account cleanup job scheduled (Daily at 00:00)");
+
+        logger.info('Account cleanup job scheduled (Daily at 00:00)');
     }
     
     public stop() {
@@ -57,8 +60,8 @@ export class AccountCleanupService {
      */
     public async cleanupPendingAccounts() {
         const cutoffDate = subDays(new Date(), 7);
-        
-        console.log(`[CLEANUP] Investigating accounts pending since before ${cutoffDate.toISOString()}`);
+
+        logger.info({ cutoffDate: cutoffDate.toISOString() }, 'Investigating accounts pending since before cutoff date');
         
         await db.transaction(async (tx) => {
              // 1. Identification
@@ -78,11 +81,11 @@ export class AccountCleanupService {
                 );
                 
              if (pendingAccounts.length === 0) {
-                 console.log("[CLEANUP] No accounts to clean up.");
+                 logger.info('No accounts to clean up');
                  return;
              }
-             
-             console.log(`[CLEANUP] Found ${pendingAccounts.length} accounts to cancel.`);
+
+             logger.info({ count: pendingAccounts.length }, 'Found accounts to cancel');
              
              for (const account of pendingAccounts) {
                   // 2. Annulation
@@ -110,8 +113,8 @@ export class AccountCleanupService {
                       }
                   });
              }
-             
-             console.log(`[CLEANUP] Successfully cancelled ${pendingAccounts.length} accounts.`);
+
+             logger.info({ count: pendingAccounts.length }, 'Successfully cancelled accounts');
         });
     }
 }

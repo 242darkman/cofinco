@@ -262,7 +262,10 @@ export const glSequences = pgTable("gl_sequences", {
   year: integer("year").notNull(),
   lastNumber: integer("last_number").notNull().default(0),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  // Required for get_next_piece_number function's ON CONFLICT clause
+  uqSequence: uniqueIndex("uq_gl_sequences").on(t.agenceId, t.journalCode, t.year),
+}));
 
 export const insertGlSequenceSchema = createInsertSchema(glSequences).omit({ id: true, updatedAt: true });
 export type InsertGlSequence = z.infer<typeof insertGlSequenceSchema>;

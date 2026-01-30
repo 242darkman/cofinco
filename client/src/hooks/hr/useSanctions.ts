@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 
+export type SanctionWorkflowStatus = 'DRAFT' | 'NOTIFIED' | 'ACKNOWLEDGED' | 'APPEALED' | 'FINAL';
+
 export interface Sanction {
   id: number;
   employeId: string;
@@ -10,6 +12,12 @@ export interface Sanction {
   gravite: 'Faible' | 'Moyenne' | 'Grave';
   emetteurId?: string;
   documentsJoints?: string;
+  statutWorkflow?: SanctionWorkflowStatus;
+  acknowledgedAt?: string;
+  appealedAt?: string;
+  appealReason?: string;
+  finalizedAt?: string;
+  finalizedBy?: string;
   createdAt?: string;
 }
 
@@ -71,6 +79,99 @@ export function useSanctions() {
     }
   };
 
+  const updateSanctionStatus = async (
+    sanctionId: number,
+    newStatus: SanctionWorkflowStatus,
+    appealReason?: string
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/hr/sanctions/${sanctionId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newStatus, appealReason }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Erreur lors de la mise à jour');
+      }
+
+      const updated = await response.json();
+      setSanctions(prev => prev.map(s => s.id === sanctionId ? updated : s));
+      return true;
+    } catch (err) {
+      console.error('Erreur mise à jour sanction:', err);
+      return false;
+    }
+  };
+
+  const updateSanction = async (sanctionId: number, data: Partial<Omit<Sanction, 'id' | 'createdAt'>>) => {
+    try {
+      const response = await fetch(`/api/hr/sanctions/${sanctionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
+      const updated = await response.json();
+      setSanctions(prev => prev.map(s => s.id === sanctionId ? { ...s, ...updated } : s));
+      return true;
+    } catch (err) {
+      console.error('Erreur mise à jour sanction:', err);
+      return false;
+    }
+  };
+
+  const deleteSanction = async (sanctionId: number) => {
+    try {
+      const response = await fetch(`/api/hr/sanctions/${sanctionId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Erreur lors de la suppression');
+      setSanctions(prev => prev.filter(s => s.id !== sanctionId));
+      return true;
+    } catch (err) {
+      console.error('Erreur suppression sanction:', err);
+      return false;
+    }
+  };
+
+  const uploadSanctionDocument = async (sanctionId: number, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/hr/sanctions/${sanctionId}/document`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Erreur lors de l\'upload');
+      }
+
+      const result = await response.json();
+      // Update local state with new documentsJoints
+      if (result.sanction) {
+        setSanctions(prev => prev.map(s => s.id === sanctionId ? { ...s, documentsJoints: result.sanction.documentsJoints } : s));
+      }
+      return result;
+    } catch (err) {
+      console.error('Erreur upload document sanction:', err);
+      return null;
+    }
+  };
+
+  const fetchSanctionDocuments = async (sanctionId: number) => {
+    try {
+      const response = await fetch(`/api/hr/sanctions/${sanctionId}/documents`);
+      if (!response.ok) throw new Error('Erreur');
+      return await response.json();
+    } catch (err) {
+      console.error('Erreur fetch documents sanction:', err);
+      return [];
+    }
+  };
+
   useEffect(() => {
     fetchSanctions();
   }, []);
@@ -80,6 +181,11 @@ export function useSanctions() {
     loading,
     error,
     createSanction,
+    updateSanction,
+    deleteSanction,
+    updateSanctionStatus,
+    uploadSanctionDocument,
+    fetchSanctionDocuments,
     fetchSanctions
   };
 }

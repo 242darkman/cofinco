@@ -54,8 +54,8 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
     try {
       const res = await fetch(`/api/comptes/${compteId}/transactions?limit=100`, { credentials: 'include' });
       if (res.ok) {
-        const data = await res.json();
-        setTransactions(data);
+        const json = await res.json();
+        setTransactions(json.data || json);
       }
     } catch (error) {
       console.error('Erreur chargement historique:', error);
@@ -115,7 +115,8 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
 
   const formattedTransactions = transactions.map(t => ({
     ...t,
-    displayDescription: t.observations || t.description || t.typePaiement || t.type || 'Opération',
+    // Priorité: description (libellé bancaire généré par le serveur) > observations > fallbacks
+    displayDescription: t.description || t.displayDescription || t.observations || t.typePaiement || t.type || 'Opération',
     displayRef: t.recu_numero || t.referenceExterne || '-'
   }));
 

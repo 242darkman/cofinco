@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { requestAllPages } from '../../lib/api-client';
 import { FileText, Download, Calendar, TrendingUp, Users, DollarSign, Activity, BarChart3, Filter } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { addPdfLogoHeader } from '@/lib/pdf-logo';
 
 interface Rapport {
   id: string;
@@ -101,7 +104,36 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
   };
 
   const exportPDF = () => {
-    alert('Export PDF en cours de développement');
+    if (rapports.length === 0) return;
+
+    const doc = new jsPDF();
+    const startY = addPdfLogoHeader(doc, {
+      title: 'Rapport Agent Terrain',
+      subtitle: `Période: ${periodeDu} au ${periodeAu} | Type: ${typeRapport}`,
+      dateRight: `Généré le: ${new Date().toLocaleDateString('fr-FR')}`,
+    });
+
+    doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85);
+    doc.text(`Visites: ${totalVisites} | Collectes: ${totalCollectes} | Montant: ${totalMontant.toLocaleString()} FCFA | Taux: ${tauxMoyen.toFixed(1)}%`, 14, startY);
+
+    autoTable(doc, {
+      startY: startY + 8,
+      head: [['Période', 'Type', 'Visites', 'Collectes', 'Montant (FCFA)', 'Taux (%)', 'KM']],
+      body: rapports.map(r => [
+        `${new Date(r.periode_debut).toLocaleDateString('fr-FR')} - ${new Date(r.periode_fin).toLocaleDateString('fr-FR')}`,
+        r.type_rapport,
+        r.nombre_visites,
+        r.nombre_collectes,
+        r.montant_total_collecte.toLocaleString(),
+        r.taux_reussite.toFixed(1),
+        r.km_parcourus.toFixed(1)
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [37, 99, 235] },
+    });
+
+    doc.save(`rapport_agent_${typeRapport}_${periodeDu}.pdf`);
   };
 
   const totalVisites = rapports.reduce((sum, r) => sum + r.nombre_visites, 0);

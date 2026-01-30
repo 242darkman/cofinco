@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit, Trash2, Save, FileText, Check, X, AlertTriangle, Calculator, CalendarClock, Percent, Wallet, Info } from 'lucide-react';
-import { Card, Button, Badge, FormField, SelectField, TextareaField, Modal, EmptyState, LoadingSpinner, ConfirmDialog } from '../ui';
+import { Card, Button, Badge, FormField, SelectField, TextareaField, Modal, EmptyState, LoadingSpinner, ConfirmDialog, ResponsiveTable, TableColumn } from '../ui';
 import { creditPlanApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -47,6 +47,10 @@ export default function AdminCreditPlansGestion({
   const [submitting, setSubmitting] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<CreditPlan | null>(null);
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Form Data
   const [formData, setFormData] = useState({
     nom: '',
@@ -78,6 +82,67 @@ export default function AdminCreditPlansGestion({
   useEffect(() => {
     loadPlans();
   }, [loadPlans]);
+
+  const totalPages = Math.ceil(plans.length / itemsPerPage);
+  const paginatedPlans = plans.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const columns: TableColumn<CreditPlan>[] = [
+    { 
+      key: 'nom', 
+      label: 'Plan', 
+      primary: true,
+      format: (val, item) => (
+        <div>
+          <div className="font-bold text-white">{val}</div>
+          <div className="text-xs text-slate-400">{item.description?.substring(0, 40)}{(item.description?.length || 0) > 40 ? '...' : ''}</div>
+        </div>
+      )
+    },
+    { 
+      key: 'type_credit', 
+      label: 'Type', 
+      badge: true,
+      badgeClassName: 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+    },
+    { 
+      key: 'taux_interet', 
+      label: 'Taux',
+      format: (val) => `${val}%` 
+    },
+    { 
+      key: 'duree_valeur', 
+      label: 'Durée',
+      format: (val, item) => `${val} ${item.duree_unite || ''}(s)`
+    },
+    { 
+      key: 'frequence_remboursement', 
+      label: 'Remboursement' 
+    },
+    { 
+      key: 'montant_min', 
+      label: 'Limites (FCFA)', 
+      format: (_, item) => (
+        <span className="text-emerald-400 text-xs font-medium">
+          {item.montant_min ? Number(item.montant_min).toLocaleString() : '0'} 
+          {' - '}
+          {item.montant_max ? Number(item.montant_max).toLocaleString() : '∞'}
+        </span>
+      )
+    },
+    { 
+      key: 'actif', 
+      label: 'Statut', 
+      format: (val) => (
+        <Badge 
+          value={val ? 'Actif' : 'Inactif'} 
+          variant={val ? 'success' : 'neutral'} 
+        />
+      )
+    },
+  ];
 
   useEffect(() => {
     if (showForm) {
@@ -206,7 +271,7 @@ export default function AdminCreditPlansGestion({
       {!onHideForm && (
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-bold text-white">Plans de Crédit</h2>
-          <Button variant="primary" icon={Plus} onClick={() => {
+          <Button variant="primary" size="sm" icon={Plus} onClick={() => {
             resetForm();
             setEditMode(false);
             setShowModal(true);
@@ -231,78 +296,45 @@ export default function AdminCreditPlansGestion({
           } : undefined}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {plans.map((plan) => (
-            <Card key={plan.id} className={`group relative transition-all duration-300 hover:border-teal-500/50 ${!plan.actif ? 'opacity-75' : ''}`}>
-              <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => handleEdit(plan)}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
-                >
-                  <Edit size={14} />
-                </button>
-                <button 
-                  onClick={() => handleDelete(plan.id, plan.nom)}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-red-400/10"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-
-              <div className="flex items-start gap-3 mb-3">
-                <div className={`p-2.5 rounded-xl ${plan.actif ? 'bg-teal-500/10 text-teal-500' : 'bg-slate-700/50 text-slate-500'}`}>
-                  <Wallet size={20} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white leading-tight">{plan.nom}</h3>
-                  <p className="text-xs text-slate-400 mt-1">{plan.type_credit}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2 mb-4 bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Taux Intérêt:</span>
-                  <span className="font-semibold text-white">{plan.taux_interet}%</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Durée:</span>
-                  <span className="font-semibold text-white">{plan.duree_valeur} {plan.duree_unite}(s)</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Remboursement:</span>
-                  <span className="font-semibold text-white">{plan.frequence_remboursement}</span>
-                </div>
-                {(plan.montant_min || plan.montant_max) && (
-                  <div className="flex justify-between text-xs pt-2 border-t border-slate-700/50 mt-2">
-                    <span className="text-slate-500">Limites:</span>
-                    <span className="font-medium text-emerald-400">
-                      {plan.montant_min ? `${Number(plan.montant_min).toLocaleString()} ` : '0 '} 
-                      - {plan.montant_max ? `${Number(plan.montant_max).toLocaleString()}` : '∞'} FCFA
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              {!plan.actif && (
-                <div className="mb-3">
-                   <Badge value="Inactif" variant="neutral" size="sm" />
-                </div>
-              )}
-
+        <ResponsiveTable
+          data={paginatedPlans}
+          columns={columns}
+          density="compact"
+          actions={(plan) => (
+            <div className="flex items-center gap-1">
               {onLaunchCredit && (
                 <Button 
                   variant="secondary" 
-                  size="sm" 
-                  fullWidth 
-                  onClick={() => onLaunchCredit(plan)}
-                  className="mt-2"
+                  size="xs" 
+                  onClick={(e) => { e.stopPropagation(); onLaunchCredit(plan); }}
+                  className="mr-2"
                 >
-                  Utiliser ce plan
+                  Utiliser
                 </Button>
               )}
-            </Card>
-          ))}
-        </div>
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleEdit(plan); }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                title="Modifier"
+              >
+                <Edit size={16} />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleDelete(plan.id, plan.nom); }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                title="Supprimer"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          )}
+          pagination={{
+            page: currentPage,
+            totalPages,
+            onPageChange: setCurrentPage
+          }}
+          onRowClick={(plan) => handleEdit(plan)}
+        />
       )}
 
       {/* Modal CRUD */}

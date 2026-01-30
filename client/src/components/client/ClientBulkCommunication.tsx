@@ -69,26 +69,21 @@ export default function ClientBulkCommunication({ clients, onClose, onComplete }
         const personalizedSubject = subject ? replacePlaceholders(subject, client) : '';
 
         try {
-          await fetch('/api/client-activities', {
+          const res = await fetch(`/api/clients/${client.id}/send-notification`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
-              client_id: client.id,
-              activity_type: method,
-              activity_description: method === 'sms'
-                ? `SMS envoyé: ${personalizedMessage.substring(0, 50)}...`
-                : `Email envoyé: ${personalizedSubject}`,
-              metadata: {
-                message: personalizedMessage,
-                subject: personalizedSubject,
-                bulk: true
-              }
+              channel: method === 'sms' ? 'SMS' : 'EMAIL',
+              message: personalizedMessage,
+              ...(method === 'email' ? { subject: personalizedSubject } : {}),
             })
           });
 
+          if (!res.ok) throw new Error('Envoi echoue');
           successCount++;
         } catch (error) {
-          console.error(`Erreur envoi à ${client.nom}:`, error);
+          console.error(`Erreur envoi a ${client.nom}:`, error);
           failedCount++;
         }
 

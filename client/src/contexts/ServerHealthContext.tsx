@@ -44,6 +44,11 @@ export function isNetworkFailure(error: unknown): boolean {
   return false;
 }
 
+// Threshold: only show offline overlay after this many consecutive failures
+const OFFLINE_FAILURE_THRESHOLD = 2;
+// Minimum time between showing the overlay again (prevents flickering)
+const OFFLINE_DEBOUNCE_MS = 3000;
+
 export function ServerHealthProvider({ children }: { children: React.ReactNode }) {
   const [isServerReachable, setIsServerReachable] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
@@ -52,6 +57,8 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
   const backoffIndexRef = useRef(0);
   const pollTimeoutRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
+  const consecutiveFailuresRef = useRef(0);
+  const lastOfflineTimeRef = useRef(0);
 
   const resolvePending = useCallback(() => {
     const resolvers = pendingResolversRef.current;
@@ -82,6 +89,7 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
     setIsChecking(false);
 
     if (reachable) {
+      consecutiveFailuresRef.current = 0; // Reset failure counter on successful health check
       setIsServerReachable(true);
       backoffIndexRef.current = 0;
       clearPolling();
@@ -122,14 +130,29 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
   }, [clearPolling, runHealthCheck, scheduleNextCheck]);
 
   const reportFailure = useCallback(() => {
-    setIsServerReachable((prev) => {
-      if (!prev) return prev;
-      return false;
-    });
+    consecutiveFailuresRef.current += 1;
+
+    // Only mark as unreachable after multiple consecutive failures
+    // This prevents flickering when a single request fails temporarily
+    if (consecutiveFailuresRef.current >= OFFLINE_FAILURE_THRESHOLD) {
+      const now = Date.now();
+      const timeSinceLastOffline = now - lastOfflineTimeRef.current;
+
+      // Debounce: don't show overlay again if it was shown recently
+      if (timeSinceLastOffline > OFFLINE_DEBOUNCE_MS) {
+        setIsServerReachable((prev) => {
+          if (!prev) return prev;
+          lastOfflineTimeRef.current = now;
+          return false;
+        });
+      }
+    }
+
     scheduleNextCheck();
   }, [scheduleNextCheck]);
 
   const reportSuccess = useCallback(() => {
+    consecutiveFailuresRef.current = 0; // Reset failure counter on success
     setIsServerReachable(true);
     backoffIndexRef.current = 0;
     clearPolling();
@@ -181,6 +204,7 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
       isMountedRef.current = false;
       clearPolling();
       pendingResolversRef.current = [];
+      consecutiveFailuresRef.current = 0;
     };
   }, [clearPolling]);
 

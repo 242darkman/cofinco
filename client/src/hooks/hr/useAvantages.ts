@@ -42,6 +42,52 @@ export function useAvantages() {
     );
   };
 
+  const createAvantage = async (data: { nom: string; type: string; montantParDefaut: number; description?: string; eligibleContrats?: string[] }) => {
+    try {
+      const response = await fetch('/api/hr/avantages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Erreur lors de la création');
+      const created = await response.json();
+      setAvantagesList(prev => [...prev, created]);
+      return true;
+    } catch (err) {
+      console.error('Erreur création avantage:', err);
+      return false;
+    }
+  };
+
+  const updateAvantage = async (id: number, data: Partial<Omit<Avantage, 'id'>>) => {
+    try {
+      const response = await fetch(`/api/hr/avantages/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
+      const updated = await response.json();
+      setAvantagesList(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
+      return true;
+    } catch (err) {
+      console.error('Erreur mise à jour avantage:', err);
+      return false;
+    }
+  };
+
+  const deleteAvantage = async (id: number) => {
+    try {
+      const response = await fetch(`/api/hr/avantages/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Erreur lors de la suppression');
+      setAvantagesList(prev => prev.filter(a => a.id !== id));
+      return true;
+    } catch (err) {
+      console.error('Erreur suppression avantage:', err);
+      return false;
+    }
+  };
+
   const applyAvantageToSelected = async (avantageId: number) => {
     if (selectedEmployes.length === 0) {
       showSuccess('Veuillez sélectionner au moins un employé');
@@ -78,6 +124,9 @@ export function useAvantages() {
     successMessage,
     toggleEmployeSelection,
     applyAvantageToSelected,
+    createAvantage,
+    updateAvantage,
+    deleteAvantage,
     showSuccess
   };
 }

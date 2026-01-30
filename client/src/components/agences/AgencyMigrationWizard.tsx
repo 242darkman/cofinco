@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Users, Receipt, AlertTriangle, CheckCircle,
   ArrowRight, Loader2, Shield, Calendar, Play, X, AlertCircle,
-  FileText, Clock, Ban, RefreshCw, Download, Eye
+  FileText, Clock, Ban, RefreshCw, Download, Eye, RotateCcw
 } from 'lucide-react';
 import { Modal, Button, SearchableSelect, ProgressBar, Badge } from '../ui';
 import { api } from '../../lib/api-client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { addPdfLogoHeader, addPdfLogoFooter } from '@/lib/pdf-logo';
 
 // ============================================
 // TYPES
@@ -120,6 +123,10 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   const [migrationId, setMigrationId] = useState<string | null>(null);
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [dryRunFailed, setDryRunFailed] = useState(false);
+  const [showCancelPrompt, setShowCancelPrompt] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [pollCount, setPollCount] = useState(0);
 
   // Fetch available agencies (excluding source)
   const { data: agences } = useQuery({
@@ -131,16 +138,31 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     enabled: isOpen
   });
 
-  // Poll migration status
-  const { data: migrationStatus, refetch: refetchStatus } = useQuery({
+  // Exponential backoff: 2s, 4s, 8s, 16s, capped at 30s
+  const getPollingInterval = useCallback(() => {
+    if (!migrationId) return false;
+    const interval = Math.min(2000 * Math.pow(2, pollCount), 30000);
+    return interval;
+  }, [migrationId, pollCount]);
+
+  // Poll migration status with exponential backoff
+  const { data: migrationStatus } = useQuery({
     queryKey: ['migration-status', migrationId],
     queryFn: async () => {
       if (!migrationId) return null;
+      setPollCount(prev => prev + 1);
       return api.get<MigrationStatus>(`/agences/migrations/${migrationId}/status`);
     },
     enabled: !!migrationId,
-    refetchInterval: migrationId ? 2000 : false,
+    refetchInterval: getPollingInterval(),
   });
+
+  // Reset poll count on status change (back to fast polling on transitions)
+  useEffect(() => {
+    if (migrationStatus?.status === 'PROCESSING' || migrationStatus?.status === 'PRE_FLIGHT_CHECK') {
+      setPollCount(0);
+    }
+  }, [migrationStatus?.status]);
 
   // Handle migration completion
   useEffect(() => {
@@ -177,10 +199,12 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     },
     onSuccess: (data) => {
       setDryRunResult(data);
+      setDryRunFailed(false);
       setIsAnalyzing(false);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de l\'analyse');
+      setDryRunFailed(true);
       setIsAnalyzing(false);
     }
   });
@@ -210,17 +234,34 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   });
 
   const cancelMigrationMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return api.post(`/agences/migrations/${id}/cancel`, { reason: 'Annulée par l\'utilisateur' });
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      return api.post(`/agences/migrations/${id}/cancel`, { reason });
     },
     onSuccess: () => {
       toast.info('Migration annulée');
       setMigrationId(null);
       setDryRunResult(null);
       setCurrentStep(0);
+      setShowCancelPrompt(false);
+      setCancelReason('');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de l\'annulation');
+    }
+  });
+
+  const rollbackMigrationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return api.post<{ success: boolean; report: any }>(`/agences/migrations/${id}/rollback`);
+    },
+    onSuccess: () => {
+      toast.success('Rollback effectué avec succès');
+      queryClient.invalidateQueries({ queryKey: ['migration-status', migrationId] });
+      onSuccess();
+    },
+    onError: (error: any) => {
+      const msg = error.message || 'Erreur lors du rollback';
+      toast.error(msg);
     }
   });
 
@@ -251,6 +292,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     if (currentStep === 3) {
       // Créer la migration et lancer le dry run
       setIsAnalyzing(true);
+      setDryRunFailed(false);
       try {
         const migration = await createMigrationMutation.mutateAsync({
           targetAgenceClients: targetClients as string,
@@ -276,20 +318,219 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     }
   };
 
+  const handleRetryDryRun = async () => {
+    if (!migrationId) return;
+    setIsAnalyzing(true);
+    setDryRunFailed(false);
+    try {
+      await dryRunMutation.mutateAsync(migrationId);
+    } catch {
+      // Error already handled in mutation onError
+    }
+  };
+
   const handleBack = () => {
     if (currentStep === 4 && migrationId) {
-      cancelMigrationMutation.mutate(migrationId);
+      setShowCancelPrompt(true);
     } else if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
     }
   };
 
-  // Is processing?
+  const handleCancelConfirm = () => {
+    if (!migrationId || !cancelReason.trim()) return;
+    cancelMigrationMutation.mutate({ id: migrationId, reason: cancelReason.trim() });
+  };
+
+  // Derived state (must be before keyboard effect)
   const isProcessing = migrationStatus?.status === 'PROCESSING' ||
     migrationStatus?.status === 'PRE_FLIGHT_CHECK';
   const isCompleted = migrationStatus?.status === 'COMPLETED';
   const isFailed = migrationStatus?.status === 'FAILED';
   const isScheduled = migrationStatus?.status === 'SCHEDULED';
+
+  // Rollback eligibility: within 24h of completion
+  const canRollback = isCompleted && migrationStatus?.completedAt &&
+    (Date.now() - new Date(migrationStatus.completedAt).getTime()) < 24 * 60 * 60 * 1000;
+  const rollbackHoursLeft = migrationStatus?.completedAt
+    ? Math.max(0, 24 - (Date.now() - new Date(migrationStatus.completedAt).getTime()) / (1000 * 60 * 60))
+    : 0;
+
+  // PDF report generation
+  const handleDownloadReport = useCallback(() => {
+    if (!migrationStatus?.report) {
+      toast.error('Aucun rapport disponible');
+      return;
+    }
+
+    try {
+      const report = migrationStatus.report;
+      const doc = new jsPDF();
+      const H = doc.internal.pageSize.getHeight();
+
+      // Header with logo
+      const completedDate = migrationStatus.completedAt
+        ? format(new Date(migrationStatus.completedAt), "d MMM yyyy 'à' HH:mm", { locale: fr })
+        : undefined;
+      let y = addPdfLogoHeader(doc, {
+        title: "Rapport de Migration d'Agence",
+        subtitle: `Réf: ${migrationStatus.reference} — Statut: ${migrationStatus.status}`,
+        dateRight: completedDate ? `Terminée le: ${completedDate}` : undefined,
+      });
+
+      // Source agency info
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Agence source', 14, y);
+      y += 7;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      doc.text(`${sourceAgence.nom} (${sourceAgence.codeAgence})`, 14, y);
+      y += 12;
+
+      // Volumetry table
+      if (report.volumetry) {
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Données Migrées', 14, y);
+        y += 4;
+
+        const volData = Object.entries(report.volumetry as Record<string, number>)
+          .filter(([, v]) => v > 0)
+          .map(([k, v]) => {
+            const labels: Record<string, string> = {
+              clients: 'Clients', comptes: 'Comptes', credits: 'Crédits',
+              demandesCredit: 'Demandes de crédit', tontines: 'Tontines',
+              employes: 'Employés', sessionsCaisse: 'Sessions caisse',
+              mouvementsFinanciers: 'Mouvements financiers',
+              operationsCaisse: 'Opérations caisse',
+              virementsProgrammes: 'Virements programmés',
+            };
+            return [labels[k] || k, String(v)];
+          });
+
+        autoTable(doc, {
+          head: [['Type d\'entité', 'Nombre']],
+          body: volData,
+          startY: y,
+          theme: 'striped',
+          headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', fontSize: 8, cellPadding: 4 },
+          bodyStyles: { fontSize: 8, textColor: [30, 41, 59], cellPadding: 3 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          margin: { left: 14, right: 14 },
+        });
+
+        y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
+      }
+
+      // Financials table
+      if (report.financials) {
+        const fmtMoney = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 }).format(v);
+
+        if (y + 60 > H) { doc.addPage(); y = 20; }
+
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Impact Financier', 14, y);
+        y += 4;
+
+        const finData = [
+          ['Soldes coffres transférés', fmtMoney(report.financials.soldesCoffresTransferes || 0)],
+          ['Total soldes comptes', fmtMoney(report.financials.totalSoldesComptes || 0)],
+          ['Crédits en cours', fmtMoney(report.financials.totalCreditsEnCours || 0)],
+          ['Demandes en attente', fmtMoney(report.financials.totalDemandesEnAttente || 0)],
+        ];
+
+        autoTable(doc, {
+          head: [['Indicateur', 'Montant']],
+          body: finData,
+          startY: y,
+          theme: 'striped',
+          headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', fontSize: 8, cellPadding: 4 },
+          bodyStyles: { fontSize: 8, textColor: [30, 41, 59], cellPadding: 3 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          margin: { left: 14, right: 14 },
+        });
+
+        y = (doc as any).lastAutoTable?.finalY + 12 || y + 40;
+      }
+
+      // Migration logs
+      if (migrationStatus.logs && migrationStatus.logs.length > 0) {
+        if (y + 40 > H) { doc.addPage(); y = 20; }
+
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Journal d\'Exécution', 14, y);
+        y += 4;
+
+        const logData = migrationStatus.logs.map(log => [
+          log.step,
+          log.success ? 'Succès' : 'Échec',
+          log.count !== undefined ? String(log.count) : '-',
+          format(new Date(log.timestamp), 'HH:mm:ss', { locale: fr }),
+        ]);
+
+        autoTable(doc, {
+          head: [['Étape', 'Résultat', 'Éléments', 'Heure']],
+          body: logData,
+          startY: y,
+          theme: 'striped',
+          headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', fontSize: 8, cellPadding: 4 },
+          bodyStyles: { fontSize: 8, textColor: [30, 41, 59], cellPadding: 3 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          margin: { left: 14, right: 14 },
+        });
+      }
+
+      // Footer with logo
+      addPdfLogoFooter(doc, 'Rapport de Migration');
+
+      doc.save(`rapport-migration-${migrationStatus.reference}-${Date.now()}.pdf`);
+      toast.success('Rapport PDF téléchargé');
+    } catch (error) {
+      console.error('Error generating migration PDF:', error);
+      toast.error('Erreur lors de la génération du rapport PDF');
+    }
+  }, [migrationStatus, sourceAgence]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when typing in inputs
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      // Don't intercept during async states
+      if (isProcessing || isCompleted || isFailed || isScheduled) return;
+
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'Enter':
+          if (canProceed()) {
+            e.preventDefault();
+            handleNext();
+          }
+          break;
+        case 'ArrowLeft':
+          if (currentStep > 0) {
+            e.preventDefault();
+            handleBack();
+          }
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, currentStep, isProcessing, isCompleted, isFailed, isScheduled]);
 
   // Reset on close
   const handleClose = () => {
@@ -302,6 +543,10 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       setExecuteNow(true);
       setMigrationId(null);
       setDryRunResult(null);
+      setDryRunFailed(false);
+      setShowCancelPrompt(false);
+      setCancelReason('');
+      setPollCount(0);
       onClose();
     }
   };
@@ -404,16 +649,42 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 </div>
               )}
 
+              {canRollback && (
+                <div className="w-full max-w-md bg-amber-500/10 rounded-lg p-4 border border-amber-500/20">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={18} />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-amber-400 text-sm">Rollback disponible</h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Vous pouvez annuler cette migration dans les {Math.floor(rollbackHoursLeft)}h{Math.round((rollbackHoursLeft % 1) * 60).toString().padStart(2, '0')} restantes.
+                        Cette action restaurera toutes les données à leur état d'origine.
+                      </p>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => migrationId && rollbackMigrationMutation.mutate(migrationId)}
+                        disabled={rollbackMigrationMutation.isPending}
+                        icon={RotateCcw}
+                      >
+                        {rollbackMigrationMutation.isPending ? (
+                          <Loader2 className="animate-spin" size={14} />
+                        ) : (
+                          'Annuler la Migration (Rollback)'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 mt-4">
                 <Button variant="outline" onClick={handleClose} icon={X}>
                   Fermer
                 </Button>
                 <Button
                   variant="primary"
-                  onClick={() => {
-                    // TODO: Download PDF report
-                    toast.info('Téléchargement du rapport...');
-                  }}
+                  onClick={handleDownloadReport}
                   icon={Download}
                 >
                   Télécharger le Rapport
@@ -473,7 +744,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               <div className="flex gap-3 mt-4">
                 <Button
                   variant="danger"
-                  onClick={() => migrationId && cancelMigrationMutation.mutate(migrationId)}
+                  onClick={() => setShowCancelPrompt(true)}
                   icon={Ban}
                 >
                   Annuler la Planification
@@ -622,6 +893,29 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                     <div className="flex flex-col items-center justify-center p-8">
                       <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
                       <p className="text-slate-300">Analyse en cours...</p>
+                    </div>
+                  ) : dryRunFailed ? (
+                    <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+                        <X className="text-red-500" size={32} />
+                      </div>
+                      <h4 className="text-lg font-bold text-white">Échec de l'analyse</h4>
+                      <p className="text-slate-400 text-sm text-center">
+                        L'analyse préalable a échoué. Vous pouvez réessayer sans avoir à recréer la migration.
+                      </p>
+                      <div className="flex gap-3">
+                        <Button variant="outline" onClick={handleBack} icon={X}>
+                          Annuler
+                        </Button>
+                        <Button
+                          variant="primary"
+                          onClick={handleRetryDryRun}
+                          disabled={dryRunMutation.isPending}
+                          icon={RefreshCw}
+                        >
+                          Réessayer l'analyse
+                        </Button>
+                      </div>
                     </div>
                   ) : dryRunResult ? (
                     <>
@@ -807,31 +1101,88 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
         {/* Footer */}
         {!isProcessing && !isCompleted && !isFailed && !isScheduled && (
-          <div className="flex justify-between pt-4 border-t border-slate-700">
-            <Button
-              variant="outline"
-              onClick={currentStep === 0 ? handleClose : handleBack}
-              disabled={createMigrationMutation.isPending || dryRunMutation.isPending}
-            >
-              {currentStep === 0 ? 'Annuler' : 'Retour'}
-            </Button>
+          <div className="space-y-2 pt-4 border-t border-slate-700">
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={currentStep === 0 ? handleClose : handleBack}
+                disabled={createMigrationMutation.isPending || dryRunMutation.isPending}
+              >
+                {currentStep === 0 ? 'Annuler' : 'Retour'}
+              </Button>
 
-            <Button
-              variant={currentStep === 5 ? 'danger' : 'primary'}
-              onClick={handleNext}
-              disabled={!canProceed() || createMigrationMutation.isPending || dryRunMutation.isPending || submitMigrationMutation.isPending}
-              icon={currentStep === 5 ? (executeNow ? Play : Calendar) : ArrowRight}
-            >
-              {createMigrationMutation.isPending || dryRunMutation.isPending ? (
-                <Loader2 className="animate-spin" size={16} />
-              ) : currentStep === 3 ? (
-                'Analyser'
-              ) : currentStep === 5 ? (
-                executeNow ? 'Lancer la Migration' : 'Planifier la Migration'
-              ) : (
-                'Suivant'
-              )}
-            </Button>
+              <Button
+                variant={currentStep === 5 ? 'danger' : 'primary'}
+                onClick={handleNext}
+                disabled={!canProceed() || createMigrationMutation.isPending || dryRunMutation.isPending || submitMigrationMutation.isPending}
+                icon={currentStep === 5 ? (executeNow ? Play : Calendar) : ArrowRight}
+              >
+                {createMigrationMutation.isPending || dryRunMutation.isPending ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : currentStep === 3 ? (
+                  'Analyser'
+                ) : currentStep === 5 ? (
+                  executeNow ? 'Lancer la Migration' : 'Planifier la Migration'
+                ) : (
+                  'Suivant'
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-slate-600 text-center">
+              Raccourcis : ← Retour · → ou Entrée pour avancer
+            </p>
+          </div>
+        )}
+
+        {/* Cancel Reason Prompt */}
+        {showCancelPrompt && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/40" onClick={() => setShowCancelPrompt(false)} />
+            <div className="relative z-[210] bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md shadow-xl animate-in fade-in zoom-in-95">
+              <h4 className="font-bold text-white mb-2">Raison de l'annulation</h4>
+              <p className="text-sm text-slate-400 mb-4">
+                Veuillez indiquer la raison de l'annulation de cette migration.
+              </p>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Ex: Changement de stratégie, erreur de sélection d'agence..."
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:border-blue-500 focus:outline-none resize-none"
+                rows={3}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && cancelReason.trim()) {
+                    e.preventDefault();
+                    handleCancelConfirm();
+                  }
+                }}
+              />
+              <div className="flex justify-end gap-3 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowCancelPrompt(false);
+                    setCancelReason('');
+                  }}
+                >
+                  Retour
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleCancelConfirm}
+                  disabled={!cancelReason.trim() || cancelMigrationMutation.isPending}
+                  icon={Ban}
+                >
+                  {cancelMigrationMutation.isPending ? (
+                    <Loader2 className="animate-spin" size={14} />
+                  ) : (
+                    'Confirmer l\'annulation'
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>

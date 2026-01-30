@@ -7,6 +7,9 @@ import {
   CreditStatus,
 } from "@shared/machines/credit-workflow";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Cron:CreditStatus');
 
 /**
  * Cron Job: Update Credit Status to "En retard"
@@ -17,7 +20,7 @@ import { dispatchDomainEvent } from "../services/notifications/domain-events/eve
  */
 export async function updateOverdueCredits() {
   const startTime = Date.now();
-  console.log('[CRON] Starting credit status update job...');
+  logger.info('Starting credit status update job...');
 
   try {
     // Step 1: Find overdue credits using SQL for maximum performance
@@ -37,11 +40,11 @@ export async function updateOverdueCredits() {
       );
 
     if (overdueCredits.length === 0) {
-      console.log('[CRON] No overdue credits found');
+      logger.info('No overdue credits found');
       return { success: true, updated: 0, duration: Date.now() - startTime };
     }
 
-    console.log(`[CRON] Found ${overdueCredits.length} overdue credits`);
+    logger.info({ count: overdueCredits.length }, 'Found overdue credits');
 
     // Step 2: Validate each credit can transition to LATE using state machine
     const validCreditIds: string[] = [];
@@ -55,7 +58,7 @@ export async function updateOverdueCredits() {
       } catch (error) {
         if (error instanceof CreditTransitionError) {
           skippedCredits.push({ id: credit.id, reason: error.message });
-          console.warn(`[CRON] Skipping credit ${credit.numeroCredit}: ${error.message}`);
+          logger.warn({ creditId: credit.id, numeroCredit: credit.numeroCredit, reason: error.message }, 'Skipping credit');
         } else {
           throw error;
         }
@@ -63,7 +66,7 @@ export async function updateOverdueCredits() {
     }
 
     if (validCreditIds.length === 0) {
-      console.log('[CRON] No credits eligible for LATE status transition');
+      logger.info({ skipped: skippedCredits.length }, 'No credits eligible for LATE status transition');
       return { success: true, updated: 0, skipped: skippedCredits.length, duration: Date.now() - startTime };
     }
 
@@ -78,11 +81,11 @@ export async function updateOverdueCredits() {
         })
         .where(inArray(credits.id, validCreditIds));
 
-      console.log(`[CRON] Updated ${validCreditIds.length} credits to 'LATE' status`);
+      logger.info({ count: validCreditIds.length }, 'Updated credits to LATE status');
     });
 
     const duration = Date.now() - startTime;
-    console.log(`[CRON] Credit status update completed in ${duration}ms`);
+    logger.info({ duration, updated: validCreditIds.length }, 'Credit status update completed');
 
     // Domain event: credits marked as overdue
     if (validCreditIds.length > 0) {
@@ -105,7 +108,7 @@ export async function updateOverdueCredits() {
     };
 
   } catch (error) {
-    console.error('[CRON] Error updating credit statuses:', error);
+    logger.error({ err: error }, 'Error updating credit statuses');
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -121,7 +124,7 @@ export async function updateOverdueCredits() {
 export async function applyLatePenalties(creditIds: string[]) {
   // TODO: Implement penalty calculation based on business rules
   // For now, this is a placeholder
-  console.log('[CRON] Late penalty application not yet configured');
+  logger.info('Late penalty application not yet configured');
   return { applied: 0 };
 }
 
@@ -132,15 +135,15 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 let cronIntervalId: NodeJS.Timeout | null = null;
 
 export function startCreditStatusUpdateCron(): void {
-  console.log('[CRON] Starting credit status update job...');
-  
+  logger.info('Starting credit status update job...');
+
   // Run immediately on startup
   updateOverdueCredits();
-  
+
   // Schedule hourly execution
   cronIntervalId = setInterval(updateOverdueCredits, CHECK_INTERVAL_MS);
-  
-  console.log('[CRON] Credit status update configured: runs every hour');
+
+  logger.info({ intervalMinutes: CHECK_INTERVAL_MS / 60000 }, 'Credit status update configured');
 }
 
 export function stopCreditStatusUpdateCron(): void {
@@ -148,5 +151,5 @@ export function stopCreditStatusUpdateCron(): void {
     clearInterval(cronIntervalId);
     cronIntervalId = null;
   }
-  console.log('[CRON] Credit status update job stopped');
+  logger.info('Credit status update job stopped');
 }

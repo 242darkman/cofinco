@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { addPdfLogoHeader } from '../lib/pdf-logo';
 
 export interface DataChange {
   id: string;
@@ -116,15 +117,13 @@ export function useDataChanges() {
   const exportToPDF = () => {
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
-    
-    doc.setFontSize(18);
-    doc.setTextColor(30, 58, 138);
-    doc.text("JOURNAL DES MODIFICATIONS - COFIN", 14, 20);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Date d'export: ${dateExport} | Total: ${filteredChanges.length} modifications`, 14, 28);
-    
+
+    const startY = addPdfLogoHeader(doc, {
+      title: 'JOURNAL DES MODIFICATIONS',
+      subtitle: `Total: ${filteredChanges.length} modifications`,
+      dateRight: `Export: ${dateExport}`,
+    });
+
     const tableData = filteredChanges.slice(0, 50).map((ch, idx) => [
       idx + 1,
       formatTimestamp(ch.timestamp),
@@ -137,7 +136,7 @@ export function useDataChanges() {
     (doc as any).autoTable({
       head: [['N°', 'Date/Heure', 'Table', 'Opération', 'Utilisateur', 'ID']],
       body: tableData,
-      startY: 35,
+      startY,
       styles: { fontSize: 7, cellPadding: 1 },
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }

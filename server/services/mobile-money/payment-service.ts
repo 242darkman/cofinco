@@ -34,6 +34,9 @@ import { getOrCreateDigitalCaisse, updateDigitalCaisseSolde } from "./mm-caisse-
 import { allocateCreditRepayment, type AllocationResult } from "../credit-allocation-service";
 import { canMemberWithdraw } from "../tontine-logic";
 import { TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('PaymentService');
 
 // Lazy import to avoid circular dependency
 let agentMmPaymentService: typeof import("../caisse-agent/agent-mm-payment-service").agentMmPaymentService | null = null;
@@ -78,7 +81,7 @@ class PaymentService {
     if (idempotencyKey) {
       const existing = await storage.getPaymentIntentByIdempotencyKey(idempotencyKey);
       if (existing) {
-        console.log(`[PaymentService] Idempotent request, returning existing intent: ${existing.id}`);
+        logger.info({ intentId: existing.id }, 'Idempotent request, returning existing intent');
         return existing;
       }
     }
@@ -127,11 +130,11 @@ class PaymentService {
         callbackUrl,
       });
 
-      console.log(`[PaymentService] Collection initiated: ${intent.id} -> ${response.providerRef}`);
+      logger.info({ intentId: intent.id, providerRef: response.providerRef }, 'Collection initiated');
       return updatedIntent!;
     } catch (error) {
       // En cas d'erreur, marquer l'intent comme FAILED
-      console.error(`[PaymentService] Collection failed:`, error);
+      logger.error({ err: error }, 'Collection failed');
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const errorCode = error instanceof MobileMoneyError ? error.code : "PROVIDER_ERROR";
@@ -172,7 +175,7 @@ class PaymentService {
     if (idempotencyKey) {
       const existing = await storage.getPaymentIntentByIdempotencyKey(idempotencyKey);
       if (existing) {
-        console.log(`[PaymentService] Idempotent request, returning existing intent: ${existing.id}`);
+        logger.info({ intentId: existing.id }, 'Idempotent request, returning existing intent');
         return existing;
       }
     }
@@ -217,10 +220,10 @@ class PaymentService {
         expireAt: new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000),
       });
 
-      console.log(`[PaymentService] Payout initiated: ${intent.id} -> ${response.providerRef}`);
+      logger.info({ intentId: intent.id, providerRef: response.providerRef }, 'Payout initiated');
       return updatedIntent!;
     } catch (error) {
-      console.error(`[PaymentService] Payout failed:`, error);
+      logger.error({ err: error }, 'Payout failed');
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const errorCode = error instanceof MobileMoneyError ? error.code : "PROVIDER_ERROR";
@@ -259,11 +262,11 @@ class PaymentService {
       processed: false,
     });
 
-    console.log(`[PaymentService] Webhook received: ${provider} - ${event.id}`);
+    logger.info({ provider, eventId: event.id }, 'Webhook received');
 
     // 2. Vérifier la signature
     if (!providerInstance.verifyWebhook(payload, signature, headers)) {
-      console.warn(`[PaymentService] Invalid webhook signature for ${provider}`);
+      logger.warn({ provider }, 'Invalid webhook signature');
       await storage.markEventProcessed(event.id, undefined, "INVALID_SIGNATURE");
       return; // Ne pas lever d'erreur, retourner 200 quand même
     }
@@ -280,14 +283,14 @@ class PaymentService {
     }
 
     if (!intent) {
-      console.warn(`[PaymentService] Orphan webhook: no intent found for ${provider} - ${parsedPayload.providerRef}`);
+      logger.warn({ provider, providerRef: parsedPayload.providerRef }, 'Orphan webhook: no intent found');
       await storage.markEventProcessed(event.id, undefined, "INTENT_NOT_FOUND");
       return;
     }
 
     // 4. Vérifier l'idempotence
     if (["SUCCESS", "FAILED", "EXPIRED", "CANCELLED", "REVERSED"].includes(intent.status)) {
-      console.log(`[PaymentService] Intent ${intent.id} already in terminal state: ${intent.status}`);
+      logger.info({ intentId: intent.id, status: intent.status }, 'Intent already in terminal state');
       await storage.markEventProcessed(event.id, intent.id, "ALREADY_PROCESSED");
       return;
     }
@@ -318,7 +321,7 @@ class PaymentService {
           const agentService = await getAgentMmPaymentService();
           await agentService.handlePaymentFailed(intent.id, errorCode, errorMessage);
         } catch (error) {
-          console.warn(`[PaymentService] Could not notify agent MM service:`, error);
+          logger.warn({ err: error }, 'Could not notify agent MM service');
         }
       }
     } else if (normalizedStatus === "EXPIRED") {
@@ -330,7 +333,7 @@ class PaymentService {
     }
     // Si PENDING, on ne fait rien (on attend le prochain webhook)
 
-    console.log(`[PaymentService] Webhook processed: ${intent.id} -> ${normalizedStatus}`);
+    logger.info({ intentId: intent.id, status: normalizedStatus }, 'Webhook processed');
   }
 
   /**
@@ -414,7 +417,7 @@ class PaymentService {
             await updateDigitalCaisseSolde(tx, digitalCaisse.id, amount, mouvement.id);
             additionalEventData.digitalCaisseId = digitalCaisse.id;
           } catch (error) {
-            console.warn(`[PaymentService] Could not update digital caisse:`, error);
+            logger.warn({ err: error }, 'Could not update digital caisse');
           }
         }
 
@@ -447,7 +450,7 @@ class PaymentService {
               additionalEventData.operationCaisseId = operationCaisseId;
             }
           } catch (error) {
-            console.warn(`[PaymentService] Could not create operationsCaisse:`, error);
+            logger.warn({ err: error }, 'Could not create operationsCaisse');
           }
         }
 
@@ -469,7 +472,7 @@ class PaymentService {
       intent.createdBy || undefined
     );
 
-    console.log(`[PaymentService] Collection processed: ${intent.id} -> mouvement ${mouvement.id}`);
+    logger.info({ intentId: intent.id, mouvementId: mouvement.id }, 'Collection processed');
 
     // Notify agent MM payment service if this was an agent-initiated payment
     if (metadata?.initiatedByAgent) {
@@ -477,7 +480,7 @@ class PaymentService {
         const agentService = await getAgentMmPaymentService();
         await agentService.handlePaymentSuccess(intent.id, mouvement.id);
       } catch (error) {
-        console.warn(`[PaymentService] Could not notify agent MM service:`, error);
+        logger.warn({ err: error }, 'Could not notify agent MM service');
       }
     }
   }
@@ -532,7 +535,7 @@ class PaymentService {
             await updateDigitalCaisseSolde(tx, digitalCaisse.id, -amount, mouvement.id);
             additionalEventData.digitalCaisseId = digitalCaisse.id;
           } catch (error) {
-            console.warn(`[PaymentService] Could not update digital caisse:`, error);
+            logger.warn({ err: error }, 'Could not update digital caisse');
           }
         }
 
@@ -569,7 +572,7 @@ class PaymentService {
               additionalEventData.operationCaisseId = operationCaisseId;
             }
           } catch (error) {
-            console.warn(`[PaymentService] Could not create operationsCaisse:`, error);
+            logger.warn({ err: error }, 'Could not create operationsCaisse');
           }
         }
 
@@ -591,7 +594,7 @@ class PaymentService {
       intent.createdBy || undefined
     );
 
-    console.log(`[PaymentService] Payout processed: ${intent.id} -> mouvement ${mouvement.id}`);
+    logger.info({ intentId: intent.id, mouvementId: mouvement.id }, 'Payout processed');
   }
 
   /**
@@ -601,7 +604,7 @@ class PaymentService {
     intent: PaymentIntent,
     statusResponse: { providerTxnId?: string }
   ): Promise<void> {
-    console.log(`[PaymentService] Reconciliation: processing ${intent.id} as SUCCESS`);
+    logger.info({ intentId: intent.id }, 'Reconciliation: processing as SUCCESS');
     await this.processSuccessfulPayment(intent, statusResponse.providerTxnId);
   }
 
@@ -646,7 +649,7 @@ class PaymentService {
       },
     });
 
-    console.log(`[PaymentService] Payment cancelled: ${id}`);
+    logger.info({ intentId: id }, 'Payment cancelled');
     return updated!;
   }
 
@@ -777,7 +780,7 @@ class PaymentService {
             const delta = intent.type === "COLLECTION" ? -amount : amount;
             await updateDigitalCaisseSolde(tx, digitalCaisse.id, delta, mouvement.id);
           } catch (error) {
-            console.warn(`[PaymentService] Could not reverse digital caisse:`, error);
+            logger.warn({ err: error }, 'Could not reverse digital caisse');
           }
         }
 
@@ -802,7 +805,7 @@ class PaymentService {
       userId
     );
 
-    console.log(`[PaymentService] Reversal processed: ${intent.id} -> mouvement ${mouvement.id}`);
+    logger.info({ intentId: intent.id, mouvementId: mouvement.id }, 'Reversal processed');
 
     return (await storage.getPaymentIntent(intentId))!;
   }
@@ -828,7 +831,7 @@ class PaymentService {
       throw new Error(`Cannot reconcile payment already in terminal status: ${intent.status}`);
     }
 
-    console.log(`[PaymentService] Manual reconciliation: ${intentId} -> ${decision} by ${userId}`);
+    logger.info({ intentId, decision, userId }, 'Manual reconciliation');
 
     if (decision === "SUCCESS") {
       // Traiter comme un succès normal

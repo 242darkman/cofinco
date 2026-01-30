@@ -15,6 +15,9 @@ import { getWsInstance } from "../../ws-server";
 import { updateSessionSolde } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { balanceService } from "../balance-service";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('CoffreTransfer');
 import {
   assertCoffreCanDebit,
   assertCoffreCanCredit,
@@ -176,8 +179,25 @@ export async function executeTransfertCoffre(
     // Si Caisse -> Coffre (Source = Caisse)
     if (!isCoffreSource) {
         // Caisse Source: Versement vers coffre (Sortie)
-        const sessionId = sessionExecuteId || transfert.sessionRequestId; // Execute ID priority if passed, else Request ID
-        // Note: Logic for session finding skipped for brevity but ideally reused
+        // AUTO-FIND: Rechercher la session active de la caisse source si non fournie
+        let sessionId = sessionExecuteId || transfert.sessionRequestId;
+
+        if (!sessionId) {
+          // Rechercher la session active pour la caisse source
+          const [activeSourceSession] = await tx.select({ id: sessionsCaisse.id })
+            .from(sessionsCaisse)
+            .where(and(
+              eq(sessionsCaisse.caisseId, transfert.caisseId),
+              eq(sessionsCaisse.statut, "OPEN")
+            ))
+            .limit(1);
+
+          if (activeSourceSession) {
+            sessionId = activeSourceSession.id;
+            logger.info({ caisseId: transfert.caisseId, sessionId }, 'Auto-found source caisse session');
+          }
+        }
+
         if (sessionId) {
             const [op] = await tx.insert(operationsCaisse).values({
                 sessionId,
@@ -202,9 +222,24 @@ export async function executeTransfertCoffre(
     // Si Coffre -> Caisse (Dest = Caisse)
     if (isCoffreSource) {
         // Caisse Dest: Approvisionnement depuis coffre (Entrée)
-        // Need to find session for Dest Caisse
-        // Assuming sessionExecuteId corresponds to the executing cashier receiving funds
-        const sessionId = sessionExecuteId;
+        // AUTO-FIND: Rechercher la session active de la caisse destination si non fournie
+        let sessionId = sessionExecuteId;
+
+        if (!sessionId) {
+          // Rechercher la session active pour la caisse destination
+          const [activeDestSession] = await tx.select({ id: sessionsCaisse.id })
+            .from(sessionsCaisse)
+            .where(and(
+              eq(sessionsCaisse.caisseId, transfert.caisseId),
+              eq(sessionsCaisse.statut, "OPEN")
+            ))
+            .limit(1);
+
+          if (activeDestSession) {
+            sessionId = activeDestSession.id;
+            logger.info({ caisseId: transfert.caisseId, sessionId }, 'Auto-found destination caisse session');
+          }
+        }
 
         if (sessionId) {
             const [op] = await tx.insert(operationsCaisse).values({
@@ -260,7 +295,7 @@ export async function executeTransfertCoffre(
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Unknown GL error";
-        console.error(`[CoffreTransfer] GL posting failed for transfert ${transfertId}: ${message}`);
+        logger.error({ transfertId, error: message }, 'GL posting failed');
         await tx.update(mouvementsFinanciers)
           .set({ glPostingStatus: "FAILED", glPostingError: message })
           .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
@@ -355,7 +390,7 @@ export async function executeTransfertCoffre(
         });
       }
     } catch (e) {
-        console.error("Failed to broadcast BALANCE_UPDATED for transfert", e);
+        logger.error({ err: e }, 'Failed to broadcast BALANCE_UPDATED for transfert');
     }
 
     return {

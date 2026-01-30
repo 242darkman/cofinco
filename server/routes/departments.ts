@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
@@ -6,6 +7,8 @@ import { departments, jobPositions } from "@shared/schema";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
+
+const logger = createLogger('Routes:Departments');
 
 // Schémas de validation
 const createDepartmentSchema = z.object({
@@ -49,7 +52,7 @@ export function registerDepartmentsRoutes(app: Express) {
       const result = await db.select().from(departments).orderBy(departments.name);
       res.json(result);
     } catch (error) {
-      console.error("Error fetching departments:", error);
+      logger.error({ err: error }, 'Error fetching departments');
       res.status(500).json({ message: "Erreur lors de la récupération des départements" });
     }
   });
@@ -66,7 +69,7 @@ export function registerDepartmentsRoutes(app: Express) {
 
       res.json(dept);
     } catch (error) {
-      console.error("Error fetching department:", error);
+      logger.error({ err: error }, 'Error fetching department');
       res.status(500).json({ message: "Erreur lors de la récupération du département" });
     }
   });
@@ -82,7 +85,7 @@ export function registerDepartmentsRoutes(app: Express) {
       const [created] = await db.insert(departments).values(parsed.data).returning();
       res.status(201).json(created);
     } catch (error) {
-      console.error("Error creating department:", error);
+      logger.error({ err: error }, 'Error creating department');
       res.status(500).json({ message: "Erreur lors de la création du département" });
     }
   });
@@ -108,7 +111,7 @@ export function registerDepartmentsRoutes(app: Express) {
 
       res.json(updated);
     } catch (error) {
-      console.error("Error updating department:", error);
+      logger.error({ err: error }, 'Error updating department');
       res.status(500).json({ message: "Erreur lors de la mise à jour du département" });
     }
   });
@@ -130,17 +133,18 @@ export function registerDepartmentsRoutes(app: Express) {
         });
       }
 
-      const [deleted] = await db.delete(departments)
+      const [archived] = await db.update(departments)
+        .set({ isActive: false, updatedAt: new Date() })
         .where(eq(departments.id, id))
         .returning();
 
-      if (!deleted) {
+      if (!archived) {
         return res.status(404).json({ message: "Département non trouvé" });
       }
 
-      res.json({ message: "Département supprimé avec succès" });
+      res.json({ message: "Département archivé avec succès" });
     } catch (error) {
-      console.error("Error deleting department:", error);
+      logger.error({ err: error }, 'Error deleting department');
       res.status(500).json({ message: "Erreur lors de la suppression du département" });
     }
   });
@@ -179,7 +183,7 @@ export function registerDepartmentsRoutes(app: Express) {
       const result = await query.orderBy(departments.name, jobPositions.name);
       res.json(result);
     } catch (error) {
-      console.error("Error fetching job positions:", error);
+      logger.error({ err: error }, 'Error fetching job positions');
       res.status(500).json({ message: "Erreur lors de la récupération des postes" });
     }
   });
@@ -214,7 +218,7 @@ export function registerDepartmentsRoutes(app: Express) {
 
       res.json(result);
     } catch (error) {
-      console.error("Error fetching job position:", error);
+      logger.error({ err: error }, 'Error fetching job position');
       res.status(500).json({ message: "Erreur lors de la récupération du poste" });
     }
   });
@@ -236,7 +240,7 @@ export function registerDepartmentsRoutes(app: Express) {
       const [created] = await db.insert(jobPositions).values(parsed.data).returning();
       res.status(201).json(created);
     } catch (error) {
-      console.error("Error creating job position:", error);
+      logger.error({ err: error }, 'Error creating job position');
       res.status(500).json({ message: "Erreur lors de la création du poste" });
     }
   });
@@ -270,7 +274,7 @@ export function registerDepartmentsRoutes(app: Express) {
 
       res.json(updated);
     } catch (error) {
-      console.error("Error updating job position:", error);
+      logger.error({ err: error }, 'Error updating job position');
       res.status(500).json({ message: "Erreur lors de la mise à jour du poste" });
     }
   });
@@ -282,17 +286,18 @@ export function registerDepartmentsRoutes(app: Express) {
 
       // TODO: Vérifier s'il y a des employés liés à ce poste
 
-      const [deleted] = await db.delete(jobPositions)
+      const [archived] = await db.update(jobPositions)
+        .set({ isActive: false, updatedAt: new Date() })
         .where(eq(jobPositions.id, id))
         .returning();
 
-      if (!deleted) {
+      if (!archived) {
         return res.status(404).json({ message: "Poste non trouvé" });
       }
 
-      res.json({ message: "Poste supprimé avec succès" });
+      res.json({ message: "Poste archivé avec succès" });
     } catch (error) {
-      console.error("Error deleting job position:", error);
+      logger.error({ err: error }, 'Error deleting job position');
       res.status(500).json({ message: "Erreur lors de la suppression du poste" });
     }
   });

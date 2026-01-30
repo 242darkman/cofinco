@@ -12,6 +12,49 @@ export async function getAllComptesComptables(): Promise<CompteComptable[]> {
   return await db.select().from(planComptable).orderBy(planComptable.numeroCompte);
 }
 
+/**
+ * Get all accounts with their current balance calculated from all movements
+ * Used for the Plan Comptable view to show real-time balances
+ */
+export async function getAllComptesComptablesWithBalances(): Promise<(CompteComptable & { soldeActuel: number })[]> {
+  // Get all movements aggregated by account (all time, no date filter)
+  const mouvements = await db.select({
+    compteId: lignesEcritures.compteId,
+    totalDebit: sql<number>`COALESCE(sum(${lignesEcritures.debit}), 0)`,
+    totalCredit: sql<number>`COALESCE(sum(${lignesEcritures.credit}), 0)`
+  })
+  .from(lignesEcritures)
+  .groupBy(lignesEcritures.compteId);
+
+  // Create a map for fast lookup
+  const balanceMap = new Map(mouvements.map(m => [m.compteId, m]));
+
+  // Get all accounts
+  const comptes = await db.select().from(planComptable).orderBy(planComptable.numeroCompte);
+
+  // Enrich accounts with their balance
+  return comptes.map(compte => {
+    const mouv = balanceMap.get(compte.id);
+    const debit = mouv ? Number(mouv.totalDebit) : 0;
+    const credit = mouv ? Number(mouv.totalCredit) : 0;
+
+    // Calculate balance based on account type
+    // For Actif/Charge accounts: Debit - Credit (positive = debit balance)
+    // For Passif/Produit/Capitaux accounts: Credit - Debit (positive = credit balance)
+    let soldeActuel = 0;
+    if (['Actif', 'Charge'].includes(compte.typeCompte || '')) {
+      soldeActuel = debit - credit;
+    } else {
+      soldeActuel = credit - debit;
+    }
+
+    return {
+      ...compte,
+      soldeActuel
+    };
+  });
+}
+
 export async function getComptesComptablesByClasse(classe: number): Promise<CompteComptable[]> {
   return await db.select().from(planComptable).where(eq(planComptable.classe, classe));
 }

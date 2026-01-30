@@ -24,8 +24,7 @@ export const balanceKeys = {
   coffre: (coffreId: string) => ['coffre-balance', coffreId] as const,
   caisseAgent: (caisseAgentId: string) => ['caisse-agent-balance', caisseAgentId] as const,
 
-  // Position de trésorerie globale
-  cashPosition: (agenceId?: string) => ['cash-position', agenceId] as const,
+  // SUPPRIMÉ: cashPosition - utiliser treasuryKeys.encaisse() pour l'encaisse GL
 };
 
 // ============================================
@@ -45,6 +44,7 @@ export const compteKeys = {
   detail: (compteId: string) => ['comptes', 'detail', compteId] as const,
   transactions: (compteId: string) => ['transactions', compteId] as const,
   stats: (compteId: string) => ['compte-stats', compteId] as const,
+  objectifs: (compteId: string) => ['comptes', 'objectifs', compteId] as const,
 };
 
 // ============================================
@@ -67,6 +67,9 @@ export const creditKeys = {
 
   // Stats
   stats: () => ['credits-stats'] as const,
+
+  // Enquêtes
+  enquetes: () => ['enquetes-credit'] as const,
 };
 
 // ============================================
@@ -200,6 +203,24 @@ export const comptabiliteKeys = {
 };
 
 // ============================================
+// TREASURY v2 (Encaisse canonique basée sur GL)
+// ============================================
+
+export const treasuryKeys = {
+  all: ['treasury'] as const,
+
+  // Encaisse canonique (Single Source of Truth depuis GL)
+  encaisse: (agenceId?: string) => ['treasury', 'encaisse', agenceId] as const,
+
+  // Encaisse avec réconciliation
+  encaisseWithReconciliation: (agenceId?: string) =>
+    ['treasury', 'encaisse', 'reconciliation', agenceId] as const,
+
+  // Breakdown détaillé par compte GL
+  breakdown: (agenceId?: string) => ['treasury', 'breakdown', agenceId] as const,
+};
+
+// ============================================
 // AGENTS TERRAIN
 // ============================================
 
@@ -259,6 +280,7 @@ export const hrKeys = {
   candidatures: () => ['/api/hr/candidatures'] as const,
   avantages: () => ['/api/hr/avantages'] as const,
   organigramme: () => ['/api/hr/organigramme'] as const,
+  avances: () => ['/api/hr/avances'] as const,
 };
 
 // ============================================

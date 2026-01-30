@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Edit, Trash2, Plus, Save, Calendar, UserPlus, AlertTriangle } from 'lucide-react';
-import { Card, Button, Badge, FormField, SelectField, Modal, EmptyState, LoadingSpinner, Pagination } from '../ui';
+import { Card, Button, Badge, FormField, SelectField, Modal, EmptyState, LoadingSpinner, Pagination, ResponsiveTable, TableColumn } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { tontineApi, membreTontineApi, clientApi, tontinePlanApi } from '../../lib/api-client';
@@ -71,7 +71,7 @@ export default function AdminTontinesGestion() {
   const [activeTab, setActiveTab] = useState<'groupes' | 'plans'>('groupes');
   const [tontinePlans, setTontinePlans] = useState<any[]>([]);
   const [showPlanForm, setShowPlanForm] = useState(false);
-  const itemsPerPage = 6; // Compact: 6 items per page
+  const itemsPerPage = 10; // Table view can show more items
 
   const [formData, setFormData] = useState({
     nom: '',
@@ -346,6 +346,7 @@ export default function AdminTontinesGestion() {
           <Button
             variant="primary"
             icon={Plus}
+            size="sm"
             onClick={() => {
               if (activeTab === 'groupes') {
                 setShowTontineForm(true);
@@ -400,7 +401,7 @@ export default function AdminTontinesGestion() {
         />
       ) : (
         <>
-          {/* Tontines Grid */}
+          {/* Tontines Table */}
           {(() => {
         const totalPages = Math.ceil(tontines.length / itemsPerPage);
         const paginatedTontines = tontines.slice(
@@ -408,110 +409,79 @@ export default function AdminTontinesGestion() {
           currentPage * itemsPerPage
         );
 
-        if (tontines.length === 0) {
-          return (
-            <EmptyState
-              icon={Users}
-              title="Aucune tontine"
-              description="Créez votre première tontine pour commencer."
-            />
-          );
-        }
+        const columns: TableColumn<Tontine>[] = [
+           { 
+            key: 'nom', 
+            label: 'Tontine', 
+            primary: true,
+            format: (val, item) => (
+              <div>
+                <div className="font-bold text-white">{val}</div>
+                <div className="text-xs text-slate-400">{item.frequence}</div>
+              </div>
+            )
+          },
+          { 
+            key: 'montant_cotisation', 
+            label: 'Cotisation (FCFA)', 
+            format: (val) => <span className="font-bold text-teal-400">{val?.toLocaleString()}</span> 
+          },
+          { 
+            key: 'membres_actuels', 
+            label: 'Membres', 
+            format: (val, item) => <span className="text-slate-200">{val || 0}/{item.nombre_membres || 0}</span>
+          },
+          { 
+            key: 'regles.frais_sortie_pourcentage', 
+            label: 'Frais', 
+            format: (val, item) => <span className="text-emerald-400 font-medium">{item.regles?.frais_sortie_pourcentage || 0}%</span>
+          },
+           { 
+            key: 'statut', 
+            label: 'Statut', 
+            badge: true
+          },
+        ];
 
         return (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {paginatedTontines.map((tontine) => (
-            <Card
-              key={tontine.id}
-              onClick={() => handleSelectTontine(tontine)}
-              className={`cursor-pointer transition-all p-5 flex flex-col h-full group ${
-                selectedTontine?.id === tontine.id
-                  ? 'bg-slate-800 border-teal-500 ring-1 ring-teal-500/50 shadow-lg shadow-teal-500/10'
-                  : 'bg-slate-900 border-slate-800 hover:border-teal-500/50'
-              }`}
-            >
-              {/* Header */}
-              <div className="flex justify-between items-start mb-4 gap-3 h-14">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-white text-base leading-tight line-clamp-2 group-hover:text-teal-400 transition-colors">
-                    {tontine.nom}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1 font-medium">{tontine.frequence}</p>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+             <ResponsiveTable
+              data={paginatedTontines}
+              columns={columns}
+              density="compact"
+              emptyMessage="Aucune tontine trouvée. Créez-en une pour commencer."
+              onRowClick={(item) => handleSelectTontine(item)}
+              actions={(tontine) => (
+                 <div className="flex items-center gap-1">
+                  {canEditTontines && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleEditTontine(tontine); }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                      title="Modifier"
+                    >
+                      <Edit size={16} />
+                    </button>
+                  )}
+                  {canDeleteTontines && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteTontine(tontine.id); }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
-                <Badge
-                  value={tontine.statut}
-                  size="sm"
-                  className="flex-shrink-0"
-                />
-              </div>
-
-              {/* Stats */}
-              <div className="space-y-2.5 mb-6 bg-slate-800/30 p-3 rounded-lg border border-slate-800/50">
-                <div className="flex justify-between text-xs sm:text-sm items-baseline">
-                  <span className="text-slate-500 font-medium">Cotisation:</span>
-                  <span className="font-bold text-teal-400">{tontine.montant_cotisation?.toLocaleString()} FCFA</span>
-                </div>
-                <div className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-slate-500 font-medium">Membres:</span>
-                  <span className="text-slate-200 font-semibold">{tontine.membres_actuels || 0}/{tontine.nombre_membres || 0}</span>
-                </div>
-                <div className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-slate-500 font-medium">Frais:</span>
-                  <span className="text-emerald-400 font-bold">{tontine.regles?.frais_sortie_pourcentage || 0}%</span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 mt-auto pt-4 border-t border-slate-800/50">
-                {canEditTontines && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={Edit}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditTontine(tontine);
-                    }}
-                    className="flex-1 justify-center bg-slate-800/50 border-slate-700 hover:bg-slate-700 hover:text-white"
-                  >
-                    Modifier
-                  </Button>
-                )}
-                {canDeleteTontines && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTontine(tontine.id);
-                    }}
-                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            canGoNext={currentPage < totalPages}
-            canGoPrevious={currentPage > 1}
-            itemsPerPage={itemsPerPage}
-            totalItems={tontines.length}
-            className="mt-4"
-          />
-        )}
-      </>
-    );
-  })()}
+              )}
+              pagination={{
+                page: currentPage,
+                totalPages,
+                onPageChange: setCurrentPage
+              }}
+            />
+          </div>
+        );
+      })()}
 
       {/* Selected Tontine Members */}
       {selectedTontine && (

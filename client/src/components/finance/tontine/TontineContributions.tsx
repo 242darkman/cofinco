@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search, Info, Zap } from 'lucide-react';
+import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search, Info, Zap, Download } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import { Pagination } from '../../ui/Pagination';
 import { SkeletonContributionCard } from '../../ui/Skeleton';
@@ -11,6 +11,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { formatMoney, formatDate } from '../../../lib/format';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
+import { exportToCSV, exportToPDF } from '../../../lib/exportUtils';
 import { usePagination } from '../../../hooks/usePagination';
 import {
   StatutClient,
@@ -426,16 +427,20 @@ export default function TontineContributions({ tontineId }: TontineContributions
 
       setSubmitting(true);
       try {
+        const providerName = operator ? operator.toUpperCase() : undefined;
         await contributionTontineApi.create({
           tontineId: tontineId,
           clientId: membre.client_id,
           typeOperation: 'Versement',
           montant: String(formData.montant),
           tourNumero: formData.tour_numero,
-          methodePaiement: formData.mode_paiement, // Already an enum value (CASH, MOBILE_MONEY, etc.)
+          methodePaiement: formData.mode_paiement,
           reference: paymentRef || formData.reference_paiement || `REF-${Date.now()}`,
-          observations: sanitizeInput(formData.notes) || (operator ? `Opérateur: ${operator}` : null),
-          idempotencyKey: crypto.randomUUID(), // Prevent duplicate submissions
+          observations: sanitizeInput(formData.notes) || undefined,
+          idempotencyKey: crypto.randomUUID(),
+          ...(formData.mode_paiement === MethodePaiement.MOBILE_MONEY && providerName
+            ? { provider: providerName }
+            : {}),
         });
 
         setShowAddForm(false);
@@ -546,6 +551,31 @@ export default function TontineContributions({ tontineId }: TontineContributions
     resetForm();
   }, [resetForm]);
 
+  // Export contributions data
+  const buildContributionExportData = useCallback(() => {
+    return contributions.map((c) => ({
+      'Date': new Date(c.date_contribution).toLocaleDateString('fr-FR'),
+      'Membre': c.client ? `${c.client.nom}${c.client.prenom ? ' ' + c.client.prenom : ''}` : '-',
+      'Tour': c.tour_numero,
+      'Montant (FCFA)': c.montant,
+      'Mode paiement': METHODE_PAIEMENT_LABELS[c.mode_paiement as keyof typeof METHODE_PAIEMENT_LABELS] || c.mode_paiement,
+      'Statut': ALL_STATUS_LABELS[c.statut] || c.statut,
+      'Référence': c.reference_paiement || '-',
+    }));
+  }, [contributions]);
+
+  const handleExportContributionsCSV = useCallback(() => {
+    const data = buildContributionExportData();
+    const date = new Date().toISOString().slice(0, 10);
+    exportToCSV(data, `tontine-contributions-${date}`);
+  }, [buildContributionExportData]);
+
+  const handleExportContributionsPDF = useCallback(() => {
+    const data = buildContributionExportData();
+    const date = new Date().toISOString().slice(0, 10);
+    exportToPDF(data, `tontine-contributions-${date}`, `Historique des contributions`);
+  }, [buildContributionExportData]);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -558,17 +588,38 @@ export default function TontineContributions({ tontineId }: TontineContributions
             Total: <span className="text-green-400 font-bold">{formatMoney(totalContributions)}</span>
           </p>
         </div>
-        {canCreateContributions && (
-          <Button
-            onClick={() => setShowAddForm(true)}
-            variant="success"
-            size="sm"
-            icon={Plus}
-            aria-describedby="contributions-heading"
-          >
-            Nouvelle
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {contributions.length > 0 && (
+            <>
+              <IconButton
+                icon={Download}
+                size="sm"
+                onClick={handleExportContributionsCSV}
+                aria-label="Exporter en CSV"
+                title="Exporter CSV"
+              />
+              <IconButton
+                icon={Download}
+                size="sm"
+                onClick={handleExportContributionsPDF}
+                aria-label="Exporter en PDF"
+                title="Exporter PDF"
+                className="text-cyan-400"
+              />
+            </>
+          )}
+          {canCreateContributions && (
+            <Button
+              onClick={() => setShowAddForm(true)}
+              variant="success"
+              size="sm"
+              icon={Plus}
+              aria-describedby="contributions-heading"
+            >
+              Nouvelle
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -860,17 +911,17 @@ export default function TontineContributions({ tontineId }: TontineContributions
                       className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition ${
                         formData.mode_paiement === option.value
                           ? 'bg-emerald-600 border-emerald-500 text-white'
-                          : option.value !== MethodePaiement.CASH
+                          : (option.value !== MethodePaiement.CASH && option.value !== MethodePaiement.MOBILE_MONEY)
                             ? 'bg-slate-800/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
                             : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                       }`}
-                      disabled={option.value !== MethodePaiement.CASH}
+                      disabled={option.value !== MethodePaiement.CASH && option.value !== MethodePaiement.MOBILE_MONEY}
                     >
                       {getModeIcon(option.value)} {option.label}
                     </button>
                   ))}
                   <div className="col-span-2 text-[10px] text-slate-500 italic text-center mt-1">
-                    * Mobile Money, Virement et Chèque bientôt disponibles
+                    * Virement et Chèque bientôt disponibles
                   </div>
 
                 </div>

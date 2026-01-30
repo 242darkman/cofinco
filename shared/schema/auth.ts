@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { SystemRole } from "../types/roles";
@@ -97,7 +97,9 @@ export const userPermissions = pgTable("user_permissions", {
   // Link directly to permissions table instead of copying module/action structure
   permissionId: uuid("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
   granted: boolean("granted").notNull().default(true),
-  
+  // CASL conditions (MongoDB-style, e.g., {"amount": {"$lte": 1000000}})
+  conditions: jsonb("conditions"),
+
   // Metadata for audit/tracking
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -124,11 +126,42 @@ export const activeSessions = pgTable("active_sessions", {
   lastActivity: timestamp("last_activity").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  // Device fingerprinting for stolen cookie detection
+  deviceFingerprint: text("device_fingerprint"),        // Full fingerprint hash
+  deviceFingerprintPartial: text("device_fingerprint_partial"), // Partial fingerprint for tolerant comparison
 });
 
 export const insertActiveSessionSchema = createInsertSchema(activeSessions).omit({ id: true });
 export type InsertActiveSession = z.infer<typeof insertActiveSessionSchema>;
 export type ActiveSession = typeof activeSessions.$inferSelect;
+
+// Refresh Tokens table - For "Remember Me" persistent sessions
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(), // SHA-256 hash of the token
+  deviceFingerprint: text("device_fingerprint"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+
+  // Token family for rotation detection
+  familyId: uuid("family_id").notNull(),
+  generation: integer("generation").notNull().default(1),
+
+  // Expiry
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at"),
+
+  // Revocation
+  revoked: boolean("revoked").notNull().default(false),
+  revokedAt: timestamp("revoked_at"),
+  revokeReason: text("revoke_reason"),
+});
+
+export const insertRefreshTokenSchema = createInsertSchema(refreshTokens).omit({ id: true, createdAt: true });
+export type InsertRefreshToken = z.infer<typeof insertRefreshTokenSchema>;
+export type RefreshToken = typeof refreshTokens.$inferSelect;
 
 // ============================================
 // RBAC: Modules et Permissions par Rôle
@@ -170,6 +203,8 @@ export const rolePermissions = pgTable("role_permissions", {
   role: roleEnum("role").notNull(),
   permissionId: uuid("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
   granted: boolean("granted").notNull().default(true),
+  // CASL conditions (MongoDB-style, e.g., {"amount": {"$lte": 1000000}})
+  conditions: jsonb("conditions"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -177,6 +212,34 @@ export const rolePermissions = pgTable("role_permissions", {
 export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
 export type RolePermission = typeof rolePermissions.$inferSelect;
+
+// ============================================
+// Permission Condition Templates
+// ============================================
+
+/**
+ * Templates de conditions réutilisables pour les permissions CASL
+ *
+ * Permet de créer des conditions complexes avec des variables:
+ * - ${userId} - ID de l'utilisateur courant
+ * - ${agenceId} - ID de l'agence active
+ * - ${now}, ${startOfDay}, etc. - Variables temporelles
+ */
+export const permissionConditionTemplates = pgTable("permission_condition_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  conditionSchema: jsonb("condition_schema").notNull(), // Le schema avec variables
+  variables: jsonb("variables").default([]), // Liste des variables utilisées
+  examples: jsonb("examples").default([]), // Exemples d'utilisation
+  isSystem: boolean("is_system").default(false), // Templates système non modifiables
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConditionTemplateSchema = createInsertSchema(permissionConditionTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertConditionTemplate = z.infer<typeof insertConditionTemplateSchema>;
+export type ConditionTemplate = typeof permissionConditionTemplates.$inferSelect;
 
 // ============================================
 // Multi-Role Architecture: User Roles Table
@@ -290,3 +353,55 @@ export const FEATURE_KEYS = [
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+// ============================================
+// Temporary Permissions (Time-limited access)
+// ============================================
+
+/**
+ * Table temporaryPermissions - Permissions temporaires avec expiration
+ *
+ * Permet d'accorder des permissions avec une date d'expiration automatique.
+ * Utile pour:
+ * - Élévations temporaires de privilèges
+ * - Accès limité dans le temps pour des projets spécifiques
+ * - Délégation temporaire de responsabilités
+ *
+ * La permission est automatiquement révoquée après expires_at par un cron job.
+ */
+export const temporaryPermissions = pgTable("temporary_permissions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permissionId: uuid("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
+  grantedBy: uuid("granted_by").notNull().references(() => users.id),
+  grantedAt: timestamp("granted_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  reason: text("reason").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  revokedAt: timestamp("revoked_at"),
+  revokedBy: uuid("revoked_by").references(() => users.id),
+  revokeReason: text("revoke_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertTemporaryPermissionSchema = createInsertSchema(temporaryPermissions)
+  .omit({ id: true, createdAt: true, updatedAt: true, grantedAt: true });
+export type InsertTemporaryPermission = z.infer<typeof insertTemporaryPermissionSchema>;
+export type TemporaryPermission = typeof temporaryPermissions.$inferSelect;
+
+// Schéma de validation pour l'API grant
+export const grantTempPermissionSchema = z.object({
+  userId: z.string().uuid("ID utilisateur invalide"),
+  permissionId: z.string().uuid("ID permission invalide").optional(),
+  permissionCode: z.string().optional(),
+  expiresAt: z.string().datetime("Date d'expiration invalide"),
+  reason: z.string().min(1, "La raison est requise").max(500, "Raison trop longue"),
+}).refine(data => data.permissionId || data.permissionCode, {
+  message: "permissionId ou permissionCode requis"
+});
+
+// Schéma pour révoquer
+export const revokeTempPermissionSchema = z.object({
+  revokeReason: z.string().max(500, "Raison trop longue").optional(),
+});

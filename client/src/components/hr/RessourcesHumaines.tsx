@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { TabGroup, ConfirmDialog, PageHeader } from '../ui';
-import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText } from 'lucide-react';
+import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
+import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3 } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 // Hooks
@@ -23,8 +23,11 @@ import AvantagesManager from './AvantagesManager';
 import RecrutementManager from './RecrutementManager';
 import OrganigrammeView from './OrganigrammeView';
 import PaieManager from './PaieManager';
+import ImportEmployeesModal from './ImportEmployeesModal';
+import HrAnalyticsDashboard from './HrAnalyticsDashboard';
 
 const TABS = [
+  { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
   { key: 'list', label: 'Liste', icon: Users },
   { key: 'presence', label: 'Présence', icon: ClipboardCheck },
   { key: 'conges', label: 'Congés', icon: Calendar },
@@ -46,6 +49,7 @@ export default function RessourcesHumaines() {
   // State
   const [activeTab, setActiveTab] = useState<TabKey>('list');
   const [showForm, setShowForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingEmploye, setEditingEmploye] = useState<Employe | null>(null);
 
@@ -75,27 +79,41 @@ export default function RessourcesHumaines() {
     selectedParticipants,
     toggleParticipant,
     createFormation,
-    fetchParticipants
+    updateFormation,
+    deleteFormation,
+    fetchParticipants,
+    evaluateParticipant
   } = useFormations();
 
   const {
     avantagesList,
     selectedEmployes,
     toggleEmployeSelection,
-    applyAvantageToSelected
+    applyAvantageToSelected,
+    createAvantage,
+    updateAvantage,
+    deleteAvantage
   } = useAvantages();
 
   const {
     sanctions,
     loading: sanctionsLoading,
-    createSanction
+    createSanction,
+    updateSanction,
+    deleteSanction,
+    updateSanctionStatus,
+    uploadSanctionDocument,
+    fetchSanctionDocuments
   } = useSanctions();
 
   const {
     candidats,
     loading: candidatsLoading,
     createCandidature,
-    updateStatut: updateCandidatureStatut
+    updateStatut: updateCandidatureStatut,
+    updateCandidature,
+    uploadCv,
+    getCvUrl
   } = useCandidatures();
 
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
@@ -167,6 +185,9 @@ export default function RessourcesHumaines() {
     }
 
     switch (activeTab) {
+      case 'dashboard':
+        return <HrAnalyticsDashboard />;
+
       case 'list':
         return (
           <EmployesList
@@ -203,7 +224,10 @@ export default function RessourcesHumaines() {
             selectedParticipants={selectedParticipants}
             onToggleParticipant={toggleParticipant}
             onCreate={createFormation}
+            onUpdate={updateFormation}
+            onDelete={deleteFormation}
             onFetchParticipants={fetchParticipants}
+            onEvaluateParticipant={evaluateParticipant}
           />
         );
 
@@ -212,6 +236,11 @@ export default function RessourcesHumaines() {
           <SanctionsManager
             sanctions={sanctions}
             onCreate={handleCreateSanction}
+            onUpdateStatus={updateSanctionStatus}
+            onUpdate={updateSanction}
+            onDelete={deleteSanction}
+            onUploadDocument={uploadSanctionDocument}
+            onFetchDocuments={fetchSanctionDocuments}
           />
         );
 
@@ -223,6 +252,9 @@ export default function RessourcesHumaines() {
             selectedEmployes={selectedEmployes}
             onToggleEmploye={toggleEmployeSelection}
             onApplyToSelected={applyAvantageToSelected}
+            onCreate={createAvantage}
+            onUpdate={updateAvantage}
+            onDelete={deleteAvantage}
           />
         );
 
@@ -235,6 +267,9 @@ export default function RessourcesHumaines() {
             candidats={candidats}
             onCreate={handleCreateCandidat}
             onUpdateStatus={handleUpdateCandidatStatus}
+            onUploadCv={uploadCv}
+            onGetCvUrl={getCvUrl}
+            onUpdateCandidature={updateCandidature}
           />
         );
 
@@ -250,32 +285,44 @@ export default function RessourcesHumaines() {
     <div className="flex flex-col h-full bg-[#020617] overflow-hidden">
       {/* Header & Tabs Section - Fixed */}
       <div className="shrink-0 space-y-2 p-2 sm:p-4 pb-0 bg-[#020617] border-b border-slate-800/50">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                Ressources Humaines
-                <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-medium tracking-wide">
-                  {employes.length} collab.
-                </span>
-              </h1>
-              <p className="text-[11px] text-slate-500 font-medium">
-                 {statistics.actifs} actifs • Administration du personnel
-              </p>
-            </div>
-
-            {activeTab === 'list' && canCreateEmployes && (
-               <button
-                 onClick={() => {
-                   setEditingEmploye(null);
-                   setShowForm(true);
-                 }}
-                 className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-bold shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 self-start sm:self-auto"
-               >
-                 <UserPlus size={14} />
-                 <span>Nouvel Employé</span>
-               </button>
-             )}
-        </div>
+        <FeatureHeader
+          featureKey="hr.employees"
+          title={
+            <>
+              {FEATURE_DESCRIPTIONS['hr.employees'].title}
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-medium tracking-wide">
+                {employes.length} collab.
+              </span>
+            </>
+          }
+          subtitle={`${statistics.actifs} actifs • ${FEATURE_DESCRIPTIONS['hr.employees'].subtitle}`}
+          helpText={FEATURE_DESCRIPTIONS['hr.employees'].helpText}
+          icon={<Users size={24} />}
+          actions={
+            activeTab === 'list' && canCreateEmployes ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5"
+                  title="Importer des employés depuis un fichier CSV"
+                >
+                  <Upload size={14} />
+                  <span className="hidden sm:inline">Import CSV</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingEmploye(null);
+                    setShowForm(true);
+                  }}
+                  className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-bold shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 self-start sm:self-auto"
+                >
+                  <UserPlus size={14} />
+                  <span>Nouvel Employé</span>
+                </button>
+              </div>
+            ) : undefined
+          }
+        />
 
         <TabGroup
           tabs={TABS}
@@ -344,6 +391,12 @@ export default function RessourcesHumaines() {
           jobPositionId: null,
           modeCalculPaie: 'MONTHLY',
         }}
+      />
+
+      <ImportEmployeesModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={fetchEmployes}
       />
 
       <ConfirmDialog

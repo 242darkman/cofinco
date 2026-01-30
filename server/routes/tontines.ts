@@ -1,11 +1,16 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:Tontines');
 import { insertTontineSchema, insertMembreTontineSchema, insertContributionTontineSchema, insertTontineAlerteSchema,
     insertTontineRegleSchema, insertTontinePenaliteSchema, insertTontineDistributionSchema,
     insertTontinePlanSchema,
     tontineCycles, tontineTurns, tontineSchedules, tontineDistributionRequests, tontineTurnAudit,
-    membresTontine, TontinePayoutMethod
+    membresTontine, tontinePenalites, tontines, contributionsTontine, TontinePayoutMethod,
+    clients
 } from "@shared/schema";
+import { users } from "@shared/schema/auth";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
@@ -15,8 +20,10 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { getWsInstance } from "../ws-server";
 import tontineProductionService from "../services/tontine-production-service";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { generateTontineReminderSchedule } from "../services/notifications/tontine-reminder-service";
+import { executeWithLedger, updateTontineSolde, updateSessionSolde, generateReference } from "../services/ledger";
 import { db } from "../db";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 
 export function registerTontineRoutes(app: Express) {
   app.get("/api/tontines", requireAuth, requireAgenceAccess(), async (req, res) => {
@@ -193,13 +200,15 @@ export function registerTontineRoutes(app: Express) {
         let sessionCaisseId = undefined;
 
         // If Cash, we need an active session
-        if (parsed.methodePaiement === 'Espèces') {
+        const isCash = parsed.methodePaiement === 'CASH';
+        if (isCash) {
             const activeSession = await storage.getActiveSessionForUser(req.session.user!.id);
             if (!activeSession) {
                 return res.status(400).json({ message: "Vous devez avoir une caisse ouverte pour encaisser des espèces." });
             }
             sessionCaisseId = activeSession.id;
         }
+        // Mobile Money contributions don't require a caisse session
 
         const contrib = await storage.createContributionTontineWithLedger(parsed, sessionCaisseId, req.session.user!.id);
 
@@ -233,7 +242,7 @@ export function registerTontineRoutes(app: Express) {
 
         res.json(addSnakeCaseAliasesDeep(contrib));
       } catch (e: any) {
-        console.error("Erreur contribution tontine:", e);
+        logger.error({ err: e }, 'Erreur contribution tontine');
         res.status(400).json({ message: e.message || "Erreur lors de l'enregistrement de la contribution" });
       }
   });
@@ -302,6 +311,250 @@ export function registerTontineRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(updated));
   });
 
+  /**
+   * GAP #4 FIX: Pay a tontine penalty through the ledger.
+   * Creates a mouvement financier, posts to GL, and emits WS events.
+   */
+  app.post("/api/tontines/:tontineId/penalites/:penaliteId/pay", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
+    try {
+      const { tontineId, penaliteId } = req.params;
+      const userId = req.session.user?.id;
+      const { sessionCaisseId, methodePaiement = "CASH" } = req.body;
+
+      // 1. Load penalty
+      const [penalite] = await db
+        .select()
+        .from(tontinePenalites)
+        .where(eq(tontinePenalites.id, penaliteId));
+
+      if (!penalite) {
+        return res.status(404).json({ message: "Pénalité introuvable" });
+      }
+
+      if (penalite.statut === "PAID" || penalite.statut === "paye") {
+        return res.status(409).json({ message: "Pénalité déjà payée" });
+      }
+
+      if (penalite.statut === "WAIVED" || penalite.statut === "CANCELLED") {
+        return res.status(409).json({ message: "Pénalité annulée ou exonérée" });
+      }
+
+      // 2. Load tontine for agenceId
+      const [tontine] = await db
+        .select()
+        .from(tontines)
+        .where(eq(tontines.id, tontineId));
+
+      if (!tontine) {
+        return res.status(404).json({ message: "Tontine introuvable" });
+      }
+
+      // 3. Load member for clientId
+      const [membre] = await db
+        .select()
+        .from(membresTontine)
+        .where(eq(membresTontine.id, penalite.membreId));
+
+      if (!membre) {
+        return res.status(404).json({ message: "Membre introuvable" });
+      }
+
+      const montant = Number(penalite.montant);
+
+      // 4. Execute through ledger
+      const { result, mouvement } = await executeWithLedger(
+        "TONTINE",
+        {
+          montant: montant.toString(),
+          sens: "CREDIT",
+          clientId: membre.clientId,
+          tontineId,
+          sessionCaisseId: methodePaiement === "CASH" ? sessionCaisseId : undefined,
+          typePaiement: "TONTINE_PENALTY",
+          methodePaiement,
+          agenceId: tontine.agenceId ?? undefined,
+          idempotencyKey: `PENALTY-PAY-${penaliteId}`,
+          metadata: {
+            description: `Paiement pénalité tontine "${tontine.nom}"`,
+            penaliteId,
+            penaltyType: penalite.penaltyType,
+          },
+        },
+        async (tx, mouvement) => {
+          // a. Update penalty status
+          await tx
+            .update(tontinePenalites)
+            .set({
+              statut: "PAID",
+              datePaiement: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(tontinePenalites.id, penaliteId));
+
+          // b. Update tontine solde (penalty goes to pot)
+          const nouveauSoldeTontine = await updateTontineSolde(tx, tontineId, montant);
+
+          // c. Update session caisse solde if cash payment
+          let nouveauSoldeSession: string | undefined;
+          if (methodePaiement === "CASH" && sessionCaisseId) {
+            nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, montant);
+          }
+
+          return {
+            result: { penaliteId, montant, tontineId },
+            additionalEventData: {
+              nouveauSoldeTontine,
+              nouveauSoldeSession,
+            },
+          };
+        },
+        userId
+      );
+
+      // 5. WS notifications
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: "penalite_paid", penaliteId, tontineId, montant },
+        });
+      }
+
+      res.json({
+        success: true,
+        penaliteId,
+        mouvementId: mouvement.id,
+        montant,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erreur paiement pénalité";
+      logger.error({ message }, 'TontinePenalitePay error');
+
+      if (message.includes("Duplicate idempotency")) {
+        return res.status(409).json({ message: "Pénalité déjà payée (idempotency)" });
+      }
+
+      res.status(500).json({ message });
+    }
+  });
+
+  /**
+   * GAP #6 FIX: Reconciliation endpoint.
+   * Compares tontines.solde vs SUM(contributions) - SUM(distributions).
+   */
+  app.get("/api/tontines/:id/reconciliation", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.TONTINE), async (req, res) => {
+    try {
+      const tontineId = req.params.id;
+
+      // 1. Load tontine solde
+      const [tontine] = await db
+        .select({ id: tontines.id, nom: tontines.nom, solde: tontines.solde })
+        .from(tontines)
+        .where(eq(tontines.id, tontineId));
+
+      if (!tontine) {
+        return res.status(404).json({ message: "Tontine introuvable" });
+      }
+
+      // 2. SUM contributions POSTED
+      const [contribResult] = await db
+        .select({ total: sql<string>`COALESCE(SUM(${contributionsTontine.montant}::numeric), 0)` })
+        .from(contributionsTontine)
+        .where(
+          and(
+            eq(contributionsTontine.tontineId, tontineId),
+            eq(contributionsTontine.statutTransaction, "POSTED")
+          )
+        );
+
+      // 3. SUM distributions SUCCESS/PARTIAL (from distribution requests)
+      const [distribResult] = await db
+        .select({ total: sql<string>`COALESCE(SUM(${tontineDistributionRequests.amountPaid}::numeric), 0)` })
+        .from(tontineDistributionRequests)
+        .where(
+          and(
+            eq(tontineDistributionRequests.tontineId, tontineId),
+            sql`${tontineDistributionRequests.status} IN ('SUCCESS', 'PARTIAL')`
+          )
+        );
+
+      // 4. SUM penalties PAID (now tracked through ledger)
+      const [penaltyResult] = await db
+        .select({ total: sql<string>`COALESCE(SUM(${tontinePenalites.montant}::numeric), 0)` })
+        .from(tontinePenalites)
+        .where(
+          and(
+            eq(tontinePenalites.tontineId, tontineId),
+            sql`${tontinePenalites.statut} IN ('PAID', 'paye')`
+          )
+        );
+
+      const soldeCourant = Number(tontine.solde || "0");
+      const totalContributions = Number(contribResult.total);
+      const totalDistributions = Number(distribResult.total);
+      const totalPenalties = Number(penaltyResult.total);
+
+      // Expected = contributions + penalties - distributions
+      const soldeCalcule = totalContributions + totalPenalties - totalDistributions;
+      const ecart = Math.abs(soldeCourant - soldeCalcule);
+      const isReconciled = ecart < 0.01;
+
+      // 5. Per-member check
+      const memberChecks = await db
+        .select({
+          membreId: membresTontine.id,
+          clientId: membresTontine.clientId,
+          totalCotisationsStored: membresTontine.totalCotisations,
+          totalCotisationsComputed: sql<string>`COALESCE(SUM(${contributionsTontine.montant}::numeric), 0)`,
+        })
+        .from(membresTontine)
+        .leftJoin(
+          contributionsTontine,
+          and(
+            eq(contributionsTontine.membreId, membresTontine.id),
+            eq(contributionsTontine.statutTransaction, "POSTED")
+          )
+        )
+        .where(eq(membresTontine.tontineId, tontineId))
+        .groupBy(membresTontine.id, membresTontine.clientId, membresTontine.totalCotisations);
+
+      const memberDiscrepancies = memberChecks
+        .filter((m) => {
+          const stored = Number(m.totalCotisationsStored || "0");
+          const computed = Number(m.totalCotisationsComputed);
+          return Math.abs(stored - computed) >= 0.01;
+        })
+        .map((m) => ({
+          membreId: m.membreId,
+          clientId: m.clientId,
+          stored: Number(m.totalCotisationsStored || "0"),
+          computed: Number(m.totalCotisationsComputed),
+          ecart: Number(m.totalCotisationsStored || "0") - Number(m.totalCotisationsComputed),
+        }));
+
+      res.json({
+        tontineId,
+        tontineName: tontine.nom,
+        soldeCourant,
+        soldeCalcule,
+        ecart,
+        isReconciled,
+        details: {
+          totalContributions,
+          totalDistributions,
+          totalPenalties,
+        },
+        memberDiscrepancies,
+        memberDiscrepancyCount: memberDiscrepancies.length,
+        checkedAt: new Date().toISOString(),
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erreur réconciliation";
+      logger.error({ message }, 'TontineReconciliation error');
+      res.status(500).json({ message });
+    }
+  });
+
   // Tontine Plans
   app.get("/api/tontine-plans", requireAuth, async (req, res) => {
     const plans = await storage.getAllTontinePlans();
@@ -353,7 +606,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(cycles));
     } catch (error: any) {
-      console.error("Erreur chargement cycles:", error);
+      logger.error({ err: error }, 'Erreur chargement cycles');
       res.status(500).json({ message: error.message || "Erreur chargement cycles" });
     }
   });
@@ -416,11 +669,16 @@ export function registerTontineRoutes(app: Express) {
           },
           timestamp: new Date(),
         });
+
+        // Generate SMS reminder schedules for all active members
+        generateTontineReminderSchedule(req.params.id).catch((err: unknown) => {
+          logger.error({ err, tontineId: req.params.id }, 'TontineReminder failed to generate reminders');
+        });
       }
 
       res.json(addSnakeCaseAliasesDeep(result));
     } catch (error: any) {
-      console.error("Erreur génération cycle:", error);
+      logger.error({ err: error }, 'Erreur génération cycle');
       res.status(400).json({ message: error.message || "Erreur génération cycle" });
     }
   });
@@ -443,7 +701,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(cycle));
     } catch (error: any) {
-      console.error("Erreur chargement cycle:", error);
+      logger.error({ err: error }, 'Erreur chargement cycle');
       res.status(500).json({ message: error.message || "Erreur chargement cycle" });
     }
   });
@@ -478,7 +736,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(updated));
     } catch (error: any) {
-      console.error("Erreur clôture cycle:", error);
+      logger.error({ err: error }, 'Erreur clôture cycle');
       res.status(400).json({ message: error.message || "Erreur clôture cycle" });
     }
   });
@@ -499,7 +757,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(turns));
     } catch (error: any) {
-      console.error("Erreur chargement tours:", error);
+      logger.error({ err: error }, 'Erreur chargement tours');
       res.status(500).json({ message: error.message || "Erreur chargement tours" });
     }
   });
@@ -549,7 +807,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(result));
     } catch (error: any) {
-      console.error("Erreur réorganisation tours:", error);
+      logger.error({ err: error }, 'Erreur réorganisation tours');
       res.status(400).json({ message: error.message || "Erreur réorganisation tours" });
     }
   });
@@ -568,7 +826,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(audits));
     } catch (error: any) {
-      console.error("Erreur chargement audit:", error);
+      logger.error({ err: error }, 'Erreur chargement audit');
       res.status(500).json({ message: error.message || "Erreur chargement audit" });
     }
   });
@@ -589,8 +847,87 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(schedules));
     } catch (error: any) {
-      console.error("Erreur chargement schedules:", error);
+      logger.error({ err: error }, 'Erreur chargement schedules');
       res.status(500).json({ message: error.message || "Erreur chargement schedules" });
+    }
+  });
+
+  // --- ECHEANCES (Calendar) ---
+  // Returns turn-level schedule data for the frontend TontineCalendar component.
+  // Uses the active (OPEN) cycle's turns joined with beneficiary info.
+  app.get("/api/tontines/:id/echeances", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const tontineId = req.params.id;
+
+      // Find the active cycle
+      const [cycle] = await db
+        .select()
+        .from(tontineCycles)
+        .where(and(eq(tontineCycles.tontineId, tontineId), eq(tontineCycles.status, "OPEN")))
+        .orderBy(desc(tontineCycles.cycleNumber))
+        .limit(1);
+
+      if (!cycle) {
+        return res.json([]);
+      }
+
+      // Get all turns for this cycle with beneficiary info
+      const turns = await db
+        .select({
+          turnNumber: tontineTurns.turnNumber,
+          dueDate: tontineTurns.dueDate,
+          status: tontineTurns.status,
+          beneficiaryMemberId: tontineTurns.beneficiaryMemberId,
+          amountExpected: tontineTurns.amountExpected,
+          amountPaidOut: tontineTurns.amountPaidOut,
+          clientNom: users.nom,
+          clientPrenom: users.prenom,
+        })
+        .from(tontineTurns)
+        .leftJoin(membresTontine, eq(tontineTurns.beneficiaryMemberId, membresTontine.id))
+        .leftJoin(clients, eq(membresTontine.clientId, clients.id))
+        .leftJoin(users, eq(clients.userId, users.id))
+        .where(and(eq(tontineTurns.tontineId, tontineId), eq(tontineTurns.cycleId, cycle.id)))
+        .orderBy(asc(tontineTurns.turnNumber));
+
+      // Get schedule contribution counts keyed by periodNumber
+      const schedules = await db
+        .select({
+          periodNumber: tontineSchedules.periodNumber,
+          membersPaidCount: tontineSchedules.membersPaidCount,
+          totalCollected: tontineSchedules.totalCollected,
+          scheduleStatus: tontineSchedules.status,
+        })
+        .from(tontineSchedules)
+        .where(and(eq(tontineSchedules.tontineId, tontineId), eq(tontineSchedules.cycleId, cycle.id)))
+        .orderBy(asc(tontineSchedules.periodNumber));
+
+      const scheduleMap = new Map(schedules.map((s) => [s.periodNumber, s]));
+
+      const echeances = turns.map((turn) => {
+        const sched = scheduleMap.get(turn.turnNumber);
+        const beneficiaire = turn.clientNom
+          ? `${turn.clientNom} ${turn.clientPrenom || ""}`.trim()
+          : null;
+
+        return {
+          tour: turn.turnNumber,
+          date: turn.dueDate,
+          beneficiaire,
+          statut: turn.status,
+          contributions_recues: sched?.membersPaidCount ?? 0,
+          contributions_attendues: cycle.membersCount,
+          montant_attendu: turn.amountExpected,
+          montant_verse: turn.amountPaidOut,
+          total_collecte: sched?.totalCollected ?? "0",
+        };
+      });
+
+      res.json(echeances);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erreur chargement échéances";
+      logger.error({ err: error }, 'Erreur chargement échéances');
+      res.status(500).json({ message });
     }
   });
 
@@ -606,7 +943,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(result));
     } catch (error: any) {
-      console.error("Erreur calcul retirable:", error);
+      logger.error({ err: error }, 'Erreur calcul retirable');
       res.status(500).json({ message: error.message || "Erreur calcul retirable" });
     }
   });
@@ -636,7 +973,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(filtered));
     } catch (error: any) {
-      console.error("Erreur chargement distribution requests:", error);
+      logger.error({ err: error }, 'Erreur chargement distribution requests');
       res.status(500).json({ message: error.message || "Erreur chargement" });
     }
   });
@@ -696,7 +1033,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(result));
     } catch (error: any) {
-      console.error("Erreur création distribution request:", error);
+      logger.error({ err: error }, 'Erreur création distribution request');
       res.status(400).json({ message: error.message || "Erreur création" });
     }
   });
@@ -777,7 +1114,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(result));
     } catch (error: any) {
-      console.error("Erreur approbation distribution:", error);
+      logger.error({ err: error }, 'Erreur approbation distribution');
       res.status(400).json({ message: error.message || "Erreur approbation" });
     }
   });
@@ -812,7 +1149,7 @@ export function registerTontineRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(updated));
     } catch (error: any) {
-      console.error("Erreur annulation distribution:", error);
+      logger.error({ err: error }, 'Erreur annulation distribution');
       res.status(400).json({ message: error.message || "Erreur annulation" });
     }
   });
@@ -875,7 +1212,7 @@ export function registerTontineRoutes(app: Express) {
         },
       }));
     } catch (error: any) {
-      console.error("Erreur dashboard tontine:", error);
+      logger.error({ err: error }, 'Erreur dashboard tontine');
       res.status(500).json({ message: error.message || "Erreur dashboard" });
     }
   });

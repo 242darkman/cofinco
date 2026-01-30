@@ -12,6 +12,9 @@ import type {
   EmailProvider,
   SendResult,
 } from "./providers/provider.interface";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('NotifWorker');
 
 // ============================================================================
 // CONFIGURATION
@@ -143,14 +146,12 @@ async function processNotificationJobs(): Promise<number> {
     }
 
     if (processedCount > 0) {
-      console.log(
-        `[NotifWorker] Processed ${processedCount}/${jobs.rows.length} jobs`
-      );
+      logger.info({ processedCount, totalJobs: jobs.rows.length }, 'Processed notification jobs');
     }
 
     return processedCount;
   } catch (error: any) {
-    console.error("[NotifWorker] Error in process loop:", error.message);
+    logger.error({ err: error }, 'Error in process loop');
     return 0;
   }
 }
@@ -234,9 +235,7 @@ async function handleJobFailure(
     .where(eq(notificationJobs.id, job.id));
 
   if (isDeadLetter) {
-    console.error(
-      `[NotifWorker] Job ${job.id} moved to DEAD_LETTER after ${newAttempts} attempts: ${errorMsg.substring(0, 200)}`
-    );
+    logger.error({ jobId: job.id, attempts: newAttempts, error: errorMsg.substring(0, 200) }, 'Job moved to DEAD_LETTER');
   }
 }
 
@@ -250,12 +249,12 @@ async function handleJobFailure(
  */
 export function startNotificationWorker(): void {
   if (isRunning) {
-    console.log("[NotifWorker] Already running");
+    logger.info('Worker already running');
     return;
   }
 
   isRunning = true;
-  console.log("[NotifWorker] Worker started (poll interval: 2s)");
+  logger.info({ pollIntervalMs: POLL_INTERVAL_MS }, 'Worker started');
 
   // Initial run
   processNotificationJobs();
@@ -281,7 +280,7 @@ export function stopNotificationWorker(): void {
     pollInterval = null;
   }
 
-  console.log("[NotifWorker] Worker stopped");
+  logger.info('Worker stopped');
 }
 
 /**

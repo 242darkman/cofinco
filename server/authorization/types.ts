@@ -278,10 +278,102 @@ export const PERMISSION_CODE_MAPPINGS: Record<string, PermissionMapping> = {
 };
 
 /**
- * Normalize permission code to lowercase
+ * PERMISSION CODE ALIASES
+ * =======================
+ *
+ * Maps variant permission codes to canonical codes for backward compatibility.
+ * This handles inconsistencies like "caisseagent" vs "caisse_agent".
+ *
+ * Usage: When receiving a permission code, first check aliases, then mappings.
+ */
+export const PERMISSION_CODE_ALIASES: Record<string, string> = {
+  // CaisseAgent variants (canonical: caisseagent)
+  'caisse_agent.view': 'caisseagent.view',
+  'caisse_agent.create': 'caisseagent.create',
+  'caisse_agent.manage': 'caisseagent.manage',
+  'caisse_agent.approve': 'caisseagent.approve',
+  'caisse_agent.reject': 'caisseagent.reject',
+  'caisse_agent.suspend': 'caisseagent.suspend',
+  'caisse-agent.view': 'caisseagent.view',
+  'caisse-agent.create': 'caisseagent.create',
+  'caisse-agent.manage': 'caisseagent.manage',
+
+  // Agent terrain variants (canonical: agent)
+  'agent-terrain.view': 'agent.view',
+  'agent-terrain.create': 'agent.create',
+  'agent-terrain.edit': 'agents_terrain.edit',
+  'agent-terrain.manage': 'agent.manage',
+  'agentterrain.view': 'agent.view',
+  'agentterrain.create': 'agent.create',
+
+  // Singular vs plural variants
+  'credit.view': 'credits.view',
+  'credit.create': 'credits.create',
+  'credit.edit': 'credits.edit',
+  'credit.delete': 'credits.delete',
+  'credit.approve': 'credits.approve',
+  'credit.disburse': 'credits.disburse',
+
+  'client.view': 'clients.view',
+  'client.create': 'clients.create',
+  'client.edit': 'clients.edit',
+  'client.delete': 'clients.delete',
+
+  'epargne.view': 'epargnes.view',
+  'epargne.create': 'epargnes.create',
+  'epargne.edit': 'epargnes.edit',
+  'epargne.deposit': 'epargnes.deposit',
+  'epargne.withdraw': 'epargnes.withdraw',
+
+  'tontine.view': 'tontines.view',
+  'tontine.create': 'tontines.create',
+  'tontine.edit': 'tontines.edit',
+  'tontine.manage': 'tontines.manage',
+
+  'remboursement.view': 'remboursements.view',
+  'remboursement.create': 'remboursements.create',
+
+  'rapport.view': 'rapports.view',
+  'rapport.export': 'rapports.export',
+
+  // Communications variants
+  'communication.view': 'communications.view',
+  'communication.send': 'communications.send',
+  'message.view': 'messages.view',
+  'message.send': 'messages.send',
+
+  // Department variants
+  'department.view': 'departments.view',
+  'department.create': 'departments.create',
+  'department.edit': 'departments.edit',
+  'department.delete': 'departments.delete',
+
+  // Employe variants
+  'employe.view': 'employes.view',
+  'employe.create': 'employes.create',
+  'employe.edit': 'employes.edit',
+  'employe.delete': 'employes.delete',
+
+  // Agence variants
+  'agence.view': 'agences.view',
+  'agence.create': 'agences.create',
+  'agence.edit': 'agences.edit',
+  'agence.delete': 'agences.delete',
+
+  // Virement variants
+  'virement.view': 'virements_programmes.view',
+  'virement.edit': 'virements_programmes.edit',
+  'virements.view': 'virements_programmes.view',
+  'virements.edit': 'virements_programmes.edit',
+};
+
+/**
+ * Normalize permission code to lowercase and resolve aliases
  */
 export function normalizePermissionCode(code: string): string {
-  return code.toLowerCase().trim();
+  const normalized = code.toLowerCase().trim();
+  // Check if this is an alias and return the canonical code
+  return PERMISSION_CODE_ALIASES[normalized] || normalized;
 }
 
 /**

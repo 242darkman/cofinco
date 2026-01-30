@@ -115,6 +115,17 @@ export interface IMobileMoneyProvider {
    * Normalise le statut du provider vers nos statuts internes
    */
   normalizeStatus(providerStatus: string): "PENDING" | "SUCCESS" | "FAILED" | "EXPIRED";
+
+  /**
+   * Récupère le solde du compte provider (optionnel)
+   */
+  getBalance?(): Promise<ProviderBalanceResponse>;
+}
+
+export interface ProviderBalanceResponse {
+  balance: string;
+  currency: string;
+  accountStatus: string;
 }
 
 // ============================================

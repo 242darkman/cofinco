@@ -56,17 +56,26 @@ const AccountRow: React.FC<AccountRowProps> = ({ account, onManage, onTransactio
   const clientName = formatClientName(account.clients?.nom, account.clients?.prenom);
   const initials = getInitials(account.clients?.nom || '?', account.clients?.prenom);
   const avatarColor = getAvatarColor(clientName || 'Inconnu');
+  const clientPhotoUrl = account.clients?.photoUrl;
 
   return (
-    <div 
+    <div
       className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-surface-base hover:bg-slate-800/50 border-b border-edge transition-colors cursor-pointer gap-4 sm:gap-0"
       onClick={() => onManage(account)}
     >
       {/* Client & Account Info */}
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        <div className={`w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center text-white text-xs font-bold tracking-wider shrink-0 shadow-lg ring-2 ring-slate-900`}>
-          {initials}
-        </div>
+        {clientPhotoUrl ? (
+          <img
+            src={clientPhotoUrl}
+            alt={clientName || 'Client'}
+            className="w-10 h-10 rounded-full object-cover shrink-0 shadow-lg ring-2 ring-slate-900"
+          />
+        ) : (
+          <div className={`w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center text-white text-xs font-bold tracking-wider shrink-0 shadow-lg ring-2 ring-slate-900`}>
+            {initials}
+          </div>
+        )}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="text-white font-medium text-sm truncate">{clientName}</h3>

@@ -1,5 +1,8 @@
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
 import { storage } from "../storage";
+
+const logger = createLogger('Routes:Loyalty');
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -14,7 +17,7 @@ loyaltyRouter.get("/:clientId/points", requireAuth, async (req, res) => {
         const history = await storage.getLoyaltyHistory(clientId);
         res.json(history);
     } catch (error) {
-        console.error("Erreur récupération historique points:", error);
+        logger.error({ err: error }, 'Erreur récupération historique points');
         res.status(500).json({ error: "Erreur serveur" });
     }
 });
@@ -26,7 +29,7 @@ loyaltyRouter.get("/:clientId/score", requireAuth, async (req, res) => {
         const score = await storage.calculateEngagementScore(clientId);
         res.json({ score });
     } catch (error) {
-        console.error("Erreur calcul score:", error);
+        logger.error({ err: error }, 'Erreur calcul score');
         res.status(500).json({ error: "Erreur serveur" });
     }
 });
@@ -52,7 +55,7 @@ loyaltyRouter.post("/:clientId/bonus", requireAuth, attachAbility, requireAbilit
 
         res.json({ success: true, message: `${points} points ajoutés` });
     } catch (error) {
-        console.error("Erreur ajout bonus:", error);
+        logger.error({ err: error }, 'Erreur ajout bonus');
         res.status(500).json({ error: "Erreur serveur" });
     }
 });

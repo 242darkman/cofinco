@@ -36,3 +36,13 @@ export { idempotencyMiddleware } from "./idempotency";
 
 // Maintenance mode
 export { checkMaintenanceMode } from "./maintenance";
+
+// Agency Scope Documentation & Helpers
+export {
+  ROUTES_REQUIRING_AGENCY_SCOPE,
+  ROUTES_EXEMPT_FROM_AGENCY_SCOPE,
+  requiresAgencyScope,
+  getAgencyScopeConfig,
+  type AgencyScopeRoute,
+  type AgencyExemptRoute,
+} from "./agency-scope";

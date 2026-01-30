@@ -28,6 +28,9 @@ import { isCoffreCaisseError } from "../services/coffre/coffre-errors";
 // State Machine errors for proper error handling
 import { CreditTransitionError } from "@shared/machines/credit-workflow";
 import { DemandeTransitionError } from "@shared/machines/demande-workflow";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Finance');
 import {
   StatutCompte,
   StatutCredit,
@@ -45,6 +48,7 @@ import { attachAbility, requireAbility, requireDisbursement, hasAbility, Actions
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { generateCreditReminderSchedule } from "../services/notifications/credit-reminder-service";
 import { db } from "../db";
 import { z } from "zod";
 import {
@@ -60,7 +64,10 @@ import * as sessionService from "../services/caisse/session-service";
 import { sessionOpeningService } from "../services/caisse/session-opening-service";
 import { sessionClosingService } from "../services/caisse/session-closing-service";
 import { accessControlService } from "../services/caisse/access-control-service";
+import { countSuggestionService } from "../services/caisse/count-suggestion-service";
 import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_OPERATIONS } from "@shared/config/caisse-operations";
+import { paymentService } from "../services/mobile-money/payment-service";
+import { MethodePaiement } from "@shared/enum/status-constants";
 
 export function registerFinanceRoutes(app: Express) {
   // Credit Plans Routes
@@ -105,19 +112,32 @@ export function registerFinanceRoutes(app: Express) {
   // Credits
   app.get("/api/credits", requireAuth, requireAgenceAccess(), async (req, res) => {
     // req.agenceFilter est injecté par requireAgenceAccess
-    // Ex: { agence: "Siège" } ou null (admin)
     const agenceFilter = req.agenceFilter as { agence?: string } | null;
-    
-    // On passe le filtre directement au storage qui l'applique en SQL (jointure client)
+
     const filter: { agence?: string; clientId?: string } = agenceFilter ? { agence: agenceFilter.agence } : {};
-    
+
     if (req.query.clientId) {
       filter.clientId = req.query.clientId as string;
     }
-    
-    const credits = await storage.getAllCredits(filter);
-    
-    res.json(addSnakeCaseAliasesDeep(credits));
+
+    const options = {
+      search: req.query.search as string | undefined,
+      page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20,
+      statut: req.query.statut as string | undefined,
+    };
+
+    const result = await storage.getAllCredits(filter, options);
+
+    res.json({
+      data: addSnakeCaseAliasesDeep(result.data),
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      },
+    });
   });
 
   // Create credit (roles: admin, chef, credit only)
@@ -347,7 +367,7 @@ export function registerFinanceRoutes(app: Express) {
               });
 
             } catch (err: any) {
-              console.error("Erreur Ledger lors du décaissement:", err);
+              logger.error({ err }, 'Erreur Ledger lors du décaissement');
               throw new Error(`Erreur lors du décaissement effectif: ${err.message}`);
             }
           }
@@ -431,6 +451,11 @@ export function registerFinanceRoutes(app: Express) {
         timestamp: new Date(),
       });
 
+      // Generate SMS reminder schedules for this credit's repayment dates
+      generateCreditReminderSchedule(credit.id).catch((err: unknown) => {
+        logger.error({ err, creditId: credit.id }, 'Failed to generate credit reminders');
+      });
+
       res.status(201).json({
         success: true,
         credit: addSnakeCaseAliasesDeep(credit),
@@ -446,7 +471,7 @@ export function registerFinanceRoutes(app: Express) {
         message
       });
     } catch (error: any) {
-      console.error("Erreur décaissement crédit:", error);
+      logger.error({ err: error }, 'Erreur décaissement crédit');
 
       // Gestion d'erreur structurée pour le workflow de réapprovisionnement
       if (error instanceof DecaissementInsufficientFundsError) {
@@ -493,7 +518,7 @@ export function registerFinanceRoutes(app: Express) {
         count: pendingDisbursements.length
       });
     } catch (error: any) {
-      console.error("Erreur récupération décaissements en attente:", error);
+      logger.error({ err: error }, 'Erreur récupération décaissements en attente');
       res.status(500).json({
         success: false,
         message: error.message || "Erreur lors de la récupération des décaissements en attente"
@@ -591,7 +616,7 @@ export function registerFinanceRoutes(app: Express) {
       });
 
     } catch (error: any) {
-      console.error("Erreur décaissement caisse:", error);
+      logger.error({ err: error }, 'Erreur décaissement caisse');
 
       if (error instanceof DecaissementInsufficientFundsError) {
         return res.status(error.httpStatus).json({
@@ -682,11 +707,189 @@ export function registerFinanceRoutes(app: Express) {
       });
 
     } catch (error: any) {
-      console.error("Erreur annulation décaissement:", error);
+      logger.error({ err: error }, 'Erreur annulation décaissement');
       res.status(500).json({
         success: false,
         message: error.message || "Erreur lors de l'annulation"
       });
+    }
+  });
+
+  /**
+   * POST /api/credits/batch-disburse/validate
+   * Validation préalable des crédits avant décaissement groupé
+   * Retourne les crédits valides et invalides avec raisons
+   */
+  app.post("/api/credits/batch-disburse/validate", requireAuth, attachAbility, requireAbility(Actions.DISBURSE_CASH, Subjects.CREDIT), requireAgenceAccess(), async (req, res) => {
+    try {
+      const data = normalizeKeysDeep(req.body) as any;
+      const creditIds: string[] = data.creditIds;
+      const sessionCaisseId: string = data.sessionCaisseId;
+
+      if (!creditIds || !Array.isArray(creditIds) || creditIds.length === 0) {
+        return res.status(400).json({ message: "Liste de crédits requise" });
+      }
+      if (!sessionCaisseId) {
+        return res.status(400).json({ message: "Session de caisse requise" });
+      }
+
+      // Récupérer le solde disponible de la session
+      const [session] = await db.select({
+        id: sessionsCaisse.id,
+        montantFermetureTheorique: sessionsCaisse.montantFermetureTheorique,
+        statut: sessionsCaisse.statut,
+      })
+      .from(sessionsCaisse)
+      .where(eq(sessionsCaisse.id, sessionCaisseId))
+      .limit(1);
+
+      if (!session || session.statut !== 'OPEN') {
+        return res.status(400).json({ message: "Session de caisse invalide ou fermée" });
+      }
+
+      const soldeDisponible = Number(session.montantFermetureTheorique) || 0;
+
+      const validation: {
+        valid: Array<{ creditId: string; montant: number; numeroCredit: string; clientNom: string }>;
+        invalid: Array<{ creditId: string; reason: string; numeroCredit?: string }>;
+        totalMontant: number;
+        soldeDisponible: number;
+        fondsInsuffisants: boolean;
+      } = {
+        valid: [],
+        invalid: [],
+        totalMontant: 0,
+        soldeDisponible,
+        fondsInsuffisants: false,
+      };
+
+      // Valider chaque crédit
+      for (const creditId of creditIds) {
+        const [credit] = await db.select().from(schema.credits).where(eq(schema.credits.id, creditId)).limit(1);
+
+        if (!credit) {
+          validation.invalid.push({ creditId, reason: "Crédit non trouvé" });
+          continue;
+        }
+
+        // Vérifier le statut
+        if (credit.statut !== StatutCredit.WAITING_DISBURSEMENT) {
+          validation.invalid.push({
+            creditId,
+            numeroCredit: credit.numeroCredit,
+            reason: `Statut invalide: ${credit.statut} (doit être WAITING_DISBURSEMENT)`
+          });
+          continue;
+        }
+
+        // Récupérer les infos client via jointure users
+        const [clientInfo] = await db.select({ nom: schema.users.nom, prenom: schema.users.prenom })
+          .from(schema.clients)
+          .innerJoin(schema.users, eq(schema.clients.userId, schema.users.id))
+          .where(eq(schema.clients.id, credit.clientId))
+          .limit(1);
+
+        const montant = Number(credit.montant) || 0;
+        validation.valid.push({
+          creditId,
+          montant,
+          numeroCredit: credit.numeroCredit,
+          clientNom: clientInfo ? `${clientInfo.prenom} ${clientInfo.nom}` : 'Inconnu'
+        });
+        validation.totalMontant += montant;
+      }
+
+      // Vérifier si les fonds sont suffisants
+      validation.fondsInsuffisants = validation.totalMontant > soldeDisponible;
+
+      res.json({
+        success: true,
+        validation,
+        canProceed: validation.invalid.length === 0 && !validation.fondsInsuffisants,
+        message: validation.fondsInsuffisants
+          ? `Fonds insuffisants: ${validation.totalMontant.toLocaleString()} nécessaires, ${soldeDisponible.toLocaleString()} disponibles`
+          : validation.invalid.length > 0
+            ? `${validation.invalid.length} crédit(s) invalide(s)`
+            : `${validation.valid.length} crédit(s) prêt(s) pour décaissement`
+      });
+
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur validation batch décaissement');
+      res.status(500).json({ success: false, message: error.message || "Erreur de validation" });
+    }
+  });
+
+  /**
+   * POST /api/credits/batch-disburse
+   * Décaissement groupé de plusieurs crédits en une seule opération
+   */
+  app.post("/api/credits/batch-disburse", requireAuth, attachAbility, requireAbility(Actions.DISBURSE_CASH, Subjects.CREDIT), requireAgenceAccess(), async (req, res) => {
+    try {
+      const data = normalizeKeysDeep(req.body) as any;
+      const user = req.session.user;
+
+      if (!user?.id) {
+        return res.status(401).json({ message: "Utilisateur non authentifié" });
+      }
+
+      const creditIds: string[] = data.creditIds;
+      const sessionCaisseId: string = data.sessionCaisseId;
+
+      if (!creditIds || !Array.isArray(creditIds) || creditIds.length === 0) {
+        return res.status(400).json({ message: "Liste de crédits requise" });
+      }
+      if (!sessionCaisseId) {
+        return res.status(400).json({ message: "L'ID de la session de caisse est requis" });
+      }
+
+      const results: Array<{ creditId: string; success: boolean; message: string; credit?: any }> = [];
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const creditId of creditIds) {
+        try {
+          const result = await storage.processLoanCashPayout({
+            creditId,
+            sessionCaisseId,
+            paymentReference: data.paymentReference,
+          }, user.id);
+
+          await logAudit(req, "DECAISSEMENT_CAISSE_EXECUTE", "credit", creditId, {
+            sessionCaisseId,
+            montant: result.credit.montant,
+            numeroCredit: result.credit.numeroCredit,
+            batchMode: true,
+          }, "success", "high");
+
+          results.push({ creditId, success: true, message: "Décaissé", credit: result.credit });
+          successCount++;
+        } catch (err: any) {
+          results.push({ creditId, success: false, message: err.message || "Erreur" });
+          failCount++;
+        }
+      }
+
+      // Broadcast updates once after batch completes
+      const wsInstance = getWsInstance();
+      if (wsInstance && successCount > 0) {
+        wsInstance.broadcast({
+          type: "CAISSE_UPDATE",
+          payload: { subtype: "BATCH_DISBURSEMENT_COMPLETED", count: successCount },
+        });
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: "batch_activated", count: successCount } });
+        wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+      }
+
+      res.json({
+        success: failCount === 0,
+        message: `${successCount} décaissé(s), ${failCount} erreur(s)`,
+        results,
+        successCount,
+        failCount,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur batch décaissement');
+      res.status(500).json({ success: false, message: error.message || "Erreur lors du décaissement groupé" });
     }
   });
 
@@ -779,7 +982,7 @@ export function registerFinanceRoutes(app: Express) {
 
         res.json(mapping);
       } catch (error: any) {
-          console.error("Error fetching credit counts:", error);
+          logger.error({ err: error }, 'Error fetching credit counts');
           res.status(500).json({ message: "Erreur lors du comptage des dossiers" });
       }
   });
@@ -1039,7 +1242,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(updated));
     } catch (error: any) {
-      console.error("Erreur mise à jour demande crédit:", error);
+      logger.error({ err: error }, 'Erreur mise à jour demande crédit');
 
       // State Machine error: return 400 with clear message
       if (error instanceof DemandeTransitionError) {
@@ -1082,7 +1285,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(demande));
     } catch (error: any) {
-      console.error("Erreur annulation demande crédit:", error);
+      logger.error({ err: error }, 'Erreur annulation demande crédit');
 
       // State Machine error: return 400 with clear message
       if (error instanceof DemandeTransitionError) {
@@ -1095,6 +1298,95 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       res.status(500).json({ message: error.message || "Erreur lors de l'annulation de la demande" });
+    }
+  });
+
+  // Start investigation - changes status from READY_FOR_INVESTIGATION to UNDER_INVESTIGATION
+  app.post("/api/demandes-credit/:id/start-investigation", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get demande
+      const demande = await storage.getDemandeCredit(id);
+      if (!demande) {
+        return res.status(404).json({ message: "Demande non trouvée" });
+      }
+
+      // Verify status is READY_FOR_INVESTIGATION
+      if (demande.statut !== StatutDemande.READY_FOR_INVESTIGATION) {
+        return res.status(400).json({
+          message: `Cette demande ne peut pas démarrer une enquête (statut actuel: ${demande.statut}). Seules les demandes en attente d'enquête peuvent démarrer.`
+        });
+      }
+
+      // Update status to UNDER_INVESTIGATION
+      const updated = await storage.updateDemandeCredit(id, {
+        statut: StatutDemande.UNDER_INVESTIGATION,
+      });
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_started', id } });
+      }
+
+      // Domain event: investigation assigned/started
+      dispatchDomainEvent({
+        type: "CREDIT_INVESTIGATION_ASSIGNED",
+        data: {
+          demandeId: id,
+          numeroDemande: demande.numeroDemande,
+          clientId: demande.clientId,
+          agentName: req.session.user?.nom || 'Agent',
+          agenceId: req.session.user?.agenceId,
+        },
+        timestamp: new Date(),
+      });
+
+      res.json({ success: true, demande: addSnakeCaseAliasesDeep(updated) });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur démarrage enquête');
+      res.status(500).json({ message: error.message || "Erreur lors du démarrage de l'enquête" });
+    }
+  });
+
+  // Validate investigation - changes status from INVESTIGATION_COMPLETE to PENDING_APPROVAL
+  app.post("/api/demandes-credit/:id/validate-investigation", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.DEMANDE_CREDIT), async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get demande
+      const demande = await storage.getDemandeCredit(id);
+      if (!demande) {
+        return res.status(404).json({ message: "Demande non trouvée" });
+      }
+
+      // Verify status is INVESTIGATION_COMPLETE
+      if (demande.statut !== StatutDemande.INVESTIGATION_COMPLETE) {
+        return res.status(400).json({
+          message: `Cette demande ne peut pas être validée (statut actuel: ${demande.statut}). Seules les demandes avec enquête terminée peuvent être validées.`
+        });
+      }
+
+      // Update status to PENDING_APPROVAL
+      const updated = await storage.updateDemandeCredit(id, {
+        statut: StatutDemande.PENDING_APPROVAL,
+      });
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_validated', id, statut: StatutDemande.PENDING_APPROVAL } });
+      }
+
+      // Audit log
+      await logAudit(req, "VALIDATE_INVESTIGATION", "demande_credit", id, {
+        previousStatut: demande.statut,
+        newStatut: StatutDemande.PENDING_APPROVAL,
+      }, "success", "medium");
+
+      res.json({ success: true, demande: addSnakeCaseAliasesDeep(updated) });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur validation enquête');
+      res.status(500).json({ message: error.message || "Erreur lors de la validation de l'enquête" });
     }
   });
 
@@ -1186,7 +1478,7 @@ export function registerFinanceRoutes(app: Express) {
         demande: addSnakeCaseAliasesDeep(updated)
       });
     } catch (error: any) {
-      console.error("Erreur rejet commission:", error);
+      logger.error({ err: error }, 'Erreur rejet commission');
       res.status(500).json({ message: error.message || "Erreur lors du rejet de la demande" });
     }
   });
@@ -1195,7 +1487,53 @@ export function registerFinanceRoutes(app: Express) {
       try {
           const data = normalizeKeysDeep(req.body) as any;
           const user = req.session.user;
-          
+          const isMobileMoney = data.methodePaiement === MethodePaiement.MOBILE_MONEY;
+          const provider = data.provider?.toUpperCase() as 'MTN' | 'AIRTEL' | undefined;
+
+          // Validation Agence: Le client doit payer dans SON agence
+          const demande = await storage.getDemandeCredit(req.params.id);
+          if (!demande) return res.status(404).json({ message: "Demande introuvable" });
+
+          const client = await storage.getClient(demande.clientId);
+          if (!client) return res.status(404).json({ message: "Client introuvable" });
+
+          // ═══════════════════════════════════════════════════════════════════
+          // MOBILE MONEY FLOW (Asynchrone - MTN MoMo / Airtel Money)
+          // ═══════════════════════════════════════════════════════════════════
+          if (isMobileMoney && provider) {
+              // Validation du numéro de téléphone
+              const phone = data.phone || data.numeroTelephone || client.telephone;
+              if (!phone) {
+                  return res.status(400).json({ message: "Numéro de téléphone requis pour le paiement Mobile Money" });
+              }
+
+              // Initier la collection Mobile Money
+              const paymentIntent = await paymentService.initiateCollection({
+                  provider,
+                  amount: parseFloat(data.montant),
+                  phone,
+                  clientId: client.id,
+                  agenceId: client.agenceId || undefined,
+                  description: `Frais d'engagement - Demande ${demande.numeroDemande}`,
+                  idempotencyKey: data.idempotencyKey,
+                  metadata: {
+                      type: 'ENGAGEMENT_FEE',
+                      demandeId: req.params.id,
+                      numeroDemande: demande.numeroDemande,
+                  }
+              }, user?.id);
+
+              // Retourner le payment intent pour le suivi côté frontend
+              return res.json({
+                  paymentPending: true,
+                  paymentIntent: addSnakeCaseAliasesDeep(paymentIntent),
+                  message: `Veuillez confirmer le paiement de ${data.montant} FCFA sur votre téléphone ${provider}`
+              });
+          }
+
+          // ═══════════════════════════════════════════════════════════════════
+          // CASH / VIREMENT FLOW (Synchrone)
+          // ═══════════════════════════════════════════════════════════════════
           let sessionCaisseId: string | undefined;
           let activeSession: any = undefined;
 
@@ -1222,12 +1560,8 @@ export function registerFinanceRoutes(app: Express) {
               return res.status(400).json({ message: "Aucune caisse ouverte. Vous devez ouvrir votre caisse pour encaisser des frais." });
           }
 
-          // Validation Agence: Le client doit payer dans SON agence
-          const demande = await storage.getDemandeCredit(req.params.id);
-          if (!demande) return res.status(404).json({ message: "Demande introuvable" });
-
-          const client = await storage.getClient(demande.clientId);
-          if (client) {
+          // Validation agence
+          if (activeSession) {
              const sessionAgenceId = activeSession.agenceId;
              const clientAgenceId = client.agenceId;
 
@@ -1254,7 +1588,7 @@ export function registerFinanceRoutes(app: Express) {
 
           res.json(addSnakeCaseAliasesDeep(result));
       } catch (error: any) {
-          console.error("Erreur paiement frais:", error);
+          logger.error({ err: error }, 'Erreur paiement frais');
           res.status(400).json({ message: error.message });
       }
   });
@@ -1357,7 +1691,7 @@ export function registerFinanceRoutes(app: Express) {
         refund: addSnakeCaseAliasesDeep(refundRequest)
       });
     } catch (error: any) {
-      console.error("Erreur création remboursement:", error);
+      logger.error({ err: error }, 'Erreur création remboursement');
       res.status(500).json({ message: error.message || "Erreur lors de la création du remboursement" });
     }
   });
@@ -1394,15 +1728,16 @@ export function registerFinanceRoutes(app: Express) {
         })
       });
     } catch (error: any) {
-      console.error("Erreur récupération statut remboursement:", error);
+      logger.error({ err: error }, 'Erreur récupération statut remboursement');
       res.status(500).json({ message: error.message });
     }
   });
 
   app.get("/api/demandes-credit/:id/enquete", requireAuth, async (req, res) => {
-      const enquete = await storage.getEnqueteByDemandeId(req.params.id);
-      if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
-      res.json(addSnakeCaseAliasesDeep(enquete));
+      const enquetes = await storage.getEnqueteByDemandeId(req.params.id);
+      if (!enquetes || enquetes.length === 0) return res.status(404).json({ message: "Enquête non trouvée" });
+      // Return the most recent enquête for this demande
+      res.json(addSnakeCaseAliasesDeep(enquetes[0]));
   });
 
   // Obtenir le détail du scoring pour une demande
@@ -1437,7 +1772,7 @@ export function registerFinanceRoutes(app: Express) {
         ...scoringResult
       });
     } catch (error: any) {
-      console.error("Erreur calcul scoring:", error);
+      logger.error({ err: error }, 'Erreur calcul scoring');
       res.status(500).json({ message: error.message || "Erreur lors du calcul du scoring" });
     }
   });
@@ -1484,7 +1819,7 @@ export function registerFinanceRoutes(app: Express) {
         details: scoringResult.details
       });
     } catch (error: any) {
-      console.error("Erreur recalcul scoring:", error);
+      logger.error({ err: error }, 'Erreur recalcul scoring');
       res.status(500).json({ message: error.message || "Erreur lors du recalcul du scoring" });
     }
   });
@@ -1592,7 +1927,7 @@ export function registerFinanceRoutes(app: Express) {
           res.json({ success: true, timeline, demande });
 
       } catch (error: any) {
-          console.error("Timeline error:", error);
+          logger.error({ err: error }, 'Timeline error');
           res.status(500).json({ message: error.message });
       }
   });
@@ -1609,14 +1944,24 @@ export function registerFinanceRoutes(app: Express) {
 
   app.post("/api/enquetes-credit", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.DEMANDE_CREDIT), async (req, res) => {
       try {
-          const data = normalizeKeysDeep(req.body);
-          const parsed = insertEnqueteCreditSchema.parse(data);
-          const enquete = await storage.createEnqueteCredit(parsed);
+          const data = normalizeKeysDeep(req.body) as any;
+          logger.info({ rawDemandeId: req.body.demandeId, normalizedDemandeId: data.demandeId }, 'Enquete create - demandeId check');
 
-          // Update Demande Status - Transition vers "En enquête" (pas "Enquête terminée")
+          const parsed = insertEnqueteCreditSchema.parse(data);
+          logger.info({ parsedDemandeId: parsed.demandeId }, 'Enquete create - after parse');
+
+          const enquete = await storage.createEnqueteCredit(parsed);
+          logger.info({ enqueteId: enquete.id, enqueteDemandeId: enquete.demandeId }, 'Enquete created');
+
+          // Update Demande Status - Marquer l'enquête comme terminée
           // Workflow: READY_FOR_INVESTIGATION -> UNDER_INVESTIGATION -> INVESTIGATION_COMPLETE
+          // Quand on enregistre le formulaire d'enquête, l'enquête est TERMINÉE
           if (enquete.demandeId) {
-              await storage.updateDemandeCredit(enquete.demandeId, { statut: StatutDemande.UNDER_INVESTIGATION as any });
+              logger.info({ demandeId: enquete.demandeId, newStatut: StatutDemande.INVESTIGATION_COMPLETE }, 'Updating demande status');
+              await storage.updateDemandeCredit(enquete.demandeId, { statut: StatutDemande.INVESTIGATION_COMPLETE as any });
+              logger.info('Demande status updated successfully');
+          } else {
+              logger.warn({ enqueteId: enquete.id }, 'No demandeId on enquete - status not updated');
           }
 
           // Notify Credit Update
@@ -1625,27 +1970,12 @@ export function registerFinanceRoutes(app: Express) {
               wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'enquete_new', demandeId: parsed.demandeId } });
           }
 
-          // Domain event: investigation assigned
-          if (enquete.demandeId) {
-            const demande = await storage.getDemandeCredit(enquete.demandeId);
-            if (demande) {
-              dispatchDomainEvent({
-                type: "CREDIT_INVESTIGATION_ASSIGNED",
-                data: {
-                  demandeId: enquete.demandeId,
-                  numeroDemande: demande.numeroDemande,
-                  clientId: demande.clientId,
-                  agentName: (parsed as any).agentNom || req.session.user?.nom || 'Agent',
-                  agenceId: req.session.user?.agenceId,
-                },
-                timestamp: new Date(),
-              });
-            }
-          }
+          // Note: Domain event CREDIT_INVESTIGATION_ASSIGNED est maintenant envoyé
+          // lors du démarrage de l'enquête (start-investigation endpoint)
 
           res.json(addSnakeCaseAliasesDeep(enquete));
       } catch (error: any) {
-          console.error('[Enquete Create Error]', error);
+          logger.error({ err: error }, 'Enquete create error');
           res.status(500).json({
               message: error.message || 'Erreur lors de la création de l\'enquête',
               code: 'ENQUETE_CREATE_ERROR'
@@ -1753,7 +2083,7 @@ export function registerFinanceRoutes(app: Express) {
 
         res.json(addSnakeCaseAliasesDeep({ ...remboursement, mouvement_id: mouvement.id }));
       } catch (error: any) {
-        console.error('Error creating remboursement:', error);
+        logger.error({ err: error }, 'Error creating remboursement');
         res.status(400).json({ message: error.message || 'Erreur lors du remboursement' });
       }
   });
@@ -2036,7 +2366,7 @@ export function registerFinanceRoutes(app: Express) {
           const riskySessions = await sessionService.getRiskySessions();
           res.json(addSnakeCaseAliasesDeep(riskySessions));
       } catch (error: any) {
-          console.error("Erreur récupération sessions à risque:", error);
+          logger.error({ err: error }, 'Erreur récupération sessions à risque');
           res.status(500).json({ message: error.message });
       }
   });
@@ -2051,7 +2381,7 @@ export function registerFinanceRoutes(app: Express) {
           const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
           res.json(addSnakeCaseAliasesDeep(sessionsWithEcarts));
       } catch (error: any) {
-          console.error("Erreur récupération écarts:", error);
+          logger.error({ err: error }, 'Erreur récupération écarts');
           res.status(500).json({ message: error.message });
       }
   });
@@ -2083,7 +2413,7 @@ export function registerFinanceRoutes(app: Express) {
               closedSessions
           });
       } catch (error: any) {
-          console.error("Erreur fermeture sessions expirées:", error);
+          logger.error({ err: error }, 'Erreur fermeture sessions expirées');
           res.status(500).json({ message: error.message });
       }
   });
@@ -2332,27 +2662,33 @@ export function registerFinanceRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(caisses));
   });
 
-  // Opérations caisse du jour — scoped à la SESSION ACTIVE uniquement
-  // Le solde de session est calculé côté client comme: montant_ouverture + entrées - sorties
-  // Il est donc CRITIQUE de ne retourner que les opérations de la session en cours,
-  // sinon des opérations d'anciennes sessions (y compris annulées) polluent le calcul.
+  // Opérations caisse du jour — toutes les opérations de la CAISSE pour aujourd'hui
+  // Permet d'afficher les transactions récentes même si la session a été rouverte
+  // NOTE: Le solde de session est calculé séparément via les données de session
   app.get("/api/operations-caisse/today", requireAuth, async (req, res) => {
       try {
         const user = req.session.user!;
 
-        // Récupérer la session active de l'utilisateur
+        // Récupérer la session active de l'utilisateur pour obtenir la caisse_id
         const activeSession = await storage.getActiveSessionForUser(user.id);
 
         if (!activeSession) {
           return res.json([]); // Pas de session active, pas d'opérations
         }
 
-        // Retourner uniquement les opérations de la session active (pas de toute la caisse)
-        const operations = await storage.getOperationsBySession(activeSession.id);
+        // Récupérer la caisse_id depuis la session
+        const caisseId = activeSession.caisse_id || activeSession.caisseId;
+
+        if (!caisseId) {
+          return res.json([]);
+        }
+
+        // Retourner les opérations du jour pour cette CAISSE (toutes sessions confondues)
+        const operations = await storage.getOperationsCaisseToday(caisseId);
 
         res.json(addSnakeCaseAliasesDeep(operations));
       } catch (error: any) {
-        console.error("Erreur récupération opérations du jour:", error);
+        logger.error({ err: error }, 'Erreur récupération opérations du jour');
         res.status(500).json({ message: error.message });
       }
   });
@@ -2369,7 +2705,7 @@ export function registerFinanceRoutes(app: Express) {
         const operations = await storage.getOperationsBySession(sessionId);
         res.json(addSnakeCaseAliasesDeep(operations));
       } catch (error: any) {
-        console.error("Erreur récupération opérations par session:", error);
+        logger.error({ err: error }, 'Erreur récupération opérations par session');
         res.status(500).json({ message: error.message });
       }
   });
@@ -2505,7 +2841,7 @@ export function registerFinanceRoutes(app: Express) {
                     wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
                 }
             } catch (err) {
-                console.error("Post-operation side-effects error:", err);
+                logger.error({ err }, 'Post-operation side-effects error');
             }
 
             res.json(addSnakeCaseAliasesDeep(operation));
@@ -2527,7 +2863,7 @@ export function registerFinanceRoutes(app: Express) {
         }
 
       } catch (error: any) {
-        console.error('Error creating operation:', error);
+        logger.error({ err: error }, 'Error creating operation');
         res.status(400).json({ message: error.message || "Erreur lors de la création de l'opération" });
       }
   });
@@ -2553,7 +2889,7 @@ export function registerFinanceRoutes(app: Express) {
              }
              res.json(addSnakeCaseAliasesDeep(updated));
       } catch (error: any) {
-         console.error('Error updating operation:', error);
+         logger.error({ err: error }, 'Error updating operation');
          res.status(400).json({ message: error.message || "Erreur lors de la mise à jour" });
       }
   });
@@ -2573,7 +2909,7 @@ export function registerFinanceRoutes(app: Express) {
       const updated = await storage.updateCredit(req.params.id, data as any);
       res.json(addSnakeCaseAliasesDeep(updated));
     } catch (error: any) {
-      console.error("Erreur mise à jour crédit:", error);
+      logger.error({ err: error }, 'Erreur mise à jour crédit');
 
       // State Machine error: return 400 with clear message
       if (error instanceof CreditTransitionError) {
@@ -2625,7 +2961,7 @@ export function registerFinanceRoutes(app: Express) {
         modele
       }));
     } catch (error: any) {
-      console.error("Erreur récupération facture:", error);
+      logger.error({ err: error }, 'Erreur récupération facture');
       res.status(500).json({ message: error.message || "Erreur lors de la récupération de la facture" });
     }
   });
@@ -2807,7 +3143,7 @@ export function registerFinanceRoutes(app: Express) {
       const mouvements = await storage.getMouvementsFinanciers(filter);
       res.json(addSnakeCaseAliasesDeep(mouvements));
     } catch (error: any) {
-      console.error('Error fetching mouvements:', error);
+      logger.error({ err: error }, 'Error fetching mouvements');
       res.status(500).json({ message: error.message || 'Erreur serveur' });
     }
   });
@@ -2899,7 +3235,7 @@ export function registerFinanceRoutes(app: Express) {
       const results = await query.orderBy(desc(creditRefundRequests.createdAt));
       res.json(addSnakeCaseAliasesDeep(results));
     } catch (error: any) {
-      console.error("Error fetching refunds:", error);
+      logger.error({ err: error }, 'Error fetching refunds');
       res.status(500).json({ message: error.message });
     }
   });
@@ -2927,7 +3263,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json({ count: result?.count || 0 });
     } catch (error: any) {
-      console.error("Error counting pending refunds:", error);
+      logger.error({ err: error }, 'Error counting pending refunds');
       res.status(500).json({ message: error.message });
     }
   });
@@ -2986,6 +3322,15 @@ export function registerFinanceRoutes(app: Express) {
          },
          timestamp: new Date(),
        });
+
+       // WebSocket: notify for real-time badge update
+       const wsInstance = getWsInstance();
+       if (wsInstance) {
+         wsInstance.broadcast({
+           type: "CREDIT_UPDATE",
+           payload: { type: 'refund_approved', refundId: refund.id, demandeId: refund.demandeId }
+         });
+       }
 
        res.json(addSnakeCaseAliasesDeep(updated));
      } catch (error: any) {
@@ -3153,6 +3498,7 @@ export function registerFinanceRoutes(app: Express) {
             compteId: courantAccount.id,
             mouvementId: mouvement.id,
             typePaiement: 'DEPOSIT_CURRENT',
+            sens: 'CREDIT', // Refund is money coming in
             montant: refundAmount.toString(),
             soldeApres: updatedAccount.soldeCourant,
             methodePaiement: 'TRANSFER',
@@ -3194,7 +3540,7 @@ export function registerFinanceRoutes(app: Express) {
        res.json(addSnakeCaseAliasesDeep(updated));
 
     } catch (error: any) {
-       console.error("Payment Error", error);
+       logger.error({ err: error }, 'Payment error');
        res.status(500).json({ message: error.message });
     }
   });
@@ -3319,7 +3665,7 @@ export function registerFinanceRoutes(app: Express) {
        });
 
     } catch (error: any) {
-       console.error("Caisse Validation Error", error);
+       logger.error({ err: error }, 'Caisse validation error');
        res.status(500).json({ message: error.message });
     }
   });
@@ -3391,10 +3737,10 @@ export function registerFinanceRoutes(app: Express) {
       if (!caisse) return res.status(404).json({ error: "Caisse not found" });
 
       if (caisse.statut === StatutCaisse.CLOSED) {
-         // If already closed, check balance. If 0, just delete.
+         // If already closed, check balance. If 0, soft delete.
          if (Number(caisse.solde) === 0) {
-            await db.delete(schema.caisses).where(eq(schema.caisses.id, id));
-            return res.json({ message: "Caisse fermée et vide supprimée." });
+            await db.update(schema.caisses).set({ deletedAt: new Date() }).where(eq(schema.caisses.id, id));
+            return res.json({ message: "Caisse fermée et vide archivée." });
          }
       }
 
@@ -3444,7 +3790,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ message: "Caisse liquidée et supprimée avec succès." });
 
     } catch (e: any) {
-      console.error("Erreur liquidation:", e);
+      logger.error({ err: e }, 'Erreur liquidation');
       res.status(500).json({ error: e.message });
     }
   });
@@ -3472,15 +3818,22 @@ export function registerFinanceRoutes(app: Express) {
       return res.status(400).json({ message: "Le montant demandé doit être positif." });
     }
 
-    // Vérifier l'assignation si pas manager
+    // Vérifier l'assignation si pas manager (ou si override superviseur valide)
     const normalizedRole = normalizeRole(user.role);
     const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
 
     if (!isManager) {
-      const assignments = await storage.getCaisseAssignments(data.caisseId);
-      const isAssigned = assignments.some(a => a.userId === user.id);
-      if (!isAssigned) {
-        return res.status(403).json({ message: "Accès refusé. Vous n'êtes pas assigné à cette caisse." });
+      let hasOverride = false;
+      if (data.supervisorOverride) {
+        const authStatus = await accessControlService.checkUserAuthorization(user.id, data.caisseId, data.agenceId || user.agenceId);
+        hasOverride = authStatus.authorized;
+      }
+      if (!hasOverride) {
+        const assignments = await storage.getCaisseAssignments(data.caisseId);
+        const isAssigned = assignments.some(a => a.userId === user.id);
+        if (!isAssigned) {
+          return res.status(403).json({ message: "Accès refusé. Vous n'êtes pas assigné à cette caisse." });
+        }
       }
     }
 
@@ -3546,15 +3899,22 @@ export function registerFinanceRoutes(app: Express) {
       return res.status(400).json({ message: "Vous devez sélectionner une caisse physique." });
     }
 
-    // Vérifier l'assignation si pas manager
+    // Vérifier l'assignation si pas manager (ou si override superviseur valide)
     const normalizedRole = normalizeRole(user.role);
     const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
 
     if (!isManager) {
-      const assignments = await storage.getCaisseAssignments(data.caisseId);
-      const isAssigned = assignments.some(a => a.userId === user.id);
-      if (!isAssigned) {
-        return res.status(403).json({ message: "Accès refusé. Vous n'êtes pas assigné à cette caisse." });
+      let hasOverride = false;
+      if (data.supervisorOverride) {
+        const authStatus = await accessControlService.checkUserAuthorization(user.id, data.caisseId, data.agenceId || user.agenceId);
+        hasOverride = authStatus.authorized;
+      }
+      if (!hasOverride) {
+        const assignments = await storage.getCaisseAssignments(data.caisseId);
+        const isAssigned = assignments.some(a => a.userId === user.id);
+        if (!isAssigned) {
+          return res.status(403).json({ message: "Accès refusé. Vous n'êtes pas assigné à cette caisse." });
+        }
       }
     }
 
@@ -3937,6 +4297,76 @@ export function registerFinanceRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(result.session));
   });
 
+  /**
+   * POST /api/sessions-caisse/:id/submit-verification
+   * Soumettre un comptage de vérification par un second utilisateur (superviseur)
+   */
+  app.post("/api/sessions-caisse/:id/submit-verification", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    const result = await sessionClosingService.submitVerificationCount({
+      sessionId: id,
+      verifierId: user.id,
+      billetage: data.billetage || data.billetageFermeture || {},
+      observations: data.observations,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        SESSION_NOT_FOUND: 404,
+        INVALID_STATUS: 409,
+        SAME_USER: 403,
+        ALREADY_VERIFIED: 409,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({ message: result.error, errorCode: result.errorCode });
+    }
+
+    await logAudit(req, "VERIFICATION_COUNT_SUBMITTED", "session_caisse", id, {
+      verificationTotal: result.verificationTotal,
+      primaryTotal: result.primaryTotal,
+      ecartVerification: result.ecartVerification,
+      matched: result.matched,
+    }, "success", "medium");
+
+    res.json(result);
+  });
+
+  /**
+   * GET /api/sessions-caisse/:id/counts
+   * Récupérer les comptages primaire et de vérification d'une session
+   */
+  app.get("/api/sessions-caisse/:id/counts", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+      const counts = await sessionClosingService.getSessionCounts(id);
+      res.json(counts);
+    } catch (error) {
+      logger.error({ err: error }, 'Session counts error');
+      res.status(500).json({ error: "Erreur lors de la récupération des comptages" });
+    }
+  });
+
+  /**
+   * GET /api/sessions-caisse/:id/suggest-count
+   * Suggère un billetage basé sur les opérations du jour
+   */
+  app.get("/api/sessions-caisse/:id/suggest-count", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+      const suggestion = await countSuggestionService.suggestDenominations(id);
+      res.json(suggestion);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Count suggestion error');
+      res.status(500).json({ error: error.message || "Erreur lors de la suggestion du billetage" });
+    }
+  });
+
   // ============================================================================
   // CAISSE ACCESS CONTROL API
   // ============================================================================
@@ -3953,7 +4383,7 @@ export function registerFinanceRoutes(app: Express) {
       const status = await accessControlService.checkCaisseAccess(caisseId, agenceId);
       res.json(addSnakeCaseAliasesDeep(status));
     } catch (error: any) {
-      console.error("Error checking caisse access:", error);
+      logger.error({ err: error }, 'Error checking caisse access');
       res.status(500).json({ message: error.message });
     }
   });
@@ -3971,7 +4401,7 @@ export function registerFinanceRoutes(app: Express) {
       const status = await accessControlService.checkUserAuthorization(user.id, caisseId, agenceId);
       res.json(addSnakeCaseAliasesDeep(status));
     } catch (error: any) {
-      console.error("Error checking authorization:", error);
+      logger.error({ err: error }, 'Error checking authorization');
       res.status(500).json({ message: error.message });
     }
   });
@@ -4017,7 +4447,7 @@ export function registerFinanceRoutes(app: Express) {
         authorization: result.authorization,
       }));
     } catch (error: any) {
-      console.error("Error validating access code:", error);
+      logger.error({ err: error }, 'Error validating access code');
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -4081,7 +4511,7 @@ export function registerFinanceRoutes(app: Express) {
         expiresAt,
       }));
     } catch (error: any) {
-      console.error("Error generating access code:", error);
+      logger.error({ err: error }, 'Error generating access code');
       res.status(500).json({ error: error.message });
     }
   });
@@ -4102,7 +4532,7 @@ export function registerFinanceRoutes(app: Express) {
       const codes = await accessControlService.getActiveCodesForAgence(agenceId);
       res.json(addSnakeCaseAliasesDeep(codes));
     } catch (error: any) {
-      console.error("Error fetching access codes:", error);
+      logger.error({ err: error }, 'Error fetching access codes');
       res.status(500).json({ error: error.message });
     }
   });
@@ -4127,7 +4557,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deactivating access code:", error);
+      logger.error({ err: error }, 'Error deactivating access code');
       res.status(500).json({ error: error.message });
     }
   });
@@ -4148,7 +4578,7 @@ export function registerFinanceRoutes(app: Express) {
       const authorizations = await accessControlService.getActiveAuthorizationsForAgence(agenceId);
       res.json(addSnakeCaseAliasesDeep(authorizations));
     } catch (error: any) {
-      console.error("Error fetching authorizations:", error);
+      logger.error({ err: error }, 'Error fetching authorizations');
       res.status(500).json({ error: error.message });
     }
   });
@@ -4180,7 +4610,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error revoking authorization:", error);
+      logger.error({ err: error }, 'Error revoking authorization');
       res.status(500).json({ error: error.message });
     }
   });
@@ -4253,9 +4683,92 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(updated));
     } catch (error: any) {
-      console.error("Error updating operating hours:", error);
+      logger.error({ err: error }, 'Error updating operating hours');
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // ============================================
+  // WEIGHT VERIFICATION (Vérification poids billets)
+  // ============================================
+
+  /**
+   * POST /api/caisse/verify-weight
+   * Verify cash denomination breakdown against actual weight
+   */
+  app.post("/api/caisse/verify-weight", requireAuth, async (req, res) => {
+    try {
+      const { billetage, actualWeightGrams } = req.body;
+
+      if (!billetage || typeof billetage !== 'object') {
+        return res.status(400).json({ error: "Billetage requis" });
+      }
+      if (typeof actualWeightGrams !== 'number' || actualWeightGrams < 0) {
+        return res.status(400).json({ error: "Poids réel requis (en grammes)" });
+      }
+
+      const { verifyBilletageWeight } = await import("@shared/config/denomination-weights");
+      const result = verifyBilletageWeight(billetage, actualWeightGrams);
+
+      res.json(result);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Weight verification error');
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/caisse/expected-weight
+   * Calculate expected weight for a billetage breakdown (no actual weight needed)
+   */
+  app.post("/api/caisse/expected-weight", requireAuth, async (req, res) => {
+    try {
+      const { billetage } = req.body;
+
+      if (!billetage || typeof billetage !== 'object') {
+        return res.status(400).json({ error: "Billetage requis" });
+      }
+
+      const { calculateExpectedWeight, DENOMINATION_VALUES, ALL_DENOMINATION_WEIGHTS } = await import("@shared/config/denomination-weights");
+      const expectedWeight = calculateExpectedWeight(billetage);
+
+      // Also calculate total value
+      let totalValue = 0;
+      const breakdown: Array<{ denomination: string; count: number; weight: number; value: number }> = [];
+      for (const [denom, count] of Object.entries(billetage)) {
+        const c = count as number;
+        if (c <= 0) continue;
+        const normalizedKey = denom.replace(/[^a-z0-9_]/gi, '');
+        const val = DENOMINATION_VALUES[normalizedKey] || DENOMINATION_VALUES[denom] || 0;
+        const wt = ALL_DENOMINATION_WEIGHTS[normalizedKey] || ALL_DENOMINATION_WEIGHTS[denom] || 0;
+        totalValue += val * c;
+        breakdown.push({ denomination: denom, count: c, weight: Math.round(wt * c * 100) / 100, value: val * c });
+      }
+
+      res.json({
+        expectedWeightGrams: expectedWeight,
+        totalValue,
+        breakdown,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Expected weight calculation error');
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/caisse/denomination-weights
+   * Returns the reference weight table for all denominations
+   */
+  app.get("/api/caisse/denomination-weights", requireAuth, async (_req, res) => {
+    const { ALL_DENOMINATION_WEIGHTS, DENOMINATION_VALUES } = await import("@shared/config/denomination-weights");
+    const entries = Object.keys(DENOMINATION_VALUES).map(key => ({
+      denomination: key,
+      value: DENOMINATION_VALUES[key],
+      weightGrams: ALL_DENOMINATION_WEIGHTS[key] || 0,
+      type: key.startsWith('billets_') ? 'billet' : 'piece',
+    }));
+    res.json({ denominations: entries });
   });
 
 }

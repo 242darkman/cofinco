@@ -21,6 +21,9 @@ import {
 } from "@shared/schema";
 import { StatutTransaction, StatutCompte } from "@shared/enum/status-constants";
 import { eq, sql, and, isNull, isNotNull, gte, inArray } from "drizzle-orm";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('Reconciliation');
 
 // ============================================================================
 // TYPES
@@ -392,13 +395,15 @@ export async function runFullReconciliation(autoFix: boolean = false): Promise<R
   };
 
   // Log le rapport
-  console.log(`[RECONCILIATION] ${report.timestamp.toISOString()}`);
-  console.log(`  Durée: ${report.duration}ms`);
-  console.log(`  Total vérifié: ${report.totalChecked}`);
-  console.log(`  OK: ${report.totalOk}`);
-  console.log(`  Écarts: ${report.totalEcarts}`);
-  console.log(`  Critiques: ${report.totalCritiques}`);
-  console.log(`  Auto-corrigés: ${report.autoFixedCount}`);
+  logger.info({
+    timestamp: report.timestamp.toISOString(),
+    duration: report.duration,
+    totalChecked: report.totalChecked,
+    totalOk: report.totalOk,
+    totalEcarts: report.totalEcarts,
+    totalCritiques: report.totalCritiques,
+    autoFixedCount: report.autoFixedCount,
+  }, 'Reconciliation report');
 
   return report;
 }

@@ -79,6 +79,17 @@ export const Actions = {
   PURGE: 'purge',
   TERMINATE: 'terminate',
   MIGRATE: 'migrate',
+
+  // Communications
+  BROADCAST: 'broadcast',
+  SCHEDULE: 'schedule',
+  ARCHIVE: 'archive',
+
+  // Loyalty/Fidélité
+  REDEEM: 'redeem',
+  AWARD: 'award',
+  ADJUST_POINTS: 'adjust',
+  EXPIRE_POINTS: 'expire',
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -143,4 +154,13 @@ export const ACTION_LABELS: Record<Action, string> = {
   [Actions.PURGE]: 'Purger',
   [Actions.TERMINATE]: 'Terminer',
   [Actions.MIGRATE]: 'Migrer',
+  // Communications
+  [Actions.BROADCAST]: 'Diffuser en masse',
+  [Actions.SCHEDULE]: 'Programmer',
+  [Actions.ARCHIVE]: 'Archiver',
+  // Loyalty
+  [Actions.REDEEM]: 'Échanger (points)',
+  [Actions.AWARD]: 'Attribuer (points)',
+  [Actions.ADJUST_POINTS]: 'Ajuster (points)',
+  [Actions.EXPIRE_POINTS]: 'Expirer (points)',
 };

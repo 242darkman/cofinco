@@ -18,7 +18,7 @@ import { LucideIcon, Lock } from 'lucide-react';
  */
 
 export type TabVariant = 'pills' | 'underline' | 'buttons';
-export type TabSize = 'sm' | 'md' | 'lg';
+export type TabSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface Tab {
   key: string;
@@ -52,6 +52,12 @@ const TabGroup: React.FC<TabGroupProps> = ({
 }) => {
   // Size classes (mobile-first)
   const sizeClasses = {
+    xs: {
+      text: 'text-[10px] sm:text-xs',
+      padding: 'px-2 py-1',
+      icon: 12,
+      gap: 'gap-1',
+    },
     sm: {
       text: 'text-xs',
       padding: 'px-3 py-1.5',

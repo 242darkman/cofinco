@@ -2,6 +2,9 @@ import { db } from './db';
 import { auditLogs, loginAttempts, InsertAuditLog, InsertLoginAttempt, securitySettings } from '@shared/schema';
 import { Request } from 'express';
 import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('Audit');
 
 export async function logAudit(
   req: Request,
@@ -43,13 +46,13 @@ export async function logAudit(
           statut,
           riskLevel,
         });
-        console.warn('Audit log logged as anonymous due to missing user:', req.session?.userId);
+        logger.warn({ userId: req.session?.userId }, 'Audit log logged as anonymous due to missing user');
         return;
       } catch (retryError) {
-        console.error('Audit log retry error:', retryError);
+        logger.error({ err: retryError }, 'Audit log retry error');
       }
     }
-    console.error('Audit log error:', error);
+    logger.error({ err: error }, 'Audit log error');
   }
 }
 
@@ -69,7 +72,7 @@ export async function logLoginAttempt(
       reason,
     });
   } catch (error) {
-    console.error('Login attempt log error:', error);
+    logger.error({ err: error }, 'Login attempt log error');
   }
 }
 
@@ -93,7 +96,7 @@ export async function getRecentFailedAttempts(
 
     return attempts.length;
   } catch (error) {
-    console.error('Failed attempts check error:', error);
+    logger.error({ err: error }, 'Failed attempts check error');
     return 0;
   }
 }
@@ -154,7 +157,7 @@ export async function getLoginLockoutInfo(username: string): Promise<{
 
     return { locked, failedAttempts, remainingAttempts, lockedUntil: null, retryAfterSeconds: 0 };
   } catch (error) {
-    console.error('Lockout info check error:', error);
+    logger.error({ err: error }, 'Lockout info check error');
     return { locked: false, failedAttempts: 0, remainingAttempts: MAX_LOGIN_ATTEMPTS, lockedUntil: null, retryAfterSeconds: 0 };
   }
 }
@@ -177,9 +180,9 @@ export async function clearLoginAttemptsOnSuccess(username: string): Promise<voi
         )
       );
     
-    console.log(`Login successful for ${username}, lockout counter cleared`);
+    logger.info({ username }, 'Login successful, lockout counter cleared');
   } catch (error) {
-    console.error('Clear login attempts error:', error);
+    logger.error({ err: error }, 'Clear login attempts error');
   }
 }
 
@@ -218,7 +221,7 @@ export async function getAuditLogs(
 
     return await query;
   } catch (error) {
-    console.error('Get audit logs error:', error);
+    logger.error({ err: error }, 'Get audit logs error');
     return [];
   }
 }
@@ -252,7 +255,7 @@ export async function getPasswordRequirements(): Promise<PasswordRequirements> {
       requireSpecialChars: settings.passwordRequireSpecial ?? DEFAULT_PASSWORD_REQUIREMENTS.requireSpecialChars,
     };
   } catch (error) {
-    console.error('Failed to load security settings for password rules:', error);
+    logger.error({ err: error }, 'Failed to load security settings for password rules');
     return DEFAULT_PASSWORD_REQUIREMENTS;
   }
 }
@@ -308,20 +311,15 @@ export async function purgeOldAuditLogs(): Promise<{ deletedCount: number; error
     const logsToDelete = countResult?.count || 0;
 
     if (logsToDelete > 0) {
-      // Delete old audit logs
-      await db.delete(auditLogs)
-        .where(lte(auditLogs.createdAt, cutoffDate));
-
-      console.log(`[AUDIT PURGE] Deleted ${logsToDelete} audit logs older than ${cutoffDate.toISOString()}`);
+      // SECURITY: Audit logs and login attempts must NEVER be hard-deleted.
+      // They are immutable records required for compliance and breach investigation.
+      // Retention-based archival should be implemented instead.
+      logger.info({ logsToDelete, cutoffDate: cutoffDate.toISOString() }, 'AUDIT PURGE: Skipped deletion of audit logs (hard delete disabled for compliance)');
     }
 
-    // Also purge old login attempts (same retention)
-    await db.delete(loginAttempts)
-      .where(lte(loginAttempts.createdAt, cutoffDate));
-
-    return { deletedCount: Number(logsToDelete) };
+    return { deletedCount: 0 };
   } catch (error) {
-    console.error('[AUDIT PURGE] Error:', error);
+    logger.error({ err: error }, 'AUDIT PURGE: Error during purge');
     return { deletedCount: 0, error: String(error) };
   }
 }
@@ -357,7 +355,7 @@ export async function getAuditLogStats(): Promise<{
       retentionMonths: RETENTION_MONTHS
     };
   } catch (error) {
-    console.error('[AUDIT STATS] Error:', error);
+    logger.error({ err: error }, 'AUDIT STATS: Error getting stats');
     return { totalLogs: 0, oldestLogDate: null, logsToDelete: 0, retentionMonths: RETENTION_MONTHS };
   }
 }
@@ -374,15 +372,15 @@ export function scheduleAuditPurge(): void {
 
   // Initial purge after 1 minute (let server start first)
   setTimeout(async () => {
-    console.log('[AUDIT PURGE] Running scheduled purge...');
+    logger.info('AUDIT PURGE: Running scheduled purge');
     await purgeOldAuditLogs();
   }, 60 * 1000);
 
   // Then every 24 hours
   setInterval(async () => {
-    console.log('[AUDIT PURGE] Running daily scheduled purge...');
+    logger.info('AUDIT PURGE: Running daily scheduled purge');
     await purgeOldAuditLogs();
   }, INTERVAL_MS);
 
-  console.log(`[AUDIT PURGE] Scheduled to run daily. Retention period: ${RETENTION_MONTHS} months.`);
+  logger.info({ retentionMonths: RETENTION_MONTHS }, 'AUDIT PURGE: Scheduled to run daily');
 }

@@ -14,6 +14,9 @@ import {
   type ReconciliationAnomaly,
 } from "@shared/schema";
 import { eq, and, gte, lt, sql, inArray } from "drizzle-orm";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Cron:MmReconciliationReport');
 
 // Re-export for convenience
 export type Anomaly = ReconciliationAnomaly;
@@ -241,7 +244,7 @@ export async function generateReconciliationReport(
   stats: ReconciliationStats;
   anomalies: Anomaly[];
 }> {
-  console.log(`[Reconciliation] Generating report for ${provider} on ${date.toISOString().split("T")[0]}`);
+  logger.info({ provider, date: date.toISOString().split("T")[0] }, `Generating report for ${provider}`);
 
   // Get intents for the date/provider
   let intents = await getIntentsForDateAndProvider(date, provider);
@@ -290,12 +293,13 @@ export async function generateReconciliationReport(
     })
     .returning();
 
-  console.log(
-    `[Reconciliation] Report generated: ${report.id} - ` +
-    `${stats.successCount}/${stats.totalIntents} success, ` +
-    `${anomalies.length} anomalies, ` +
-    `écart: ${stats.ecart}`
-  );
+  logger.info({
+    reportId: report.id,
+    successCount: stats.successCount,
+    totalIntents: stats.totalIntents,
+    anomaliesCount: anomalies.length,
+    ecart: stats.ecart
+  }, `Report generated: ${report.id} - ${stats.successCount}/${stats.totalIntents} success, ${anomalies.length} anomalies`);
 
   return {
     reportId: report.id,
@@ -316,7 +320,7 @@ export async function generateDailyReconciliationReports(date?: Date): Promise<{
   const reportDate = date || yesterday();
   const startTime = Date.now();
 
-  console.log(`[Reconciliation] Starting daily report generation for ${reportDate.toISOString().split("T")[0]}`);
+  logger.info({ date: reportDate.toISOString().split("T")[0] }, 'Starting daily report generation');
 
   const results: Array<{
     provider: string;
@@ -337,11 +341,11 @@ export async function generateDailyReconciliationReports(date?: Date): Promise<{
     }
 
     const duration = Date.now() - startTime;
-    console.log(`[Reconciliation] Daily reports completed in ${duration}ms`);
+    logger.info({ durationMs: duration }, `Daily reports completed in ${duration}ms`);
 
     return { success: true, reports: results };
   } catch (error) {
-    console.error("[Reconciliation] Error generating daily reports:", error);
+    logger.error({ err: error }, 'Error generating daily reports');
     return {
       success: false,
       reports: results,
@@ -419,7 +423,7 @@ export async function markReportReviewed(
     })
     .where(eq(mmReconciliationReports.id, reportId));
 
-  console.log(`[Reconciliation] Report ${reportId} marked as reviewed by ${reviewedBy}`);
+  logger.info({ reportId, reviewedBy }, `Report ${reportId} marked as reviewed by ${reviewedBy}`);
 }
 
 /**
@@ -438,7 +442,7 @@ export async function markReportResolved(
     })
     .where(eq(mmReconciliationReports.id, reportId));
 
-  console.log(`[Reconciliation] Report ${reportId} marked as resolved by ${resolvedBy}`);
+  logger.info({ reportId, resolvedBy }, `Report ${reportId} marked as resolved by ${resolvedBy}`);
 }
 
 // Cron scheduler
@@ -469,7 +473,7 @@ function scheduleNextRun(): void {
   const delay = getNextRunDelay();
   const nextRunDate = new Date(Date.now() + delay);
 
-  console.log(`[Reconciliation Cron] Next run scheduled for ${nextRunDate.toISOString()}`);
+  logger.info({ nextRun: nextRunDate.toISOString() }, `Next run scheduled for ${nextRunDate.toISOString()}`);
 
   cronTimeoutId = setTimeout(async () => {
     await generateDailyReconciliationReports();
@@ -482,9 +486,9 @@ function scheduleNextRun(): void {
  * Runs at 00:30 every day
  */
 export function startReconciliationReportCron(): void {
-  console.log("[Reconciliation Cron] Starting reconciliation report cron job...");
+  logger.info('Starting reconciliation report cron job');
   scheduleNextRun();
-  console.log("[Reconciliation Cron] Reconciliation report cron configured: runs daily at 00:30");
+  logger.info('Reconciliation report cron configured: runs daily at 00:30');
 }
 
 /**
@@ -495,7 +499,7 @@ export function stopReconciliationReportCron(): void {
     clearTimeout(cronTimeoutId);
     cronTimeoutId = null;
   }
-  console.log("[Reconciliation Cron] Reconciliation report cron stopped");
+  logger.info('Reconciliation report cron stopped');
 }
 
 export default {

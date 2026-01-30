@@ -7,6 +7,9 @@ import webPush from "web-push";
 import { db } from "../db";
 import { pushSubscriptions, pushNotificationLogs, users, userRoles } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Push');
 
 // VAPID keys - should be set in environment variables
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
@@ -21,12 +24,12 @@ export function initializePushService() {
     try {
       webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
       pushConfigured = true;
-      console.log("[Push] Web Push service initialized");
+      logger.info('Web Push service initialized');
     } catch (error) {
-      console.error("[Push] Failed to initialize Web Push:", error);
+      logger.error({ err: error }, 'Failed to initialize Web Push');
     }
   } else {
-    console.log("[Push] VAPID keys not configured - push notifications disabled");
+    logger.info('VAPID keys not configured - push notifications disabled');
   }
 }
 

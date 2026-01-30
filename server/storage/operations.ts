@@ -22,12 +22,28 @@ async function resolveAgentPrimaryAgenceId(agentId: string): Promise<string | un
 }
 
 // Agents Terrain
-export async function getAgentTerrain(id: string): Promise<AgentTerrain | undefined> {
-  const [agent] = await db
-    .select()
+export async function getAgentTerrain(id: string): Promise<any | undefined> {
+  const results = await db
+    .select({
+      agent: agentsTerrain,
+      user: users,
+      agenceId: employes.agenceId
+    })
     .from(agentsTerrain)
+    .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .leftJoin(users, eq(employes.userId, users.id))
     .where(and(eq(agentsTerrain.id, id), notDeleted(agentsTerrain)));
-  return agent || undefined;
+
+  if (results.length === 0) return undefined;
+
+  const { agent, user, agenceId } = results[0];
+  return {
+    ...agent,
+    nom: user?.nom || "Inconnu",
+    prenom: user?.prenom || "",
+    photoUrl: user?.photoProfile || null,
+    agenceId: agenceId || null,
+  };
 }
 
 export async function getAllAgentsTerrain(): Promise<any[]> {
@@ -76,6 +92,7 @@ export async function getAllAgentsTerrain(): Promise<any[]> {
       ...agent,
       nom: user?.nom || "Inconnu",
       prenom: user?.prenom || "",
+      photoUrl: user?.photoProfile || null,
       agenceId: agenceId || null,
       nombreClients: clientsCount[0]?.count || 0,
       collectesJour: collectesCount[0]?.count || 0,
@@ -530,7 +547,7 @@ export async function getEmploye(id: string): Promise<Employe | undefined> {
 }
 
 export async function getAllEmployes(): Promise<Employe[]> {
-    return db.select().from(employes);
+    return db.select().from(employes).where(notDeleted(employes));
 }
 
 export async function createEmploye(employe: InsertEmploye): Promise<Employe> {
@@ -544,8 +561,13 @@ export async function updateEmploye(id: string, employe: Partial<InsertEmploye>)
 }
 
 export async function deleteEmploye(id: string): Promise<boolean> {
-    const result = await db.delete(employes).where(eq(employes.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
+    // Soft delete: set deletedAt instead of hard delete
+    const [softDeleted] = await db
+      .update(employes)
+      .set({ deletedAt: new Date() } as any)
+      .where(eq(employes.id, id))
+      .returning();
+    return !!softDeleted;
 }
 
 // Pos Devices

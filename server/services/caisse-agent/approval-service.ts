@@ -20,6 +20,9 @@
  */
 
 import { db } from "../../db";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('ApprovalService');
 import {
   operationsTerrain,
   operationsTerrainAuditLogs,
@@ -336,7 +339,7 @@ export class ApprovalService {
       .where(eq(credits.id, metadata.creditId!));
 
     if (!credit) {
-      console.warn(`Crédit ${metadata.creditId} non trouvé`);
+      logger.warn({ creditId: metadata.creditId }, 'Credit not found');
       return {};
     }
 
@@ -421,7 +424,7 @@ export class ApprovalService {
       .where(eq(comptes.id, metadata.compteId!));
 
     if (!compte) {
-      console.warn(`Compte ${metadata.compteId} non trouvé`);
+      logger.warn({ compteId: metadata.compteId }, 'Account not found');
       return {};
     }
 
@@ -467,6 +470,7 @@ export class ApprovalService {
       compteId: metadata.compteId!,
       mouvementId: mouvementCompte.id,
       typePaiement,
+      sens: "CREDIT", // Deposit is money coming in
       statut: StatutTransaction.POSTED,
       montant: operation.montant,
       methodePaiement: "CASH",

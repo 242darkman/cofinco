@@ -1,9 +1,11 @@
 import type { Express } from "express";
+import { createLogger } from "./lib/logger";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerClientRoutes } from "./routes/clients";
 import { registerFinanceRoutes } from "./routes/finance";
 import { registerTontineRoutes } from "./routes/tontines";
 import { registerOperationsRoutes } from "./routes/operations";
+import { registerAgentModulesRoutes } from "./routes/agent-modules";
 import { registerSettingsRoutes } from "./routes/settings";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { hrRouter } from "./routes/hr";
@@ -13,6 +15,7 @@ import { registerConversationsRoutes } from "./routes/conversations";
 import { createServer, type Server } from "http";
 import { setupWebSocket, setWsInstance } from "./ws-server";
 import { registerAccountingRoutes } from "./routes/accounting";
+import { registerTreasuryRoutes } from "./routes/treasury";
 import { transactionsRouter } from "./routes/transactions";
 import { registerRbacRoutes } from "./routes/rbac";
 import { registerAgencesRoutes } from "./routes/agences";
@@ -37,6 +40,10 @@ import { regularisationRouter } from "./routes/regularisation";
 import { paymentsRouter, webhooksRouter } from "./routes/payments";
 import { paymentsTestRouter } from "./routes/payments-test";
 import balancesRouter from "./routes/balances";
+import permissionAnalyticsRouter from "./routes/permission-analytics";
+import { registerMonitoringRoutes } from "./routes/monitoring";
+
+const logger = createLogger('Routes');
 
 export function registerRoutes(app: Express): Server {
   // Apply Maintenance Middleware globally
@@ -71,6 +78,7 @@ export function registerRoutes(app: Express): Server {
   registerComptesRoutes(app); // Comptes microfinance (dépôt, retrait, blocage, transfert)
   registerTontineRoutes(app);
   registerOperationsRoutes(app); // Agents, prospection
+  registerAgentModulesRoutes(app); // Agent sub-modules (commissions, planning, objectifs, etc.)
   registerDashboardRoutes(app); // Dashboard statistics
   registerMessagesRoutes(app); // Messaging System (Legacy v1)
   registerConversationsRoutes(app); // Messaging System V2 (Conversations)
@@ -84,8 +92,14 @@ export function registerRoutes(app: Express): Server {
   // Accounting Module
   registerAccountingRoutes(app);
 
+  // Treasury Module v2 (Encaisse canonique basée sur GL)
+  registerTreasuryRoutes(app);
+
   // RBAC Module (Roles & Permissions)
   registerRbacRoutes(app);
+
+  // Permission Analytics (Admin only)
+  app.use("/api/admin/permission-analytics", permissionAnalyticsRouter);
 
   // Agences Module (Multi-agency management)
   registerAgencesRoutes(app);
@@ -108,6 +122,9 @@ export function registerRoutes(app: Express): Server {
   // Reevaluation Module (Credit reevaluation workflow)
   registerReevaluationRoutes(app);
 
+  // Financial Monitoring Module (alerts, reconciliation, real-time monitoring)
+  registerMonitoringRoutes(app);
+
   // External Services
   registerMobileMoneyRoutes(app);
 
@@ -126,7 +143,7 @@ export function registerRoutes(app: Express): Server {
         environment: process.env.NODE_ENV || "development"
       });
     } catch (error) {
-      console.error("Error reading version:", error);
+      logger.error({ err: error }, 'Error reading version');
       res.status(500).json({ version: "unknown" });
     }
   });

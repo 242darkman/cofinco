@@ -49,8 +49,8 @@ export async function updateTontinePlan(id: string, updateData: Partial<InsertTo
 }
 
 export async function deleteTontinePlan(id: string): Promise<boolean> {
-  const result = await db.delete(tontinePlans).where(eq(tontinePlans.id, id));
-  return result.rowCount ? result.rowCount > 0 : false;
+  const result = await db.update(tontinePlans).set({ actif: false, updatedAt: new Date() }).where(eq(tontinePlans.id, id)).returning();
+  return result.length > 0;
 }
 export async function getTontine(id: string): Promise<any | undefined> {
   const [result] = await db
@@ -156,19 +156,13 @@ export async function updateTontine(id: string, updateData: Partial<InsertTontin
 }
 
 export async function deleteTontine(id: string): Promise<boolean> {
-  // Delete all dependencies first to avoid FK constraints
-  await db.delete(tontineAlertes).where(eq(tontineAlertes.tontineId, id));
-  await db.delete(tontineDistributions).where(eq(tontineDistributions.tontineId, id));
-  await db.delete(tontinePenalites).where(eq(tontinePenalites.tontineId, id));
-  await db.delete(tontineRegles).where(eq(tontineRegles.tontineId, id));
-  await db.delete(contributionsTontine).where(eq(contributionsTontine.tontineId, id));
-  
-  // Then delete members
-  await db.delete(membresTontine).where(eq(membresTontine.tontineId, id));
-  
-  // Finally delete the tontine
-  const result = await db.delete(tontines).where(eq(tontines.id, id));
-  return result.rowCount ? result.rowCount > 0 : false;
+  // Soft-archive all dependencies (preserve financial history)
+  await db.update(tontineRegles).set({ actif: false }).where(eq(tontineRegles.tontineId, id));
+  await db.update(membresTontine).set({ statut: "REMOVED" }).where(eq(membresTontine.tontineId, id));
+
+  // Soft delete the tontine itself (has deletedAt column)
+  const result = await db.update(tontines).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(tontines.id, id)).returning();
+  return result.length > 0;
 }
 
 // Membres Tontine
@@ -448,8 +442,8 @@ export async function updateTontineRegle(id: string, updates: Partial<InsertTont
 }
 
 export async function deleteTontineRegle(id: string): Promise<boolean> {
-  const result = await db.delete(tontineRegles).where(eq(tontineRegles.id, id));
-  return result.rowCount ? result.rowCount > 0 : false;
+  const result = await db.update(tontineRegles).set({ actif: false }).where(eq(tontineRegles.id, id)).returning();
+  return result.length > 0;
 }
 
 // Pénalités

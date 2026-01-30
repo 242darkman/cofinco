@@ -114,6 +114,19 @@ export function useCaisseWebSocket({
           );
           break;
 
+        case 'SESSION_RISK_ALERT':
+          // Emit custom event for supervision dashboard
+          window.dispatchEvent(new CustomEvent('session-risk-alert', { detail: data.payload }));
+
+          // Show toast for critical alerts
+          if (data.payload?.riskLevel === 'CRITICAL') {
+            toast.error(
+              `Alerte: ${data.payload.caisseNom} inactive depuis ${Math.round(data.payload.hoursInactive)}h`,
+              { duration: 10000, description: `Caissier: ${data.payload.caissierNom}` }
+            );
+          }
+          break;
+
         case 'MOUVEMENT_CREE':
         case 'SESSION_CAISSE_CHANGE':
             // Trigger refresh

@@ -3,6 +3,54 @@
  * ====================
  * Builds CASL abilities for users based on their roles and permissions.
  * Supports multi-role architecture (V3) and agency scoping.
+ *
+ * ## Multi-Role Architecture
+ *
+ * Users can have multiple roles, either globally or scoped to specific agencies.
+ * When a user has multiple roles, their permissions are computed using a **UNION strategy**:
+ *
+ * - All permissions from all roles are combined
+ * - If ANY role grants a permission, the user has it
+ * - User-specific overrides take priority over role-based permissions
+ * - Deny overrides remove permissions regardless of role grants
+ *
+ * ### Example:
+ * ```
+ * User has: CAISSIER + GESTIONNAIRE_CREDIT
+ * CAISSIER grants: caisse.view, caisse.create, epargnes.view
+ * GESTIONNAIRE_CREDIT grants: credits.view, credits.create, credits.approve
+ *
+ * Effective permissions: UNION of both = all of the above
+ * ```
+ *
+ * ## Disbursement Permission Fallback Chain
+ *
+ * For credit disbursement, permissions are checked in this order:
+ *
+ * 1. **Specific channel permission** (e.g., `disburse_cash`, `disburse_account`, `disburse_momo`)
+ * 2. **Generic disburse permission** (`disburse` on Credit subject)
+ * 3. **Full manage access** (`manage` on Credit subject)
+ * 4. **Admin wildcard** (`manage` on `all` subject)
+ *
+ * This allows fine-grained control while maintaining backwards compatibility:
+ * - Users with `credits.disburse` can use ALL channels
+ * - Users with `credits.disburse_cash` can ONLY disburse cash
+ * - Users with `credits.manage` have full control including disbursement
+ *
+ * ## Agency Scoping
+ *
+ * Roles can be scoped to specific agencies:
+ * - `agenceId = null`: Global role (applies everywhere)
+ * - `agenceId = 'uuid'`: Scoped role (only applies when user is in that agency)
+ *
+ * When building abilities:
+ * - If `agenceIdActive` is provided, only global + matching agency roles apply
+ * - Locked features for the agency result in deny rules
+ *
+ * ## Permission Source Tracking
+ *
+ * Use `getPermissionSources()` to determine which roles grant a specific permission.
+ * This is useful for debugging and UI display.
  */
 
 import { createMongoAbility, MongoAbility, RawRuleOf } from '@casl/ability';
@@ -21,6 +69,7 @@ import {
   normalizePermissionCode,
   parsePermissionCode,
 } from './types';
+import { getActiveTemporaryPermissionCodes } from '../services/temporary-permissions-service';
 
 /**
  * Context for building ability
@@ -46,6 +95,8 @@ interface PermissionEntry {
   code: string;
   granted: boolean;
   moduleName?: string | null;
+  conditions?: Record<string, any> | null;
+  isTemporary?: boolean;
 }
 
 /**
@@ -336,14 +387,30 @@ export async function buildAbilityForUser(context: AbilityContext): Promise<Abil
     // Get role-based permissions (union of all roles)
     const rolePerms = await getRolePermissions(roleNames);
 
+    // Get temporary permissions (active and not expired)
+    const tempPermCodes = await getActiveTemporaryPermissionCodes(userId);
+    const tempPerms: PermissionEntry[] = tempPermCodes.map(code => ({
+      code: normalizePermissionCode(code),
+      granted: true,
+      isTemporary: true,
+    }));
+
     // Get user-specific overrides
     const userOverrides = await getUserPermissionOverrides(userId);
 
     // Merge: start with role permissions, then apply overrides
+    // Priority order: role -> temporary -> user overrides (highest)
     const permissionMap = new Map<string, PermissionEntry>();
 
     for (const perm of rolePerms) {
       permissionMap.set(perm.code, perm);
+    }
+
+    // Add temporary permissions (if not already granted by role)
+    for (const perm of tempPerms) {
+      if (!permissionMap.has(perm.code)) {
+        permissionMap.set(perm.code, perm);
+      }
     }
 
     for (const override of userOverrides) {
@@ -413,8 +480,30 @@ export function hasPermissionCode(ability: AppAbility, code: string): boolean {
 }
 
 /**
- * Fallback permission mapping for credit disbursement
- * Maps legacy permission codes to new CASL actions
+ * Disbursement Permission Fallback Chain
+ * ========================================
+ *
+ * Maps legacy permission codes to CASL actions for backwards compatibility.
+ * This enables a cascading permission check:
+ *
+ * Priority order (first match wins):
+ * 1. Specific channel: `credits.disburse_cash` → can ONLY disburse cash
+ * 2. Generic disburse: `credits.disburse` → can disburse via ANY channel
+ * 3. Credit approve: `credits.approve` → legacy fallback for disburse
+ * 4. Full manage: `credits.manage` → can do everything on credits
+ * 5. Admin wildcard: `manage all` → superuser access
+ *
+ * @example
+ * ```typescript
+ * // User with credits.disburse can use all channels
+ * canDisburse(ability, 'CASH'); // true
+ * canDisburse(ability, 'ACCOUNT'); // true
+ * canDisburse(ability, 'MOBILE_MONEY'); // true
+ *
+ * // User with credits.disburse_cash can only use cash
+ * canDisburse(ability, 'CASH'); // true
+ * canDisburse(ability, 'ACCOUNT'); // false (unless they also have disburse_account)
+ * ```
  */
 export const DISBURSEMENT_PERMISSION_FALLBACKS: Record<string, Array<{ action: Action; subject: Subject }>> = {
   // If user has credits.disburse, they can use any channel
@@ -435,8 +524,30 @@ export const DISBURSEMENT_PERMISSION_FALLBACKS: Record<string, Array<{ action: A
 };
 
 /**
- * Check disbursement permission with fallbacks
- * Supports legacy permission codes while transitioning to CASL
+ * Check if a user can disburse a credit via a specific channel
+ *
+ * Implements the disbursement fallback chain:
+ * 1. Check specific channel permission (e.g., DISBURSE_CASH)
+ * 2. Check generic DISBURSE permission
+ * 3. Check full MANAGE access on Credit
+ * 4. Check admin wildcard (MANAGE on ALL)
+ *
+ * @param ability - The user's CASL ability instance
+ * @param channel - The disbursement channel: 'CASH' | 'ACCOUNT' | 'MOBILE_MONEY'
+ * @returns true if the user can disburse via the specified channel
+ *
+ * @example
+ * ```typescript
+ * const ability = await getAbilityForUser({ userId: 'xxx' });
+ *
+ * if (canDisburse(ability, 'CASH')) {
+ *   // Proceed with cash disbursement
+ * } else if (canDisburse(ability, 'ACCOUNT')) {
+ *   // Offer account transfer as alternative
+ * } else {
+ *   // User cannot disburse
+ * }
+ * ```
  */
 export function canDisburse(
   ability: AppAbility,
@@ -470,4 +581,187 @@ export function canDisburse(
   }
 
   return false;
+}
+
+/**
+ * Permission source tracking information
+ */
+export interface PermissionSource {
+  code: string;
+  grantedBy: 'role' | 'user_override' | 'admin';
+  roles?: SystemRole[];
+  isUserOverride?: boolean;
+}
+
+/**
+ * Get the source(s) of a permission for a user
+ *
+ * This function helps identify which role(s) grant a specific permission,
+ * useful for debugging and displaying in the UI.
+ *
+ * @param userId - The user ID to check
+ * @param permissionCode - The permission code to check (e.g., 'credits.view')
+ * @returns PermissionSource with details about where the permission comes from
+ *
+ * @example
+ * ```typescript
+ * const source = await getPermissionSources('user-uuid', 'credits.approve');
+ * // Returns: { code: 'credits.approve', grantedBy: 'role', roles: ['CHEF_AGENCE', 'GESTIONNAIRE_CREDIT'] }
+ * ```
+ */
+export async function getPermissionSources(
+  userId: string,
+  permissionCode: string
+): Promise<PermissionSource | null> {
+  const normalizedCode = normalizePermissionCode(permissionCode);
+
+  // 1. Get all roles for the user
+  const userRolesResult = await db.select({
+    role: userRoles.role,
+  })
+  .from(userRoles)
+  .where(eq(userRoles.userId, userId));
+
+  const roleNames = userRolesResult.map(r => r.role as SystemRole);
+  const isAdmin = roleNames.some(r => isAdminRole(r));
+
+  // 2. If admin, they have all permissions
+  if (isAdmin) {
+    return {
+      code: normalizedCode,
+      grantedBy: 'admin',
+      roles: roleNames.filter(r => isAdminRole(r)),
+    };
+  }
+
+  // 3. Check user-specific override first
+  const [userOverride] = await db.select({
+    granted: userPermissions.granted,
+  })
+  .from(userPermissions)
+  .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
+  .where(and(
+    eq(userPermissions.userId, userId),
+    eq(permissions.code, normalizedCode)
+  ));
+
+  if (userOverride) {
+    return {
+      code: normalizedCode,
+      grantedBy: 'user_override',
+      isUserOverride: true,
+    };
+  }
+
+  // 4. Check which roles grant this permission
+  const grantingRoles = await db.select({
+    role: rolePermissions.role,
+  })
+  .from(rolePermissions)
+  .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+  .where(and(
+    inArray(rolePermissions.role, roleNames),
+    eq(permissions.code, normalizedCode),
+    eq(rolePermissions.granted, true)
+  ));
+
+  if (grantingRoles.length > 0) {
+    return {
+      code: normalizedCode,
+      grantedBy: 'role',
+      roles: grantingRoles.map(r => r.role as SystemRole),
+    };
+  }
+
+  // Permission not granted
+  return null;
+}
+
+/**
+ * Get all permission sources for a user
+ * Returns a map of permission codes to their sources
+ */
+export async function getAllPermissionSources(userId: string): Promise<Map<string, PermissionSource>> {
+  const sources = new Map<string, PermissionSource>();
+
+  // Get user roles
+  const userRolesResult = await db.select({
+    role: userRoles.role,
+  })
+  .from(userRoles)
+  .where(eq(userRoles.userId, userId));
+
+  const roleNames = userRolesResult.map(r => r.role as SystemRole);
+  const isAdmin = roleNames.some(r => isAdminRole(r));
+
+  // Get all permissions
+  const allPerms = await db.select({
+    code: permissions.code,
+  })
+  .from(permissions);
+
+  // If admin, all permissions come from admin role
+  if (isAdmin) {
+    const adminRoles = roleNames.filter(r => isAdminRole(r));
+    for (const perm of allPerms) {
+      sources.set(perm.code, {
+        code: perm.code,
+        grantedBy: 'admin',
+        roles: adminRoles,
+      });
+    }
+    return sources;
+  }
+
+  // Get user overrides
+  const userOverrides = await db.select({
+    code: permissions.code,
+    granted: userPermissions.granted,
+  })
+  .from(userPermissions)
+  .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
+  .where(eq(userPermissions.userId, userId));
+
+  for (const override of userOverrides) {
+    if (override.granted) {
+      sources.set(override.code, {
+        code: override.code,
+        grantedBy: 'user_override',
+        isUserOverride: true,
+      });
+    }
+  }
+
+  // Get role permissions
+  const rolePerms = await db.select({
+    code: permissions.code,
+    role: rolePermissions.role,
+  })
+  .from(rolePermissions)
+  .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+  .where(and(
+    inArray(rolePermissions.role, roleNames),
+    eq(rolePermissions.granted, true)
+  ));
+
+  // Group by permission code
+  for (const perm of rolePerms) {
+    // Skip if already set by user override
+    if (sources.has(perm.code)) continue;
+
+    const existing = sources.get(perm.code);
+    if (existing && existing.roles) {
+      if (!existing.roles.includes(perm.role as SystemRole)) {
+        existing.roles.push(perm.role as SystemRole);
+      }
+    } else {
+      sources.set(perm.code, {
+        code: perm.code,
+        grantedBy: 'role',
+        roles: [perm.role as SystemRole],
+      });
+    }
+  }
+
+  return sources;
 }

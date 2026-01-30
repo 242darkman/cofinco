@@ -14,6 +14,9 @@ import type {
   WebhookPayload
 } from "../types";
 import { ProviderApiError, WebhookVerificationError } from "../types";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger('MtnMomoProvider');
 
 // Configuration MTN depuis les variables d'environnement
 const MTN_CONFIG = {
@@ -332,12 +335,12 @@ export class MTNProvider implements IMobileMoneyProvider {
     // MTN utilise HMAC-SHA256 pour signer les callbacks
     // En sandbox, la vérification peut être désactivée
     if (MTN_CONFIG.environment === "sandbox") {
-      console.log("[MTN] Sandbox mode: skipping webhook signature verification");
+      logger.info('Sandbox mode: skipping webhook signature verification');
       return true;
     }
 
     if (!signature) {
-      console.warn("[MTN] No signature provided in webhook");
+      logger.warn('No signature provided in webhook');
       return false;
     }
 
@@ -353,12 +356,12 @@ export class MTNProvider implements IMobileMoneyProvider {
       );
 
       if (!isValid) {
-        console.warn("[MTN] Webhook signature mismatch");
+        logger.warn('Webhook signature mismatch');
       }
 
       return isValid;
     } catch (error) {
-      console.error("[MTN] Webhook verification error:", error);
+      logger.error({ err: error }, 'Webhook verification error');
       return false;
     }
   }

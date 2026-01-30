@@ -9,6 +9,9 @@ import {
   TypeTacheRegularisation,
   Priorite,
 } from "@shared/enum/status-constants";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('AutoTransfer');
 
 /** Génère une référence unique avec crypto.randomUUID() */
 const generateReference = () =>
@@ -169,6 +172,7 @@ export async function executeAutomaticTransfer(
           compteId: compteSource.id,
           mouvementId: mouvement.id,
           typePaiement: "TRANSFER_OUT",
+          sens: "DEBIT",
           montant: compteDest.versementAutoMontant!,
           soldeApres: nouveauSoldeSource,
           methodePaiement: "TRANSFER",
@@ -179,6 +183,7 @@ export async function executeAutomaticTransfer(
           compteId: compteDest.id,
           mouvementId: mouvement.id,
           typePaiement: "TRANSFER_IN",
+          sens: "CREDIT",
           montant: compteDest.versementAutoMontant!,
           soldeApres: nouveauSoldeDest,
           methodePaiement: "TRANSFER",
@@ -219,7 +224,7 @@ export async function executeAutomaticTransfer(
 
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'Erreur inconnue';
-      console.error(`[Automatic Transfer] Tentative ${attempt}/${maxRetries} échouée:`, lastError);
+      logger.error({ attempt, maxRetries, error: lastError }, 'Transfer attempt failed');
 
       // Si ce n'est pas la dernière tentative, attendre avec backoff exponentiel
       if (attempt < maxRetries) {
@@ -230,7 +235,7 @@ export async function executeAutomaticTransfer(
   }
 
   // Toutes les tentatives ont échoué - enregistrer l'échec
-  console.error(`[Automatic Transfer] Échec après ${maxRetries} tentatives pour compte ${compteId}`);
+  logger.error({ maxRetries, compteId }, 'All transfer attempts failed');
 
   try {
     const [compteDest] = await db
@@ -262,7 +267,7 @@ export async function executeAutomaticTransfer(
       });
     }
   } catch (logError) {
-    console.error('[Automatic Transfer] Erreur lors de l\'enregistrement de l\'échec:', logError);
+    logger.error({ err: logError }, 'Error recording failure');
   }
 
   return {

@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   X, User, TrendingUp, TrendingDown, Calendar,
   DollarSign, Percent, Lock, Download, Copy,
@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetCl
 import TabGroup from '../../ui/TabGroup';
 import Badge from '../../ui/Badge';
 import { Button, IconButton } from '../../ui';
-import { compteEpargneApi, transactionEpargneApi, clientApi, sessionCaisseApi } from '../../../lib/api-client';
+import { compteEpargneApi, transactionEpargneApi, sessionCaisseApi } from '../../../lib/api-client';
 import { TransactionRowActions } from '../shared/TransactionRowActions';
 import { ReceiptViewer } from '../shared/ReceiptViewer';
 import { useReceiptActions } from '../../../hooks/finance/useReceiptActions';
@@ -24,6 +24,7 @@ import StatementExportModal from './StatementExportModal';
 import { formatClientName } from '../../../lib/format';
 import { useLocation } from 'wouter';
 import { AccountActivationModal } from '../caisse/AccountActivationModal';
+import { compteKeys, caisseKeys } from '../../../lib/query-keys';
 
 // Mapping EN -> FR pour les types de compte
 const TYPE_COMPTE_LABELS: Record<string, string> = {
@@ -58,21 +59,65 @@ interface AccountDetailSlideOverProps {
 
 export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRequestActivation }: AccountDetailSlideOverProps) {
   const [, navigate] = useLocation();
-  const [compte, setCompte] = useState<any>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('transactions');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showActivationModal, setShowActivationModal] = useState(false);
-  const [stats, setStats] = useState({
-    totalDepots: 0,
-    totalRetraits: 0,
-    nombreTransactions: 0
+
+  // --- React Query: Account detail ---
+  const compteQuery = useQuery({
+    queryKey: compteKeys.detail(compteId || ''),
+    queryFn: () => compteEpargneApi.getById(compteId!),
+    enabled: isOpen && !!compteId,
   });
+
+  const compte = compteQuery.data || null;
+
+  // --- React Query: Transactions ---
+  const transactionsQuery = useQuery({
+    queryKey: compteKeys.transactions(compteId || ''),
+    queryFn: () => transactionEpargneApi.getByCompte(compteId!),
+    enabled: isOpen && !!compteId,
+  });
+
+  // Normalize transactions and compute KPIs
+  const transactions = useMemo(() => {
+    const raw = transactionsQuery.data?.data;
+    if (!raw) return [];
+    return raw.map((t: any) => {
+      const rawType = t.typePaiement || t.type_paiement || 'Autre';
+      const translatedLabel = getStatusLabel(rawType, ALL_STATUS_LABELS);
+      return {
+        ...t,
+        montant: Number(t.montant) || 0,
+        solde_apres: Number(t.solde_apres || t.soldeApres || 0),
+        type_transaction: translatedLabel !== rawType ? translatedLabel : rawType.replace(/ (Épargne|Courant|Bloqué)$/, ''),
+        date_transaction: t.createdAt || t.created_at || new Date().toISOString(),
+        description: t.observations || t.typePaiement,
+        reference: t.billingReference || t.billing_reference || t.id?.substring(0, 8)
+      };
+    });
+  }, [transactionsQuery.data]);
+
+  const stats = useMemo(() => {
+    return transactions.reduce((acc: { totalDepots: number; totalRetraits: number; nombreTransactions: number }, t: any) => {
+      const m = Number(t.montant) || 0;
+      const rawType = t.typePaiement || t.type_transaction || '';
+      if (isDepositType(rawType) || (m > 0 && !isWithdrawalType(rawType))) {
+        acc.totalDepots += Math.abs(m);
+      } else if (isWithdrawalType(rawType) || m < 0) {
+        acc.totalRetraits += Math.abs(m);
+      }
+      acc.nombreTransactions++;
+      return acc;
+    }, { totalDepots: 0, totalRetraits: 0, nombreTransactions: 0 });
+  }, [transactions]);
+
+  const loading = compteQuery.isLoading || transactionsQuery.isLoading;
 
   // Query for active caisse session (needed for account activation)
   const { data: sessionActive } = useQuery({
-    queryKey: ['session-caisse', 'active'],
+    queryKey: caisseKeys.sessionActive(),
     queryFn: async () => {
       const data = await sessionCaisseApi.getActive();
       const status = data ? computeSessionStatus(data) : null;
@@ -92,85 +137,14 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
     handleCloseViewer
   } = useReceiptActions();
 
-  useEffect(() => {
-    if (isOpen && compteId) {
-      loadCompteDetails();
+  // Invalidation helper (replaces loadCompteDetails)
+  const invalidateDetails = () => {
+    if (compteId) {
+      queryClient.invalidateQueries({ queryKey: compteKeys.detail(compteId) });
+      queryClient.invalidateQueries({ queryKey: compteKeys.transactions(compteId) });
     }
-  }, [isOpen, compteId]);
-
-  const loadCompteDetails = async () => {
-    if (!compteId) return;
-    setLoading(true);
-    try {
-      // Parallel fetching for speed
-      const [comptesResponse, transactionsData, clientsResponse] = await Promise.all([
-        compteEpargneApi.getAll(),
-        transactionEpargneApi.getByCompte(compteId),
-        clientApi.getAllList()
-      ]);
-
-      // Handle Data
-      const comptesResponseAny = comptesResponse as any;
-      const comptesData = Array.isArray(comptesResponse) ? comptesResponse : (comptesResponseAny.data || []);
-      const clientsData = Array.isArray(clientsResponse) ? clientsResponse : ((clientsResponse as any).data || []);
-
-      const compteData = comptesData.find((c: any) => c.id === compteId);
-      
-      if (compteData) {
-        // Resolve client
-        const clientId = compteData.client_id || compteData.clientId;
-        let client = clientsData.find((c: any) => c.id === clientId);
-        if (!client && compteData.clients) client = compteData.clients;
-
-        setCompte({
-          ...compteData,
-          clients: client || { nom: 'Inconnu', email: '', phone: '' }
-        });
-      }
-
-      if (transactionsData) {
-        // Normalize transactions
-         const normalizedTransactions = transactionsData.map((t: any) => {
-            const rawType = t.typePaiement || t.type_paiement || 'Autre';
-            // Try to translate using the raw enum value
-            const translatedLabel = getStatusLabel(rawType, ALL_STATUS_LABELS);
-            
-            return {
-              ...t,
-              montant: Number(t.montant) || 0,
-              solde_apres: Number(t.solde_apres || t.soldeApres || 0),
-              type_transaction: translatedLabel !== rawType ? translatedLabel : rawType.replace(/ (Épargne|Courant|Bloqué)$/, ''),
-              date_transaction: t.createdAt || t.created_at || new Date().toISOString(),
-              description: t.observations || t.typePaiement,
-              reference: t.billingReference || t.billing_reference || t.id?.substring(0, 8)
-            };
-          });
-          
-          setTransactions(normalizedTransactions);
-          
-          // KPIs using type-safe helper functions
-          const kpi = normalizedTransactions.reduce((acc: { totalDepots: number; totalRetraits: number; nombreTransactions: number }, t: { montant: number; type_transaction: string; typePaiement?: string }) => {
-             const m = Number(t.montant) || 0;
-             const rawType = t.typePaiement || t.type_transaction || '';
-
-             // Use helper functions that check enum values + fallback patterns
-             if (isDepositType(rawType) || (m > 0 && !isWithdrawalType(rawType))) {
-               acc.totalDepots += Math.abs(m);
-             } else if (isWithdrawalType(rawType) || m < 0) {
-               acc.totalRetraits += Math.abs(m);
-             }
-
-             acc.nombreTransactions++;
-             return acc;
-          }, { totalDepots: 0, totalRetraits: 0, nombreTransactions: 0 });
-          setStats(kpi);
-      }
-
-    } catch (e) {
-      console.error("Error loading details", e);
-    } finally {
-      setLoading(false);
-    }
+    queryClient.invalidateQueries({ queryKey: compteKeys.lists() });
+    queryClient.invalidateQueries({ queryKey: compteKeys.epargne() });
   };
 
   const tabs = [
@@ -257,18 +231,18 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
              </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto pro-scrollbar">
              {loading ? (
-                <div className="p-8 flex justify-center">
+                <div className="p-6 flex justify-center">
                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                 </div>
              ) : (
-                <div className="p-4 space-y-6">
-                   
+                <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+
                    {/* 2. Hero Section (Virtual Card) - Different for PENDING_ACTIVATION */}
                    {isPending ? (
                      // PENDING ACTIVATION: Special "funds not yet deposited" card
-                     <div className="relative overflow-hidden rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-900 p-6">
+                     <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-900 p-4 sm:p-6">
                        {/* Hatched pattern background to signify "not yet real" */}
                        <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(135deg,#fff_25%,transparent_25%,transparent_50%,#fff_50%,#fff_75%,transparent_75%,transparent)] bg-[length:20px_20px]" />
 
@@ -340,30 +314,30 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                        </div>
                      </div>
                    ) : (
-                     // ACTIVE: Standard balance card
-                     <div className={`rounded-2xl p-6 text-white shadow-xl relative overflow-hidden ${getGradient()}`}>
+                     // ACTIVE: Standard balance card - Compact & Responsive
+                     <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden ${getGradient()}`}>
                         <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
                         <div className="relative z-10">
-                           <div className="flex justify-between items-start mb-6">
-                              <p className="opacity-80 text-sm font-medium">Solde Disponible</p>
+                           <div className="flex justify-between items-start mb-3 sm:mb-4">
+                              <p className="opacity-80 text-xs sm:text-sm font-medium">Solde Disponible</p>
                               {(() => {
                                  const Icon = uiConfig.icon;
-                                 return <Icon className="text-white/80" />;
+                                 return <Icon className="text-white/80 w-5 h-5 sm:w-6 sm:h-6" />;
                               })()}
                            </div>
 
-                           <h1 className="text-4xl font-bold font-mono tracking-tight mb-8">
-                              {realBalance.toLocaleString('fr-FR')} <span className="text-lg opacity-60 font-sans">FCFA</span>
+                           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold font-mono tracking-tight mb-4 sm:mb-6">
+                              {realBalance.toLocaleString('fr-FR')} <span className="text-sm sm:text-lg opacity-60 font-sans">FCFA</span>
                            </h1>
 
-                           <div className="flex justify-between items-end text-sm opacity-90 font-medium">
-                              <div>
-                                 <div className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Titulaire</div>
-                                 <div>{formatClientName(compte.clients?.nom, compte.clients?.prenom)}</div>
+                           <div className="flex justify-between items-end text-xs sm:text-sm opacity-90 font-medium">
+                              <div className="min-w-0 flex-1 mr-3">
+                                 <div className="text-[10px] sm:text-xs opacity-60 uppercase tracking-wider mb-0.5">Titulaire</div>
+                                 <div className="truncate">{formatClientName(compte.clients?.nom, compte.clients?.prenom) || '—'}</div>
                               </div>
-                              <div className="text-right">
-                                 <div className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Ouverture</div>
+                              <div className="text-right shrink-0">
+                                 <div className="text-[10px] sm:text-xs opacity-60 uppercase tracking-wider mb-0.5">Ouverture</div>
                                  <div>{new Date(compte.date_ouverture || compte.createdAt).toLocaleDateString()}</div>
                               </div>
                            </div>
@@ -371,24 +345,24 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                      </div>
                    )}
 
-                   {/* KPIs (In/Out) */}
-                   <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
-                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                            <ArrowDownLeft size={16} />
+                   {/* KPIs (In/Out) - Compact */}
+                   <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      <div className="bg-slate-800/50 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-slate-700/50 flex items-center gap-2 sm:gap-3">
+                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                            <ArrowDownLeft size={14} className="sm:w-4 sm:h-4" />
                          </div>
-                         <div>
-                            <div className="text-xs text-slate-500">Entrées</div>
-                            <div className="text-sm font-bold text-emerald-400">+{stats.totalDepots.toLocaleString()}</div>
+                         <div className="min-w-0">
+                            <div className="text-[10px] sm:text-xs text-slate-500">Entrées</div>
+                            <div className="text-xs sm:text-sm font-bold text-emerald-400 truncate">+{stats.totalDepots.toLocaleString()}</div>
                          </div>
                       </div>
-                      <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
-                         <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-                            <ArrowUpRight size={16} />
+                      <div className="bg-slate-800/50 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-slate-700/50 flex items-center gap-2 sm:gap-3">
+                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
+                            <ArrowUpRight size={14} className="sm:w-4 sm:h-4" />
                          </div>
-                         <div>
-                            <div className="text-xs text-slate-500">Sorties</div>
-                            <div className="text-sm font-bold text-red-400">-{stats.totalRetraits.toLocaleString()}</div>
+                         <div className="min-w-0">
+                            <div className="text-[10px] sm:text-xs text-slate-500">Sorties</div>
+                            <div className="text-xs sm:text-sm font-bold text-red-400 truncate">-{stats.totalRetraits.toLocaleString()}</div>
                          </div>
                       </div>
                    </div>
@@ -402,42 +376,42 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                       fullWidth
                    />
 
-                   <div className="mt-4">
+                   <div className="mt-3 sm:mt-4">
                       {activeTab === 'transactions' && (
-                         <div className="space-y-3">
-                            <div className="flex justify-between items-center pb-2">
-                               <h3 className="text-sm font-semibold text-white">Dernières opérations</h3>
-                               <span className="text-xs text-slate-500">{transactions.length} transactions</span>
+                         <div className="space-y-2 sm:space-y-3">
+                            <div className="flex justify-between items-center pb-1 sm:pb-2">
+                               <h3 className="text-xs sm:text-sm font-semibold text-white">Dernières opérations</h3>
+                               <span className="text-[10px] sm:text-xs text-slate-500">{transactions.length} transactions</span>
                             </div>
-                            
+
                             {transactions.length === 0 ? (
-                               <div className="text-center py-10 text-slate-500 bg-slate-800/30 rounded-xl border border-slate-800">
+                               <div className="text-center py-6 sm:py-10 text-slate-500 text-xs sm:text-sm bg-slate-800/30 rounded-lg sm:rounded-xl border border-slate-800">
                                   Aucune transaction
                                </div>
                             ) : (
                                transactions.map((t) => {
                                   const isDebit = isWithdrawalType(t.typePaiement) || t.montant < 0;
                                   return (
-                                  <div key={t.id} className="bg-slate-800/30 border border-slate-700/50 p-3 rounded-xl flex items-center justify-between hover:bg-slate-800/50 transition-colors group">
-                                     <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                  <div key={t.id} className="bg-slate-800/30 border border-slate-700/50 p-2 sm:p-3 rounded-lg sm:rounded-xl flex items-center justify-between hover:bg-slate-800/50 transition-colors group">
+                                     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
                                            !isDebit ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
                                         }`}>
-                                           {!isDebit ? <TrendingUp size={18}/> : <TrendingDown size={18}/>}
+                                           {!isDebit ? <TrendingUp size={14} className="sm:w-[18px] sm:h-[18px]"/> : <TrendingDown size={14} className="sm:w-[18px] sm:h-[18px]"/>}
                                         </div>
-                                        <div>
-                                           <div className="font-medium text-slate-200 text-sm">{t.type_transaction}</div>
-                                           <div className="text-xs text-slate-500">
+                                        <div className="min-w-0">
+                                           <div className="font-medium text-slate-200 text-xs sm:text-sm truncate">{t.type_transaction}</div>
+                                           <div className="text-[10px] sm:text-xs text-slate-500">
                                              {new Date(t.date_transaction).toLocaleDateString()} • {new Date(t.date_transaction).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                            </div>
                                         </div>
                                      </div>
-                                     <div className="text-right">
-                                        <div className={`font-mono font-bold text-sm ${!isDebit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                     <div className="text-right shrink-0 ml-2">
+                                        <div className={`font-mono font-bold text-xs sm:text-sm ${!isDebit ? 'text-emerald-400' : 'text-red-400'}`}>
                                            {!isDebit ? '+' : '-'}{Math.abs(t.montant).toLocaleString()}
                                         </div>
                                         {/* Actions opacity 0 until hover */}
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity"> 
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                             <TransactionRowActions
                                                factureId={t.factureId}
                                                transactionId={t.id}
@@ -456,47 +430,49 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                       )}
 
                       {activeTab === 'details' && (
-                         <div className="space-y-6">
-                            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
-                               <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                                  <User size={16} className="text-cyan-400"/>
+                         <div className="space-y-3 sm:space-y-4">
+                            {/* Information Titulaire - Compact */}
+                            <div className="bg-slate-800/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-slate-700/50">
+                               <h3 className="text-xs sm:text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
+                                  <User size={14} className="text-cyan-400 sm:w-4 sm:h-4"/>
                                   Information Titulaire
                                </h3>
-                               <div className="space-y-3 text-sm">
-                                  <div className="flex justify-between py-2 border-b border-slate-700/50">
+                               <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-700/50">
+                                  <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Nom Complet</span>
-                                     <span className="text-white font-medium">{formatClientName(compte.clients?.nom, compte.clients?.prenom)}</span>
+                                     <span className="text-white font-medium truncate ml-2 text-right">{formatClientName(compte.clients?.nom, compte.clients?.prenom) || '—'}</span>
                                   </div>
-                                  <div className="flex justify-between py-2 border-b border-slate-700/50">
+                                  <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Téléphone</span>
-                                     <span className="text-white">{compte.clients?.phone || compte.clients?.telephone || 'N/A'}</span>
+                                     <span className="text-white font-mono text-[11px] sm:text-sm">{compte.clients?.phone || compte.clients?.telephone || '—'}</span>
                                   </div>
-                                  <div className="flex justify-between py-2">
+                                  <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Email</span>
-                                     <span className="text-white">{compte.clients?.email || 'N/A'}</span>
+                                     <span className="text-white truncate ml-2 text-right max-w-[160px] sm:max-w-none">{compte.clients?.email || '—'}</span>
                                   </div>
                                </div>
                             </div>
 
-                            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
-                               <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                                  <CreditCard size={16} className="text-emerald-400"/>
+                            {/* Détails Compte - Compact */}
+                            <div className="bg-slate-800/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-slate-700/50">
+                               <h3 className="text-xs sm:text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
+                                  <CreditCard size={14} className="text-emerald-400 sm:w-4 sm:h-4"/>
                                   Détails Compte
                                </h3>
-                               <div className="space-y-3 text-sm">
-                                  <div className="flex justify-between py-2 border-b border-slate-700/50">
+                               <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-700/50">
+                                  <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Numéro</span>
-                                     <span className="text-white font-mono">{compte.numero_compte}</span>
+                                     <span className="text-white font-mono text-[11px] sm:text-sm">{compte.numero_compte}</span>
                                   </div>
-                                  <div className="flex justify-between py-2 border-b border-slate-700/50">
+                                  <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Date d'ouverture</span>
                                      <span className="text-white">{new Date(compte.date_ouverture).toLocaleDateString()}</span>
                                   </div>
                                   {uiConfig.interestRate > 0 && (
-                                     <div className="flex justify-between py-2 border-b border-slate-700/50">
+                                     <div className="flex justify-between items-center py-1.5 sm:py-2">
                                         <span className="text-slate-500">Taux d'intérêt</span>
                                         <div className="flex items-center gap-1 text-emerald-400 font-bold">
-                                           <Percent size={12}/>
+                                           <Percent size={10} className="sm:w-3 sm:h-3"/>
                                            {uiConfig.interestRate}%
                                         </div>
                                      </div>
@@ -548,7 +524,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
           onClose={() => setShowActivationModal(false)}
           onSuccess={() => {
             setShowActivationModal(false);
-            loadCompteDetails(); // Refresh account details
+            invalidateDetails();
           }}
         />
       )}

@@ -27,7 +27,7 @@ import {
   type Compte,
   type TransactionCompte,
 } from "@shared/schema";
-import { eq, and, isNull, desc, sql, gte, lte, asc } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, gte, lte, lt, asc } from "drizzle-orm";
 import { subMonths, subYears, startOfDay, endOfDay, eachDayOfInterval, format, isSameDay } from "date-fns";
 import {
   executeWithLedger,
@@ -38,6 +38,10 @@ import {
   type SensMouvement,
   type MouvementFinancier,
 } from "./ledger";
+import {
+  deriveSensFromType,
+  formatTransactionDescription,
+} from "@shared/config/transaction-labels";
 import {
   createFactureForDepot,
   createFactureForRetrait,
@@ -328,11 +332,12 @@ export async function createCompte(
         })
         .returning();
 
-      // Create transaction record
+      // Create transaction record with derived sens
       await tx.insert(transactionsCompte).values({
         compteId: compte.id,
         mouvementId: mouvement.id,
         typePaiement: initialDepositTypePaiement,
+        sens: deriveSensFromType(initialDepositTypePaiement),
         montant: data.soldeInitial.toString(),
         soldeApres: data.soldeInitial.toString(),
         methodePaiement: "CASH",
@@ -495,13 +500,14 @@ export async function processCompteDepot(
     nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, montant);
   }
 
-  // Create transaction record
+  // Create transaction record with sens derived from typePaiement
   const [transaction] = await tx
     .insert(transactionsCompte)
     .values({
       compteId: compteId,
       mouvementId: mouvement.id,
       typePaiement: typePaiement as any,
+      sens: deriveSensFromType(typePaiement),
       montant: montant.toString(),
       soldeApres: nouveauSolde,
       methodePaiement: methodePaiement as any,
@@ -673,13 +679,14 @@ export async function processCompteRetrait(
     nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, -montant);
   }
 
-  // Create transaction record
+  // Create transaction record with sens derived from typePaiement
   const [transaction] = await tx
     .insert(transactionsCompte)
     .values({
       compteId: compteId,
       mouvementId: mouvement.id,
       typePaiement: typePaiement as any,
+      sens: deriveSensFromType(typePaiement),
       montant: montant.toString(),
       soldeApres: nouveauSolde,
       methodePaiement: methodePaiement as any,
@@ -1083,40 +1090,79 @@ export async function getCompteAgenceHistorique(compteId: string) {
 /**
  * Récupère les transactions d'un compte
  */
-export async function getCompteTransactions(compteId: string, limit = 50) {
+export async function getCompteTransactions(
+  compteId: string,
+  limit = 50,
+  cursor?: string // ISO timestamp of last item (createdAt) — items before this will be returned
+) {
+  const conditions = [eq(transactionsCompte.compteId, compteId)];
+  if (cursor) {
+    conditions.push(lt(transactionsCompte.createdAt, new Date(cursor)));
+  }
+
+  // Fetch limit + 1 to detect if there are more items
+  // Now using sens directly from transactionsCompte (stored at insert time)
   const rawResult = await db
     .select({
       id: transactionsCompte.id,
       createdAt: transactionsCompte.createdAt,
       montant: transactionsCompte.montant,
-      // Fetch raw enum value
-      sens: mouvementsFinanciers.sens,
+      // sens is now stored directly in transactionsCompte
+      sens: transactionsCompte.sens,
       typePaiement: transactionsCompte.typePaiement,
       observations: transactionsCompte.observations,
       recu_numero: transactionsCompte.referenceExterne,
       referenceExterne: transactionsCompte.referenceExterne,
       solde_apres: transactionsCompte.soldeApres,
       mouvementId: transactionsCompte.mouvementId,
-      factureId: transactionsCompte.factureId, // ← NOUVEAU: Pour les actions de reçu dans l'UI
+      factureId: transactionsCompte.factureId,
+      // Métadonnées pour enrichir les libellés (numéro compte dest, etc.)
+      metadata: mouvementsFinanciers.metadata,
     })
     .from(transactionsCompte)
     .leftJoin(mouvementsFinanciers, eq(transactionsCompte.mouvementId, mouvementsFinanciers.id))
-    .where(eq(transactionsCompte.compteId, compteId))
+    .where(and(...conditions))
     .orderBy(desc(transactionsCompte.createdAt))
-    .limit(limit);
+    .limit(limit + 1);
 
-  return rawResult.map(t => {
-    // Priority for description
-    const description = t.observations || t.typePaiement || 'Opération';
+  const hasMore = rawResult.length > limit;
+  const items = hasMore ? rawResult.slice(0, limit) : rawResult;
+
+  const data = items.map(t => {
+    // Use stored sens, fallback to derivation for records without sens (pre-migration)
+    const effectiveSens = t.sens || deriveSensFromType(t.typePaiement);
+
+    // Extraire les métadonnées du mouvement pour enrichir le libellé
+    const mouvementMeta = (t as any).metadata as Record<string, unknown> | null;
+    const metadata = mouvementMeta ? {
+      compteDestNumero: mouvementMeta.compteDestNumero as string | undefined,
+      compteSourceNumero: mouvementMeta.compteSourceNumero as string | undefined,
+      numeroCredit: mouvementMeta.numeroCredit as string | undefined,
+      tontineName: mouvementMeta.tontineName as string | undefined,
+      motif: mouvementMeta.motif as string | undefined,
+    } : undefined;
+
+    // Générer un libellé bancaire professionnel
+    const description = formatTransactionDescription(
+      t.typePaiement,
+      t.observations,
+      metadata
+    );
 
     return {
       ...t,
-      sens: t.sens || 'DEBIT',
-      type: t.typePaiement, // Maintain compatibility
+      sens: effectiveSens,
+      type: t.typePaiement,
       description,
-      factureId: t.factureId, // ← NOUVEAU: Exposé dans l'API
+      factureId: t.factureId,
     };
   });
+
+  const nextCursor = hasMore && data.length > 0
+    ? data[data.length - 1].createdAt?.toISOString() ?? null
+    : null;
+
+  return { data, nextCursor, hasMore };
 }
 
 export async function cloturerCompte(
@@ -1430,6 +1476,7 @@ export async function createCompteWithInitialDeposit(
         compteId: data.compteSourceId,
         mouvementId: mouvement.id,
         typePaiement: 'INTERNAL_TRANSFER',
+        sens: 'DEBIT', // Outgoing transfer
         montant: data.montantInitial.toString(),
         soldeApres: (soldeSource - data.montantInitial).toString(),
         methodePaiement: 'TRANSFER',
@@ -1439,17 +1486,18 @@ export async function createCompteWithInitialDeposit(
 
       // Update Source Balance
       await tx.update(comptes)
-        .set({ 
+        .set({
           soldeCourant: (soldeSource - data.montantInitial).toString(),
           updatedAt: new Date()
         })
         .where(eq(comptes.id, data.compteSourceId));
-      
+
       // D. Transaction 2: CREDIT New Account (Initial Deposit)
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId: compte.id,
         mouvementId: mouvement.id,
         typePaiement: 'INITIAL_DEPOSIT',
+        sens: 'CREDIT', // Incoming deposit
         montant: data.montantInitial.toString(),
         soldeApres: data.montantInitial.toString(),
         methodePaiement: 'TRANSFER',
@@ -1537,6 +1585,7 @@ export async function payerDepotInitialCompte(
         compteId,
         mouvementId: mouvement.id,
         typePaiement: 'INITIAL_DEPOSIT',
+        sens: 'CREDIT', // Incoming deposit
         montant: data.montant.toString(),
         soldeApres: data.montant.toString(),
         methodePaiement: 'CASH',
@@ -1597,6 +1646,93 @@ export async function payerDepotInitialCompte(
   });
 }
 
+/**
+ * Créditer des intérêts sur un compte (opération atomique via ledger)
+ *
+ * Crée un mouvement financier + écriture GL + transaction compte,
+ * le tout dans une seule transaction DB.
+ */
+export async function crediterInterets(
+  data: {
+    compteId: string;
+    montant: number;
+    periode: string;
+    tauxInteret: number;
+    observations?: string;
+  },
+  userId?: string
+): Promise<{ transaction: typeof transactionsCompte.$inferSelect; mouvement: MouvementFinancier }> {
+  // 1. Get & validate compte
+  const [compte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
+  if (!compte) {
+    throw new CompteError("Compte non trouvé", "COMPTE_NOT_FOUND");
+  }
+
+  if (compte.statut === StatutCompteConst.CLOSED) {
+    throw new CompteError("Impossible de créditer des intérêts sur un compte clôturé", "COMPTE_CLOSED");
+  }
+
+  if (data.montant <= 0) {
+    throw new CompteError("Le montant des intérêts doit être supérieur à 0", "INVALID_AMOUNT");
+  }
+
+  // 2. Round to 2 decimals (floor to avoid over-crediting)
+  const montantAcrediter = Math.floor(data.montant * 100) / 100;
+
+  // 3. Execute atomically via ledger
+  const observations = data.observations ||
+    `Intérêts créditeurs - ${data.periode} (${data.tauxInteret}%)`;
+
+  const { result, mouvement } = await executeWithLedger(
+    "EPARGNE",
+    {
+      montant: montantAcrediter.toString(),
+      sens: "CREDIT" as SensMouvement,
+      clientId: compte.clientId,
+      compteId: data.compteId,
+      agenceId: compte.agenceId || undefined,
+      methodePaiement: "TRANSFER",
+      typePaiement: "INTEREST_PAYMENT",
+      metadata: {
+        observations,
+        periode: data.periode,
+        tauxInteret: data.tauxInteret,
+        soldeAvant: compte.soldeCourant,
+      },
+    },
+    async (tx, mvt) => {
+      // Atomic balance update with pessimistic lock
+      const nouveauSolde = await updateCompteSolde(tx, data.compteId, montantAcrediter);
+
+      // Create transaction record linked to mouvement
+      const [transaction] = await tx
+        .insert(transactionsCompte)
+        .values({
+          compteId: data.compteId,
+          mouvementId: mvt.id,
+          typePaiement: "INTEREST_PAYMENT",
+          sens: "CREDIT", // Interest is always incoming
+          montant: montantAcrediter.toString(),
+          soldeApres: nouveauSolde,
+          methodePaiement: "TRANSFER",
+          observations,
+          createdBy: userId || null,
+        } as any)
+        .returning();
+
+      return {
+        result: transaction,
+        additionalEventData: {
+          nouveauSoldeCompte: nouveauSolde,
+        },
+      };
+    },
+    userId
+  );
+
+  return { transaction: result, mouvement };
+}
+
 export default {
   // Validation
   clientHasCompteOfType,
@@ -1610,6 +1746,7 @@ export default {
   deposerSurCompte,
   retirerDuCompte,
   cloturerCompte,
+  crediterInterets,
   // Blocking
   bloquerCompte,
   debloquerCompte,

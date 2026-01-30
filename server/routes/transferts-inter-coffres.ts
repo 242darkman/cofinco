@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:TransfertsInterCoffres');
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -41,7 +44,7 @@ transfertsInterCoffresRouter.get("/coffres", async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /coffres:", error);
+    logger.error({ err: error }, 'Erreur GET /coffres');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -52,7 +55,7 @@ transfertsInterCoffresRouter.get("/coffres/siege", async (req, res) => {
     const result = await coffresService.getCoffreSiege();
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /coffres/siege:", error);
+    logger.error({ err: error }, 'Erreur GET /coffres/siege');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -69,7 +72,7 @@ transfertsInterCoffresRouter.get("/coffres/:id", async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /coffres/:id:", error);
+    logger.error({ err: error }, 'Erreur GET /coffres/:id');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -86,7 +89,7 @@ transfertsInterCoffresRouter.get("/coffres/agence/:agenceId", async (req, res) =
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /coffres/agence/:agenceId:", error);
+    logger.error({ err: error }, 'Erreur GET /coffres/agence/:agenceId');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -112,7 +115,7 @@ transfertsInterCoffresRouter.patch("/coffres/:id", attachAbility, requireAbility
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur PATCH /coffres/:id:", error);
+    logger.error({ err: error }, 'Erreur PATCH /coffres/:id');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -137,7 +140,7 @@ transfertsInterCoffresRouter.post("/coffres/:id/approvisionner", attachAbility, 
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur POST /coffres/:id/approvisionner:", error);
+    logger.error({ err: error }, 'Erreur POST /coffres/:id/approvisionner');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -148,7 +151,7 @@ transfertsInterCoffresRouter.get("/stats/coffres", async (req, res) => {
     const result = await coffresService.getStatistiques();
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /stats/coffres:", error);
+    logger.error({ err: error }, 'Erreur GET /stats/coffres');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -188,7 +191,7 @@ transfertsInterCoffresRouter.get("/transferts", async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /transferts:", error);
+    logger.error({ err: error }, 'Erreur GET /transferts');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -237,7 +240,7 @@ transfertsInterCoffresRouter.post("/transferts", async (req, res) => {
 
     res.status(201).json(result);
   } catch (error: any) {
-    console.error("Erreur POST /transferts:", error);
+    logger.error({ err: error }, 'Erreur POST /transferts');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -254,7 +257,7 @@ transfertsInterCoffresRouter.get("/transferts/:id", async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /transferts/:id:", error);
+    logger.error({ err: error }, 'Erreur GET /transferts/:id');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -284,7 +287,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/submit", async (req, res) => 
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur POST /transferts/:id/submit:", error);
+    logger.error({ err: error }, 'Erreur POST /transferts/:id/submit');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -326,7 +329,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/approve", async (req, res) =>
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur POST /transferts/:id/approve:", error);
+    logger.error({ err: error }, 'Erreur POST /transferts/:id/approve');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -367,7 +370,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/reject", async (req, res) => 
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur POST /transferts/:id/reject:", error);
+    logger.error({ err: error }, 'Erreur POST /transferts/:id/reject');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -409,7 +412,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/dispatch", async (req, res) =
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur POST /transferts/:id/dispatch:", error);
+    logger.error({ err: error }, 'Erreur POST /transferts/:id/dispatch');
     // Gérer les erreurs de verrouillage PostgreSQL (lock_not_available)
     if (error.code === "55P03") {
       return res.status(409).json({ 
@@ -462,7 +465,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/receive", async (req, res) =>
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur POST /transferts/:id/receive:", error);
+    logger.error({ err: error }, 'Erreur POST /transferts/:id/receive');
     // Gérer les erreurs de verrouillage PostgreSQL (lock_not_available)
     if (error.code === "55P03") {
       return res.status(409).json({ 
@@ -507,7 +510,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/cancel", async (req, res) => 
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur POST /transferts/:id/cancel:", error);
+    logger.error({ err: error }, 'Erreur POST /transferts/:id/cancel');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -519,7 +522,7 @@ transfertsInterCoffresRouter.get("/transferts/:id/documents", async (req, res) =
     const result = await transfertService.getDocuments(id);
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /transferts/:id/documents:", error);
+    logger.error({ err: error }, 'Erreur GET /transferts/:id/documents');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -531,7 +534,7 @@ transfertsInterCoffresRouter.get("/transferts/:id/audit", async (req, res) => {
     const result = await transfertService.getAuditLogs(id);
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur GET /transferts/:id/audit:", error);
+    logger.error({ err: error }, 'Erreur GET /transferts/:id/audit');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -570,7 +573,7 @@ transfertsInterCoffresRouter.get("/reconciliations", async (req, res) => {
 
     res.json({ success: true, reconciliations, stats });
   } catch (error: any) {
-    console.error("Erreur GET /reconciliations:", error);
+    logger.error({ err: error }, 'Erreur GET /reconciliations');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -601,7 +604,7 @@ transfertsInterCoffresRouter.get("/taches", async (req, res) => {
 
     res.json({ success: true, taches });
   } catch (error: any) {
-    console.error("Erreur GET /taches:", error);
+    logger.error({ err: error }, 'Erreur GET /taches');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -636,7 +639,7 @@ transfertsInterCoffresRouter.post("/taches/:id/resolve", attachAbility, requireA
 
     res.json({ success: true, tache: updated });
   } catch (error: any) {
-    console.error("Erreur POST /taches/:id/resolve:", error);
+    logger.error({ err: error }, 'Erreur POST /taches/:id/resolve');
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -667,7 +670,7 @@ transfertsInterCoffresRouter.get("/config", async (req, res) => {
 
     res.json({ success: true, config });
   } catch (error: any) {
-    console.error("Erreur GET /config:", error);
+    logger.error({ err: error }, 'Erreur GET /config');
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -725,7 +728,7 @@ transfertsInterCoffresRouter.put("/config", attachAbility, requireAbility(Action
 
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur PUT /config:", error);
+    logger.error({ err: error }, 'Erreur PUT /config');
     res.status(400).json({ success: false, error: error.message });
   }
 });

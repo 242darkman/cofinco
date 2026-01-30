@@ -5,6 +5,10 @@ import { parse as parseCookie } from "cookie";
 import { unsign } from "cookie-signature";
 import { sessionMiddleware } from "./auth";
 import { storage } from "./storage";
+import { createLogger } from "./lib/logger";
+import { isSessionValid, updateSessionActivity } from "./session-tracker";
+
+const logger = createLogger('WebSocket');
 
 // Extend WebSocket interface
 interface ExtendedWebSocket extends WebSocket {
@@ -89,6 +93,7 @@ type GlobalMessage = {
     | "EMPLOYE_UPDATE" | "AGENCE_UPDATE" | "HR_UPDATE"
     | "ACCOUNTING_UPDATE" | "LOYALTY_UPDATE"
     | "SETTINGS_UPDATE" | "RBAC_UPDATE"
+    | "AGENT_MODULES_UPDATE"
 
     // =============================================
     // LOCALISATION (Agents terrain)
@@ -99,7 +104,7 @@ type GlobalMessage = {
     // SESSIONS & SÉCURITÉ
     // =============================================
     | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT"
-    | "MAINTENANCE_UPDATE" | "FORCE_LOGOUT"
+    | "SESSION_INVALID" | "MAINTENANCE_UPDATE" | "FORCE_LOGOUT"
 
     // =============================================
     // COFFRE-FORT
@@ -112,6 +117,17 @@ type GlobalMessage = {
     // =============================================
     | "BALANCE_UPDATED"
     | "BALANCE_ALERT" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_ERROR"
+
+    // =============================================
+    // MONITORING FINANCIER & ALERTES
+    // =============================================
+    | "MONITORING_ALERT" | "MONITORING_ALERT_UPDATED" | "MONITORING_ALERT_DISMISSED"
+    | "MONITORING_DASHBOARD" | "ALERT_CREATED"
+
+    // =============================================
+    // RAPPELS & SCHEDULES
+    // =============================================
+    | "SCHEDULE_UPDATED"
 
     // =============================================
     // VIREMENTS PROGRAMMÉS
@@ -146,7 +162,7 @@ export function setupWebSocket(server: Server) {
     wss.clients.forEach((ws) => {
       const extWs = ws as ExtendedWebSocket;
       if (extWs.isAlive === false) {
-          console.log('[WebSocket] Terminating inactive connection');
+          logger.debug('Terminating inactive connection');
           return ws.terminate();
       }
 
@@ -165,7 +181,7 @@ export function setupWebSocket(server: Server) {
       if (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ECONNREFUSED') {
         return;
       }
-      console.error('[WebSocket] Socket error during upgrade:', err);
+      logger.error({ err }, 'Socket error during upgrade');
     });
 
     try {
@@ -177,14 +193,14 @@ export function setupWebSocket(server: Server) {
         return;
       }
       
-      console.log('[WebSocket] Upgrade request on:', url.pathname);
+      logger.debug({ pathname: url.pathname }, 'Upgrade request received');
       
       const isProduction = process.env.NODE_ENV === 'production';
 
       // 1. Strict Cookie Authentication
       const cookieHeader = request.headers.cookie;
       if (!cookieHeader) {
-          console.log('[WebSocket] Rejected: No cookie header');
+          logger.warn('Rejected: No cookie header');
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
@@ -196,7 +212,7 @@ export function setupWebSocket(server: Server) {
       const signedSessionId = cookies[cookieName];
 
       if (!signedSessionId) {
-          console.log('[WebSocket] Rejected: Session cookie missing');
+          logger.warn('Rejected: Session cookie missing');
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
@@ -205,7 +221,7 @@ export function setupWebSocket(server: Server) {
       // 2. Unsign Cookie
       // express-session cookies are prefixed with "s:"
       if (!signedSessionId.startsWith('s:')) {
-           console.log('[WebSocket] Rejected: Invalid cookie format');
+           logger.warn('Rejected: Invalid cookie format');
            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
            socket.destroy();
            return;
@@ -215,7 +231,7 @@ export function setupWebSocket(server: Server) {
       const sessionId = unsign(signedSessionId.slice(2), sessionSecret);
 
       if (!sessionId) {
-          console.log('[WebSocket] Rejected: Cookie signature invalid');
+          logger.warn('Rejected: Cookie signature invalid');
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
@@ -226,7 +242,7 @@ export function setupWebSocket(server: Server) {
       // It will fetch the session from DB (PostgresStore) and populate req.session.
 
       if (!sessionMiddleware) {
-         console.error('[WebSocket] Session middleware not available');
+         logger.error('Session middleware not available');
          socket.destroy();
          return;
       }
@@ -240,7 +256,7 @@ export function setupWebSocket(server: Server) {
 
       sessionMiddleware(request, mockRes as any, (err?: Error) => {
         if (err) {
-          console.error('[WebSocket] Session middleware error:', err);
+          logger.error({ err }, 'Session middleware error');
           socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
           socket.destroy();
           return;
@@ -251,13 +267,13 @@ export function setupWebSocket(server: Server) {
         // Final sanity check: session ID must match what we unsigned
         // (Middleware usually handles this, but good to be sure)
         if (session.id !== sessionId) {
-             console.log('[WebSocket] Warning: Session ID mismatch (middleware vs cookie)');
+             logger.warn({ sessionId, middlewareId: session.id }, 'Session ID mismatch (middleware vs cookie)');
         }
 
         const userId = session?.userId;
         
         if (!userId) {
-          console.log('[WebSocket] Rejected: No userId in session (expired or invalid)');
+          logger.warn('Rejected: No userId in session (expired or invalid)');
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
@@ -265,12 +281,13 @@ export function setupWebSocket(server: Server) {
         
         // 4. Proceed with Upgrade
         try {
-              // Store userId in request for connection handler
+              // Store userId and sessionId in request for connection handler
               (request as any).authenticatedUserId = userId;
+              (request as any).authenticatedSessionId = sessionId;
               (request as any).userAgence = session?.user?.agence;
               (request as any).userRole = session?.user?.role;
 
-              console.error('[WS-DEBUG] Connection established for user:', userId);
+              logger.debug({ userId }, 'Connection established (upgrade handler)');
               wss.handleUpgrade(request, socket, head, (ws) => {
                 const extWs = ws as ExtendedWebSocket;
                 extWs.isAlive = true;
@@ -279,18 +296,18 @@ export function setupWebSocket(server: Server) {
                 try {
                     wss.emit("connection", ws, request);
                 } catch (emitError) {
-                    console.error('[WebSocket] Error emitting connection event:', emitError);
+                    logger.error({ err: emitError }, 'Error emitting connection event');
                 }
               });
           } catch (error) {
-              console.error('[WebSocket] Error inside upgrading:', error);
+              logger.error({ err: error }, 'Error inside upgrading');
               try {
                   socket.destroy();
               } catch (e) { /* ignore */ }
           }
       });
     } catch (unexpectedError) {
-      console.error('[WebSocket] Critical error in upgrade handler:', unexpectedError);
+      logger.error({ err: unexpectedError }, 'Critical error in upgrade handler');
       try {
         socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
         socket.destroy();
@@ -306,18 +323,20 @@ export function setupWebSocket(server: Server) {
         // Ignore benign connection errors
         return;
       }
-      console.error('[WebSocket] Connection error:', err);
+      logger.error({ err }, 'Connection error');
     });
 
     // Use pre-authenticated values from upgrade handler
     const userId = (request as any).authenticatedUserId as string;
-    console.log("[WS] Connection established for userId:", userId); // Added log
+    const sessionId = (request as any).authenticatedSessionId as string;
+    logger.info({ userId, sessionId: sessionId?.slice(0, 8) + '...' }, 'Connection established');
     const userAgence = (request as any).userAgence as string | undefined;
     const userRole = (request as any).userRole as string | undefined;
 
     if (userId) {
-      // Store user metadata in WebSocket
+      // Store user metadata in WebSocket (including sessionId for heartbeat validation)
       (ws as any).userId = userId;
+      (ws as any).sessionId = sessionId;
       (ws as any).agence = userAgence;
       (ws as any).role = userRole;
       
@@ -328,7 +347,7 @@ export function setupWebSocket(server: Server) {
       
       // Update Connection Status (Dead Man Switch)
       storage.updateUserConnectionStatus(userId, 'CONNECTED').catch(err => {
-          console.error(`[WebSocket] Failed to update 'CONNECTED' status for ${userId}`, err);
+          logger.error({ err, userId }, 'Failed to update CONNECTED status');
       });
 
       // Notify everyone of new user presence
@@ -342,7 +361,7 @@ export function setupWebSocket(server: Server) {
       });
     }
 
-    ws.on("message", (message) => {
+    ws.on("message", async (message) => {
        (ws as ExtendedWebSocket).isAlive = true;
 
        // Rate limiting check
@@ -350,7 +369,7 @@ export function setupWebSocket(server: Server) {
          const { allowed, remaining, warn } = checkRateLimit(userId);
 
          if (!allowed) {
-           console.warn(`[WebSocket] Rate limit exceeded for user ${userId}`);
+           logger.warn({ userId }, 'Rate limit exceeded');
            ws.send(JSON.stringify({
              type: 'RATE_LIMITED',
              payload: {
@@ -379,6 +398,42 @@ export function setupWebSocket(server: Server) {
              ws.send(JSON.stringify({ type: 'PONG' }));
          }
 
+         // Session heartbeat - validates session is still active server-side
+         if (data.type === 'SESSION_HEARTBEAT') {
+           const sessionId = (ws as any).sessionId;
+           if (sessionId) {
+             // Update session activity - proves client is responsive
+             updateSessionActivity(sessionId).catch(() => {});
+
+             const validity = await isSessionValid(sessionId);
+             ws.send(JSON.stringify({
+               type: 'SESSION_HEARTBEAT_RESPONSE',
+               payload: {
+                 valid: validity.valid,
+                 reason: validity.reason,
+                 timestamp: Date.now(),
+               }
+             }));
+
+             // If session is invalid, notify and close
+             if (!validity.valid) {
+               logger.info({ userId, sessionId, reason: validity.reason }, 'Session invalid during WS heartbeat');
+               ws.send(JSON.stringify({
+                 type: 'SESSION_INVALID',
+                 payload: {
+                   reason: validity.reason || 'session_expired',
+                   message: 'Votre session a expiré. Veuillez vous reconnecter.',
+                 }
+               }));
+             }
+           } else {
+             ws.send(JSON.stringify({
+               type: 'SESSION_HEARTBEAT_RESPONSE',
+               payload: { valid: false, reason: 'no_session_id', timestamp: Date.now() }
+             }));
+           }
+         }
+
          // Handle subscription to aggregate channels
          if (data.type === 'SUBSCRIBE') {
            const { aggregate } = data; // e.g., 'client:uuid-xxx' or 'compte:uuid-xxx'
@@ -394,7 +449,7 @@ export function setupWebSocket(server: Server) {
              }
              (ws as any).subscriptions.add(aggregate);
              
-             console.log(`[WebSocket] User ${userId} subscribed to ${aggregate}`);
+             logger.debug({ userId, aggregate }, 'User subscribed to channel');
              ws.send(JSON.stringify({ type: 'SUBSCRIBED', aggregate }));
            }
          }
@@ -405,7 +460,7 @@ export function setupWebSocket(server: Server) {
            if (aggregate && typeof aggregate === 'string') {
              subscriptions.get(aggregate)?.delete(ws);
              (ws as any).subscriptions?.delete(aggregate);
-             console.log(`[WebSocket] User ${userId} unsubscribed from ${aggregate}`);
+             logger.debug({ userId, aggregate }, 'User unsubscribed from channel');
              ws.send(JSON.stringify({ type: 'UNSUBSCRIBED', aggregate }));
            }
          }
@@ -501,7 +556,7 @@ export function setupWebSocket(server: Server) {
             try {
                storage.updateAgentLocation(userId, latitude, longitude);
             } catch (err) {
-               console.error("Failed to persist agent location", err);
+               logger.error({ err, userId, latitude, longitude }, 'Failed to persist agent location');
             }
           }
        } catch (e) {
@@ -533,7 +588,7 @@ export function setupWebSocket(server: Server) {
 
           // Update Connection Status (Dead Man Switch)
           storage.updateUserConnectionStatus(userId, 'DISCONNECTED').catch(err => {
-              console.error(`[WebSocket] Failed to update 'DISCONNECTED' status for ${userId}`, err);
+              logger.error({ err, userId }, 'Failed to update DISCONNECTED status');
           });
 
           // Notify everyone of offline status

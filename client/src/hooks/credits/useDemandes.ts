@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { StatutDemande } from '@shared/enum/status-constants';
+import type { Facture } from '@shared/schema/operations';
 import { creditKeys } from '../../lib/query-keys';
 
 export interface DemandeCredit {
@@ -33,181 +34,294 @@ export interface DemandeCredit {
   };
 }
 
+// ============================================================================
+// FETCH FUNCTION
+// ============================================================================
+
+async function fetchDemandesFromAPI(): Promise<DemandeCredit[]> {
+  const response = await fetch('/api/demandes-credit?includeDeleted=true');
+  if (!response.ok) throw new Error('Erreur serveur');
+  const data = await response.json();
+  return data || [];
+}
+
+// ============================================================================
+// HOOK
+// ============================================================================
+
 export function useDemandes() {
   const queryClient = useQueryClient();
-  const [demandes, setDemandes] = useState<DemandeCredit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Helper to invalidate counts after mutations
-  const invalidateCounts = () => {
+  // ── Query: demandes list ─────────────────────────────────────────────
+  const {
+    data: demandes = [],
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery<DemandeCredit[]>({
+    queryKey: creditKeys.demandes(),
+    queryFn: fetchDemandesFromAPI,
+  });
+
+  const error = queryError instanceof Error ? queryError.message : null;
+
+  // Helper to invalidate demandes + counts after mutations
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: creditKeys.demandes() });
     queryClient.invalidateQueries({ queryKey: creditKeys.demandesCounts() });
-  };
+  }, [queryClient]);
 
-  const fetchDemandes = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/demandes-credit?includeDeleted=true');
-      if (!response.ok) throw new Error('Erreur serveur');
-      
-      const data = await response.json();
-      setDemandes(data || []);
-    } catch (err) {
-      console.error('Erreur fetch demandes:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ── Mutations ────────────────────────────────────────────────────────
 
-  const approuverDemande = async (id: string, montantApprouve: number) => {
-    try {
+  const approuverMutation = useMutation({
+    mutationFn: async ({ id, montantApprouve }: { id: string; montantApprouve: number }) => {
       const response = await fetch(`/api/demandes-credit/${id}/approuver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ montant_approuve: montantApprouve })
+        body: JSON.stringify({ montant_approuve: montantApprouve }),
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Erreur lors de l\'approbation');
+        throw new Error(errorData.message || "Erreur lors de l'approbation");
       }
-
-      await fetchDemandes();
-      invalidateCounts();
+      return montantApprouve;
+    },
+    onSuccess: (montantApprouve) => {
+      invalidateAll();
       toast.success('Demande approuvée', {
-        description: `Montant approuvé: ${montantApprouve.toLocaleString()} FCFA`
+        description: `Montant approuvé: ${montantApprouve.toLocaleString()} FCFA`,
       });
-      return true;
-    } catch (err) {
-      console.error('Erreur approbation:', err);
-      const message = err instanceof Error ? err.message : 'Erreur approbation';
-      setError(message);
-      toast.error('Échec de l\'approbation', { description: message });
-      return false;
-    }
-  };
+    },
+    onError: (err: Error) => {
+      toast.error("Échec de l'approbation", { description: err.message });
+    },
+  });
 
-  const rejeterDemande = async (id: string, motif?: string) => {
-    try {
+  const rejeterMutation = useMutation({
+    mutationFn: async ({ id, motif }: { id: string; motif?: string }) => {
       const response = await fetch(`/api/demandes-credit/${id}/rejeter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motif })
+        body: JSON.stringify({ motif }),
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Erreur lors du rejet');
       }
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success('Demande rejetée', { description: 'Le client sera notifié du rejet' });
+    },
+    onError: (err: Error) => {
+      toast.error('Échec du rejet', { description: err.message });
+    },
+  });
 
-      await fetchDemandes();
-      invalidateCounts();
-      toast.success('Demande rejetée', {
-        description: 'Le client sera notifié du rejet'
-      });
-      return true;
-    } catch (err) {
-      console.error('Erreur rejet:', err);
-      const message = err instanceof Error ? err.message : 'Erreur rejet';
-      setError(message);
-      toast.error('Échec du rejet', { description: message });
-      return false;
-    }
-  };
-
-  const deleteDemande = async (id: string) => {
-    try {
-      const response = await fetch(`/api/demandes-credit/${id}`, {
-        method: 'DELETE'
-      });
-
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/demandes-credit/${id}`, { method: 'DELETE' });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Erreur lors de la suppression');
       }
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success('Demande supprimée', { description: 'La demande a été supprimée avec succès' });
+    },
+    onError: (err: Error) => {
+      toast.error('Échec de la suppression', { description: err.message });
+    },
+  });
 
-      await fetchDemandes();
-      invalidateCounts();
-      toast.success('Demande supprimée', {
-        description: 'La demande a été supprimée avec succès'
-      });
-      return true;
-    } catch (err) {
-      console.error('Erreur suppression:', err);
-      const message = err instanceof Error ? err.message : 'Erreur suppression';
-      setError(message);
-      toast.error('Échec de la suppression', { description: message });
-      return false;
-    }
-  };
-
-  const cancelDemande = async (id: string, motif?: string) => {
-    try {
+  const cancelMutation = useMutation({
+    mutationFn: async ({ id, motif }: { id: string; motif?: string }) => {
       const response = await fetch(`/api/demandes-credit/${id}/cancel`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motif })
+        body: JSON.stringify({ motif }),
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Erreur lors de l\'annulation');
+        throw new Error(errorData.message || "Erreur lors de l'annulation");
       }
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success('Demande annulée', { description: 'La demande a été annulée avec succès' });
+    },
+    onError: (err: Error) => {
+      toast.error("Échec de l'annulation", { description: err.message });
+    },
+  });
 
-      await fetchDemandes();
-      invalidateCounts();
-      toast.success('Demande annulée', {
-        description: 'La demande a été annulée avec succès'
+  const startInvestigationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/demandes-credit/${id}/start-investigation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Erreur lors du démarrage de l'enquête");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success('Enquête démarrée', { description: 'Vous pouvez maintenant remplir le formulaire d\'enquête' });
+    },
+    onError: (err: Error) => {
+      toast.error("Échec du démarrage", { description: err.message });
+    },
+  });
+
+  const payerFraisMutation = useMutation({
+    mutationFn: async ({
+      id,
+      montant,
+      methodePaiement = 'Espèces',
+      sessionCaisseId,
+      provider,
+      phone,
+    }: {
+      id: string;
+      montant: number;
+      methodePaiement?: string;
+      sessionCaisseId?: string;
+      provider?: 'mtn' | 'airtel';
+      phone?: string;
+    }) => {
+      const response = await fetch(`/api/demandes-credit/${id}/payer-frais`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ montant, methode_paiement: methodePaiement, sessionCaisseId, provider, phone }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || 'Erreur paiement frais');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+
+  // ── Backward-compatible wrappers ─────────────────────────────────────
+  // These maintain the same return signatures as the old useState version
+
+  const approuverDemande = async (id: string, montantApprouve: number): Promise<boolean> => {
+    try {
+      await approuverMutation.mutateAsync({ id, montantApprouve });
       return true;
-    } catch (err) {
-      console.error('Erreur annulation:', err);
-      const message = err instanceof Error ? err.message : 'Erreur annulation';
-      setError(message);
-      toast.error('Échec de l\'annulation', { description: message });
+    } catch {
       return false;
     }
   };
 
-  const payerFrais = async (id: string, montant: number, methodePaiement: string = 'Espèces', sessionCaisseId?: string) => {
+  const rejeterDemande = async (id: string, motif?: string): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/demandes-credit/${id}/payer-frais`, {
+      await rejeterMutation.mutateAsync({ id, motif });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteDemande = async (id: string): Promise<boolean> => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const cancelDemande = async (id: string, motif?: string): Promise<boolean> => {
+    try {
+      await cancelMutation.mutateAsync({ id, motif });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const startInvestigation = async (id: string): Promise<boolean> => {
+    try {
+      await startInvestigationMutation.mutateAsync(id);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Mutation pour valider une enquête terminée (INVESTIGATION_COMPLETE -> PENDING_APPROVAL)
+  const validateInvestigationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/demandes-credit/${id}/validate-investigation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ montant, methode_paiement: methodePaiement, sessionCaisseId })
       });
-
       if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.message || 'Erreur paiement frais');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Erreur lors de la validation de l'enquête");
       }
+      return response.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success('Enquête validée', { description: 'La demande est maintenant en attente d\'approbation par le comité' });
+    },
+    onError: (err: Error) => {
+      toast.error("Échec de la validation", { description: err.message });
+    },
+  });
 
-      const data = await response.json();
-      await fetchDemandes();
-      invalidateCounts();
+  const validateInvestigation = async (id: string): Promise<boolean> => {
+    try {
+      await validateInvestigationMutation.mutateAsync(id);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
-      // Return the full response including facture
+  const payerFrais = async (
+    id: string,
+    montant: number,
+    methodePaiement: string = 'Espèces',
+    sessionCaisseId?: string,
+    provider?: 'mtn' | 'airtel',
+    phone?: string
+  ): Promise<{ success: boolean; facture: Facture | null; paymentPending?: boolean; paymentIntent?: any; message?: string }> => {
+    try {
+      const data = await payerFraisMutation.mutateAsync({ id, montant, methodePaiement, sessionCaisseId, provider, phone });
+      // Handle Mobile Money async response
+      if (data.paymentPending) {
+        return { success: true, facture: null, paymentPending: true, paymentIntent: data.paymentIntent, message: data.message };
+      }
       return { success: true, facture: data.facture };
-    } catch (err) {
-      console.error('Erreur paiement frais:', err);
-      const message = err instanceof Error ? err.message : 'Erreur paiement frais';
-      setError(message);
-      toast.error(message);
+    } catch {
       return { success: false, facture: null };
     }
   };
+
+  // ── Derived data ─────────────────────────────────────────────────────
 
   const normalizeStatut = (statut?: string): string => {
     if (!statut) return StatutDemande.PENDING_FEES;
     return statut.toUpperCase();
   };
 
-  const getDemandesEnAttente = () => demandes.filter(d => {
-    const normalized = normalizeStatut(d.statut);
-    return normalized === StatutDemande.PENDING_FEES;
-  });
+  const getDemandesEnAttente = useCallback(
+    () => demandes.filter((d) => normalizeStatut(d.statut) === StatutDemande.PENDING_FEES),
+    [demandes]
+  );
 
   const getStatutColor = (statut: string) => {
     const normalized = normalizeStatut(statut);
@@ -220,33 +334,25 @@ export function useDemandes() {
       [StatutDemande.REJECTED]: 'bg-red-500/20 text-red-400 border-red-500/30',
       [StatutDemande.DISBURSED]: 'bg-green-500/20 text-green-400 border-green-500/30',
       [StatutDemande.CLOSED]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-      [StatutDemande.CANCELLED]: 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+      [StatutDemande.CANCELLED]: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     };
     return colors[normalized] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
   };
-
-  useEffect(() => {
-    fetchDemandes();
-
-    const handleUpdate = () => {
-        fetchDemandes();
-    };
-
-    window.addEventListener('credit-update', handleUpdate);
-    return () => window.removeEventListener('credit-update', handleUpdate);
-  }, []);
 
   return {
     demandes,
     loading,
     error,
-    fetchDemandes,
+    fetchDemandes: refetch,
     approuverDemande,
     rejeterDemande,
     deleteDemande,
     cancelDemande,
+    startInvestigation,
+    validateInvestigation,
+    validatingInvestigation: validateInvestigationMutation.isPending,
     getDemandesEnAttente,
     getStatutColor,
-    payerFrais
+    payerFrais,
   };
 }

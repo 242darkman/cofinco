@@ -1,12 +1,15 @@
 /**
  * Reevaluation API Routes
- * 
+ *
  * Handles all HTTP endpoints for credit reevaluation workflow.
  */
 
 import type { Express, Request, Response } from "express";
+import { createLogger } from "../lib/logger";
 import { z } from "zod";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Reevaluations');
 import {
   createReevaluation,
   validateEligibility,
@@ -119,7 +122,7 @@ export function registerReevaluationRoutes(app: Express) {
         ...eligibility
       });
     } catch (error: any) {
-      console.error("Error checking eligibility:", error);
+      logger.error({ err: error }, 'Error checking eligibility');
       res.status(500).json({
         success: false,
         error: { code: "SERVER_ERROR", message: error.message }
@@ -188,7 +191,7 @@ export function registerReevaluationRoutes(app: Express) {
         } : null
       });
     } catch (error: any) {
-      console.error("Error creating reevaluation:", error);
+      logger.error({ err: error }, 'Error creating reevaluation');
       res.status(500).json({ 
         success: false, 
         error: { code: "SERVER_ERROR", message: error.message } 
@@ -211,7 +214,7 @@ export function registerReevaluationRoutes(app: Express) {
         reevaluations
       });
     } catch (error: any) {
-      console.error("Error fetching reevaluations:", error);
+      logger.error({ err: error }, 'Error fetching reevaluations');
       res.status(500).json({ 
         success: false, 
         error: { code: "SERVER_ERROR", message: error.message } 
@@ -360,7 +363,7 @@ export function registerReevaluationRoutes(app: Express) {
         }
       });
     } catch (error: any) {
-      console.error("Error fetching timeline:", error);
+      logger.error({ err: error }, 'Error fetching timeline');
       res.status(500).json({ 
         success: false, 
         error: { code: "SERVER_ERROR", message: error.message } 
@@ -401,7 +404,7 @@ export function registerReevaluationRoutes(app: Express) {
         client
       });
     } catch (error: any) {
-      console.error("Error fetching reevaluation:", error);
+      logger.error({ err: error }, 'Error fetching reevaluation');
       res.status(500).json({ 
         success: false, 
         error: { code: "SERVER_ERROR", message: error.message } 
@@ -445,7 +448,7 @@ export function registerReevaluationRoutes(app: Express) {
         }
       });
     } catch (error: any) {
-      console.error("Error validating eligibility:", error);
+      logger.error({ err: error }, 'Error validating eligibility');
       res.status(400).json({ 
         success: false, 
         error: { code: "VALIDATION_FAILED", message: error.message } 
@@ -494,7 +497,7 @@ export function registerReevaluationRoutes(app: Express) {
         enquete: result.enquete
       });
     } catch (error: any) {
-      console.error("Error starting enquete:", error);
+      logger.error({ err: error }, 'Error starting enquete');
       res.status(400).json({ 
         success: false, 
         error: { code: "ENQUETE_FAILED", message: error.message } 
@@ -563,7 +566,7 @@ export function registerReevaluationRoutes(app: Express) {
         } : null
       });
     } catch (error: any) {
-      console.error("Error submitting to committee:", error);
+      logger.error({ err: error }, 'Error submitting to committee');
       res.status(400).json({ 
         success: false, 
         error: { code: "SUBMISSION_FAILED", message: error.message } 
@@ -632,7 +635,7 @@ export function registerReevaluationRoutes(app: Express) {
         } : null
       });
     } catch (error: any) {
-      console.error("Error recording decision:", error);
+      logger.error({ err: error }, 'Error recording decision');
       res.status(400).json({ 
         success: false, 
         error: { code: "DECISION_FAILED", message: error.message } 
@@ -675,7 +678,7 @@ export function registerReevaluationRoutes(app: Express) {
         message: "Réévaluation annulée"
       });
     } catch (error: any) {
-      console.error("Error cancelling reevaluation:", error);
+      logger.error({ err: error }, 'Error cancelling reevaluation');
       res.status(400).json({ 
         success: false, 
         error: { code: "CANCELLATION_FAILED", message: error.message } 
@@ -698,7 +701,7 @@ export function registerReevaluationRoutes(app: Express) {
         logs
       });
     } catch (error: any) {
-      console.error("Error fetching audit logs:", error);
+      logger.error({ err: error }, 'Error fetching audit logs');
       res.status(500).json({ 
         success: false, 
         error: { code: "SERVER_ERROR", message: error.message } 
@@ -764,7 +767,7 @@ export function registerReevaluationRoutes(app: Express) {
         }
       });
     } catch (error: any) {
-      console.error("Error listing reevaluations:", error);
+      logger.error({ err: error }, 'Error listing reevaluations');
       res.status(500).json({
         success: false,
         error: { code: "SERVER_ERROR", message: error.message }

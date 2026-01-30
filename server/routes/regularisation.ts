@@ -4,6 +4,9 @@
  */
 
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:Regularisation');
 import { z } from "zod";
 import { db } from "../db";
 import { tachesRegularisation, transfertsInterCoffres, users } from "@shared/schema";
@@ -254,7 +257,7 @@ regularisationRouter.get(
         },
       });
     } catch (error: any) {
-      console.error("Erreur liste régularisations:", error);
+      logger.error({ err: error }, 'Erreur liste régularisations');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -359,7 +362,7 @@ regularisationRouter.get(
         })),
       });
     } catch (error: any) {
-      console.error("Erreur stats régularisations:", error);
+      logger.error({ err: error }, 'Erreur stats régularisations');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -458,7 +461,7 @@ regularisationRouter.get(
         transfert,
       });
     } catch (error: any) {
-      console.error("Erreur détails régularisation:", error);
+      logger.error({ err: error }, 'Erreur détails régularisation');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -552,7 +555,7 @@ regularisationRouter.post(
         res.json({ success: true, task: updated });
       }
     } catch (error: any) {
-      console.error("Erreur résolution régularisation:", error);
+      logger.error({ err: error }, 'Erreur résolution régularisation');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -625,7 +628,7 @@ regularisationRouter.post(
         res.json({ success: true, task: updated });
       }
     } catch (error: any) {
-      console.error("Erreur assignation régularisation:", error);
+      logger.error({ err: error }, 'Erreur assignation régularisation');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -690,7 +693,7 @@ regularisationRouter.patch(
         res.json({ success: true, task: updated });
       }
     } catch (error: any) {
-      console.error("Erreur mise à jour priorité:", error);
+      logger.error({ err: error }, 'Erreur mise à jour priorité');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });

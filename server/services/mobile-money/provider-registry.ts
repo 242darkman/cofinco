@@ -4,6 +4,9 @@
  */
 
 import type { IMobileMoneyProvider } from "./types";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('ProviderRegistry');
 
 class ProviderRegistry {
   private providers: Map<string, IMobileMoneyProvider> = new Map();
@@ -13,10 +16,10 @@ class ProviderRegistry {
    */
   register(provider: IMobileMoneyProvider): void {
     if (this.providers.has(provider.code)) {
-      console.warn(`[ProviderRegistry] Provider ${provider.code} already registered, replacing...`);
+      logger.warn({ providerCode: provider.code }, 'Provider already registered, replacing');
     }
     this.providers.set(provider.code, provider);
-    console.log(`[ProviderRegistry] Registered provider: ${provider.name} (${provider.code})`);
+    logger.info({ providerName: provider.name, providerCode: provider.code }, 'Registered provider');
   }
 
   /**
@@ -67,7 +70,7 @@ export const providerRegistry = new ProviderRegistry();
  * À appeler au démarrage de l'application
  */
 export async function initializeProviders(): Promise<void> {
-  console.log("[ProviderRegistry] Initializing providers...");
+  logger.info('Initializing providers');
 
   try {
     // Import dynamique pour éviter les dépendances circulaires
@@ -83,9 +86,9 @@ export async function initializeProviders(): Promise<void> {
     const airtelProvider = new AirtelProvider();
     providerRegistry.register(airtelProvider);
 
-    console.log(`[ProviderRegistry] ${providerRegistry.getCodes().length} providers initialized: ${providerRegistry.getCodes().join(", ")}`);
+    logger.info({ count: providerRegistry.getCodes().length, providers: providerRegistry.getCodes() }, 'Providers initialized');
   } catch (error) {
-    console.error("[ProviderRegistry] Failed to initialize providers:", error);
+    logger.error({ err: error }, 'Failed to initialize providers');
     // Ne pas planter l'app si les providers ne sont pas configurés
     // Utile en dev sans clés MTN
     if (process.env.NODE_ENV === "production") {

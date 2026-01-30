@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { LOGO_BASE64 } from '@/lib/pdf-logo';
 
 // Types pour les transactions internes (sans client)
 export type InternalTransactionType =
@@ -120,12 +121,108 @@ interface ReceiptCompanyInfo {
 interface ReceiptTemplateProps {
   data: ReceiptData;
   companyInfo?: ReceiptCompanyInfo;
+  /** Type of copy: 'original', 'duplicate', or 'both' (prints 2 copies) */
+  copyType?: 'original' | 'duplicate' | 'both';
+  /** Show QR code for verification */
+  showQRCode?: boolean;
 }
 
 const DEFAULT_COMPANY_INFO: ReceiptCompanyInfo = {
   name: 'COFIN&CO-M',
   address: 'Brazzaville, République du Congo',
   phone: '+242 06 123 4567',
+  email: 'contact@cofinco-m.com',
+  siteWeb: 'www.cofinco-m.com',
+  nif: 'NIF-123456789',
+  rccm: 'RCCM-BZV-1234',
+};
+
+// Simple QR code placeholder for thermal receipt (compact version)
+interface MiniQRCodeProps {
+  data: string;
+  size?: number;
+}
+
+const MiniQRCode: React.FC<MiniQRCodeProps> = ({ data, size = 32 }) => {
+  // Generate a simple hash-based pattern
+  const hashCode = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash);
+  };
+
+  const hash = hashCode(data);
+  const gridSize = 4;
+  const cellSize = size / (gridSize + 2);
+
+  const pattern: boolean[][] = [];
+  for (let i = 0; i < gridSize; i++) {
+    pattern[i] = [];
+    for (let j = 0; j < gridSize; j++) {
+      const idx = i * gridSize + Math.min(j, gridSize - 1 - j);
+      pattern[i][j] = ((hash >> (idx % 32)) & 1) === 1;
+    }
+  }
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="inline-block">
+      <rect x="0" y="0" width={size} height={size} fill="white" />
+      {/* Corner markers */}
+      <rect x="0" y="0" width={cellSize} height={cellSize} fill="black" />
+      <rect x="0" y={(gridSize + 1) * cellSize} width={cellSize} height={cellSize} fill="black" />
+      <rect x={(gridSize + 1) * cellSize} y="0" width={cellSize} height={cellSize} fill="black" />
+      {/* Data pattern */}
+      {pattern.map((row, i) =>
+        row.map((cell, j) => cell ? (
+          <rect
+            key={`${i}-${j}`}
+            x={(j + 1) * cellSize}
+            y={(i + 1) * cellSize}
+            width={cellSize * 0.85}
+            height={cellSize * 0.85}
+            fill="black"
+          />
+        ) : null)
+      )}
+    </svg>
+  );
+};
+
+// Logo with fallback for receipt
+interface LogoWithFallbackProps {
+  src?: string;
+  alt: string;
+  className?: string;
+}
+
+const LogoWithFallback: React.FC<LogoWithFallbackProps> = ({ src, alt, className }) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    const initials = alt.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    return (
+      <div className={`${className} bg-black text-white font-bold flex items-center justify-center rounded`}>
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  );
 };
 
 const formatDateTime = (value: string | Date) => {
@@ -242,15 +339,253 @@ const normalizeReceiptData = (data: ReceiptData, companyInfo?: ReceiptCompanyInf
   };
 };
 
+// Single receipt content component
+const ReceiptContent: React.FC<{
+  normalized: ReturnType<typeof normalizeReceiptData>;
+  formattedDate: string;
+  copyLabel?: string;
+  showQRCode?: boolean;
+  verificationData: string;
+}> = ({ normalized, formattedDate, copyLabel, showQRCode, verificationData }) => (
+  <>
+    <div className="text-center">
+      <LogoWithFallback
+        src={LOGO_BASE64}
+        alt={normalized.resolvedCompany.name || 'Logo'}
+        className="w-12 h-12 mx-auto mb-1 object-contain"
+      />
+      <div className="text-[16px] font-bold uppercase tracking-wide">
+        {normalized.resolvedCompany.name}
+      </div>
+      <div className="text-[12px]">{normalized.resolvedCompany.address}</div>
+      <div className="text-[12px]">{normalized.resolvedCompany.phone}</div>
+      {normalized.resolvedCompany.email && (
+        <div className="text-[11px]">{normalized.resolvedCompany.email}</div>
+      )}
+      {normalized.title && (
+        <div className="mt-1 text-[12px] font-semibold uppercase">
+          {normalized.title}
+        </div>
+      )}
+      {/* Copy type label */}
+      {copyLabel && (
+        <div className="mt-1 text-[10px] font-bold uppercase border border-black px-2 py-0.5 inline-block">
+          {copyLabel}
+        </div>
+      )}
+    </div>
+
+    <div className="ticket-divider border-t border-dashed border-black my-2" />
+
+    <div className="space-y-1 text-[12px]">
+      <div className="flex justify-between">
+        <span>Réf</span>
+        <span className="font-semibold">{normalized.reference}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Date</span>
+        <span>{formattedDate}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Type</span>
+        <span>{normalized.type}</span>
+      </div>
+      {normalized.modePaiement && (
+        <div className="flex justify-between">
+          <span>Mode</span>
+          <span>{normalized.modePaiement}</span>
+        </div>
+      )}
+      {normalized.cashierName && (
+        <div className="flex justify-between">
+          <span>Caissier</span>
+          <span>{normalized.cashierName}</span>
+        </div>
+      )}
+    </div>
+
+    {/* Section Client (transactions normales) */}
+    {!normalized.isInternal && (normalized.clientName || normalized.clientPhone || normalized.clientAccount) && (
+      <>
+        <div className="ticket-divider border-t border-dashed border-black my-2" />
+        <div className="space-y-1 text-[12px]">
+          {normalized.clientName && (
+            <div className="flex justify-between">
+              <span>Client</span>
+              <span className="font-semibold">{normalized.clientName}</span>
+            </div>
+          )}
+          {normalized.clientAccount && (
+            <div className="flex justify-between">
+              <span>Compte</span>
+              <span>{normalized.clientAccount}</span>
+            </div>
+          )}
+          {normalized.clientPhone && (
+            <div className="flex justify-between">
+              <span>Tél.</span>
+              <span>{normalized.clientPhone}</span>
+            </div>
+          )}
+        </div>
+      </>
+    )}
+
+    {/* Section Transaction Interne (source/destination) */}
+    {normalized.isInternal && normalized.internalTransaction && (
+      <>
+        <div className="ticket-divider border-t border-dashed border-black my-2" />
+        <div className="space-y-1 text-[12px]">
+          {normalized.internalTransaction.source && (
+            <div className="flex justify-between">
+              <span>Source</span>
+              <span className="font-semibold text-right">
+                {ENTITY_TYPE_LABELS[normalized.internalTransaction.source.type] || normalized.internalTransaction.source.type}
+                {normalized.internalTransaction.source.code && ` (${normalized.internalTransaction.source.code})`}
+                <br />
+                <span className="font-normal">{normalized.internalTransaction.source.nom}</span>
+              </span>
+            </div>
+          )}
+          {normalized.internalTransaction.destination && (
+            <div className="flex justify-between">
+              <span>Destination</span>
+              <span className="font-semibold text-right">
+                {ENTITY_TYPE_LABELS[normalized.internalTransaction.destination.type] || normalized.internalTransaction.destination.type}
+                {normalized.internalTransaction.destination.code && ` (${normalized.internalTransaction.destination.code})`}
+                <br />
+                <span className="font-normal">{normalized.internalTransaction.destination.nom}</span>
+              </span>
+            </div>
+          )}
+          {normalized.internalTransaction.motif && (
+            <div className="flex justify-between">
+              <span>Motif</span>
+              <span className="text-right max-w-[60%]">{normalized.internalTransaction.motif}</span>
+            </div>
+          )}
+          {normalized.internalTransaction.observations && (
+            <div className="mt-1">
+              <span className="block text-[11px] text-gray-600">Observations:</span>
+              <span className="text-[11px] italic">{normalized.internalTransaction.observations}</span>
+            </div>
+          )}
+        </div>
+
+        {normalized.internalTransaction.autorisation && (
+          <>
+            <div className="ticket-divider border-t border-dashed border-black my-2" />
+            <div className="space-y-1 text-[12px]">
+              <div className="text-center text-[11px] font-semibold uppercase mb-1">Autorisation</div>
+              <div className="flex justify-between">
+                <span>Autorisé par</span>
+                <span className="font-semibold">{normalized.internalTransaction.autorisation.par}</span>
+              </div>
+              {normalized.internalTransaction.autorisation.role && (
+                <div className="flex justify-between">
+                  <span>Fonction</span>
+                  <span>{normalized.internalTransaction.autorisation.role}</span>
+                </div>
+              )}
+              {normalized.internalTransaction.autorisation.reference && (
+                <div className="flex justify-between">
+                  <span>Réf. Auth.</span>
+                  <span>{normalized.internalTransaction.autorisation.reference}</span>
+                </div>
+              )}
+              {normalized.internalTransaction.autorisation.date && (
+                <div className="flex justify-between">
+                  <span>Date Auth.</span>
+                  <span>{formatDateTime(normalized.internalTransaction.autorisation.date)}</span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </>
+    )}
+
+    <div className="ticket-divider border-t border-dashed border-black my-2" />
+
+    <div className="space-y-2">
+      {normalized.details.length > 0 ? (
+        normalized.details.map((detail, index) => (
+          <div
+            key={`${detail.label}-${index}`}
+            className={`flex justify-between ${detail.isBold ? 'font-bold text-[15px]' : ''}`}
+          >
+            <span>{detail.label}</span>
+            <span className="text-right">{detail.value}</span>
+          </div>
+        ))
+      ) : (
+        <div className="text-center text-[12px]">Aucun détail disponible</div>
+      )}
+    </div>
+
+    <div className="ticket-divider border-t border-dashed border-black my-2" />
+
+    <div className="flex justify-between font-bold text-[16px]">
+      <span>Total</span>
+      <span>{formatAmount(normalized.amount, normalized.currency)}</span>
+    </div>
+
+    {normalized.montantLettres && (
+      <div className="mt-2 text-[11px] italic">
+        Arrêté la présente facture à la somme de : {normalized.montantLettres}
+      </div>
+    )}
+
+    {/* QR Code for verification */}
+    {showQRCode && (
+      <div className="mt-3 flex items-center justify-center gap-2">
+        <MiniQRCode data={verificationData} size={28} />
+        <span className="text-[9px] text-gray-600">Vérification</span>
+      </div>
+    )}
+
+    {normalized.footerMessage && (
+      <div className="mt-3 text-[11px]">
+        {normalized.footerMessage}
+      </div>
+    )}
+
+    <div className="mt-4 text-center text-[11px]">
+      Merci pour votre confiance.
+    </div>
+
+    {/* Legal identifiers at bottom */}
+    {(normalized.resolvedCompany.nif || normalized.resolvedCompany.rccm) && (
+      <div className="mt-2 text-center text-[9px] text-gray-500">
+        {normalized.resolvedCompany.nif && <span>NIF: {normalized.resolvedCompany.nif}</span>}
+        {normalized.resolvedCompany.nif && normalized.resolvedCompany.rccm && <span> | </span>}
+        {normalized.resolvedCompany.rccm && <span>RCCM: {normalized.resolvedCompany.rccm}</span>}
+      </div>
+    )}
+  </>
+);
+
 export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateProps>(
-  ({ data, companyInfo }, ref) => {
+  ({ data, companyInfo, copyType = 'original', showQRCode = true }, ref) => {
     const normalized = normalizeReceiptData(data, companyInfo);
     const formattedDate = formatDateTime(normalized.date);
+
+    // Generate verification data for QR code
+    const verificationData = JSON.stringify({
+      ref: normalized.reference,
+      total: normalized.amount,
+      date: new Date(normalized.date).toISOString().split('T')[0],
+    });
+
+    // Determine copy labels
+    const getCopyLabel = (type: 'original' | 'duplicate') => {
+      return type === 'original' ? 'ORIGINAL' : 'DUPLICATA';
+    };
 
     return (
       <div
         data-receipt-root
-        className="ticket-receipt w-full max-w-full sm:max-w-[80mm] bg-white text-black font-mono text-[14px] leading-snug mx-auto p-4"
+        className="ticket-receipt w-full max-w-full sm:max-w-[80mm] bg-white text-black font-mono text-[14px] leading-snug mx-auto"
         ref={ref}
       >
         <style type="text/css" media="print">
@@ -276,197 +611,54 @@ export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateP
               border-top: 1px dashed #000;
               margin: 8px 0;
             }
+            .receipt-copy {
+              page-break-after: always;
+            }
+            .receipt-copy:last-child {
+              page-break-after: auto;
+            }
           `}
         </style>
 
-        <div className="text-center">
-          <div className="text-[16px] font-bold uppercase tracking-wide">
-            {normalized.resolvedCompany.name}
-          </div>
-          <div className="text-[12px]">{normalized.resolvedCompany.address}</div>
-          <div className="text-[12px]">{normalized.resolvedCompany.phone}</div>
-          {normalized.title && (
-            <div className="mt-1 text-[12px] font-semibold uppercase">
-              {normalized.title}
-            </div>
-          )}
-        </div>
-
-        <div className="ticket-divider border-t border-dashed border-black my-2" />
-
-        <div className="space-y-1 text-[12px]">
-          <div className="flex justify-between">
-            <span>Réf</span>
-            <span className="font-semibold">{normalized.reference}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Date</span>
-            <span>{formattedDate}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Type</span>
-            <span>{normalized.type}</span>
-          </div>
-          {normalized.modePaiement && (
-            <div className="flex justify-between">
-              <span>Mode</span>
-              <span>{normalized.modePaiement}</span>
-            </div>
-          )}
-          {normalized.cashierName && (
-            <div className="flex justify-between">
-              <span>Caissier</span>
-              <span>{normalized.cashierName}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Section Client (transactions normales) */}
-        {!normalized.isInternal && (normalized.clientName || normalized.clientPhone || normalized.clientAccount) && (
+        {/* Render based on copyType */}
+        {copyType === 'both' ? (
           <>
-            <div className="ticket-divider border-t border-dashed border-black my-2" />
-            <div className="space-y-1 text-[12px]">
-              {normalized.clientName && (
-                <div className="flex justify-between">
-                  <span>Client</span>
-                  <span className="font-semibold">{normalized.clientName}</span>
-                </div>
-              )}
-              {normalized.clientAccount && (
-                <div className="flex justify-between">
-                  <span>Compte</span>
-                  <span>{normalized.clientAccount}</span>
-                </div>
-              )}
-              {normalized.clientPhone && (
-                <div className="flex justify-between">
-                  <span>Tél.</span>
-                  <span>{normalized.clientPhone}</span>
-                </div>
-              )}
+            {/* Original */}
+            <div className="receipt-copy p-4">
+              <ReceiptContent
+                normalized={normalized}
+                formattedDate={formattedDate}
+                copyLabel={getCopyLabel('original')}
+                showQRCode={showQRCode}
+                verificationData={verificationData}
+              />
+            </div>
+            {/* Cut line indicator */}
+            <div className="border-t-2 border-dashed border-black my-2 relative">
+              <span className="absolute left-1/2 -translate-x-1/2 -top-2 bg-white px-2 text-[8px] text-gray-500">✂ DÉCOUPER ICI</span>
+            </div>
+            {/* Duplicate */}
+            <div className="receipt-copy p-4">
+              <ReceiptContent
+                normalized={normalized}
+                formattedDate={formattedDate}
+                copyLabel={getCopyLabel('duplicate')}
+                showQRCode={showQRCode}
+                verificationData={verificationData}
+              />
             </div>
           </>
-        )}
-
-        {/* Section Transaction Interne (source/destination) */}
-        {normalized.isInternal && normalized.internalTransaction && (
-          <>
-            <div className="ticket-divider border-t border-dashed border-black my-2" />
-            <div className="space-y-1 text-[12px]">
-              {/* Source */}
-              {normalized.internalTransaction.source && (
-                <div className="flex justify-between">
-                  <span>Source</span>
-                  <span className="font-semibold text-right">
-                    {ENTITY_TYPE_LABELS[normalized.internalTransaction.source.type] || normalized.internalTransaction.source.type}
-                    {normalized.internalTransaction.source.code && ` (${normalized.internalTransaction.source.code})`}
-                    <br />
-                    <span className="font-normal">{normalized.internalTransaction.source.nom}</span>
-                  </span>
-                </div>
-              )}
-              {/* Destination */}
-              {normalized.internalTransaction.destination && (
-                <div className="flex justify-between">
-                  <span>Destination</span>
-                  <span className="font-semibold text-right">
-                    {ENTITY_TYPE_LABELS[normalized.internalTransaction.destination.type] || normalized.internalTransaction.destination.type}
-                    {normalized.internalTransaction.destination.code && ` (${normalized.internalTransaction.destination.code})`}
-                    <br />
-                    <span className="font-normal">{normalized.internalTransaction.destination.nom}</span>
-                  </span>
-                </div>
-              )}
-              {/* Motif */}
-              {normalized.internalTransaction.motif && (
-                <div className="flex justify-between">
-                  <span>Motif</span>
-                  <span className="text-right max-w-[60%]">{normalized.internalTransaction.motif}</span>
-                </div>
-              )}
-              {/* Observations */}
-              {normalized.internalTransaction.observations && (
-                <div className="mt-1">
-                  <span className="block text-[11px] text-gray-600">Observations:</span>
-                  <span className="text-[11px] italic">{normalized.internalTransaction.observations}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Autorisation */}
-            {normalized.internalTransaction.autorisation && (
-              <>
-                <div className="ticket-divider border-t border-dashed border-black my-2" />
-                <div className="space-y-1 text-[12px]">
-                  <div className="text-center text-[11px] font-semibold uppercase mb-1">Autorisation</div>
-                  <div className="flex justify-between">
-                    <span>Autorisé par</span>
-                    <span className="font-semibold">{normalized.internalTransaction.autorisation.par}</span>
-                  </div>
-                  {normalized.internalTransaction.autorisation.role && (
-                    <div className="flex justify-between">
-                      <span>Fonction</span>
-                      <span>{normalized.internalTransaction.autorisation.role}</span>
-                    </div>
-                  )}
-                  {normalized.internalTransaction.autorisation.reference && (
-                    <div className="flex justify-between">
-                      <span>Réf. Auth.</span>
-                      <span>{normalized.internalTransaction.autorisation.reference}</span>
-                    </div>
-                  )}
-                  {normalized.internalTransaction.autorisation.date && (
-                    <div className="flex justify-between">
-                      <span>Date Auth.</span>
-                      <span>{formatDateTime(normalized.internalTransaction.autorisation.date)}</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        <div className="ticket-divider border-t border-dashed border-black my-2" />
-
-        <div className="space-y-2">
-          {normalized.details.length > 0 ? (
-            normalized.details.map((detail, index) => (
-              <div
-                key={`${detail.label}-${index}`}
-                className={`flex justify-between ${detail.isBold ? 'font-bold text-[15px]' : ''}`}
-              >
-                <span>{detail.label}</span>
-                <span className="text-right">{detail.value}</span>
-              </div>
-            ))
-          ) : (
-            <div className="text-center text-[12px]">Aucun détail disponible</div>
-          )}
-        </div>
-
-        <div className="ticket-divider border-t border-dashed border-black my-2" />
-
-        <div className="flex justify-between font-bold text-[16px]">
-          <span>Total</span>
-          <span>{formatAmount(normalized.amount, normalized.currency)}</span>
-        </div>
-
-        {normalized.montantLettres && (
-          <div className="mt-2 text-[11px] italic">
-            Arrêté la présente facture à la somme de : {normalized.montantLettres}
+        ) : (
+          <div className="p-4">
+            <ReceiptContent
+              normalized={normalized}
+              formattedDate={formattedDate}
+              copyLabel={copyType === 'duplicate' ? getCopyLabel('duplicate') : undefined}
+              showQRCode={showQRCode}
+              verificationData={verificationData}
+            />
           </div>
         )}
-
-        {normalized.footerMessage && (
-          <div className="mt-3 text-[11px]">
-            {normalized.footerMessage}
-          </div>
-        )}
-
-        <div className="mt-4 text-center text-[11px]">
-          Merci pour votre confiance.
-        </div>
       </div>
     );
   }

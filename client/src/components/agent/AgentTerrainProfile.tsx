@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, User, Phone, Mail, MapPin, Calendar, Target, TrendingUp, Users, DollarSign, CheckCircle, Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, User, Phone, Mail, MapPin, Calendar, Target, TrendingUp, Users, DollarSign, CheckCircle, Clock, Camera, Loader2 } from 'lucide-react';
 import { Button, Card, Badge, TabGroup } from '../ui';
+import { resolveStorageUrl } from '../../lib/format';
 
 interface AgentTerrainProfileProps {
   agentId: string;
@@ -11,6 +12,9 @@ interface AgentTerrainProfileProps {
 export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentTerrainProfileProps) {
   const [agent, setAgent] = useState<any>(null);
   const [visites, setVisites] = useState<any[]>([]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [stats, setStats] = useState({
     visitesTotal: 0,
     visitesEffectuees: 0,
@@ -31,13 +35,28 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
 
     try {
       const [agentRes, visitesRes] = await Promise.all([
-        fetch(`/api/agents-terrain/${agentId}`),
-        fetch(`/api/agents-terrain/${agentId}/visites`)
+        fetch(`/api/agents-terrain/${agentId}`, { credentials: 'include' }),
+        fetch(`/api/agents-terrain/${agentId}/visites`, { credentials: 'include' })
       ]);
 
       if (agentRes.ok) {
         const agentData = await agentRes.json();
         setAgent(agentData);
+
+        // Fetch employe data to get photo
+        const employeId = agentData.employeId || agentData.employe_id;
+        if (employeId) {
+          try {
+            const employeRes = await fetch(`/api/employes/${employeId}`, { credentials: 'include' });
+            if (employeRes.ok) {
+              const employeData = await employeRes.json();
+              const photo = employeData.user?.photoProfile || employeData.user?.photo_profile || employeData.photoProfile || employeData.photo_profile;
+              if (photo) setPhotoUrl(photo);
+            }
+          } catch {
+            // Photo not available, use initials fallback
+          }
+        }
       }
 
       if (visitesRes.ok) {
@@ -72,6 +91,53 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !agent) return;
+
+    const employeId = agent.employeId || agent.employe_id;
+    if (!employeId) {
+      alert('Impossible de mettre à jour la photo: agent non lié à un employé');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileType', 'profile');
+      formData.append('entityType', 'user');
+      formData.append('entityId', employeId);
+
+      const uploadRes = await fetch('/api/storage/entity/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      if (!uploadRes.ok) throw new Error('Erreur upload');
+      const uploadData = await uploadRes.json();
+      const newPhotoUrl = uploadData.url || uploadData.path;
+
+      // Update employe's user photo
+      const patchRes = await fetch(`/api/employes/${employeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ photoProfile: newPhotoUrl })
+      });
+
+      if (patchRes.ok) {
+        setPhotoUrl(newPhotoUrl);
+      }
+    } catch (error) {
+      console.error('Erreur upload photo:', error);
+      alert('Erreur lors du téléversement de la photo');
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Non défini';
     const date = new Date(dateString);
@@ -100,12 +166,40 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4 backdrop-blur-sm">
       <div className="bg-surface-base w-full sm:max-w-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-theme-lg animate-in slide-in-from-bottom duration-300">
-        
+
         {/* Header Compact */}
         <div className="p-4 border-b border-edge flex items-center justify-between gap-3 bg-surface-base shrink-0 sm:rounded-t-2xl">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0 shadow-lg shadow-blue-500/20">
-              {agent.nom?.charAt(0)}{agent.prenom?.charAt(0)}
+            <div className="relative group">
+              {photoUrl ? (
+                <img
+                  src={resolveStorageUrl(photoUrl)}
+                  alt={`${agent.nom} ${agent.prenom}`}
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-blue-500/30 shadow-lg shadow-blue-500/20"
+                />
+              ) : (
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0 shadow-lg shadow-blue-500/20">
+                  {agent.nom?.charAt(0)}{agent.prenom?.charAt(0)}
+                </div>
+              )}
+              <input
+                ref={photoInputRef}
+                type="file"
+                className="hidden"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handlePhotoUpload}
+              />
+              <button
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+              >
+                {uploadingPhoto ? (
+                  <Loader2 size={16} className="text-white animate-spin" />
+                ) : (
+                  <Camera size={16} className="text-white" />
+                )}
+              </button>
             </div>
             <div className="min-w-0">
               <h2 className="text-lg font-bold text-content-primary truncate">
@@ -117,12 +211,12 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 shrink-0">
              <Button size="sm" variant="primary" onClick={onEdit} icon={User}>
                 Modifier
              </Button>
-             <button 
+             <button
                 onClick={onClose}
                 className="p-2 text-content-muted hover:text-content-primary transition-colors"
                 aria-label="Fermer"
@@ -273,11 +367,11 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                       <Badge value={`${objectifAtteint}%`} variant={objectifAtteint >= 100 ? 'success' : 'primary'} />
                    </div>
                    <div className="w-full bg-surface-elevated rounded-full h-2 overflow-hidden mb-1">
-                      <div 
+                      <div
                          className={`h-full rounded-full transition-all duration-500 ease-out ${
                             objectifAtteint >= 100 ? 'bg-status-success' : 'bg-primary'
                          }`}
-                         style={{ width: `${Math.min(objectifAtteint, 100)}%` }} 
+                         style={{ width: `${Math.min(objectifAtteint, 100)}%` }}
                       />
                    </div>
                    <p className="text-right text-xs text-content-muted">
@@ -296,9 +390,9 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                       </div>
                    </div>
                    <div className="w-full bg-surface-elevated rounded-full h-2 overflow-hidden mb-1">
-                      <div 
+                      <div
                          className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all duration-500 ease-out"
-                         style={{ width: `${tauxReussite}%` }} 
+                         style={{ width: `${tauxReussite}%` }}
                       />
                    </div>
                    <div className="flex justify-between text-xs text-content-muted">

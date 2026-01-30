@@ -1,50 +1,87 @@
 
 import React, { Suspense } from 'react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { Card } from '../ui';
+import { Card, Button } from '../ui';
+import ErrorBoundary from '../shared/ErrorBoundary';
+import type { DashboardStats } from '../../hooks/dashboard/useDashboardStats';
 
 // Lazy load charts
 const BalanceHistoryChart = React.lazy(() => import('../finance/accounting/BalanceHistoryChart'));
 const PortfolioDistributionChart = React.lazy(() => import('../finance/accounting/PortfolioDistributionChart'));
 
 interface AnalyticsGridProps {
-  stats: any;
+  stats: DashboardStats | null;
+  chartHeight?: number;
 }
 
-export default function AnalyticsGrid({ stats }: AnalyticsGridProps) {
+function ChartErrorFallback() {
+  const { t } = useLanguage();
+  return (
+    <Card variant="default" className="h-full flex flex-col items-center justify-center bg-slate-900 border-slate-800 gap-2 p-4">
+      <AlertCircle size={24} className="text-red-400" />
+      <p className="text-xs text-slate-400">{t('erreurChargementGraphiques')}</p>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => window.location.reload()}
+        className="text-xs h-7 px-3"
+      >
+        <RefreshCw size={12} className="mr-1" />
+        {t('recharger')}
+      </Button>
+    </Card>
+  );
+}
+
+export default function AnalyticsGrid({ stats, chartHeight = 250 }: AnalyticsGridProps) {
   const { t } = useLanguage();
 
   const productSplit = stats?.charts?.productSplit || [];
-  
-  // Transform API data to match PortfolioDistributionChart format if needed
-  // API returns: { name: "Crédit", value: 30, color: "#10b981" } which matches expectations
-  
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+    <div
+      className="grid grid-cols-1 lg:grid-cols-3 gap-3"
+      role="region"
+      aria-label={t('graphiquesAnalytiques') || 'Graphiques analytiques'}
+    >
        {/* Area Chart - Growth */}
-       <div className="lg:col-span-2 min-h-[250px]">
-         <Suspense fallback={
-           <Card variant="default" className="h-[250px] flex items-center justify-center bg-slate-900 border-slate-800">
-             <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" />
-           </Card>
-         }>
-           <BalanceHistoryChart height={250} />
-         </Suspense>
-       </div>
+       <figure
+         className="lg:col-span-2"
+         style={{ minHeight: chartHeight }}
+         role="img"
+         aria-label={t('graphiqueEvolutionSolde') || 'Graphique d\'évolution du solde'}
+       >
+         <ErrorBoundary fallback={<ChartErrorFallback />}>
+           <Suspense fallback={
+             <Card variant="default" className="flex items-center justify-center bg-slate-900 border-slate-800" style={{ height: chartHeight }}>
+               <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" aria-label={t('chargement')} />
+             </Card>
+           }>
+             <BalanceHistoryChart height={chartHeight} />
+           </Suspense>
+         </ErrorBoundary>
+       </figure>
 
        {/* Donut Chart - Distribution */}
-       <div className="min-h-[250px]">
-         <Suspense fallback={
-           <Card variant="default" className="h-[250px] flex items-center justify-center bg-slate-900 border-slate-800">
-             <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
-           </Card>
-         }>
-           <PortfolioDistributionChart 
-             data={productSplit} 
-             height={250}
-           />
-         </Suspense>
-       </div>
+       <figure
+         style={{ minHeight: chartHeight }}
+         role="img"
+         aria-label={t('graphiqueRepartitionProduits') || 'Graphique de répartition des produits'}
+       >
+         <ErrorBoundary fallback={<ChartErrorFallback />}>
+           <Suspense fallback={
+             <Card variant="default" className="flex items-center justify-center bg-slate-900 border-slate-800" style={{ height: chartHeight }}>
+               <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" aria-label={t('chargement')} />
+             </Card>
+           }>
+             <PortfolioDistributionChart
+               data={productSplit}
+               height={chartHeight}
+             />
+           </Suspense>
+         </ErrorBoundary>
+       </figure>
     </div>
   );
 }

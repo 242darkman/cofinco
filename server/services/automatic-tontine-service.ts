@@ -5,6 +5,9 @@ import { createContributionTontineWithLedger } from "../storage/tontines";
 import { updateTontineSolde, executeWithLedger, updateCompteSolde, generateReference } from "./ledger";
 import { isTourFullyPaid } from "./tontine-logic";
 import { StatutTontine, StatutMembreTontine, TypeCompte, StatutTransaction, TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('AutoTontine');
 
 export async function processAutomaticTontineContributions() {
   const now = new Date();
@@ -43,7 +46,7 @@ export async function processAutomaticTontineContributions() {
 
         if (tourStatus.isPaid) {
           // Tour déjà payé via avance - sauter silencieusement
-          console.log(`[Auto-Tontine] Tour ${currentTour} déjà payé via avance pour membre ${membre.id} (${membre.clientId})`);
+          logger.info({ currentTour, membreId: membre.id, clientId: membre.clientId }, 'Tour already paid via advance');
           continue;
         }
 
@@ -51,7 +54,7 @@ export async function processAutomaticTontineContributions() {
         const montantAPrevelever = tourStatus.montantRestant;
 
         if (montantAPrevelever <= 0) {
-          console.log(`[Auto-Tontine] Rien à prélever pour membre ${membre.id} tour ${currentTour}`);
+          logger.info({ membreId: membre.id, currentTour }, 'Nothing to debit for member');
           continue;
         }
 
@@ -59,15 +62,15 @@ export async function processAutomaticTontineContributions() {
         try {
           await executeAutomaticContribution(tontine, membre, currentTour, montantAPrevelever);
           results.success++;
-          console.log(`[Auto-Tontine] Prélèvement réussi: ${montantAPrevelever} FCFA pour membre ${membre.id} tour ${currentTour}`);
+          logger.info({ amount: montantAPrevelever, membreId: membre.id, currentTour }, 'Debit successful');
         } catch (error) {
-           console.error(`Error processing auto-contribution for tontine ${tontine.id} member ${membre.id}:`, error);
+           logger.error({ tontineId: tontine.id, membreId: membre.id, err: error }, 'Error processing auto-contribution');
            results.failed++;
            results.errors.push({ tontineId: tontine.id, membreId: membre.id, error });
         }
       }
     } catch (e) {
-      console.error("Error processing tontine:", tontine.id, e);
+      logger.error({ tontineId: tontine.id, err: e }, 'Error processing tontine');
     }
   }
   
@@ -196,6 +199,7 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
                 compteId: compte.id,
                 mouvementId: mouvement.id,
                 typePaiement: TypeOperationCaisse.TONTINE_CONTRIBUTION,
+                sens: "DEBIT", // Contribution is money going out
                 montant: amount.toString(),
                 soldeApres: nouveauSoldeCompte,
                 methodePaiement: MethodePaiement.TRANSFER,

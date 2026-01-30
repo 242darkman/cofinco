@@ -2,6 +2,9 @@ import type { SmsProvider, SendResult } from "./provider.interface";
 import { db } from "../../../db";
 import { smsProviderSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger('MtnSms');
 
 // ============================================================================
 // Token Cache (module-level singleton)
@@ -111,9 +114,7 @@ export class MtnSmsProvider implements SmsProvider {
       expiresAt: Date.now() + expiresIn * 1000,
     };
 
-    console.log(
-      `[MTN-SMS] Token acquired, expires in ${expiresIn}s`
-    );
+    logger.info({ expiresIn }, 'Token acquired');
 
     return cachedToken.token;
   }
@@ -156,7 +157,7 @@ export class MtnSmsProvider implements SmsProvider {
 
       // Auto-refresh token on 401 (expired token)
       if (response.status === 401) {
-        console.log("[MTN-SMS] Token expired, refreshing...");
+        logger.info('Token expired, refreshing');
         cachedToken = null;
         token = await this.getAccessToken();
 
@@ -176,9 +177,7 @@ export class MtnSmsProvider implements SmsProvider {
         const requestId =
           data.requestId || data.resourceReference?.resourceURL || clientCorrelator;
 
-        console.log(
-          `[MTN-SMS] Sent successfully (correlator=${clientCorrelator})`
-        );
+        logger.info({ correlator: clientCorrelator }, 'SMS sent successfully');
 
         return {
           success: true,
@@ -195,9 +194,7 @@ export class MtnSmsProvider implements SmsProvider {
         data.message ||
         `MTN error HTTP ${response.status}`;
 
-      console.error(
-        `[MTN-SMS] Send failed (correlator=${clientCorrelator}): ${errorMsg}`
-      );
+      logger.error({ correlator: clientCorrelator, error: errorMsg }, 'SMS send failed');
 
       return {
         success: false,
@@ -205,9 +202,7 @@ export class MtnSmsProvider implements SmsProvider {
         rawResponse: data,
       };
     } catch (error: any) {
-      console.error(
-        `[MTN-SMS] Unexpected error: ${error.message}`
-      );
+      logger.error({ err: error }, 'Unexpected error');
       return {
         success: false,
         error: error.message || "MTN send failed",

@@ -6,7 +6,7 @@
  * - conversation_participants: Membres avec tracking "vu à"
  * - messages_v2: Messages avec support multi-type (TEXT, IMAGE, FILE, AUDIO)
  * - message_reactions: Réactions emoji par utilisateur
- * - message_receipts: Tracking livraison/lecture précis (optionnel)
+ * - (message_receipts removed - unused, read tracking via conversation_participants.lastReadAt)
  *
  * Index optimisés pour:
  * - Liste conversations par utilisateur (tri updatedAt)
@@ -244,43 +244,6 @@ export const messageReactions = pgTable('message_reactions', {
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MESSAGE RECEIPTS TABLE (TRACKING PRÉCIS PAR MESSAGE)
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Table optionnelle pour tracking précis de livraison/lecture par message.
- * Alternative: utiliser uniquement conversation_participants.lastReadAt
- *
- * Avantages:
- * - Savoir exactement qui a lu quel message (utile pour groupes)
- * - Distinction livraison (arrivé sur device) vs lecture (vu par user)
- *
- * Inconvénients:
- * - Plus de rows = plus de stockage
- * - Writes plus fréquents
- */
-export const messageReceipts = pgTable('message_receipts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  messageId: uuid('message_id').notNull().references(() => messagesV2.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-
-  // Livraison: message reçu par le device de l'utilisateur
-  deliveredAt: timestamp('delivered_at'),
-
-  // Lecture: message vu par l'utilisateur
-  readAt: timestamp('read_at'),
-}, (table) => [
-  // Un user ne peut avoir qu'un receipt par message
-  uniqueIndex('idx_receipts_unique').on(table.messageId, table.userId),
-
-  // Index pour fetch receipts d'un message
-  index('idx_receipts_message').on(table.messageId),
-
-  // Index pour user timeline de lectures
-  index('idx_receipts_user_read').on(table.userId, table.readAt.desc()),
-]);
-
-// ══════════════════════════════════════════════════════════════════════════════
 // RELATIONS DRIZZLE ORM
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -335,7 +298,6 @@ export const messagesV2Relations = relations(messagesV2, ({ one, many }) => ({
     relationName: 'messageReplies',
   }),
   reactions: many(messageReactions, { relationName: 'messageReactions' }),
-  receipts: many(messageReceipts, { relationName: 'messageReceipts' }),
 }));
 
 export const messageReactionsRelations = relations(messageReactions, ({ one }) => ({
@@ -351,18 +313,6 @@ export const messageReactionsRelations = relations(messageReactions, ({ one }) =
   }),
 }));
 
-export const messageReceiptsRelations = relations(messageReceipts, ({ one }) => ({
-  message: one(messagesV2, {
-    fields: [messageReceipts.messageId],
-    references: [messagesV2.id],
-    relationName: 'messageReceipts',
-  }),
-  user: one(users, {
-    fields: [messageReceipts.userId],
-    references: [users.id],
-    relationName: 'userMessageReceipts',
-  }),
-}));
 
 // ══════════════════════════════════════════════════════════════════════════════
 // INSERT/SELECT TYPES
@@ -380,8 +330,6 @@ export type SelectMessageV2 = typeof messagesV2.$inferSelect;
 export type InsertMessageReaction = typeof messageReactions.$inferInsert;
 export type SelectMessageReaction = typeof messageReactions.$inferSelect;
 
-export type InsertMessageReceipt = typeof messageReceipts.$inferInsert;
-export type SelectMessageReceipt = typeof messageReceipts.$inferSelect;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ZOD SCHEMAS (VALIDATION)
@@ -414,9 +362,6 @@ export const insertMessageReactionSchema = createInsertSchema(messageReactions).
   createdAt: true,
 });
 
-export const insertMessageReceiptSchema = createInsertSchema(messageReceipts).omit({
-  id: true,
-});
 
 // ══════════════════════════════════════════════════════════════════════════════
 // API REQUEST/RESPONSE SCHEMAS

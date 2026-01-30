@@ -9,7 +9,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
-import { PaymentDetailModal, type PaymentDetailData } from '@/components/finance/payments';
+import { PaymentDetailModal, type PaymentDetailData, ProviderBalanceWidget } from '@/components/finance/payments';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 // Safe date format helper
@@ -288,6 +288,11 @@ export default function MobileMoneyTransactionsPage() {
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>
         </div>
+      </div>
+
+      {/* Provider Balances */}
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 mb-4">
+        <ProviderBalanceWidget />
       </div>
 
       {/* Stats summary */}

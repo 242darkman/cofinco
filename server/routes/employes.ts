@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { z } from "zod";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:Employes');
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users, employes, agentsTerrain, userRoles } from "@shared/schema";
@@ -165,7 +168,7 @@ export function registerEmployesRoutes(app: Express) {
 
       return res.status(400).json({ message: "Paramètre 'username' ou 'fullName' requis" });
     } catch (error) {
-      console.error("Error checking username:", error);
+      logger.error({ err: error }, 'Error checking username');
       res.status(500).json({ message: "Erreur lors de la vérification du nom d'utilisateur" });
     }
   });
@@ -182,14 +185,14 @@ export function registerEmployesRoutes(app: Express) {
 
       const employe = await storage.getEmployeByUserId(userId);
       if (!employe) {
-        return res.status(404).json({ message: "Profil employé non trouvé" });
+        return res.json({ data: null, message: "Aucun profil employé pour cet utilisateur" });
       }
 
       // Récupérer avec les données complètes
       const employeWithUser = await storage.getEmployeWithUser(employe.id);
-      res.json(employeWithUser);
+      res.json({ data: employeWithUser });
     } catch (error) {
-      console.error("Error fetching current user employe:", error);
+      logger.error({ err: error }, 'Error fetching current user employe');
       res.status(500).json({ message: "Erreur lors de la récupération du profil employé" });
     }
   });
@@ -210,7 +213,7 @@ export function registerEmployesRoutes(app: Express) {
 
       res.json(employesList);
     } catch (error) {
-      console.error("Error fetching employes:", error);
+      logger.error({ err: error }, 'Error fetching employes');
       res.status(500).json({ message: "Erreur lors de la récupération des employés" });
     }
   });
@@ -226,7 +229,7 @@ export function registerEmployesRoutes(app: Express) {
       }
       res.json(employe);
     } catch (error) {
-      console.error("Error fetching employe:", error);
+      logger.error({ err: error }, 'Error fetching employe');
       res.status(500).json({ message: "Erreur lors de la récupération de l'employé" });
     }
   });
@@ -245,7 +248,7 @@ export function registerEmployesRoutes(app: Express) {
       const employeWithUser = await storage.getEmployeWithUser(employe.id);
       res.json(employeWithUser);
     } catch (error) {
-      console.error("Error fetching employe by userId:", error);
+      logger.error({ err: error }, 'Error fetching employe by userId');
       res.status(500).json({ message: "Erreur lors de la récupération de l'employé" });
     }
   });
@@ -325,18 +328,18 @@ export function registerEmployesRoutes(app: Express) {
           isPrimary: true,
         });
 
+        // 4. Si le rôle est AGENT_TERRAIN, créer l'entrée agents_terrain (synchrone dans la transaction)
+        if (resolvedRole === SystemRole.AGENT_TERRAIN) {
+          await tx.insert(agentsTerrain).values({
+            employeId: employe.id,
+            zoneAffectation: data.zonesAffectation?.length ? data.zonesAffectation.join(', ') : null,
+            objectifMensuel: data.objectifMensuel || '100000',
+            statut: StatutUser.ACTIVE,
+          });
+        }
+
         return { user, employe };
       });
-
-      // 4. If role is AGENT_TERRAIN, create agent terrain entry
-      if (resolvedRole === SystemRole.AGENT_TERRAIN && result.employe.id) {
-        await db.insert(agentsTerrain).values({
-          employeId: result.employe.id,
-          zoneAffectation: data.zonesAffectation?.length ? data.zonesAffectation.join(', ') : null,
-          objectifMensuel: data.objectifMensuel || '100000',
-          statut: StatutUser.ACTIVE,
-        });
-      }
 
       // Relocate files from temp UUID to real entity ID
       const tempEntityId = data.tempEntityId;
@@ -352,7 +355,7 @@ export function registerEmployesRoutes(app: Express) {
 
           await StorageService.deleteEntityFiles('employe', tempEntityId);
         } catch (relocateError) {
-          console.error(`⚠️ File relocation failed for employe ${result.employe.id}:`, relocateError);
+          logger.warn({ err: relocateError, employeId: result.employe.id }, 'File relocation failed for employe');
         }
       }
 
@@ -392,7 +395,7 @@ export function registerEmployesRoutes(app: Express) {
             wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_new', id: result.employe.id } });
         }
       } catch (wsError) {
-        console.error("Failed to notify via WebSocket:", wsError);
+        logger.error({ err: wsError }, 'Failed to notify via WebSocket');
       }
 
       // Retourner l'employé avec ses données user
@@ -404,9 +407,9 @@ export function registerEmployesRoutes(app: Express) {
       const tempId = req.body?.tempEntityId || req.body?.temp_entity_id;
       if (tempId) {
         StorageService.deleteEntityFiles('employe', tempId)
-          .catch(err => console.error("Cleanup temp files failed:", err));
+          .catch(err => logger.error({ err }, 'Cleanup temp files failed'));
       }
-      console.error("Error creating employe:", error);
+      logger.error({ err: error }, 'Error creating employe');
       res.status(500).json({ message: "Erreur lors de la création de l'employé" });
     }
   });
@@ -438,19 +441,19 @@ export function registerEmployesRoutes(app: Express) {
       // Données user
       if (data.nom !== undefined) userData.nom = data.nom;
       if (data.prenom !== undefined) userData.prenom = data.prenom;
-      if (data.email !== undefined) userData.email = data.email;
-      if (data.telephone !== undefined) userData.telephone = data.telephone;
+      if (data.email !== undefined) userData.email = data.email || null;
+      if (data.telephone !== undefined) userData.telephone = data.telephone || null;
       if (data.sexe !== undefined) userData.sexe = data.sexe;
-      if (data.dateNaissance !== undefined) userData.dateNaissance = data.dateNaissance;
-      if (data.adresse !== undefined) userData.adresse = data.adresse;
-      if (data.ville !== undefined) userData.ville = data.ville;
-      if (data.photoProfile !== undefined) userData.photoProfile = data.photoProfile;
+      if (data.dateNaissance !== undefined) userData.dateNaissance = data.dateNaissance || null;
+      if (data.adresse !== undefined) userData.adresse = data.adresse || null;
+      if (data.ville !== undefined) userData.ville = data.ville || null;
+      if (data.photoProfile !== undefined) userData.photoProfile = data.photoProfile || null;
       if (data.statut !== undefined) userData.statut = data.statut;
 
       // Données employe (sans roleSystem - géré par userRoles)
-      if (data.matricule !== undefined) employeData.matricule = data.matricule;
-      if (data.jobPositionId !== undefined) employeData.jobPositionId = data.jobPositionId;
-      if (data.dateEmbauche !== undefined) employeData.dateEmbauche = data.dateEmbauche;
+      if (data.matricule !== undefined) employeData.matricule = data.matricule || null;
+      if (data.jobPositionId !== undefined) employeData.jobPositionId = data.jobPositionId || null;
+      if (data.dateEmbauche !== undefined) employeData.dateEmbauche = data.dateEmbauche || null;
       if (data.typeContrat !== undefined) employeData.typeContrat = data.typeContrat;
       if (data.agenceId !== undefined) employeData.agenceId = data.agenceId;
       if (data.managerId !== undefined) employeData.managerId = data.managerId;
@@ -486,7 +489,7 @@ export function registerEmployesRoutes(app: Express) {
       res.json(updated);
 
     } catch (error) {
-      console.error("Error updating employe:", error);
+      logger.error({ err: error }, 'Error updating employe');
       res.status(500).json({ message: "Erreur lors de la mise à jour de l'employé" });
     }
   });
@@ -529,7 +532,7 @@ export function registerEmployesRoutes(app: Express) {
       res.json({ message: "Employé supprimé avec succès" });
 
     } catch (error) {
-      console.error("Error deleting employe:", error);
+      logger.error({ err: error }, 'Error deleting employe');
       res.status(500).json({ message: "Erreur lors de la suppression de l'employé" });
     }
   });
@@ -614,7 +617,7 @@ export function registerEmployesRoutes(app: Express) {
       res.status(201).json(employeWithUser);
 
     } catch (error) {
-      console.error("Error creating employe from user:", error);
+      logger.error({ err: error }, 'Error creating employe from user');
       res.status(500).json({ message: "Erreur lors de la création du profil employé" });
     }
   });

@@ -48,13 +48,14 @@ export class CreditService {
       
       const url = `/api/credits${params.toString() ? '?' + params.toString() : ''}`;
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         console.error('Error fetching credits');
         return [];
       }
-      
-      return await response.json();
+
+      const result = await response.json();
+      return Array.isArray(result) ? result : result.data ?? [];
     } catch (error) {
       console.error('Error fetching credits:', error);
       return [];

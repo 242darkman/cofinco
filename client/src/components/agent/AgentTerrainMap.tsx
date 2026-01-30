@@ -57,9 +57,10 @@ export default function AgentTerrainMap() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [agentsRes, clientsRes] = await Promise.all([
+      const [agentsRes, clientsRes, visitesRes] = await Promise.all([
         fetch('/api/agent-locations/latest', { credentials: 'include' }),
         requestAllPages<ClientWithIdentity>('/clients/with-location'),
+        fetch('/api/visites-terrain?per_page=200', { credentials: 'include' }),
       ]);
 
       if (agentsRes.ok) {
@@ -68,6 +69,19 @@ export default function AgentTerrainMap() {
       }
 
       setClients(Array.isArray(clientsRes) ? clientsRes : []);
+
+      if (visitesRes.ok) {
+        const visitesData = await visitesRes.json();
+        const rawVisites = Array.isArray(visitesData) ? visitesData : (visitesData.data || []);
+        setVisits(rawVisites.filter((v: any) => v.latitude && v.longitude).map((v: any) => ({
+          id: v.id,
+          clientNom: v.client_nom || v.clientNom || 'Client',
+          latitude: Number(v.latitude),
+          longitude: Number(v.longitude),
+          statut: v.statut || v.status || 'Effectuée',
+          dateVisite: v.date_visite || v.dateVisite || v.created_at || '',
+        })));
+      }
 
       setLastUpdate(new Date());
     } catch (error) {

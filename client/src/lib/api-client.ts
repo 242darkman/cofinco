@@ -2,6 +2,9 @@
 // Security-enhanced with automatic 401 detection and session invalidation
 // Multi-agency support with automatic X-Agence-Id header injection
 // Cross-tab logout synchronization via BroadcastChannel
+// Device fingerprinting for stolen cookie detection
+
+import { getOrCreateFingerprint, clearStoredFingerprint } from './device-fingerprint';
 
 const API_BASE = '/api';
 
@@ -187,7 +190,11 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
     }
 
     // Pour les autres routes, c'est une expiration de session
-    if (!endpoint.includes('/auth/me')) {
+    // Exclure les endpoints d'auth qui peuvent retourner 401 normalement (utilisateur non connecté)
+    const isAuthEndpoint = endpoint.includes('/auth/me') ||
+                           endpoint.includes('/auth/session-info') ||
+                           endpoint.includes('/auth/refresh');
+    if (!isAuthEndpoint) {
       console.warn(`[API] Session expirée - déconnexion automatique (reason: ${reason})`);
       // Broadcast to other tabs
       broadcastSessionInvalid(reason);
@@ -222,6 +229,7 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
 /**
  * Requête HTTP sécurisée avec credentials et gestion d'erreur centralisée
  * Injecte automatiquement le header X-Agence-Id si une agence est sélectionnée
+ * Injecte automatiquement les headers de device fingerprint pour la sécurité
  */
 async function request<T>(
   endpoint: string,
@@ -236,6 +244,18 @@ async function request<T>(
   // Injecter X-Agence-Id automatiquement (sauf pour certains endpoints)
   if (currentAgenceId && !endpoint.startsWith('/auth/') && !endpoint.startsWith('/me/agences')) {
     headers['X-Agence-Id'] = currentAgenceId;
+  }
+
+  // Injecter les headers de device fingerprint pour la vérification de sécurité
+  // (sauf pour les endpoints d'authentification qui gèrent le fingerprint différemment)
+  if (!endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/register')) {
+    try {
+      const fingerprint = getOrCreateFingerprint();
+      headers['X-Device-Fingerprint'] = fingerprint.full;
+      headers['X-Device-Fingerprint-Partial'] = fingerprint.partial;
+    } catch {
+      // Ignore fingerprint errors - security check is optional
+    }
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -341,10 +361,19 @@ export interface SessionCheckResponse extends AuthUser {
 
 // Auth API
 export const authApi = {
-  login: async (username: string, password: string): Promise<LoginResult> => {
+  login: async (username: string, password: string, rememberMe: boolean = false): Promise<LoginResult> => {
+    // Generate device fingerprint for security
+    const fingerprint = getOrCreateFingerprint();
+
     const response = await request<LoginResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({
+        username,
+        password,
+        deviceFingerprint: fingerprint.full,
+        deviceFingerprintPartial: fingerprint.partial,
+        rememberMe,
+      }),
     });
     return {
       user: response.user,
@@ -358,6 +387,8 @@ export const authApi = {
     const result = await request<{ message: string }>('/auth/logout', {
       method: 'POST',
     });
+    // Clear device fingerprint on logout
+    clearStoredFingerprint();
     // Broadcast logout to other tabs
     broadcastLogout();
     return result;
@@ -389,6 +420,35 @@ export const authApi = {
       }
       // For other errors (network, server down), consider session valid but return error info
       return { valid: false, reason: 'network_error' };
+    }
+  },
+
+  /**
+   * Refresh session using remember-me token
+   * Attempts to get a new session using the refresh token cookie
+   * Returns the new user if successful, null otherwise
+   */
+  refreshSession: async (): Promise<{ success: boolean; user?: AuthUser; permissions?: PermissionsData }> => {
+    try {
+      // Get fingerprint for the new session
+      const fingerprint = getOrCreateFingerprint();
+
+      const response = await request<LoginResponse>('/auth/refresh', {
+        method: 'POST',
+        body: JSON.stringify({
+          deviceFingerprint: fingerprint.full,
+          deviceFingerprintPartial: fingerprint.partial,
+        }),
+      });
+
+      return {
+        success: true,
+        user: response.user,
+        permissions: response.permissions,
+      };
+    } catch (error) {
+      // Refresh failed - likely no valid token or token expired
+      return { success: false };
     }
   },
 };
@@ -609,13 +669,15 @@ export function extractInsufficientFundsData(error: unknown): InsufficientFundsE
 
 // Credit API
 export const creditApi = {
-  getAll: (params?: { clientId?: string; statut?: string; includeEcheances?: boolean }) => {
+  getAll: async (params?: { clientId?: string; statut?: string; includeEcheances?: boolean }) => {
     const queryParams = new URLSearchParams();
     if (params?.clientId) queryParams.append('client_id', params.clientId);
     if (params?.statut) queryParams.append('statut', params.statut);
     if (params?.includeEcheances) queryParams.append('include_echeances', 'true');
     const query = queryParams.toString();
-    return request<any[]>(`/credits${query ? `?${query}` : ''}`);
+    const response = await request<{ data: any[]; pagination?: any }>(`/credits${query ? `?${query}` : ''}`);
+    // Handle both paginated response {data: [...]} and direct array
+    return Array.isArray(response) ? response : (response?.data || []);
   },
   getById: (id: string) => request<any>(`/credits/${id}`),
   getByClient: (clientId: string) => request<any[]>(`/clients/${clientId}/credits`),
@@ -771,6 +833,11 @@ export const compteEpargneApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  crediterInterets: (id: string, data: { montant: number; periode: string; tauxInteret: number; observations?: string }) =>
+    request<{ transaction: any; mouvement_id: string; message: string }>(`/comptes/${id}/crediter-interets`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   debloquer: (id: string, data?: { motif?: string }) => request<any>(`/comptes/${id}/debloquer`, {
     method: 'POST',
     body: JSON.stringify(data || {}),
@@ -874,11 +941,35 @@ export const compteEpargneApi = {
       oldestPendingSchedule: string | null;
       avgExecutionTimeMs: number | null;
     }>('/comptes/transferts-programmes/health'),
+
+  // Batch activation of pending accounts
+  batchActivate: (accountIds: string[]) =>
+    request<{
+      success: boolean;
+      activated: number;
+      failed: number;
+      results: Array<{ id: string; success: boolean; error?: string }>;
+    }>('/comptes/batch-activate', {
+      method: 'POST',
+      body: JSON.stringify({ accountIds }),
+    }),
 };
 
 // Transaction Epargne API
+export interface PaginatedTransactions {
+  data: any[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 export const transactionEpargneApi = {
-  getByCompte: (compteId: string) => request<any[]>(`/comptes/${compteId}/transactions`),
+  getByCompte: (compteId: string, opts?: { limit?: number; cursor?: string }) => {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.cursor) params.set('cursor', opts.cursor);
+    const qs = params.toString();
+    return request<PaginatedTransactions>(`/comptes/${compteId}/transactions${qs ? `?${qs}` : ''}`);
+  },
   create: (data: any) => request<any>('/transactions-epargne', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -1049,7 +1140,7 @@ export const sessionCaisseApi = {
   }),
   // ========== WORKFLOW SECURISE D'OUVERTURE (Coffre → Caisse) ==========
   // Phase A: Demande d'ouverture
-  requestOpening: (data: { caisseId: string; montantDemande: number; agenceId?: string; observations?: string }) =>
+  requestOpening: (data: { caisseId: string; montantDemande: number; agenceId?: string; observations?: string; supervisorOverride?: boolean }) =>
     request<{ session: any; transfert: any }>('/sessions-caisse/request-opening', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1069,7 +1160,7 @@ export const sessionCaisseApi = {
       body: JSON.stringify({ reason }),
     }),
   // Ouverture directe avec fonds reporté existant (sans passer par le coffre)
-  openDirect: (data: { caisseId: string; agenceId?: string; observations?: string }) =>
+  openDirect: (data: { caisseId: string; agenceId?: string; observations?: string; supervisorOverride?: boolean }) =>
     request<{ session: any }>('/sessions-caisse/open-direct', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1113,11 +1204,85 @@ export const sessionCaisseApi = {
       body: JSON.stringify({ reason }),
     }),
 
+  // Soumettre un comptage de vérification (second compteur)
+  submitVerification: (id: string, data: { billetage: Record<string, number>; observations?: string }) =>
+    request<any>(`/sessions-caisse/${id}/submit-verification`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Récupérer les comptages d'une session (primaire + vérification)
+  getCounts: (id: string) =>
+    request<any>(`/sessions-caisse/${id}/counts`),
+
   // Récupérer les sessions en cours de fermeture (pour supervision)
   getClosingSessions: (agenceId?: string) => {
     const query = agenceId ? `?agenceId=${agenceId}` : '';
     return request<any[]>(`/sessions-caisse/closing${query}`);
   },
+
+  // ========== DENOMINATION TEMPLATES ==========
+  getDenominationTemplates: (caisseId?: string) => {
+    const query = caisseId ? `?caisseId=${caisseId}` : '';
+    return request<any[]>(`/caisses/denomination-templates${query}`);
+  },
+
+  createDenominationTemplate: (data: {
+    nom: string;
+    description?: string;
+    caisseId?: string;
+    agenceId?: string;
+    billetage: Record<string, number>;
+    totalCalcule: string;
+    typeTemplate?: string;
+  }) =>
+    request<any>('/caisses/denomination-templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateDenominationTemplate: (id: string, data: Partial<{
+    nom: string;
+    description?: string;
+    billetage: Record<string, number>;
+    totalCalcule: string;
+    typeTemplate?: string;
+  }>) =>
+    request<any>(`/caisses/denomination-templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteDenominationTemplate: (id: string) =>
+    request<{ success: boolean }>(`/caisses/denomination-templates/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // ========== COUNT SUGGESTION ==========
+  suggestCount: (sessionId: string) =>
+    request<{
+      billetage: Record<string, number>;
+      totalSuggere: number;
+      soldeTheorique: number;
+      confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+      reasoning: string[];
+    }>(`/sessions-caisse/${sessionId}/suggest-count`),
+
+  // ========== DUAL COUNT CONFIG ==========
+  getDualCountConfig: (agenceId?: string) => {
+    const query = agenceId ? `?agenceId=${agenceId}` : '';
+    return request<any>(`/caisses/dual-count-config${query}`);
+  },
+
+  setDualCountConfig: (data: {
+    agenceId?: string;
+    thresholdMontant?: number;
+    alwaysRequiredForClosing?: boolean;
+  }) =>
+    request<any>('/caisses/dual-count-config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // Operations Caisse API
@@ -1135,10 +1300,77 @@ export const caisseOperationApi = {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
+  canReverse: (id: string) => request<{ reversible: boolean; reason?: string }>(`/comptes/operations/${id}/can-reverse`),
+  cancel: (id: string, data: { reason: string; sessionCaisseId?: string }) =>
+    request<{ success: boolean; reversal: any; original: any; message: string }>(`/comptes/operations/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  sendReceipt: (id: string, data: { channel: "SMS" | "EMAIL"; recipient: string }) =>
+    request<{ success: boolean; message: string; correlationId: string }>(`/comptes/operations/${id}/send-receipt`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getChain: (id: string) =>
+    request<any[]>(`/comptes/operations/${id}/chain`),
 };
 
 // Alias for backward compatibility
 export const operationCaisseApi = caisseOperationApi;
+
+// Scheduled Caisse Transfers API (inter-agency)
+export const scheduledCaisseTransfersApi = {
+  getAll: (filters?: { agenceSourceId?: string; agenceDestId?: string; statut?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.agenceSourceId) params.append('agenceSourceId', filters.agenceSourceId);
+    if (filters?.agenceDestId) params.append('agenceDestId', filters.agenceDestId);
+    if (filters?.statut) params.append('statut', filters.statut);
+    const q = params.toString();
+    return request<any[]>(`/caisses/scheduled-transfers${q ? `?${q}` : ''}`);
+  },
+
+  getById: (id: string) => request<any>(`/caisses/scheduled-transfers/${id}`),
+
+  create: (data: {
+    agenceSourceId: string;
+    agenceDestId: string;
+    montant: number;
+    datePrevue: string;
+    frequence?: string;
+    jourSemaine?: number;
+    jourMois?: number;
+    motif?: string;
+    maxExecutions?: number;
+  }) =>
+    request<any>('/caisses/scheduled-transfers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<{
+    montant: number;
+    datePrevue: string;
+    frequence: string;
+    jourSemaine: number;
+    jourMois: number;
+    motif: string;
+    maxExecutions: number;
+  }>) =>
+    request<any>(`/caisses/scheduled-transfers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  cancel: (id: string) =>
+    request<{ success: boolean }>(`/caisses/scheduled-transfers/${id}/cancel`, {
+      method: 'POST',
+    }),
+
+  execute: (id: string) =>
+    request<any>(`/caisses/scheduled-transfers/${id}/execute`, {
+      method: 'POST',
+    }),
+};
 
 // Caisses Separees API
 export const caisseSepareeApi = {
@@ -1538,34 +1770,173 @@ export const compteBloqueApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  // Use generic transactions endpoint
-  getTransactions: (compteId: string) => request<any[]>(`/comptes/${compteId}/transactions`),
+  // Use generic transactions endpoint (returns paginated envelope)
+  getTransactions: (compteId: string) => request<PaginatedTransactions>(`/comptes/${compteId}/transactions`),
 };
 
 // HR Presence API
 export const hrPresenceApi = {
   getToday: () => request<any>('/hr/presence/today'),
   getByStatus: (status: string) => request<any[]>(`/hr/presence/by-status/${status}`),
-  checkIn: () => request<any>('/hr/presence/checkin', { method: 'POST' }),
+  checkIn: (gps?: { latitude?: number | null; longitude?: number | null; accuracy?: number | null; gpsSource?: string }) =>
+    request<any>('/hr/presence/checkin', {
+      method: 'POST',
+      ...(gps ? { body: JSON.stringify(gps) } : {}),
+    }),
   checkOut: () => request<any>('/hr/presence/checkout', { method: 'POST' }),
   startBreak: () => request<any>('/hr/presence/start-break', { method: 'POST' }),
   endBreak: () => request<any>('/hr/presence/end-break', { method: 'POST' }),
 };
 
-// Audit Logs API
+// HR Salary Advances API
+export const hrAvancesApi = {
+  getAll: (params?: { employeId?: string; statut?: string }) => {
+    const qp = new URLSearchParams();
+    if (params?.employeId) qp.append('employeId', params.employeId);
+    if (params?.statut) qp.append('statut', params.statut);
+    const q = qp.toString();
+    return request<any[]>(`/hr/avances${q ? `?${q}` : ''}`);
+  },
+  create: (data: { employeId: string; montant: number; motif: string; dateRemboursement?: string }) =>
+    request<any>('/hr/avances', { method: 'POST', body: JSON.stringify(data) }),
+  approve: (id: string) =>
+    request<any>(`/hr/avances/${id}/approve`, { method: 'PATCH' }),
+  reject: (id: string, motif: string) =>
+    request<any>(`/hr/avances/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ motif }) }),
+  pay: (id: string) =>
+    request<any>(`/hr/avances/${id}/pay`, { method: 'PATCH' }),
+  deduct: (id: string, moisDeduction?: string) =>
+    request<any>(`/hr/avances/${id}/deduct`, { method: 'PATCH', body: JSON.stringify({ moisDeduction }) }),
+};
+
+// Audit Logs API (Enhanced)
 export const auditApi = {
-  getAll: (params?: { entity_type?: string; action?: string; limit?: number }) => {
+  getAll: (params?: Record<string, string>) => {
     const queryParams = new URLSearchParams();
-    if (params?.entity_type) queryParams.append('entity_type', params.entity_type);
-    if (params?.action) queryParams.append('action', params.action);
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value);
+      });
+    }
     const query = queryParams.toString();
-    return request<any[]>(`/audit-logs${query ? `?${query}` : ''}`);
+    return request<any>(`/audit/logs${query ? `?${query}` : ''}`);
+  },
+  getPaginated: (params?: { page?: number; limit?: number; search?: string; entity_type?: string; action?: string }) => {
+    const apiParams = {
+      ...params,
+      perPage: params?.limit,
+    };
+    return requestPaginated<any>('/audit/logs', apiParams);
   },
   create: (data: any) => request<any>('/audit-logs', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  rollback: (auditLogId: string) => request<{ success: boolean; error?: string }>(`/audit/${auditLogId}/rollback`, {
+    method: 'POST',
+  }),
+  getSettingsHistory: (settingsType: string, limit?: number) => {
+    const params = limit ? `?limit=${limit}` : '';
+    return request<any[]>(`/settings/history/${settingsType}${params}`);
+  },
+  restoreSettingsVersion: (settingsType: string, version: number) =>
+    request<{ success: boolean; snapshot?: Record<string, any>; error?: string }>(
+      `/settings/history/${settingsType}/restore/${version}`,
+      { method: 'POST' }
+    ),
+  getPermissionAuditHistory: (params?: { entityType?: string; entityId?: string; limit?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.entityType) queryParams.append('entityType', params.entityType);
+    if (params?.entityId) queryParams.append('entityId', params.entityId);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    const query = queryParams.toString();
+    return request<any[]>(`/audit/permissions${query ? `?${query}` : ''}`);
+  },
+  getImportBatches: (params?: { importType?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.importType) queryParams.append('importType', params.importType);
+    const query = queryParams.toString();
+    return request<any[]>(`/import/batches${query ? `?${query}` : ''}`);
+  },
+  rollbackImportBatch: (batchId: string) =>
+    request<{ success: boolean; deletedCount: number; error?: string }>(`/import/batches/${batchId}/rollback`, {
+      method: 'POST',
+    }),
+};
+
+// System Alerts API
+export const alertsApi = {
+  getAll: (unreadOnly?: boolean) => {
+    const params = unreadOnly ? '?unreadOnly=true' : '';
+    return request<any[]>(`/alerts${params}`);
+  },
+  create: (data: { type: string; title: string; message: string; targetAudience?: string; targetUserIds?: string[]; expiresAt?: string }) =>
+    request<any>('/alerts', { method: 'POST', body: JSON.stringify(data) }),
+  markAsRead: (id: string) => request<{ success: boolean }>(`/alerts/${id}/read`, { method: 'POST' }),
+  delete: (id: string) => request<{ success: boolean }>(`/alerts/${id}`, { method: 'DELETE' }),
+};
+
+// Settings Extended API
+export const settingsExtendedApi = {
+  // Blocking Rules
+  getBlockingRules: () => request<any[]>('/settings/blocking-rules'),
+  createBlockingRule: (data: { ruleType: string; pattern: string; description?: string; reason?: string; expiresAt?: string | null }) =>
+    request<any>('/settings/blocking-rules', { method: 'POST', body: JSON.stringify(data) }),
+  updateBlockingRule: (id: string, data: Partial<{ ruleType: string; pattern: string; description: string; reason: string; expiresAt: string | null; isActive: boolean }>) =>
+    request<any>(`/settings/blocking-rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteBlockingRule: (id: string) => request<{ success: boolean }>(`/settings/blocking-rules/${id}`, { method: 'DELETE' }),
+
+  // Maintenance Schedules
+  getMaintenanceSchedules: () => request<any[]>('/settings/maintenance-schedules'),
+  createMaintenanceSchedule: (data: {
+    title: string;
+    description?: string;
+    scheduledStart: string;
+    scheduledEnd: string;
+    affectedModules?: string[];
+    notifyAt?: string[];
+  }) => request<any>('/settings/maintenance-schedules', { method: 'POST', body: JSON.stringify(data) }),
+  updateMaintenanceSchedule: (id: string, data: any) =>
+    request<any>(`/settings/maintenance-schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Holiday Exceptions
+  getHolidays: (agenceId?: string) => {
+    const params = agenceId ? `?agenceId=${agenceId}` : '';
+    return request<any[]>(`/settings/holidays${params}`);
+  },
+  createHoliday: (data: {
+    date: string;
+    name: string;
+    isRecurring?: boolean;
+    agenceId?: string;
+    affectsAllCaisses?: boolean;
+    caisseIds?: string[];
+  }) => request<any>('/settings/holidays', { method: 'POST', body: JSON.stringify(data) }),
+  deleteHoliday: (id: string) => request<{ success: boolean }>(`/settings/holidays/${id}`, { method: 'DELETE' }),
+
+  // Role Templates
+  getRoleTemplates: () => request<any[]>('/settings/role-templates'),
+  createRoleTemplate: (data: { code: string; name: string; description?: string; permissions: string[] }) =>
+    request<any>('/settings/role-templates', { method: 'POST', body: JSON.stringify(data) }),
+  updateRoleTemplate: (id: string, data: any) =>
+    request<any>(`/settings/role-templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRoleTemplate: (id: string) => request<{ success: boolean }>(`/settings/role-templates/${id}`, { method: 'DELETE' }),
+
+  // Regularization Rules
+  getRegularizationRules: () => request<any[]>('/settings/regularization-rules'),
+  createRegularizationRule: (data: {
+    name: string;
+    description?: string;
+    triggerCondition: string;
+    conditionValue?: Record<string, any>;
+    action: string;
+    actionConfig?: Record<string, any>;
+    priority?: number;
+  }) => request<any>('/settings/regularization-rules', { method: 'POST', body: JSON.stringify(data) }),
+  updateRegularizationRule: (id: string, data: any) =>
+    request<any>(`/settings/regularization-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRegularizationRule: (id: string) =>
+    request<{ success: boolean }>(`/settings/regularization-rules/${id}`, { method: 'DELETE' }),
 };
 
 // Comptabilité API
@@ -2385,5 +2756,408 @@ export const transactionApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+};
+
+// HR API
+export const hrApi = {
+  // Hiring Approval Workflow
+  getHiringApprovalConfig: (agenceId: string) =>
+    request<any>(`/hr/hiring-approval/config?agenceId=${agenceId}`),
+
+  setHiringApprovalConfig: (data: {
+    agenceId: string;
+    approvalLevels: Array<{ level: number; role: string; required: boolean }>;
+    minSalaryThreshold?: number;
+  }) =>
+    request<any>('/hr/hiring-approval/config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  initializeHiringApproval: (candidatureId: number, agenceId: string) =>
+    request<any>(`/hr/hiring-approval/initialize/${candidatureId}`, {
+      method: 'POST',
+      body: JSON.stringify({ agenceId }),
+    }),
+
+  submitHiringApproval: (candidatureId: number, decision: 'APPROVED' | 'REJECTED', commentaire?: string) =>
+    request<any>('/hr/hiring-approval/submit', {
+      method: 'POST',
+      body: JSON.stringify({ candidatureId, decision, commentaire }),
+    }),
+
+  getPendingHiringApprovals: (role: string, agenceId?: string) => {
+    const params = new URLSearchParams({ role });
+    if (agenceId) params.append('agenceId', agenceId);
+    return request<any[]>(`/hr/hiring-approval/pending?${params.toString()}`);
+  },
+
+  getHiringApprovalStatus: (candidatureId: number) =>
+    request<any>(`/hr/hiring-approval/status/${candidatureId}`),
+
+  // Sanction Escalation Rules
+  getEscalationRules: (agenceId?: string) => {
+    const params = agenceId ? `?agenceId=${agenceId}` : '';
+    return request<any[]>(`/hr/sanction-escalation-rules${params}`);
+  },
+
+  createEscalationRule: (data: {
+    agenceId?: string;
+    sanctionCountThreshold: number;
+    periodMonths: number;
+    sourceGravite: string;
+    escalateToGravite: string;
+    notificationRequired?: boolean;
+    autoApply?: boolean;
+  }) =>
+    request<any>('/hr/sanction-escalation-rules', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateEscalationRule: (id: string, data: Partial<{
+    sanctionCountThreshold: number;
+    periodMonths: number;
+    sourceGravite: string;
+    escalateToGravite: string;
+    notificationRequired: boolean;
+    autoApply: boolean;
+    actif: boolean;
+  }>) =>
+    request<any>(`/hr/sanction-escalation-rules/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteEscalationRule: (id: string) =>
+    request<any>(`/hr/sanction-escalation-rules/${id}`, { method: 'DELETE' }),
+
+  // Onboarding
+  getOnboardingChecklists: (agenceId?: string) => {
+    const params = agenceId ? `?agenceId=${agenceId}` : '';
+    return request<any[]>(`/hr/onboarding/checklists${params}`);
+  },
+
+  createOnboardingChecklist: (data: {
+    agenceId?: string;
+    nom: string;
+    items: Array<{ name: string; required: boolean; category?: string }>;
+  }) =>
+    request<any>('/hr/onboarding/checklists', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getOnboardingInstances: (filters?: { candidatureId?: number; employeId?: string; statut?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.candidatureId) params.append('candidatureId', String(filters.candidatureId));
+    if (filters?.employeId) params.append('employeId', filters.employeId);
+    if (filters?.statut) params.append('statut', filters.statut);
+    const q = params.toString();
+    return request<any[]>(`/hr/onboarding/instances${q ? `?${q}` : ''}`);
+  },
+
+  getOnboardingInstance: (id: string) =>
+    request<any>(`/hr/onboarding/instances/${id}`),
+
+  startOnboarding: (candidatureId: number, checklistId?: string) =>
+    request<any>('/hr/onboarding/start', {
+      method: 'POST',
+      body: JSON.stringify({ candidatureId, checklistId }),
+    }),
+
+  completeOnboardingItem: (instanceId: string, itemName: string, notes?: string) =>
+    request<any>(`/hr/onboarding/instances/${instanceId}/complete-item`, {
+      method: 'POST',
+      body: JSON.stringify({ itemName, notes }),
+    }),
+
+  uncompleteOnboardingItem: (instanceId: string, itemName: string) =>
+    request<any>(`/hr/onboarding/instances/${instanceId}/uncomplete-item`, {
+      method: 'POST',
+      body: JSON.stringify({ itemName }),
+    }),
+
+  convertToEmployee: (instanceId: string, employeeData: {
+    poste: string;
+    departementId?: string;
+    salaireBase: number;
+    dateEmbauche?: string;
+  }) =>
+    request<any>('/hr/onboarding/convert-to-employee', {
+      method: 'POST',
+      body: JSON.stringify({ instanceId, ...employeeData }),
+    }),
+
+  cancelOnboarding: (instanceId: string, reason?: string) =>
+    request<any>(`/hr/onboarding/instances/${instanceId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  // Attendance Analytics
+  getAttendanceAnalytics: (employeId: string, year?: number, month?: number) => {
+    const params = new URLSearchParams();
+    if (year) params.append('year', String(year));
+    if (month) params.append('month', String(month));
+    const q = params.toString();
+    return request<any>(`/hr/attendance/analytics/${employeId}${q ? `?${q}` : ''}`);
+  },
+
+  exportAttendance: (employeId: string, params?: { year?: number; month?: number; format?: string }) => {
+    const qp = new URLSearchParams();
+    if (params?.year) qp.append('year', String(params.year));
+    if (params?.month) qp.append('month', String(params.month));
+    if (params?.format) qp.append('format', params.format);
+    const q = qp.toString();
+    return request<any>(`/hr/attendance/export/${employeId}${q ? `?${q}` : ''}`);
+  },
+
+  // Employee Documents
+  getEmployeeDocuments: (employeId: string) =>
+    request<EmployeeDocument[]>(`/hr/employees/${employeId}/documents`),
+
+  uploadEmployeeDocument: async (employeId: string, file: File, metadata: {
+    typeDocument: string;
+    categorie?: string;
+    nom: string;
+    description?: string;
+    dateEmission?: string;
+    dateExpiration?: string;
+  }) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (value !== undefined) formData.append(key, value);
+    });
+    return request<EmployeeDocument>(`/hr/employees/${employeId}/documents`, {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set Content-Type for FormData
+    });
+  },
+
+  verifyEmployeeDocument: (documentId: string, decision: 'VERIFIED' | 'REJECTED', motifRejet?: string) =>
+    request<EmployeeDocument>(`/hr/documents/${documentId}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({ decision, motifRejet }),
+    }),
+
+  deleteEmployeeDocument: (documentId: string) =>
+    request<void>(`/hr/documents/${documentId}`, { method: 'DELETE' }),
+
+  // Formation Certificates
+  getFormationCertificates: (formationId: number) =>
+    request<FormationCertificate[]>(`/hr/formations/${formationId}/certificates`),
+
+  getEmployeeCertificates: (employeId: string) =>
+    request<FormationCertificate[]>(`/hr/employees/${employeId}/certificates`),
+
+  issueCertificate: (formationId: number, data: {
+    employeId: string;
+    employeNom: string;
+    competences?: string;
+    dateExpiration?: string;
+  }) =>
+    request<FormationCertificate>(`/hr/formations/${formationId}/certificates`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  issueBatchCertificates: (formationId: number, data?: {
+    competences?: string;
+    dateExpiration?: string;
+  }) =>
+    request<{ issued: number; certificates: FormationCertificate[] }>(`/hr/formations/${formationId}/certificates/batch`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+
+  revokeCertificate: (certificateId: string, motifRevocation: string) =>
+    request<FormationCertificate>(`/hr/certificates/${certificateId}/revoke`, {
+      method: 'PATCH',
+      body: JSON.stringify({ motifRevocation }),
+    }),
+};
+
+// Types for Employee Documents
+export interface EmployeeDocument {
+  id: string;
+  employeId: string;
+  nom: string;
+  typeDocument: string;
+  categorie: string;
+  description?: string;
+  storageKey: string;
+  bucket: string;
+  fileName: string;
+  fileSize?: number;
+  mimeType?: string;
+  dateEmission?: string;
+  dateExpiration?: string;
+  statut: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+  verifiePar?: string;
+  verifieAt?: string;
+  motifRejet?: string;
+  ajoutePar?: string;
+  createdAt: string;
+  updatedAt: string;
+  url?: string;
+}
+
+// Types for Formation Certificates
+export interface FormationCertificate {
+  id: string;
+  formationId: number;
+  employeId: string;
+  employeNom: string;
+  numeroCertificat: string;
+  titre: string;
+  dateEmission: string;
+  dateExpiration?: string;
+  competences?: string;
+  statut: 'ISSUED' | 'REVOKED' | 'EXPIRED';
+  revoquePar?: string;
+  revoqueAt?: string;
+  motifRevocation?: string;
+  fichierUrl?: string;
+  emisPar?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// NOTIFICATION TEMPLATES API
+// ============================================
+
+export interface SmsTemplate {
+  id: string;
+  code: string;
+  nom: string;
+  contenu: string;
+  placeholders: string;
+  description?: string;
+  actif: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  code: string;
+  nom: string;
+  subject: string;
+  contenuHtml: string;
+  contenuText: string;
+  placeholders: string;
+  description?: string;
+  actif: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const notificationTemplatesApi = {
+  // SMS Templates
+  getSmsTemplates: () => request<SmsTemplate[]>('/settings/sms-templates'),
+
+  getSmsTemplate: (id: string) => request<SmsTemplate>(`/settings/sms-templates/${id}`),
+
+  updateSmsTemplate: (id: string, data: Partial<Pick<SmsTemplate, 'nom' | 'contenu' | 'placeholders' | 'description' | 'actif'>>) =>
+    request<SmsTemplate>(`/settings/sms-templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // Email Templates
+  getEmailTemplates: () => request<EmailTemplate[]>('/settings/email-templates'),
+
+  getEmailTemplate: (id: string) => request<EmailTemplate>(`/settings/email-templates/${id}`),
+
+  updateEmailTemplate: (id: string, data: Partial<Pick<EmailTemplate, 'nom' | 'subject' | 'contenuHtml' | 'contenuText' | 'placeholders' | 'description' | 'actif'>>) =>
+    request<EmailTemplate>(`/settings/email-templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // Preview
+  previewTemplate: (channel: 'SMS' | 'EMAIL', code: string, sampleData: Record<string, string>) =>
+    request<{ rendered: string; subject?: string }>('/settings/templates/preview', {
+      method: 'POST',
+      body: JSON.stringify({ channel, code, sampleData }),
+    }),
+};
+
+// ============================================
+// PERMISSION ANALYTICS API
+// ============================================
+
+export interface PermissionAnalyticsConfig {
+  enabled: boolean;
+  samplingRateAllowed: number;
+  samplingRateDenied: number;
+  batchSize: number;
+  flushIntervalMs: number;
+  retentionDays: number;
+}
+
+export interface PermissionStats {
+  permissionCode: string;
+  action: string;
+  subject: string;
+  totalChecks: number;
+  allowedCount: number;
+  deniedCount: number;
+  uniqueUsers: number;
+  allowRate: number;
+  firstCheck: string;
+  lastCheck: string;
+}
+
+export interface PermissionDenial {
+  permissionCode: string;
+  deniedCount: number;
+  uniqueUsers: number;
+  lastDenied: string;
+}
+
+export interface UnusedPermission {
+  id: string;
+  code: string;
+  name: string;
+  moduleName: string;
+  createdAt: string;
+}
+
+export const permissionAnalyticsApi = {
+  getConfig: () => request<PermissionAnalyticsConfig>('/admin/permission-analytics/config'),
+
+  updateConfig: (updates: Partial<PermissionAnalyticsConfig>) =>
+    request<PermissionAnalyticsConfig>('/admin/permission-analytics/config', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    }),
+
+  getStats: () => request<PermissionStats[]>('/admin/permission-analytics/stats'),
+
+  getDenials: (limit = 10) =>
+    request<PermissionDenial[]>(`/admin/permission-analytics/denials?limit=${limit}`),
+
+  getUnused: () => request<UnusedPermission[]>('/admin/permission-analytics/unused'),
+
+  refreshStats: () =>
+    request<{ success: boolean; message: string }>('/admin/permission-analytics/refresh', {
+      method: 'POST',
+    }),
+
+  purgeLogs: (daysToKeep?: number) =>
+    request<{ success: boolean; deleted: number }>('/admin/permission-analytics/purge', {
+      method: 'POST',
+      body: JSON.stringify({ daysToKeep }),
+    }),
+
+  flushBuffer: () =>
+    request<{ success: boolean; message: string }>('/admin/permission-analytics/flush', {
+      method: 'POST',
+    }),
 };
 

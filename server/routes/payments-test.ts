@@ -4,6 +4,9 @@
  */
 
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:PaymentsTest');
 import * as storage from "../storage/mobile-money";
 import { paymentService } from "../services/mobile-money/payment-service";
 
@@ -79,7 +82,7 @@ paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
       intent: updatedIntent,
     });
   } catch (error) {
-    console.error("[Test] Simulate webhook error:", error);
+    logger.error({ err: error }, 'Test - Simulate webhook error');
     res.status(500).json({
       error: "Erreur lors de la simulation",
       message: error instanceof Error ? error.message : "Erreur inconnue",
@@ -129,7 +132,7 @@ paymentsTestRouter.post("/create-mock-intent", async (req, res) => {
       nextStep: `POST /api/payments-test/simulate-webhook avec paymentIntentId: ${intent.id}`,
     });
   } catch (error) {
-    console.error("[Test] Create mock intent error:", error);
+    logger.error({ err: error }, 'Test - Create mock intent error');
     res.status(500).json({
       error: "Erreur lors de la création",
       message: error instanceof Error ? error.message : "Erreur inconnue",

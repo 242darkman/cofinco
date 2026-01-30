@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
-import { transactionEpargneApi, compteEpargneApi } from '../../../lib/api-client';
+import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
@@ -148,38 +148,36 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
     setLoading(true);
 
     try {
-      const montantTransaction = type === 'Retrait' ? -montantNum : montantNum;
-      // For pending activation, start from 0
-      const calculatedNouveauSolde = actualBalance + montantTransaction;
-
-      // Sanitize user inputs
+      // Sanitize user inputs for observations
       const sanitizedReference = sanitizeInput(paymentRef || formData.reference);
       const sanitizedDescription = sanitizeInput(formData.description) ||
         (isPendingActivation
           ? `Encaissement dépôt initial: ${montantNum.toLocaleString('fr-FR')} FCFA`
           : `${type} de ${montantNum.toLocaleString('fr-FR')} FCFA via ${formData.mode_paiement}`);
 
-      await transactionEpargneApi.create({
-        compte_id: compte.id,
-        type_transaction: type,
-        montant: montantTransaction,
-        solde_avant: actualBalance,
-        solde_apres: calculatedNouveauSolde,
-        reference: sanitizedReference,
-        mode_paiement: formData.mode_paiement,
-        operateur_mobile: operator || selectedOperator || null,
-        description: sanitizedDescription
-      });
+      const operatorInfo = (operator || selectedOperator) ? `Opérateur: ${operator || selectedOperator}` : '';
+      const observations = [sanitizedDescription, sanitizedReference, operatorInfo].filter(Boolean).join(' - ');
 
-      // Update account - for pending activation, also activate the account
+      // Single atomic call via ledger-backed endpoint
       if (isPendingActivation && type === 'Dépôt') {
-        await compteEpargneApi.update(compte.id, {
-          solde: calculatedNouveauSolde,
-          statut: StatutCompte.ACTIVE // Activate the account
+        await compteEpargneApi.depotInitial(compte.id, {
+          montant: montantNum,
+          sessionCaisseId: undefined, // Backend will auto-resolve from user session
         });
         toast.success(`Compte activé ! Dépôt de ${formatMoney(montantNum)} encaissé avec succès`);
+      } else if (type === 'Dépôt') {
+        await compteEpargneApi.depot(compte.id, {
+          montant: montantNum,
+          methodePaiement: formData.mode_paiement,
+          observations,
+        });
+        toast.success(`${type} de ${formatMoney(montantNum)} effectué avec succès`);
       } else {
-        await compteEpargneApi.update(compte.id, { solde: calculatedNouveauSolde });
+        await compteEpargneApi.retrait(compte.id, {
+          montant: montantNum,
+          methodePaiement: formData.mode_paiement,
+          observations,
+        });
         toast.success(`${type} de ${formatMoney(montantNum)} effectué avec succès`);
       }
 
@@ -192,7 +190,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
       setLoading(false);
       setShowPaymentModal(false);
     }
-  }, [compte, type, montantNum, actualBalance, isPendingActivation, formData, selectedOperator, onSuccess]);
+  }, [compte, type, montantNum, isPendingActivation, formData, selectedOperator, onSuccess]);
 
   const handlePaymentValidation = useCallback((paymentRef: string, operator?: string) => {
     processTransaction(paymentRef, operator);

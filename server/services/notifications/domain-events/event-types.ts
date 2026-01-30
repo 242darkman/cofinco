@@ -25,6 +25,10 @@ export type DomainEventType =
   | "HR_LEAVE_REQUESTED"
   | "HR_LEAVE_APPROVED"
   | "HR_LEAVE_REJECTED"
+  // HR Sanctions
+  | "HR_SANCTION_CREATED"
+  | "HR_SANCTION_NOTIFIED"
+  | "HR_SANCTION_FINALIZED"
   // Tontine lifecycle
   | "TONTINE_MEMBER_JOINED"
   | "TONTINE_CONTRIBUTION_RECEIVED"
@@ -259,6 +263,38 @@ export interface ScheduledTransferFailedData {
   retryCount: number;
   maxRetries: number;
   disabled: boolean;
+}
+
+// HR Sanctions
+
+export interface HrSanctionCreatedData {
+  sanctionId: number;
+  employeId: string;
+  employeNom: string;
+  type: string;
+  gravite: string;
+  motif: string;
+  emetteurId?: string;
+  agenceId?: string;
+}
+
+export interface HrSanctionNotifiedData {
+  sanctionId: number;
+  employeId: string;
+  employeNom: string;
+  type: string;
+  gravite: string;
+  agenceId?: string;
+}
+
+export interface HrSanctionFinalizedData {
+  sanctionId: number;
+  employeId: string;
+  employeNom: string;
+  type: string;
+  gravite: string;
+  finalizedBy?: string;
+  agenceId?: string;
 }
 
 export interface HrLeaveRequestedData {

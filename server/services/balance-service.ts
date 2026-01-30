@@ -20,7 +20,9 @@ import {
   transactionsCompte,
   contributionsTontine,
   tontineDistributionRequests,
-  operationsCaisse
+  operationsCaisse,
+  transfertsCoffreCaisse,
+  transfertsInterCoffres,
 } from "@shared/schema";
 import { eq, sql, and, isNull, desc, sum } from "drizzle-orm";
 import type {
@@ -36,6 +38,9 @@ import type {
 import { RECONCILIATION_THRESHOLDS } from "@shared/types/balances";
 import { getWsInstance } from "../ws-server";
 import { randomUUID } from "crypto";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('BalanceService');
 
 class BalanceService {
 
@@ -408,7 +413,12 @@ class BalanceService {
     const [calculated] = await db.select({
       total: sql<number>`COALESCE(SUM(
         CASE
-          WHEN ${transactionsCompte.typePaiement} IN ('DEPOSIT_CASH', 'DEPOSIT_MM', 'DEPOSIT_TRANSFER', 'TRANSFER_IN', 'INTEREST', 'BONUS', 'SYSTEM_CREDIT')
+          WHEN ${transactionsCompte.typePaiement} IN (
+            'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED',
+            'TRANSFER_IN', 'INTEREST_PAYMENT', 'INITIAL_DEPOSIT',
+            'CREDIT_DISBURSEMENT', 'TONTINE_WITHDRAWAL', 'COFFRE_TO_CAISSE',
+            'COFFRE_TRANSIT_IN', 'SESSION_SURPLUS', 'ADJUSTMENT'
+          )
           THEN CAST(${transactionsCompte.montant} AS DECIMAL)
           ELSE -CAST(${transactionsCompte.montant} AS DECIMAL)
         END
@@ -474,7 +484,11 @@ class BalanceService {
       total: sql<number>`
         ${session.montantOuverture || 0}::numeric + COALESCE(SUM(
           CASE
-            WHEN ${operationsCaisse.typeOperation} IN ('DEPOT', 'ENCAISSEMENT', 'APPROVISIONNEMENT')
+            WHEN ${operationsCaisse.typeOperation} IN (
+              'SAVINGS_DEPOSIT', 'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED',
+              'SAFE_SUPPLY', 'CREDIT_REPAYMENT', 'LOAN_REPAYMENT', 'TONTINE_CONTRIBUTION',
+              'MISC_COLLECTION', 'INITIAL_DEPOSIT'
+            )
             THEN CAST(${operationsCaisse.montant} AS DECIMAL)
             ELSE -CAST(${operationsCaisse.montant} AS DECIMAL)
           END
@@ -555,6 +569,74 @@ class BalanceService {
   }
 
   /**
+   * Réconcilie le solde d'un coffre-fort avec les transferts exécutés
+   */
+  async reconcileCoffre(coffreId: string): Promise<ReconciliationResult> {
+    const [coffre] = await db.select({
+      id: coffresForts.id,
+      code: coffresForts.code,
+      solde: coffresForts.solde,
+    })
+    .from(coffresForts)
+    .where(eq(coffresForts.id, coffreId));
+
+    if (!coffre) {
+      throw new Error(`Coffre not found: ${coffreId}`);
+    }
+
+    const persistedBalance = Number(coffre.solde || 0);
+
+    // Calculate balance from coffre-caisse transfers (EXECUTED only)
+    // CAISSE_VERS_COFFRE = inflow, COFFRE_VERS_CAISSE = outflow
+    const [coffreCaisseResult] = await db.select({
+      inflow: sql<number>`COALESCE(SUM(CASE WHEN ${transfertsCoffreCaisse.typeTransfert} = 'CAISSE_VERS_COFFRE' THEN CAST(${transfertsCoffreCaisse.montant} AS DECIMAL) ELSE 0 END), 0)`,
+      outflow: sql<number>`COALESCE(SUM(CASE WHEN ${transfertsCoffreCaisse.typeTransfert} = 'COFFRE_VERS_CAISSE' THEN CAST(${transfertsCoffreCaisse.montant} AS DECIMAL) ELSE 0 END), 0)`,
+    })
+    .from(transfertsCoffreCaisse)
+    .where(and(
+      eq(transfertsCoffreCaisse.coffreId, coffreId),
+      eq(transfertsCoffreCaisse.statut, 'EXECUTED' as any)
+    ));
+
+    // Calculate from inter-coffre transfers (RECEIVED only)
+    const [interCoffreInflow] = await db.select({
+      total: sql<number>`COALESCE(SUM(CAST(${transfertsInterCoffres.montant} AS DECIMAL)), 0)`,
+    })
+    .from(transfertsInterCoffres)
+    .where(and(
+      eq(transfertsInterCoffres.coffreDestinationId, coffreId),
+      sql`${transfertsInterCoffres.statut} IN ('RECEIVED', 'RECEIVED_WITH_DISCREPANCY')`
+    ));
+
+    const [interCoffreOutflow] = await db.select({
+      total: sql<number>`COALESCE(SUM(CAST(${transfertsInterCoffres.montant} AS DECIMAL)), 0)`,
+    })
+    .from(transfertsInterCoffres)
+    .where(and(
+      eq(transfertsInterCoffres.coffreSourceId, coffreId),
+      sql`${transfertsInterCoffres.statut} IN ('RECEIVED', 'RECEIVED_WITH_DISCREPANCY')`
+    ));
+
+    const calculatedBalance =
+      Number(coffreCaisseResult?.inflow || 0) - Number(coffreCaisseResult?.outflow || 0) +
+      Number(interCoffreInflow?.total || 0) - Number(interCoffreOutflow?.total || 0);
+
+    const discrepancy = Math.abs(persistedBalance - calculatedBalance);
+
+    return {
+      entityType: 'coffre',
+      entityId: coffreId,
+      entityRef: coffre.code,
+      persistedBalance,
+      calculatedBalance,
+      discrepancy,
+      hasDiscrepancy: discrepancy > RECONCILIATION_THRESHOLDS.MINOR,
+      severity: this.getSeverity(discrepancy),
+      checkedAt: new Date(),
+    };
+  }
+
+  /**
    * Réconciliation complète de toutes les entités
    */
   async runFullReconciliation(agenceId?: string): Promise<ReconciliationReport> {
@@ -574,7 +656,7 @@ class BalanceService {
           discrepancies.push(result);
         }
       } catch (err) {
-        console.error(`Reconciliation error for compte ${compte.id}:`, err);
+        logger.error({ compteId: compte.id, err }, 'Reconciliation error for compte');
       }
     }
 
@@ -590,7 +672,7 @@ class BalanceService {
           discrepancies.push(result);
         }
       } catch (err) {
-        console.error(`Reconciliation error for session ${session.id}:`, err);
+        logger.error({ sessionId: session.id, err }, 'Reconciliation error for session');
       }
     }
 
@@ -606,7 +688,23 @@ class BalanceService {
           discrepancies.push(result);
         }
       } catch (err) {
-        console.error(`Reconciliation error for tontine ${tontine.id}:`, err);
+        logger.error({ tontineId: tontine.id, err }, 'Reconciliation error for tontine');
+      }
+    }
+
+    // 4. Tous les coffres-forts actifs
+    const activeCoffres = await db.select({ id: coffresForts.id })
+      .from(coffresForts)
+      .where(eq(coffresForts.statut, 'ACTIVE' as any));
+
+    for (const coffre of activeCoffres) {
+      try {
+        const result = await this.reconcileCoffre(coffre.id);
+        if (result.hasDiscrepancy) {
+          discrepancies.push(result);
+        }
+      } catch (err) {
+        logger.error({ coffreId: coffre.id, err }, 'Reconciliation error for coffre');
       }
     }
 
@@ -631,7 +729,7 @@ class BalanceService {
       summary.totalDiscrepancyAmount += d.discrepancy;
     }
 
-    const totalChecked = allComptes.length + activeSessions.length + activeTontines.length;
+    const totalChecked = allComptes.length + activeSessions.length + activeTontines.length + activeCoffres.length;
     summary.ok = totalChecked - discrepancies.length;
 
     return {
@@ -685,7 +783,13 @@ class BalanceService {
       timestamp: new Date().toISOString()
     };
 
-    console.log(`[BALANCE_UPDATED] ${params.entityType}:${params.entityId} = ${params.newBalance} (Δ${payload.delta}) ref:${params.mouvementRef}`);
+    logger.info({
+      entityType: params.entityType,
+      entityId: params.entityId,
+      newBalance: params.newBalance,
+      delta: payload.delta,
+      mouvementRef: params.mouvementRef,
+    }, 'Balance updated');
 
     // Broadcast global
     wsInstance.broadcast({

@@ -1,19 +1,24 @@
 import type { Express } from "express";
-import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences, userRoles, employes } from "@shared/schema";
+import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences, userRoles, employes, activeSessions } from "@shared/schema";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
-import { loginUser, registerUser, requireAuth, hashPassword, comparePasswords } from "../auth";
+import { loginUser, registerUser, requireAuth, hashPassword, comparePasswords, SESSION_CONFIG } from "../auth";
 import { attachAbility, requireAbility, requireResetPassword } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { logAudit, logLoginAttempt, getLoginLockoutInfo, validatePassword, getPasswordRequirements, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
-import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions, isSessionValid, markSessionInactive, markUserSessionsInactive, sessionGuard } from "../session-tracker";
+import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions, isSessionValid, markSessionInactive, markUserSessionsInactive, sessionGuard, enforceSessionLimit, countUserSessions, getUserSessions, getMaxSessionsPerUser } from "../session-tracker";
 import { getPermissionsForUser } from "../services/permissions-service";
+import refreshTokenService, { REFRESH_TOKEN_COOKIE_NAME } from "../services/refresh-token-service";
+import { requestOtp, verifyOtp, OtpRateLimitError } from "../services/notifications/otp/otp-service";
 import { z } from "zod";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { db } from "../db";
 import { StatutUser } from "@shared/enum/status-constants";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { StorageService } from "../services/storage-service";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Auth');
 
 /**
  * Récupérer le caissePin d'un utilisateur depuis la table employes.
@@ -168,7 +173,7 @@ async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string;
 export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, password, deviceFingerprint, deviceFingerprintPartial, rememberMe } = req.body;
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
       }
@@ -240,7 +245,7 @@ export function registerAuthRoutes(app: Express) {
            });
         }
       } catch (e) {
-        console.error("Failed to fallback to WS notification:", e);
+        logger.error({ err: e }, 'Failed to send WS notification');
       }
       
       // Récupérer le rôle effectif depuis userRoles (Architecture V3)
@@ -265,7 +270,7 @@ export function registerAuthRoutes(app: Express) {
         await new Promise<void>((resolve, reject) => {
           req.session.save((err) => {
             if (err) {
-              console.error("Session save error:", err);
+              logger.error({ err }, 'Session save error');
               reject(err);
             } else {
               resolve();
@@ -274,12 +279,31 @@ export function registerAuthRoutes(app: Express) {
         });
       } catch (sessionErr) {
         // Log but don't fail the login - session might still work
-        console.error("Warning: Session save failed, but continuing login:", sessionErr);
+        logger.warn({ err: sessionErr }, 'Session save failed, but continuing login');
+      }
+
+      // Enforce session limit (max 3 sessions per user)
+      // If limit reached, oldest session(s) will be terminated
+      const limitResult = await enforceSessionLimit(user.id);
+      if (limitResult.sessionsTerminated > 0) {
+        logger.info({
+          userId: user.id,
+          terminated: limitResult.sessionsTerminated,
+          devices: limitResult.terminatedSessions.map(s => `${s.browser}/${s.deviceType}`).join(', '),
+        }, 'Session limit enforced - old sessions terminated');
       }
 
       // Create session tracking record with session expiry (24h from now)
+      // Include device fingerprint for stolen cookie detection
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await createSessionRecord(req.sessionID, user.id, req, expiresAt);
+      await createSessionRecord(
+        req.sessionID,
+        user.id,
+        req,
+        expiresAt,
+        deviceFingerprint,
+        deviceFingerprintPartial
+      );
 
       // Log successful login in audit
       await logAudit(
@@ -295,15 +319,668 @@ export function registerAuthRoutes(app: Express) {
       // Charger les permissions pour inclure dans la réponse (évite race condition)
       const permissionsData = await getPermissionsForUser(user.id, effectiveRole);
 
+      // Handle "Remember Me" - create refresh token for persistent sessions
+      let rememberMeInfo: { expiresAt: Date } | null = null;
+      if (rememberMe) {
+        const refreshTokenResult = await refreshTokenService.create(user.id, req);
+
+        // Set refresh token as HTTP-only cookie
+        res.cookie(
+          REFRESH_TOKEN_COOKIE_NAME,
+          refreshTokenResult.token,
+          refreshTokenService.getCookieOptions(refreshTokenResult.expiresAt)
+        );
+
+        rememberMeInfo = { expiresAt: refreshTokenResult.expiresAt };
+        logger.info({ userId: user.id }, 'Created remember-me refresh token');
+      }
+
       res.json({
         user: req.session.user,
         message: "Login successful",
         mustChangePassword: user.mustChangePassword || false,
-        permissions: permissionsData // Inclus pour éviter un second appel API
+        permissions: permissionsData, // Inclus pour éviter un second appel API
+        rememberMe: rememberMeInfo,
       });
     } catch (error) {
-      console.error("Login error:", error);
+      logger.error({ err: error }, 'Login error');
       res.status(500).json({ message: "Internal server error during login" });
+    }
+  });
+
+  // ============================================
+  // SESSION INFO & EXTENSION
+  // ============================================
+
+  /**
+   * GET /api/auth/session-info
+   * Returns session expiration info for the client to display warnings
+   */
+  app.get("/api/auth/session-info", requireAuth, async (req, res) => {
+    try {
+      const sessionId = req.sessionID;
+      const [session] = await db.select({
+        expiresAt: activeSessions.expiresAt,
+        lastActivity: activeSessions.lastActivity,
+        loginAt: activeSessions.loginAt,
+      })
+      .from(activeSessions)
+      .where(eq(activeSessions.sessionId, sessionId));
+
+      if (!session) {
+        return res.status(404).json({ error: "Session non trouvée" });
+      }
+
+      // Calculate time remaining (cookie-based, 2 hour rolling for microfinance)
+      const cookieMaxAge = SESSION_CONFIG.INACTIVITY_TIMEOUT_MS;
+      const lastActivity = new Date(session.lastActivity).getTime();
+      const expiresAt = lastActivity + cookieMaxAge;
+      const now = Date.now();
+      const remainingMs = Math.max(0, expiresAt - now);
+
+      res.json({
+        expiresAt: new Date(expiresAt).toISOString(),
+        remainingMs,
+        remainingMinutes: Math.floor(remainingMs / 60000),
+        lastActivity: session.lastActivity,
+        loginAt: session.loginAt,
+        warningThresholdMs: SESSION_CONFIG.WARNING_BEFORE_EXPIRY_MS,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Error getting session info');
+      res.status(500).json({ error: "Erreur lors de la récupération des infos de session" });
+    }
+  });
+
+  /**
+   * POST /api/auth/extend-session
+   * Extends the session by touching it (updates lastActivity)
+   */
+  app.post("/api/auth/extend-session", requireAuth, async (req, res) => {
+    try {
+      const sessionId = req.sessionID;
+      const userId = req.session.user!.id;
+
+      // Update session activity (this extends the rolling session)
+      await db.update(activeSessions)
+        .set({ lastActivity: new Date() })
+        .where(eq(activeSessions.sessionId, sessionId));
+
+      // Touch the express session to refresh the cookie
+      req.session.touch();
+
+      const cookieMaxAge = SESSION_CONFIG.INACTIVITY_TIMEOUT_MS;
+      const newExpiresAt = Date.now() + cookieMaxAge;
+      const remainingMinutes = Math.floor(cookieMaxAge / 60000);
+
+      logger.info({ userId, sessionId: sessionId.slice(0, 8) }, 'Session extended by user');
+
+      res.json({
+        success: true,
+        message: `Session prolongée de ${remainingMinutes} minutes`,
+        expiresAt: new Date(newExpiresAt).toISOString(),
+        remainingMs: cookieMaxAge,
+        remainingMinutes,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Error extending session');
+      res.status(500).json({ error: "Erreur lors de la prolongation de la session" });
+    }
+  });
+
+  // ============================================
+  // REFRESH TOKEN (Remember Me)
+  // ============================================
+
+  /**
+   * POST /api/auth/refresh
+   * Uses a refresh token to create a new session (for "Remember Me" functionality)
+   * The refresh token is sent as an HTTP-only cookie
+   */
+  app.post("/api/auth/refresh", async (req, res) => {
+    try {
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+      if (!refreshToken) {
+        return res.status(401).json({
+          error: "no_refresh_token",
+          message: "Aucun token de rafraîchissement trouvé",
+        });
+      }
+
+      // Use the refresh token (this rotates it)
+      const result = await refreshTokenService.use(refreshToken);
+
+      if (!result.success) {
+        // Clear the invalid cookie
+        res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/api/auth' });
+
+        return res.status(401).json({
+          error: result.error,
+          message: result.error === 'token_expired'
+            ? "Token expiré - veuillez vous reconnecter"
+            : result.error === 'token_revoked'
+            ? "Session révoquée pour raison de sécurité"
+            : "Token invalide",
+        });
+      }
+
+      // Get user data to create a new session
+      const [user] = await db.select()
+        .from(users)
+        .where(eq(users.id, result.userId!));
+
+      if (!user) {
+        res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/api/auth' });
+        return res.status(401).json({ error: "user_not_found" });
+      }
+
+      // Get user's effective role
+      const [primaryRole] = await db.select({ role: userRoles.role })
+        .from(userRoles)
+        .where(and(
+          eq(userRoles.userId, user.id),
+          eq(userRoles.isPrimary, true)
+        ));
+
+      const effectiveRole = normalizeRole(primaryRole?.role) || SystemRole.CLIENT;
+
+      // Get user's primary agence
+      const primaryAgence = await resolvePrimaryAgence(user.id);
+
+      // Create a new express session
+      req.session.regenerate(async (err) => {
+        if (err) {
+          logger.error({ err }, 'Session regeneration failed during refresh');
+          res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/api/auth' });
+          return res.status(500).json({ error: "session_error" });
+        }
+
+        // Set session data
+        req.session.userId = user.id;
+        req.session.user = {
+          id: user.id,
+          username: user.username || '',
+          email: user.email || '',
+          nom: user.nom,
+          prenom: user.prenom,
+          role: effectiveRole,
+          statut: user.statut,
+          agence: primaryAgence?.agenceNom || null,
+          agenceId: primaryAgence?.agenceId,
+          photoProfile: user.photoProfile,
+          mustChangePassword: user.mustChangePassword || false,
+        };
+
+        // Create session tracking record
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const { deviceFingerprint, deviceFingerprintPartial } = req.body || {};
+        await createSessionRecord(
+          req.sessionID,
+          user.id,
+          req,
+          expiresAt,
+          deviceFingerprint,
+          deviceFingerprintPartial
+        );
+
+        // Set new refresh token cookie
+        res.cookie(
+          REFRESH_TOKEN_COOKIE_NAME,
+          result.newToken!,
+          refreshTokenService.getCookieOptions(result.newExpiresAt!)
+        );
+
+        // Load permissions
+        const permissionsData = await getPermissionsForUser(user.id, effectiveRole);
+
+        logger.info({ userId: user.id }, 'Session refreshed via remember-me token');
+
+        res.json({
+          user: req.session.user,
+          message: "Session restaurée",
+          permissions: permissionsData,
+          rememberMe: { expiresAt: result.newExpiresAt },
+        });
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Error refreshing session');
+      res.status(500).json({ error: "Erreur lors du rafraîchissement de la session" });
+    }
+  });
+
+  /**
+   * POST /api/auth/revoke-remember-me
+   * Revokes the current remember-me token (logout from persistent session)
+   */
+  app.post("/api/auth/revoke-remember-me", async (req, res) => {
+    try {
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+      if (refreshToken) {
+        await refreshTokenService.revoke(refreshToken, 'user_logout');
+      }
+
+      res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/api/auth' });
+
+      res.json({ success: true, message: "Remember-me révoqué" });
+    } catch (error) {
+      logger.error({ err: error }, 'Error revoking remember-me');
+      res.status(500).json({ error: "Erreur lors de la révocation" });
+    }
+  });
+
+  // ============================================
+  // FORGOT PASSWORD (Self-service password reset)
+  // ============================================
+
+  /**
+   * POST /api/auth/forgot-password
+   * Requests a password reset OTP to be sent via SMS or email
+   * Public endpoint (no auth required)
+   */
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { identifier } = req.body;
+
+      if (!identifier) {
+        return res.status(400).json({
+          error: "identifier_required",
+          message: "Veuillez fournir votre email ou numéro de téléphone",
+        });
+      }
+
+      // Find user by email or phone
+      const [user] = await db.select({
+        id: users.id,
+        email: users.email,
+        telephone: users.telephone,
+        nom: users.nom,
+        prenom: users.prenom,
+        statut: users.statut,
+        canLogin: users.canLogin,
+      })
+      .from(users)
+      .where(
+        identifier.includes('@')
+          ? eq(users.email, identifier)
+          : eq(users.telephone, identifier)
+      );
+
+      // Always return success to prevent user enumeration
+      // But only send OTP if user exists and is active
+      if (!user || user.statut !== StatutUser.ACTIVE || !user.canLogin) {
+        logger.info({ identifier: identifier.slice(0, 5) + '***' }, 'Password reset requested for non-existent/inactive user');
+        // Delay response to prevent timing attacks
+        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+        return res.json({
+          success: true,
+          message: "Si un compte existe avec ces informations, un code de vérification sera envoyé.",
+        });
+      }
+
+      // Determine destination (prefer email, fallback to phone)
+      const destination = user.email || user.telephone;
+      if (!destination) {
+        logger.warn({ userId: user.id }, 'User has no email or phone for password reset');
+        return res.json({
+          success: true,
+          message: "Si un compte existe avec ces informations, un code de vérification sera envoyé.",
+        });
+      }
+
+      const channel = user.email ? 'EMAIL' : 'SMS';
+
+      // Request OTP
+      const otpResult = await requestOtp({
+        userId: user.id,
+        destination,
+        channel,
+        purpose: 'PASSWORD_RESET',
+        templatePayload: {
+          userName: `${user.prenom || ''} ${user.nom}`.trim(),
+        },
+        ipAddress: req.ip,
+      });
+
+      logger.info({
+        userId: user.id,
+        channel,
+        destinationMasked: destination.slice(0, 3) + '***',
+      }, 'Password reset OTP sent');
+
+      res.json({
+        success: true,
+        message: "Si un compte existe avec ces informations, un code de vérification sera envoyé.",
+        // Only expose these in development
+        ...(process.env.NODE_ENV !== 'production' ? {
+          debug: {
+            otpId: otpResult.otpId,
+            code: otpResult.debugCode,
+            expiresAt: otpResult.expiresAt,
+          }
+        } : {}),
+      });
+    } catch (error) {
+      if (error instanceof OtpRateLimitError) {
+        return res.status(429).json({
+          error: "rate_limited",
+          message: error.message,
+        });
+      }
+      logger.error({ err: error }, 'Forgot password error');
+      res.status(500).json({
+        error: "server_error",
+        message: "Une erreur est survenue. Veuillez réessayer plus tard.",
+      });
+    }
+  });
+
+  /**
+   * POST /api/auth/reset-password
+   * Resets password using OTP verification
+   * Public endpoint (no auth required)
+   */
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { identifier, code, newPassword } = req.body;
+
+      if (!identifier || !code || !newPassword) {
+        return res.status(400).json({
+          error: "missing_fields",
+          message: "Tous les champs sont requis (identifiant, code, nouveau mot de passe)",
+        });
+      }
+
+      // Validate password complexity
+      const requirements = await getPasswordRequirements();
+      const validation = validatePassword(newPassword, requirements);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: "password_weak",
+          message: "Le mot de passe ne respecte pas les exigences de sécurité",
+          details: validation.errors,
+        });
+      }
+
+      // Find user
+      const [user] = await db.select({
+        id: users.id,
+        email: users.email,
+        telephone: users.telephone,
+        nom: users.nom,
+        prenom: users.prenom,
+        username: users.username,
+        statut: users.statut,
+      })
+      .from(users)
+      .where(
+        identifier.includes('@')
+          ? eq(users.email, identifier)
+          : eq(users.telephone, identifier)
+      );
+
+      if (!user) {
+        return res.status(400).json({
+          error: "invalid_code",
+          message: "Code invalide ou expiré",
+        });
+      }
+
+      // Determine destination for OTP verification
+      const destination = user.email || user.telephone;
+      if (!destination) {
+        return res.status(400).json({
+          error: "invalid_code",
+          message: "Code invalide ou expiré",
+        });
+      }
+
+      // Verify OTP
+      const otpResult = await verifyOtp({
+        destination,
+        purpose: 'PASSWORD_RESET',
+        code,
+      });
+
+      if (!otpResult.valid) {
+        return res.status(400).json({
+          error: "invalid_code",
+          message: otpResult.error || "Code invalide ou expiré",
+          attemptsRemaining: otpResult.attemptsRemaining,
+        });
+      }
+
+      // OTP verified - update password
+      const hashedPassword = await hashPassword(newPassword);
+      await db.update(users)
+        .set({
+          password: hashedPassword,
+          mustChangePassword: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+
+      // SECURITY: Invalidate ALL sessions for this user
+      await markUserSessionsInactive(user.id);
+
+      // Revoke ALL refresh tokens
+      await refreshTokenService.revokeUser(user.id, 'password_reset');
+
+      // Audit log
+      await logAudit(
+        req,
+        "PASSWORD_RESET_SELF",
+        "auth",
+        user.id,
+        { method: 'otp', ip: req.ip },
+        "success",
+        "critical"
+      );
+
+      // Domain event for notification
+      dispatchDomainEvent({
+        type: "USER_PASSWORD_CHANGED",
+        data: {
+          userId: user.id,
+          userName: [user.nom, user.prenom].filter(Boolean).join(" ") || user.username || "",
+          email: user.email || undefined,
+          resetMethod: 'self_service',
+        },
+        timestamp: new Date(),
+      });
+
+      logger.info({ userId: user.id }, 'Password reset completed via self-service');
+
+      res.json({
+        success: true,
+        message: "Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter.",
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Reset password error');
+      res.status(500).json({
+        error: "server_error",
+        message: "Une erreur est survenue. Veuillez réessayer plus tard.",
+      });
+    }
+  });
+
+  /**
+   * GET /api/auth/my-sessions
+   * Returns all active sessions for the current user
+   */
+  app.get("/api/auth/my-sessions", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const currentSessionId = req.sessionID;
+
+      const sessions = await db.select({
+        id: activeSessions.id,
+        sessionId: activeSessions.sessionId,
+        deviceType: activeSessions.deviceType,
+        browser: activeSessions.browser,
+        os: activeSessions.os,
+        ipAddress: activeSessions.ipAddress,
+        location: activeSessions.location,
+        loginAt: activeSessions.loginAt,
+        lastActivity: activeSessions.lastActivity,
+        isActive: activeSessions.isActive,
+      })
+      .from(activeSessions)
+      .where(and(
+        eq(activeSessions.userId, userId),
+        eq(activeSessions.isActive, true)
+      ))
+      .orderBy(desc(activeSessions.lastActivity));
+
+      // Mark which session is the current one
+      const sessionsWithCurrent = sessions.map(s => ({
+        ...s,
+        isCurrent: s.sessionId === currentSessionId,
+        // Mask session ID for security (show only first 8 chars)
+        sessionIdMasked: s.sessionId.slice(0, 8) + '...',
+      }));
+
+      res.json({
+        sessions: sessionsWithCurrent,
+        count: sessions.length,
+        maxAllowed: getMaxSessionsPerUser(),
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Error getting user sessions');
+      res.status(500).json({ error: "Erreur lors de la récupération des sessions" });
+    }
+  });
+
+  /**
+   * DELETE /api/auth/sessions/:sessionId
+   * Revoke a specific session (user can only revoke their own sessions)
+   */
+  app.delete("/api/auth/sessions/:sessionId", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const { sessionId } = req.params;
+      const currentSessionId = req.sessionID;
+
+      // Cannot revoke current session (use logout instead)
+      if (sessionId === currentSessionId) {
+        return res.status(400).json({
+          error: "Impossible de révoquer la session actuelle. Utilisez la déconnexion.",
+        });
+      }
+
+      // Verify the session belongs to the current user
+      const [session] = await db.select({
+        id: activeSessions.id,
+        userId: activeSessions.userId,
+      })
+      .from(activeSessions)
+      .where(eq(activeSessions.sessionId, sessionId));
+
+      if (!session) {
+        return res.status(404).json({ error: "Session non trouvée" });
+      }
+
+      if (session.userId !== userId) {
+        return res.status(403).json({ error: "Vous ne pouvez pas révoquer cette session" });
+      }
+
+      // Mark session as inactive
+      await db.update(activeSessions)
+        .set({ isActive: false })
+        .where(eq(activeSessions.sessionId, sessionId));
+
+      // Notify via WebSocket
+      try {
+        const { getWsInstance } = await import('../ws-server');
+        const ws = getWsInstance();
+        if (ws) {
+          ws.sendToUser(userId, {
+            type: 'SESSION_INVALID',
+            payload: {
+              reason: 'session_revoked',
+              message: 'Cette session a été révoquée depuis un autre appareil.',
+              sessionId,
+            }
+          });
+        }
+      } catch {
+        // WebSocket notification is best-effort
+      }
+
+      logger.info({ userId, revokedSessionId: sessionId.slice(0, 8) }, 'Session revoked by user');
+
+      res.json({ success: true, message: "Session révoquée avec succès" });
+    } catch (error) {
+      logger.error({ err: error }, 'Error revoking session');
+      res.status(500).json({ error: "Erreur lors de la révocation de la session" });
+    }
+  });
+
+  /**
+   * DELETE /api/auth/sessions
+   * Revoke all sessions except the current one (logout everywhere else)
+   */
+  app.delete("/api/auth/sessions", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const currentSessionId = req.sessionID;
+
+      // Get all other sessions
+      const otherSessions = await db.select({ sessionId: activeSessions.sessionId })
+        .from(activeSessions)
+        .where(and(
+          eq(activeSessions.userId, userId),
+          eq(activeSessions.isActive, true),
+          sql`${activeSessions.sessionId} != ${currentSessionId}`
+        ));
+
+      if (otherSessions.length === 0) {
+        return res.json({
+          success: true,
+          message: "Aucune autre session à révoquer",
+          count: 0,
+        });
+      }
+
+      // Mark all other sessions as inactive
+      await db.update(activeSessions)
+        .set({ isActive: false })
+        .where(and(
+          eq(activeSessions.userId, userId),
+          sql`${activeSessions.sessionId} != ${currentSessionId}`
+        ));
+
+      // Notify via WebSocket
+      try {
+        const { getWsInstance } = await import('../ws-server');
+        const ws = getWsInstance();
+        if (ws) {
+          for (const session of otherSessions) {
+            ws.sendToUser(userId, {
+              type: 'SESSION_INVALID',
+              payload: {
+                reason: 'logout_everywhere',
+                message: 'Vous avez été déconnecté de tous les autres appareils.',
+                sessionId: session.sessionId,
+              }
+            });
+          }
+        }
+      } catch {
+        // WebSocket notification is best-effort
+      }
+
+      logger.info({ userId, count: otherSessions.length }, 'All other sessions revoked by user');
+
+      res.json({
+        success: true,
+        message: `${otherSessions.length} session(s) révoquée(s)`,
+        count: otherSessions.length,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Error revoking all sessions');
+      res.status(500).json({ error: "Erreur lors de la révocation des sessions" });
     }
   });
 
@@ -328,6 +1005,13 @@ export function registerAuthRoutes(app: Express) {
       await deleteSessionRecord(sessionId);
     }
 
+    // Revoke any refresh token (remember-me)
+    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+    if (refreshToken) {
+      await refreshTokenService.revoke(refreshToken, 'user_logout');
+    }
+    res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/api/auth' });
+
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Failed to logout" });
@@ -342,11 +1026,11 @@ export function registerAuthRoutes(app: Express) {
     // Validate session is still active in database
     const validity = await isSessionValid(req.sessionID);
     if (!validity.valid) {
-      console.log(`[AUTH] Session ${req.sessionID} invalid: ${validity.reason}`);
+      logger.warn({ sessionId: req.sessionID, reason: validity.reason }, 'Session invalid');
 
       // Destroy the session
       req.session.destroy((err) => {
-        if (err) console.error('[AUTH] Error destroying invalid session:', err);
+        if (err) logger.error({ err }, 'Error destroying invalid session');
       });
 
       return res.status(401).json({
@@ -366,7 +1050,7 @@ export function registerAuthRoutes(app: Express) {
             await new Promise<void>((resolve) => req.session.save(() => resolve()));
           }
        } catch (e) {
-         console.error("Session repair failed:", e);
+         logger.error({ err: e }, 'Session repair failed');
        }
     }
 
@@ -461,7 +1145,7 @@ export function registerAuthRoutes(app: Express) {
       });
 
     } catch (e) {
-      console.error("Error verifying PIN:", e);
+      logger.error({ err: e }, 'Error verifying PIN');
       res.status(500).json({ error: "Erreur de vérification" });
     }
   });
@@ -647,7 +1331,7 @@ export function registerAuthRoutes(app: Express) {
 
           await StorageService.deleteEntityFiles('user', tempEntityId);
         } catch (relocateError) {
-          console.error(`⚠️ File relocation failed for user ${user.id}:`, relocateError);
+          logger.error({ err: relocateError, userId: user.id }, 'File relocation failed for user');
         }
       }
 
@@ -680,9 +1364,9 @@ export function registerAuthRoutes(app: Express) {
       // Cleanup temp files if creation failed
       if (tempEntityId) {
         StorageService.deleteEntityFiles('user', tempEntityId)
-          .catch(err => console.error("Cleanup temp files failed:", err));
+          .catch(err => logger.error({ err }, 'Cleanup temp files failed'));
       }
-      console.error("Register error:", error);
+      logger.error({ err: error }, 'Register error');
       res.status(500).json({ message: "Registration failed" });
     }
   });
@@ -765,7 +1449,7 @@ export function registerAuthRoutes(app: Express) {
               role: newRole
             }
           });
-          console.log(`🔄 RBAC: Broadcasted role change for user ${userId} -> ${newRole}`);
+          logger.info({ userId, newRole }, 'RBAC: Broadcasted role change');
         }
       }
 
@@ -793,7 +1477,7 @@ export function registerAuthRoutes(app: Express) {
                 status: userUpdateData.statut
               }
             });
-            console.log(`🚨 SECURITY: Broadcasted user_status change for user ${userId} -> ${userUpdateData.statut}`);
+            logger.warn({ userId, status: userUpdateData.statut }, 'SECURITY: Broadcasted user_status change');
           }
         }
       }
@@ -802,7 +1486,7 @@ export function registerAuthRoutes(app: Express) {
       const effectiveRole = await getEffectiveRole(userId);
       res.json({ ...updated, role: effectiveRole });
     } catch (e) {
-      console.error("Update user failed:", e);
+      logger.error({ err: e }, 'Update user failed');
       res.status(500).json({ message: "Update failed" });
     }
   });
@@ -850,12 +1534,12 @@ export function registerAuthRoutes(app: Express) {
             status: StatutUser.INACTIVE
           }
         });
-        console.log(`🚨 SECURITY: Broadcasted user deletion (INACTIVE) for user ${userId}`);
+        logger.warn({ userId }, 'SECURITY: Broadcasted user deletion (INACTIVE)');
       }
 
       res.sendStatus(200);
     } catch (error) {
-      console.error("Error deleting user:", error);
+      logger.error({ err: error }, 'Error deleting user');
       res.status(500).json({ message: "Erreur lors de la suppression de l'utilisateur" });
     }
   });
@@ -912,7 +1596,7 @@ export function registerAuthRoutes(app: Express) {
       const stats = await getAuditLogStats();
       res.json(stats);
     } catch (error) {
-      console.error("Get audit stats error:", error);
+      logger.error({ err: error }, 'Get audit stats error');
       res.status(500).json({ message: "Erreur lors de la récupération des statistiques" });
     }
   });
@@ -941,7 +1625,7 @@ export function registerAuthRoutes(app: Express) {
         deletedCount: result.deletedCount
       });
     } catch (error) {
-      console.error("Purge audit logs error:", error);
+      logger.error({ err: error }, 'Purge audit logs error');
       res.status(500).json({ message: "Erreur lors de la purge des logs" });
     }
   });
@@ -955,16 +1639,15 @@ export function registerAuthRoutes(app: Express) {
       const { userId } = req.params;
       const adminUser = req.session.user;
 
-      console.log('[SESSION TERMINATE] Request received:', {
+      logger.debug({
         targetUserId: userId,
         adminUserId: adminUser?.id,
         adminUsername: adminUser?.username,
-        areEqual: userId === adminUser?.id
-      });
+      }, 'Session terminate request received');
 
       // Cannot terminate own session
       if (userId === adminUser?.id) {
-        console.log('[SESSION TERMINATE] Blocked: Admin trying to terminate own session');
+        logger.warn({ adminUserId: adminUser?.id }, 'Blocked: Admin trying to terminate own session');
         return res.status(400).json({ message: "Vous ne pouvez pas terminer votre propre session" });
       }
 
@@ -992,7 +1675,7 @@ export function registerAuthRoutes(app: Express) {
           });
         }
       } catch (wsError) {
-        console.error("WebSocket notification failed:", wsError);
+        logger.error({ err: wsError }, 'WebSocket notification failed');
       }
 
       await logAudit(
@@ -1005,10 +1688,10 @@ export function registerAuthRoutes(app: Express) {
         "high"
       );
 
-      console.log('[SESSION TERMINATE] Success:', { userId, deletedCount });
+      logger.info({ userId, deletedCount }, 'Session terminate success');
       res.json({ message: "Session terminée avec succès", deletedCount });
     } catch (error) {
-      console.error("Terminate session error:", error);
+      logger.error({ err: error }, 'Terminate session error');
       res.status(500).json({ message: "Erreur lors de la terminaison de la session" });
     }
   });
@@ -1055,7 +1738,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json(formattedSessions);
     } catch (error) {
-      console.error("Get active sessions error:", error);
+      logger.error({ err: error }, 'Get active sessions error');
       res.status(500).json({ message: "Erreur lors de la récupération des sessions" });
     }
   });
@@ -1128,7 +1811,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json(permissionsMap);
     } catch (error) {
-      console.error("Error fetching permissions:", error);
+      logger.error({ err: error }, 'Error fetching permissions');
       res.status(500).json({ message: "Erreur lors de la récupération des permissions" });
     }
   });
@@ -1211,7 +1894,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ message: "Permissions mises à jour avec succès", count: permissionIdsToGrant.length });
     } catch (error) {
-      console.error("Error saving permissions:", error);
+      logger.error({ err: error }, 'Error saving permissions');
       res.status(500).json({ message: "Erreur lors de la sauvegarde des permissions" });
     }
   });
@@ -1266,7 +1949,7 @@ export function registerAuthRoutes(app: Express) {
       // No need to check individual fields - the existence of the permission means it's allowed
       res.json({ allowed: true });
     } catch (error) {
-      console.error("Error checking permission:", error);
+      logger.error({ err: error }, 'Error checking permission');
       res.status(500).json({ message: "Erreur lors de la vérification des permissions" });
     }
   });
@@ -1321,7 +2004,7 @@ export function registerAuthRoutes(app: Express) {
       });
 
     } catch (error) {
-      console.error("Verify supervisor error:", error);
+      logger.error({ err: error }, 'Verify supervisor error');
       res.status(500).json({ message: "Erreur de vérification" });
     }
   });
@@ -1366,7 +2049,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ message: "PIN caisse configuré avec succès" });
     } catch (error) {
-      console.error("Set caisse PIN error:", error);
+      logger.error({ err: error }, 'Set caisse PIN error');
       res.status(500).json({ message: "Erreur lors de la configuration du PIN" });
     }
   });
@@ -1403,7 +2086,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ message: "PIN utilisateur configuré avec succès" });
     } catch (error) {
-      console.error("Set user caisse PIN error:", error);
+      logger.error({ err: error }, 'Set user caisse PIN error');
       res.status(500).json({ message: "Erreur lors de la configuration du PIN utilisateur" });
     }
   });
@@ -1455,7 +2138,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json(enrichedRoles);
     } catch (error) {
-      console.error("Get user roles error:", error);
+      logger.error({ err: error }, 'Get user roles error');
       res.status(500).json({ error: "Erreur lors de la récupération des rôles" });
     }
   });
@@ -1500,7 +2183,7 @@ export function registerAuthRoutes(app: Express) {
       if (error.code === '23505') { // Unique violation
         return res.status(409).json({ error: "Ce rôle existe déjà pour cet utilisateur et cette agence" });
       }
-      console.error("Add user role error:", error);
+      logger.error({ err: error }, 'Add user role error');
       res.status(500).json({ error: "Erreur lors de l'ajout du rôle" });
     }
   });
@@ -1544,7 +2227,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ message: "Rôle supprimé avec succès" });
     } catch (error) {
-      console.error("Delete user role error:", error);
+      logger.error({ err: error }, 'Delete user role error');
       res.status(500).json({ error: "Erreur lors de la suppression du rôle" });
     }
   });
@@ -1590,7 +2273,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ message: "Rôle principal mis à jour" });
     } catch (error) {
-      console.error("Set primary role error:", error);
+      logger.error({ err: error }, 'Set primary role error');
       res.status(500).json({ error: "Erreur lors de la mise à jour du rôle principal" });
     }
   });
@@ -1613,7 +2296,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json(roles);
     } catch (error) {
-      console.error("Get my roles error:", error);
+      logger.error({ err: error }, 'Get my roles error');
       res.status(500).json({ error: "Erreur lors de la récupération des rôles" });
     }
   });

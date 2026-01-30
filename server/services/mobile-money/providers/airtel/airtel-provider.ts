@@ -31,6 +31,9 @@ import {
   maskAirtelConfig,
   type AirtelProviderConfig,
 } from "./airtel-config";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger('AirtelProvider');
 
 // Interfaces pour les réponses Airtel
 interface AirtelApiResponse<T = unknown> {
@@ -102,7 +105,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
     );
 
     // Log de configuration (secrets masqués)
-    console.log("[Airtel Provider] Initialized:", maskAirtelConfig(this.config));
+    logger.info({ config: maskAirtelConfig(this.config) }, 'Airtel Provider initialized');
   }
 
   /**
@@ -132,9 +135,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
     };
 
     try {
-      console.log(
-        `[Airtel] Initiating collection: ${request.externalRef} - ${request.amount} ${this.config.currency}`
-      );
+      logger.info({ externalRef: request.externalRef, amount: request.amount, currency: this.config.currency }, 'Initiating collection');
 
       const response = await this.makeRequest<AirtelApiResponse<AirtelTransactionData>>(
         "POST",
@@ -147,7 +148,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
 
       // Vérifier le statut de la réponse
       if (response.status?.code === "200" || response.status?.success === true) {
-        console.log(`[Airtel] Collection initiated: ${txData?.id || request.externalRef}`);
+        logger.info({ transactionId: txData?.id || request.externalRef }, 'Collection initiated');
 
         return {
           providerRef: txData?.id || request.externalRef,
@@ -205,9 +206,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
     };
 
     try {
-      console.log(
-        `[Airtel] Initiating payout: ${request.externalRef} - ${request.amount} ${this.config.currency}`
-      );
+      logger.info({ externalRef: request.externalRef, amount: request.amount, currency: this.config.currency }, 'Initiating payout');
 
       let response: AirtelApiResponse<AirtelTransactionData>;
 
@@ -239,7 +238,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
 
       // Vérifier le statut de la réponse
       if (response.status?.code === "200" || response.status?.success === true) {
-        console.log(`[Airtel] Payout initiated: ${txData?.id || request.externalRef}`);
+        logger.info({ transactionId: txData?.id || request.externalRef }, 'Payout initiated');
 
         return {
           providerRef: txData?.id || request.externalRef,
@@ -299,7 +298,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
     } catch (error) {
       // Si l'endpoint n'existe pas ou retourne une erreur,
       // on retourne PENDING pour forcer le système à attendre le webhook
-      console.log(`[Airtel] Status check failed for ${providerRef}, assuming PENDING`);
+      logger.debug({ providerRef }, 'Status check failed, assuming PENDING');
       return { status: "PENDING" };
     }
   }
@@ -327,7 +326,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
     const token = await this.authService.getAccessToken();
 
     try {
-      console.log(`[Airtel] Fetching transactions summary: ${startDate} to ${endDate}`);
+      logger.info({ startDate, endDate }, 'Fetching transactions summary');
 
       const queryParams = new URLSearchParams({
         start_date: startDate,
@@ -378,7 +377,7 @@ export class AirtelProvider implements IMobileMoneyProvider {
     const token = await this.authService.getAccessToken();
 
     try {
-      console.log("[Airtel] Fetching account balance...");
+      logger.info('Fetching account balance');
 
       const response = await this.makeRequest<AirtelApiResponse<AirtelBalanceData>>(
         "GET",
@@ -423,13 +422,13 @@ export class AirtelProvider implements IMobileMoneyProvider {
   ): boolean {
     // En environnement UAT/sandbox, on peut bypasser si pas de secret configuré
     if (this.config.environment !== "production" && !this.config.callbackHmacSecret) {
-      console.log("[Airtel] UAT mode: skipping webhook signature verification");
+      logger.debug('UAT mode: skipping webhook signature verification');
       return true;
     }
 
     // En production, le secret HMAC est obligatoire
     if (!this.config.callbackHmacSecret) {
-      console.error("[Airtel] Production mode but no HMAC secret configured!");
+      logger.error('Production mode but no HMAC secret configured');
       return false;
     }
 

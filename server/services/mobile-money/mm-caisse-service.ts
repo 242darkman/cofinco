@@ -11,6 +11,9 @@ import { caisses, agences, type Caisse, type InsertCaisse } from "@shared/schema
 import { eq, and, or, inArray } from "drizzle-orm";
 import { TypeCaisse, getDigitalCaisseType, TYPE_CAISSE_LABELS } from "@shared/enum/status-constants";
 import type { PgTransaction } from "drizzle-orm/pg-core";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('MmCaisse');
 
 // Type for transaction context
 type TxContext = PgTransaction<any, any, any> | typeof db;
@@ -71,7 +74,7 @@ export async function getOrCreateDigitalCaisse(
     })
     .returning();
 
-  console.log(`[MM Caisse] Created digital caisse for ${provider} in ${agence.nom}: ${newCaisse.id}`);
+  logger.info({ provider, agenceName: agence.nom, caisseId: newCaisse.id }, 'Created digital caisse');
 
   return newCaisse;
 }
@@ -118,7 +121,7 @@ export async function updateDigitalCaisseSolde(
     })
     .where(eq(caisses.id, caisseId));
 
-  console.log(`[MM Caisse] Updated solde for ${caisseId}: ${currentSolde} -> ${newSolde} (delta: ${delta > 0 ? '+' : ''}${delta}, mouvement: ${mouvementId})`);
+  logger.info({ caisseId, currentSolde, newSolde, delta, mouvementId }, 'Updated solde');
 
   return newSolde.toString();
 }
@@ -259,12 +262,12 @@ export async function ensureDigitalCaissesForAllAgences(): Promise<{
           statut: "OPEN",
         });
         created++;
-        console.log(`[MM Caisse] Created ${provider} caisse for ${agence.nom}`);
+        logger.info({ provider, agenceName: agence.nom }, 'Created caisse');
       }
     }
   }
 
-  console.log(`[MM Caisse] Ensured digital caisses: ${created} created, ${existing} already existed`);
+  logger.info({ created, existing }, 'Ensured digital caisses');
 
   return { created, existing };
 }

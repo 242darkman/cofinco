@@ -29,6 +29,9 @@ import { Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 import { pool, db } from "../db";
 import { isAdminRole } from "../../shared/types/roles";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('DbContext');
 
 /**
  * Configuration du contexte RLS
@@ -95,12 +98,12 @@ export function setDbContext(
 
   // Log en mode debug
   if (process.env.DEBUG_RLS === "true") {
-    console.log("[RLS Context]", {
+    logger.debug({
       userId: context.userId,
       agencyId: context.agencyId,
       isAdmin: context.isAdmin,
       path: req.path,
-    });
+    }, 'RLS Context');
   }
 
   next();
@@ -260,9 +263,7 @@ export function requireRLSContext(
 
   // Les non-admins doivent avoir une agence définie
   if (!context.agencyId) {
-    console.warn(
-      `[RLS Security] User ${context.userId} attempted access without agency context`
-    );
+    logger.warn({ userId: context.userId }, 'User attempted access without agency context');
     res.status(403).json({
       error: "Contexte d'agence requis",
       message: "Aucune agence n'est associée à votre session.",

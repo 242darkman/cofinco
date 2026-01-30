@@ -20,6 +20,7 @@ import type {
   PayoutResponse,
   StatusResponse,
   WebhookPayload,
+  ProviderBalanceResponse,
 } from "../../types";
 import { ProviderApiError } from "../../types";
 import { MtnAuthService } from "./mtn-auth-service";
@@ -29,6 +30,9 @@ import {
   maskMtnConfig,
   type MtnProviderConfig,
 } from "./mtn-config";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger('MtnProvider');
 
 // Types internes MTN
 interface MtnRequestToPayBody {
@@ -87,15 +91,17 @@ export class MtnProvider implements IMobileMoneyProvider {
     }
 
     // Initialiser le service d'authentification
+    // On utilise la subscription key de collection par défaut pour le refresh proactif
     this.authService = new MtnAuthService({
       baseUrl: this.config.baseUrl,
       apiUserId: this.config.apiUserId,
       apiKey: this.config.apiKey,
+      subscriptionKey: this.config.subscriptionKeys.collection,
       environment: this.config.environment,
     });
 
     // Log de configuration (masquée)
-    console.log("[MTN Provider] Initialized", maskMtnConfig(this.config));
+    logger.info({ config: maskMtnConfig(this.config) }, 'MTN Provider initialized');
   }
 
   // ============================================
@@ -131,14 +137,13 @@ export class MtnProvider implements IMobileMoneyProvider {
       payeeNote: `Collection ${externalRef}`,
     };
 
-    console.log("[MTN] Initiating collection", {
+    logger.info({
       referenceId,
       externalRef,
       amount,
       currency: this.config.currency,
-      // phone masqué
       phoneLastDigits: phone.slice(-4),
-    });
+    }, 'Initiating collection');
 
     try {
       const response = await this.makeRequest(
@@ -156,7 +161,7 @@ export class MtnProvider implements IMobileMoneyProvider {
 
       // MTN retourne 202 Accepted pour les requêtes async réussies
       if (response.status === 202) {
-        console.log("[MTN] Collection accepted", { referenceId, externalRef });
+        logger.info({ referenceId, externalRef }, 'Collection accepted');
 
         return {
           providerRef: referenceId,
@@ -177,11 +182,11 @@ export class MtnProvider implements IMobileMoneyProvider {
       if (error instanceof ProviderApiError) throw error;
 
       const err = error as Error;
-      console.error("[MTN] Collection failed", {
+      logger.error({
         referenceId,
         externalRef,
-        error: err.message,
-      });
+        err,
+      }, 'Collection failed');
 
       throw new ProviderApiError(
         `MTN collection failed: ${err.message}`,
@@ -224,13 +229,13 @@ export class MtnProvider implements IMobileMoneyProvider {
       payeeNote: `Transfer ${externalRef}`,
     };
 
-    console.log("[MTN] Initiating disbursement", {
+    logger.info({
       referenceId,
       externalRef,
       amount,
       currency: this.config.currency,
       phoneLastDigits: phone.slice(-4),
-    });
+    }, 'Initiating disbursement');
 
     try {
       const response = await this.makeRequest(
@@ -247,7 +252,7 @@ export class MtnProvider implements IMobileMoneyProvider {
       );
 
       if (response.status === 202) {
-        console.log("[MTN] Disbursement accepted", { referenceId, externalRef });
+        logger.info({ referenceId, externalRef }, 'Disbursement accepted');
 
         return {
           providerRef: referenceId,
@@ -267,11 +272,11 @@ export class MtnProvider implements IMobileMoneyProvider {
       if (error instanceof ProviderApiError) throw error;
 
       const err = error as Error;
-      console.error("[MTN] Disbursement failed", {
+      logger.error({
         referenceId,
         externalRef,
-        error: err.message,
-      });
+        err,
+      }, 'Disbursement failed');
 
       throw new ProviderApiError(
         `MTN disbursement failed: ${err.message}`,
@@ -307,7 +312,7 @@ export class MtnProvider implements IMobileMoneyProvider {
     }
 
     // Transaction non trouvée
-    console.log("[MTN] Transaction not found", { providerRef });
+    logger.info({ providerRef }, 'Transaction not found');
     return { status: "PENDING" }; // On garde PENDING pour la réconciliation
   }
 
@@ -360,13 +365,64 @@ export class MtnProvider implements IMobileMoneyProvider {
     } catch (error) {
       if (error instanceof ProviderApiError) throw error;
 
-      console.error("[MTN] Status check error", {
+      logger.error({
         referenceId,
         type,
-        error: (error as Error).message,
-      });
+        err: error,
+      }, 'Status check error');
 
       return null;
+    }
+  }
+
+  // ============================================
+  // BALANCE CHECK
+  // ============================================
+
+  /**
+   * Récupère le solde du compte MTN MoMo (collection)
+   * Endpoint: GET /collection/v1_0/account/balance
+   */
+  async getBalance(): Promise<ProviderBalanceResponse> {
+    const accessToken = await this.authService.getAccessToken(
+      "collection",
+      this.config.subscriptionKeys.collection
+    );
+
+    try {
+      logger.info('Fetching account balance');
+
+      const response = await this.makeRequest("GET", "/collection/v1_0/account/balance", undefined, {
+        Authorization: `Bearer ${accessToken}`,
+        "X-Target-Environment": this.config.targetEnvironment,
+        "Ocp-Apim-Subscription-Key": this.config.subscriptionKeys.collection,
+      });
+
+      if (!response.ok) {
+        throw new ProviderApiError(
+          `Balance check failed: HTTP ${response.status}`,
+          "BALANCE_CHECK_FAILED",
+          this.code,
+          response.status
+        );
+      }
+
+      const data = await response.json() as { availableBalance: string; currency: string };
+
+      return {
+        balance: data.availableBalance || "0",
+        currency: data.currency || this.config.currency,
+        accountStatus: "ACTIVE",
+      };
+    } catch (error) {
+      if (error instanceof ProviderApiError) throw error;
+
+      const err = error as Error;
+      throw new ProviderApiError(
+        `MTN balance enquiry failed: ${err.message}`,
+        "BALANCE_ERROR",
+        this.code
+      );
     }
   }
 
@@ -385,19 +441,19 @@ export class MtnProvider implements IMobileMoneyProvider {
   ): boolean {
     // En sandbox, on peut bypasser la vérification
     if (this.config.environment === "sandbox") {
-      console.log("[MTN] Sandbox mode: skipping webhook verification");
+      logger.info('Sandbox mode: skipping webhook verification');
       return true;
     }
 
     // En production, la signature est obligatoire
     if (!signature) {
-      console.warn("[MTN] Missing webhook signature");
+      logger.warn('Missing webhook signature');
       return false;
     }
 
     // Vérifier si on a un callback token configuré
     if (!this.config.callbackToken) {
-      console.warn("[MTN] No callback token configured, cannot verify webhook");
+      logger.warn('No callback token configured, cannot verify webhook');
       // En production sans token, on refuse par sécurité
       return false;
     }
@@ -414,12 +470,12 @@ export class MtnProvider implements IMobileMoneyProvider {
       );
 
       if (!isValid) {
-        console.warn("[MTN] Invalid webhook signature");
+        logger.warn('Invalid webhook signature');
       }
 
       return isValid;
     } catch (error) {
-      console.error("[MTN] Webhook verification error", error);
+      logger.error({ err: error }, 'Webhook verification error');
       return false;
     }
   }
@@ -533,10 +589,7 @@ export class MtnProvider implements IMobileMoneyProvider {
 
           if (attempt < this.config.maxRetries) {
             const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
-            console.log(
-              `[MTN] Request failed (${response.status}), retrying in ${delay}ms...`,
-              { attempt, endpoint }
-            );
+            logger.info({ status: response.status, attempt, endpoint, delayMs: delay }, 'Request failed, retrying');
             await this.sleep(delay);
             continue;
           }
@@ -553,11 +606,12 @@ export class MtnProvider implements IMobileMoneyProvider {
 
         if (attempt < this.config.maxRetries) {
           const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
-          console.log(`[MTN] Request error, retrying in ${delay}ms...`, {
+          logger.info({
             attempt,
             endpoint,
             error: lastError.message,
-          });
+            delayMs: delay,
+          }, 'Request error, retrying');
           await this.sleep(delay);
         }
       }

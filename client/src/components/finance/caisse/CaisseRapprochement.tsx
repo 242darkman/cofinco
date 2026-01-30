@@ -1,13 +1,25 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { X, Lock, AlertTriangle, CheckCircle, Calculator, Banknote, Coins, ArrowRight, ArrowLeft, Loader2, Vault, PiggyBank, FileText } from 'lucide-react';
+import { X, Lock, AlertTriangle, CheckCircle, Calculator, Banknote, Coins, ArrowRight, ArrowLeft, Loader2, Vault, PiggyBank, FileText, UserCheck, ChevronDown, ChevronUp, Scale, FileUp, Save, Sparkles, Smartphone } from 'lucide-react';
+import WeightVerificationPanel from './WeightVerificationPanel';
+import MobileMoneyReconciliationPanel from './MobileMoneyReconciliationPanel';
+import ClosureReportButton from './ClosureReportButton';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { Button, Badge } from '@/components/ui';
+import { Button, Badge, FormField } from '@/components/ui';
 import { sessionCaisseApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SessionCaisse } from '../../../types/finance';
+
+interface DenominationTemplate {
+  id: string;
+  nom: string;
+  description?: string;
+  billetage: Record<string, number>;
+  totalCalcule: string;
+  typeTemplate: string;
+}
 
 
 interface CaisseRapprochementProps {
@@ -83,6 +95,43 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
   const [montantReporte, setMontantReporte] = useState<number>(0);
   const [observations, setObservations] = useState('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // Verification count state
+  const [showVerification, setShowVerification] = useState(false);
+  const [verificationBilletage, setVerificationBilletage] = useState<Record<DenominationName, number>>({
+    billets_10000: 0, billets_5000: 0, billets_1000: 0, billets_500: 0,
+    billets_200: 0, billets_100: 0, billets_50: 0, pieces_20: 0, pieces_10: 0, pieces_5: 0,
+  });
+  const [verificationSubmitted, setVerificationSubmitted] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{ verificationTotal: number; primaryTotal: number; ecartVerification: number; matched: boolean } | null>(null);
+  const [loadingVerification, setLoadingVerification] = useState(false);
+
+  // Denomination templates state
+  const [denominationTemplates, setDenominationTemplates] = useState<DenominationTemplate[]>([]);
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+
+  // Auto-suggestion state
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+  const [suggestionInfo, setSuggestionInfo] = useState<{
+    confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+    reasoning: string[];
+  } | null>(null);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // Mobile Money reconciliation state
+  const [mmReconciliation, setMmReconciliation] = useState<{
+    providers: Array<{
+      provider: 'MTN' | 'AIRTEL';
+      expectedBalance: number;
+      providerBalance: number | null;
+      ecart: number;
+      status: 'MATCHED' | 'DISCREPANCY' | 'API_FAILED';
+    }>;
+    hasDiscrepancy: boolean;
+  } | null>(null);
+  const [loadingMmReconciliation, setLoadingMmReconciliation] = useState(false);
 
   // Calculated values
   // Le solde théorique = montant d'ouverture + entrées - sorties
@@ -278,6 +327,219 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
   // Validation helper
   const isTransferValid = Math.abs((montantVersCoffre + montantReporte) - montantPhysique) <= 1;
 
+  // Verification count helpers
+  const verificationTotal = useMemo(() => {
+    return DENOMINATIONS.reduce((total, denom) => total + (verificationBilletage[denom.name] || 0) * denom.value, 0);
+  }, [verificationBilletage]);
+
+  const updateVerificationBilletage = useCallback((name: DenominationName, value: number) => {
+    setVerificationBilletage(prev => ({ ...prev, [name]: Math.max(0, Math.floor(value)) }));
+  }, []);
+
+  const handleSubmitVerification = async () => {
+    if (verificationTotal <= 0) {
+      toast.warning('Veuillez effectuer le billetage de vérification');
+      return;
+    }
+    setLoadingVerification(true);
+    try {
+      const result = await sessionCaisseApi.submitVerification(session.id, {
+        billetage: verificationBilletage,
+        observations: 'Comptage de vérification superviseur',
+      });
+      setVerificationResult(result);
+      setVerificationSubmitted(true);
+      if (result.matched) {
+        toast.success('Les deux comptages concordent');
+      } else {
+        toast.warning(`Écart de vérification: ${formatMoney(Math.abs(result.ecartVerification))}`);
+      }
+    } catch (err: any) {
+      const errorMessage = handleApiError(err, 'Erreur lors du comptage de vérification');
+      toast.error(errorMessage);
+    } finally {
+      setLoadingVerification(false);
+    }
+  };
+
+  // Fetch existing verification counts on mount in transfer step
+  useEffect(() => {
+    if (step === 'transfer') {
+      sessionCaisseApi.getCounts(session.id).then((counts: any) => {
+        if (counts.verification) {
+          setVerificationResult({
+            verificationTotal: counts.verification.total,
+            primaryTotal: counts.primary?.total || 0,
+            ecartVerification: counts.ecartVerification || 0,
+            matched: counts.matched || false,
+          });
+          setVerificationSubmitted(true);
+        }
+      }).catch(() => { /* ignore - verification is optional */ });
+    }
+  }, [step, session.id]);
+
+  // Fetch Mobile Money reconciliation data
+  const fetchMmReconciliation = useCallback(async () => {
+    if (!session.agenceId && !(session as any).agence_id) return;
+
+    setLoadingMmReconciliation(true);
+    try {
+      const res = await fetch(`/api/caisses/sessions/${session.id}/mm-reconciliation`);
+      if (res.ok) {
+        const data = await res.json();
+        setMmReconciliation(data);
+      }
+    } catch (err) {
+      // MM reconciliation is optional, don't block
+      console.warn('MM reconciliation fetch failed:', err);
+    } finally {
+      setLoadingMmReconciliation(false);
+    }
+  }, [session.id, session.agenceId]);
+
+  useEffect(() => {
+    if (step === 'transfer') {
+      fetchMmReconciliation();
+    }
+  }, [step, fetchMmReconciliation]);
+
+  // Handler for MM override
+  const handleMmOverride = async (provider: string, reason: string) => {
+    try {
+      await fetch(`/api/caisses/sessions/${session.id}/mm-override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, reason }),
+      });
+      toast.success(`Écart ${provider} accepté avec justification`);
+      fetchMmReconciliation();
+    } catch (err) {
+      toast.error(handleApiError(err, 'Erreur lors de la validation'));
+    }
+  };
+
+  // Fetch denomination templates on count step
+  useEffect(() => {
+    if (step === 'count') {
+      setLoadingTemplates(true);
+      sessionCaisseApi.getDenominationTemplates(session.caisseId || session.caisse_id)
+        .then((templates: DenominationTemplate[]) => {
+          setDenominationTemplates(templates || []);
+        })
+        .catch(() => {
+          // Templates are optional, ignore errors
+        })
+        .finally(() => setLoadingTemplates(false));
+    }
+  }, [step, session.caisseId, session.caisse_id]);
+
+  // Apply a denomination template
+  const handleApplyTemplate = useCallback((template: DenominationTemplate) => {
+    const newBilletage = { ...billetage };
+    // Reset all values first
+    Object.keys(newBilletage).forEach(key => {
+      newBilletage[key as DenominationName] = 0;
+    });
+    // Apply template values
+    Object.entries(template.billetage).forEach(([denom, count]) => {
+      // Convert template keys (10000, 5000, etc.) to our format (billets_10000, billets_5000, etc.)
+      const denomValue = parseInt(denom);
+      const matchingDenom = DENOMINATIONS.find(d => d.value === denomValue);
+      if (matchingDenom) {
+        newBilletage[matchingDenom.name] = count as number;
+      }
+    });
+    setBilletage(newBilletage);
+    toast.success(`Modèle "${template.nom}" appliqué`);
+  }, [billetage]);
+
+  // Auto-suggest count based on day's operations
+  const handleAutoSuggest = useCallback(async () => {
+    setLoadingSuggestion(true);
+    setSuggestionInfo(null);
+    try {
+      const result = await sessionCaisseApi.suggestCount(session.id);
+      if (result.billetage) {
+        const newBilletage = { ...billetage };
+        // Reset all values first
+        Object.keys(newBilletage).forEach(key => {
+          newBilletage[key as DenominationName] = 0;
+        });
+        // Apply suggested values
+        Object.entries(result.billetage).forEach(([key, count]) => {
+          // Handle both formats: billets_10000 and 10000
+          if (key in newBilletage) {
+            newBilletage[key as DenominationName] = count as number;
+          } else {
+            const denomValue = parseInt(key);
+            const matchingDenom = DENOMINATIONS.find(d => d.value === denomValue);
+            if (matchingDenom) {
+              newBilletage[matchingDenom.name] = count as number;
+            }
+          }
+        });
+        setBilletage(newBilletage);
+        setSuggestionInfo({
+          confidence: result.confidence,
+          reasoning: result.reasoning,
+        });
+        toast.success(`Suggestion appliquée (confiance: ${result.confidence})`);
+      }
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors de la suggestion'));
+    } finally {
+      setLoadingSuggestion(false);
+    }
+  }, [session.id, billetage]);
+
+  // Save current count as template
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      toast.warning('Veuillez saisir un nom pour le modèle');
+      return;
+    }
+    if (soldeCalcule <= 0) {
+      toast.warning('Veuillez effectuer un billetage avant de sauvegarder');
+      return;
+    }
+
+    setLoadingTemplates(true);
+    try {
+      // Convert billetage to template format {10000: count, 5000: count, ...}
+      const templateBilletage: Record<string, number> = {};
+      DENOMINATIONS.forEach(denom => {
+        const count = billetage[denom.name];
+        if (count > 0) {
+          templateBilletage[String(denom.value)] = count;
+        }
+      });
+
+      await sessionCaisseApi.createDenominationTemplate({
+        nom: templateName.trim(),
+        description: templateDescription.trim() || undefined,
+        caisseId: session.caisseId || session.caisse_id,
+        billetage: templateBilletage,
+        totalCalcule: String(soldeCalcule),
+        typeTemplate: 'GENERAL',
+      });
+
+      toast.success('Modèle sauvegardé');
+      setShowSaveTemplateModal(false);
+      setTemplateName('');
+      setTemplateDescription('');
+
+      // Refresh templates
+      const templates = await sessionCaisseApi.getDenominationTemplates(session.caisseId || session.caisse_id);
+      setDenominationTemplates(templates || []);
+    } catch (err: any) {
+      const errorMessage = handleApiError(err, 'Erreur lors de la sauvegarde du modèle');
+      toast.error(errorMessage);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 font-sans animate-in fade-in duration-200"
@@ -448,11 +710,99 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
               {/* Billetage */}
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Calculator size={18} className="text-slate-400" />
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Billetage</h4>
-                  <div className="h-px bg-slate-800 flex-1 ml-2" />
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Calculator size={18} className="text-slate-400" />
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">Billetage</h4>
+                  </div>
+
+                  {/* Template actions */}
+                  <div className="flex items-center gap-2">
+                    {/* Template selector dropdown */}
+                    {denominationTemplates.length > 0 && (
+                      <div className="relative">
+                        <select
+                          className="appearance-none pl-3 pr-8 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 focus:border-indigo-500/50 focus:outline-none cursor-pointer"
+                          onChange={(e) => {
+                            const template = denominationTemplates.find(t => t.id === e.target.value);
+                            if (template) handleApplyTemplate(template);
+                            e.target.value = '';
+                          }}
+                          defaultValue=""
+                        >
+                          <option value="" disabled>
+                            {loadingTemplates ? 'Chargement...' : `📋 Modèles (${denominationTemplates.length})`}
+                          </option>
+                          {denominationTemplates.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.nom} ({formatMoney(Number(t.totalCalcule))})
+                            </option>
+                          ))}
+                        </select>
+                        <FileUp size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                      </div>
+                    )}
+
+                    {/* Auto-suggest button */}
+                    <button
+                      onClick={handleAutoSuggest}
+                      disabled={loadingSuggestion}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                      title="Suggestion automatique basée sur les opérations"
+                    >
+                      {loadingSuggestion ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={12} />
+                      )}
+                      <span className="hidden sm:inline">Suggestion</span>
+                    </button>
+
+                    {/* Save as template button */}
+                    {soldeCalcule > 0 && (
+                      <button
+                        onClick={() => setShowSaveTemplateModal(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-xs text-indigo-400 hover:bg-indigo-500/20 transition-colors"
+                        title="Sauvegarder comme modèle"
+                      >
+                        <Save size={12} />
+                        <span className="hidden sm:inline">Sauvegarder</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Suggestion info banner */}
+                {suggestionInfo && (
+                  <div className={`mb-4 p-3 rounded-lg border ${
+                    suggestionInfo.confidence === 'HIGH'
+                      ? 'bg-green-500/10 border-green-500/30'
+                      : suggestionInfo.confidence === 'MEDIUM'
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : 'bg-slate-800/50 border-slate-700'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sparkles size={14} className={
+                        suggestionInfo.confidence === 'HIGH' ? 'text-green-400' :
+                        suggestionInfo.confidence === 'MEDIUM' ? 'text-amber-400' : 'text-slate-400'
+                      } />
+                      <span className="text-xs font-medium text-white">
+                        Suggestion appliquée (confiance: {suggestionInfo.confidence})
+                      </span>
+                      <button
+                        onClick={() => setSuggestionInfo(null)}
+                        className="ml-auto text-slate-500 hover:text-white"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <ul className="text-[10px] text-slate-400 space-y-0.5 pl-5">
+                      {suggestionInfo.reasoning.slice(0, 3).map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                   {DENOMINATIONS.map((denom) => {
@@ -493,6 +843,17 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                   })}
                 </div>
               </div>
+
+              {/* Weight Verification */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Scale size={18} className="text-slate-400" />
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Vérification par poids</h4>
+                  <span className="text-[10px] text-slate-500">(optionnel)</span>
+                  <div className="h-px bg-slate-800 flex-1 ml-2" />
+                </div>
+                <WeightVerificationPanel initialBilletage={billetage} compact />
+              </div>
             </div>
           )}
 
@@ -512,6 +873,111 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                   <div className="text-sm text-amber-400 flex items-center gap-2">
                     <AlertTriangle size={14} />
                     Écart de {formatMoney(ecart)} enregistré
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Money Reconciliation */}
+              {(mmReconciliation || loadingMmReconciliation) && (
+                <div className="animate-in fade-in duration-300">
+                  {loadingMmReconciliation ? (
+                    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-sm">Vérification des soldes Mobile Money...</span>
+                      </div>
+                    </div>
+                  ) : mmReconciliation && (
+                    <MobileMoneyReconciliationPanel
+                      providers={mmReconciliation.providers}
+                      hasDiscrepancy={mmReconciliation.hasDiscrepancy}
+                      onRefresh={fetchMmReconciliation}
+                      onOverride={handleMmOverride}
+                      isRefreshing={loadingMmReconciliation}
+                      showActions={true}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Verification Count Section */}
+              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setShowVerification(!showVerification)}
+                  className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-800/60 transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <UserCheck size={16} className="text-blue-400" />
+                    <span className="text-sm font-semibold text-white">Comptage de vérification (superviseur)</span>
+                    {verificationSubmitted && verificationResult && (
+                      <Badge
+                        variant={verificationResult.matched ? 'success' : 'danger'}
+                        value={verificationResult.matched ? 'Concordant' : `Écart ${formatMoney(Math.abs(verificationResult.ecartVerification))}`}
+                        size="sm"
+                      />
+                    )}
+                  </div>
+                  {showVerification ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                </button>
+
+                {showVerification && (
+                  <div className="px-4 pb-4 space-y-3 border-t border-slate-700/50">
+                    {verificationSubmitted && verificationResult ? (
+                      <div className={`mt-3 rounded-lg p-3 ${verificationResult.matched ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                        <p className="text-sm text-white font-medium mb-1">
+                          {verificationResult.matched ? 'Les deux comptages concordent' : 'Écart détecté entre les deux comptages'}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <span className="text-slate-400">Caissier</span>
+                            <p className="text-white font-bold">{formatMoney(verificationResult.primaryTotal)}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-400">Vérificateur</span>
+                            <p className="text-white font-bold">{formatMoney(verificationResult.verificationTotal)}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-400">Écart</span>
+                            <p className={`font-bold ${verificationResult.matched ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {formatMoney(verificationResult.ecartVerification)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-slate-400 mt-3">
+                          Un superviseur peut soumettre un comptage indépendant pour valider le comptage du caissier.
+                        </p>
+                        <div className="grid grid-cols-5 gap-2">
+                          {DENOMINATIONS.map(({ name, label, value }) => (
+                            <div key={name} className="text-center">
+                              <label className="text-[10px] text-slate-500 block mb-1">{label}</label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={verificationBilletage[name] || ''}
+                                onChange={(e) => updateVerificationBilletage(name, parseInt(e.target.value) || 0)}
+                                className="w-full px-1.5 py-1.5 bg-slate-900/50 border border-slate-700 rounded text-xs text-white text-center focus:border-blue-500/50 outline-none [appearance:textfield]"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-400">Total vérification: <strong className="text-white">{formatMoney(verificationTotal)}</strong></span>
+                          <Button
+                            onClick={handleSubmitVerification}
+                            disabled={loadingVerification || verificationTotal <= 0}
+                            variant="outline"
+                            size="sm"
+                            className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                          >
+                            {loadingVerification ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+                            Soumettre
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -664,6 +1130,18 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
               <Button onClick={onClose} variant="outline" className="w-full sm:w-auto border-slate-700">
                 Annuler
               </Button>
+              <ClosureReportButton
+                session={session}
+                billetage={billetage}
+                montantVersCoffre={montantVersCoffre}
+                montantReporte={montantReporte}
+                ecartJustification={ecartJustification}
+                observations={observations}
+                mmReconciliation={mmReconciliation?.providers}
+                variant="outline"
+                size="md"
+                className="border-slate-700"
+              />
               <Button
                 onClick={() => setShowConfirmDialog(true)}
                 disabled={loading || !isTransferValid || !canCloseCaisse}
@@ -711,6 +1189,83 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
         confirmText="Confirmer la fermeture"
         cancelText="Annuler"
       />
+
+      {/* Save as Template Modal */}
+      {showSaveTemplateModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[110] p-4"
+          onClick={() => setShowSaveTemplateModal(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700/50 w-full max-w-md rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-800">
+              <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                <Save size={18} className="text-indigo-400" />
+                Sauvegarder comme modèle
+              </h4>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
+                  Nom du modèle *
+                </label>
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="ex: Ouverture standard, Fermeture weekend..."
+                  className="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-indigo-500/50 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
+                  Description (optionnel)
+                </label>
+                <textarea
+                  value={templateDescription}
+                  onChange={(e) => setTemplateDescription(e.target.value)}
+                  placeholder="Description ou notes pour ce modèle..."
+                  className="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-indigo-500/50 focus:outline-none resize-none"
+                  rows={2}
+                />
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 mb-2">Billetage à sauvegarder:</p>
+                <div className="flex flex-wrap gap-2">
+                  {DENOMINATIONS.filter(d => billetage[d.name] > 0).map(d => (
+                    <span key={d.name} className="px-2 py-1 bg-slate-700/50 rounded text-xs text-slate-300">
+                      {d.label} × {billetage[d.name]}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs font-bold text-indigo-400 mt-2">
+                  Total: {formatMoney(soldeCalcule)}
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-800 flex justify-end gap-3">
+              <Button
+                onClick={() => setShowSaveTemplateModal(false)}
+                variant="outline"
+                className="border-slate-700"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSaveAsTemplate}
+                disabled={loadingTemplates || !templateName.trim()}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                {loadingTemplates ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+                Sauvegarder
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

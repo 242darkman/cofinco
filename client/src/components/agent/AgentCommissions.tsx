@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, Calendar, Check, X, Download, Plus, Edit } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, Check, X, Download, Plus, Edit, RefreshCw, Loader2 } from 'lucide-react';
 import { StatutPaiementCommission, STATUT_PAIEMENT_COMMISSION_LABELS } from '@shared/enum/status-constants';
 
 interface Commission {
@@ -31,6 +31,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedPeriode, setSelectedPeriode] = useState('');
+  const [recalculating, setRecalculating] = useState<string | null>(null); // commission id or 'all'
   const [formData, setFormData] = useState({
     agent_id: agentId || '',
     periode: new Date().toISOString().slice(0, 7),
@@ -52,7 +53,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       if (agentId) params.append('agent_id', agentId);
       if (selectedPeriode) params.append('periode', selectedPeriode);
       
-      const response = await fetch(`/api/agent-commissions?${params.toString()}`);
+      const response = await fetch(`/api/agent-commissions?${params.toString()}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Erreur lors du chargement');
       const data = await response.json();
       setCommissions(data || []);
@@ -79,6 +80,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       const response = await fetch('/api/agent-commissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
           montant_commission,
@@ -116,6 +118,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       const response = await fetch(`/api/agent-commissions/${commissionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           statut_paiement: 'Payé',
           date_paiement: new Date().toISOString()
@@ -126,6 +129,40 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       fetchCommissions();
     } catch (error: any) {
       alert('Erreur: ' + error.error);
+    }
+  };
+
+  const recalculateOne = async (commissionId: string) => {
+    setRecalculating(commissionId);
+    try {
+      const response = await fetch(`/api/agent-commissions/${commissionId}/recalculate`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Erreur recalcul');
+      await fetchCommissions();
+    } catch (error) {
+      console.error('Erreur recalcul:', error);
+    } finally {
+      setRecalculating(null);
+    }
+  };
+
+  const recalculateAll = async () => {
+    setRecalculating('all');
+    try {
+      const response = await fetch('/api/agent-commissions/recalculate-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ agent_id: agentId, periode: selectedPeriode || undefined }),
+      });
+      if (!response.ok) throw new Error('Erreur recalcul');
+      await fetchCommissions();
+    } catch (error) {
+      console.error('Erreur recalcul:', error);
+    } finally {
+      setRecalculating(null);
     }
   };
 
@@ -193,9 +230,44 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
           className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
         />
 
-        <button className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center gap-2 transition">
+        <button
+          onClick={() => {
+            if (commissions.length === 0) return;
+            const headers = ['Période', 'Agent', 'Collecté', 'Taux %', 'Commission', 'Primes', 'Avances', 'Net', 'Statut', 'Paiement'];
+            const rows = commissions.map(c => [
+              c.periode,
+              c.agent ? `${c.agent.nom} ${c.agent.prenom}` : '',
+              c.montant_collecte,
+              c.taux_commission,
+              c.montant_commission,
+              c.primes,
+              c.avances,
+              c.montant_net,
+              c.statut_paiement,
+              c.date_paiement ? new Date(c.date_paiement).toLocaleDateString('fr-FR') : ''
+            ]);
+            const csv = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `commissions_${selectedPeriode || 'all'}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center gap-2 transition"
+        >
           <Download size={20} />
           Exporter
+        </button>
+
+        <button
+          onClick={recalculateAll}
+          disabled={recalculating === 'all' || commissions.length === 0}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2 transition disabled:opacity-50"
+        >
+          {recalculating === 'all' ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} />}
+          Recalculer Tout
         </button>
       </div>
 
@@ -386,14 +458,24 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {commission.statut_paiement === StatutPaiementCommission.PENDING && (
+                    <div className="flex gap-1.5">
                       <button
-                        onClick={() => handlePayer(commission.id)}
-                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition"
+                        onClick={() => recalculateOne(commission.id)}
+                        disabled={recalculating === commission.id}
+                        className="px-2 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 rounded text-sm transition disabled:opacity-50"
+                        title="Recalculer depuis collectes"
                       >
-                        Payer
+                        {recalculating === commission.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                       </button>
-                    )}
+                      {commission.statut_paiement === StatutPaiementCommission.PENDING && (
+                        <button
+                          onClick={() => handlePayer(commission.id)}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition"
+                        >
+                          Payer
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle, Download } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
+import { TontineTimelineHorizontal } from './TontineTimeline';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Pagination } from '../../ui/Pagination';
 import { SkeletonMemberCard } from '../../ui/Skeleton';
@@ -11,6 +12,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { usePagination } from '../../../hooks/usePagination';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
 import { formatClientName } from '../../../lib/format';
+import { exportToCSV, exportToPDF } from '../../../lib/exportUtils';
 import {
   StatutClient,
   StatutMembreTontine,
@@ -260,6 +262,33 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
     return STATUT_MEMBRE_TONTINE_LABELS[statut as StatutMembreTontineValue] || statut;
   }, []);
 
+  // Export members data
+  const buildExportData = useCallback(() => {
+    return membres.map((m) => ({
+      'Position': m.position_ordre,
+      'Nom': formatClientName(m.client?.nom, m.client?.prenom),
+      'Statut': getStatutLabel(m.status || m.statut || StatutMembreTontine.ACTIVE),
+      'Total cotisé (FCFA)': Number(m.totalCotisations || m.montant_total_contribue || 0),
+      'Tours payés': m.toursPayes ?? '-',
+      'Tours restants': m.toursRestants ?? '-',
+      'Restant (FCFA)': m.montantRestant ?? 0,
+      'Bénéfice reçu': m.a_recu_benefice ? 'Oui' : 'Non',
+      "Date d'adhésion": new Date(m.date_adhesion || m.dateAdhesion || '').toLocaleDateString('fr-FR'),
+    }));
+  }, [membres, getStatutLabel]);
+
+  const handleExportCSV = useCallback(() => {
+    const data = buildExportData();
+    const date = new Date().toISOString().slice(0, 10);
+    exportToCSV(data, `tontine-membres-${date}`);
+  }, [buildExportData]);
+
+  const handleExportPDF = useCallback(() => {
+    const data = buildExportData();
+    const date = new Date().toISOString().slice(0, 10);
+    exportToPDF(data, `tontine-membres-${date}`, `Liste des membres de la tontine`);
+  }, [buildExportData]);
+
   const handleCloseModal = useCallback(() => {
     setShowAddForm(false);
     setSelectedClientId('');
@@ -316,18 +345,39 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                 {membres.length} / {maxMembres}
             </span>
         </div>
-        <Button
-          onClick={() => setShowAddForm(true)}
-          variant="success"
-          size="sm"
-          icon={UserPlus}
-          disabled={isFull}
-          title={isFull ? "La tontine est complète" : "Ajouter un membre"}
-          className={isFull ? "opacity-50 cursor-not-allowed" : ""}
-          aria-describedby="membres-heading"
-        >
-          {isFull ? 'Complet' : 'Ajouter'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {membres.length > 0 && (
+            <>
+              <IconButton
+                icon={Download}
+                size="sm"
+                onClick={handleExportCSV}
+                aria-label="Exporter en CSV"
+                title="Exporter CSV"
+              />
+              <IconButton
+                icon={Download}
+                size="sm"
+                onClick={handleExportPDF}
+                aria-label="Exporter en PDF"
+                title="Exporter PDF"
+                className="text-cyan-400"
+              />
+            </>
+          )}
+          <Button
+            onClick={() => setShowAddForm(true)}
+            variant="success"
+            size="sm"
+            icon={UserPlus}
+            disabled={isFull}
+            title={isFull ? "La tontine est complète" : "Ajouter un membre"}
+            className={isFull ? "opacity-50 cursor-not-allowed" : ""}
+            aria-describedby="membres-heading"
+          >
+            {isFull ? 'Complet' : 'Ajouter'}
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
@@ -445,19 +495,25 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                       </div>
                     </div>
 
-                    {/* Progression des tours */}
+                    {/* Progression des tours avec timeline visuelle */}
                     {membre.toursPayes !== undefined && (
-                      <div className="mt-2 flex items-center gap-2 text-[10px]">
-                        <Clock size={12} className="text-slate-500" />
-                        <span className="text-slate-400">
-                          Tours payés: <span className="text-cyan-400 font-bold">{membre.toursPayes}</span>
-                          {' / '}
-                          <span className="text-slate-500">{maxMembres}</span>
-                        </span>
-                        <span className="text-slate-600">|</span>
-                        <span className="text-slate-400">
-                          Restants: <span className={`font-bold ${(membre.toursRestants || 0) > 0 ? 'text-amber-400' : 'text-green-400'}`}>{membre.toursRestants || 0}</span>
-                        </span>
+                      <div className="mt-2 space-y-1.5">
+                        <TontineTimelineHorizontal
+                          tourActuel={membre.tourActuel || 1}
+                          toursPayes={membre.toursPayes || 0}
+                          nombreMembres={maxMembres}
+                        />
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <span className="text-slate-400">
+                            Tours payés: <span className="text-cyan-400 font-bold">{membre.toursPayes}</span>
+                            {' / '}
+                            <span className="text-slate-500">{maxMembres}</span>
+                          </span>
+                          <span className="text-slate-600">|</span>
+                          <span className="text-slate-400">
+                            Restants: <span className={`font-bold ${(membre.toursRestants || 0) > 0 ? 'text-amber-400' : 'text-green-400'}`}>{membre.toursRestants || 0}</span>
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>

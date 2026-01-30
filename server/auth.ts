@@ -62,6 +62,45 @@ import type { User } from '@shared/schema';
 import { SystemRole, normalizeRole as normalizeSystemRole } from '@shared/types/roles';
 import pgSession from 'connect-pg-simple';
 import pg from 'pg';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('Auth');
+
+// ============================================
+// Session Configuration for Microfinance
+// ============================================
+//
+// Security considerations for financial applications:
+// - Inactivity timeout: Balance between security and UX
+// - Rolling sessions: Reset timer on each activity
+// - Absolute timeout: Force re-auth after max time (implemented via session-tracker)
+//
+// Industry standards:
+// - Banking apps: 15-30 min inactivity
+// - Microfinance (field agents): 2-4 hours (longer due to rural connectivity)
+// - Back-office admin: 1-2 hours
+//
+// Our configuration:
+// - 2 hours inactivity (rolling) - Good for field agents with intermittent connectivity
+// - Session refreshes on every request (rolling: true)
+// - Absolute timeout of 12 hours handled by session-tracker
+
+/**
+ * Session timeout configuration (in milliseconds)
+ */
+export const SESSION_CONFIG = {
+  /** Inactivity timeout - session expires after this time without activity */
+  INACTIVITY_TIMEOUT_MS: 2 * 60 * 60 * 1000, // 2 hours
+
+  /** Same value in seconds for Redis TTL */
+  INACTIVITY_TIMEOUT_SEC: 2 * 60 * 60, // 2 hours
+
+  /** Absolute session timeout - force re-login regardless of activity (handled by session-tracker) */
+  ABSOLUTE_TIMEOUT_MS: 12 * 60 * 60 * 1000, // 12 hours (workday)
+
+  /** Warning before session expires (shown to user) */
+  WARNING_BEFORE_EXPIRY_MS: 5 * 60 * 1000, // 5 minutes
+} as const;
 
 // ============================================
 // Session Store Configuration
@@ -101,30 +140,30 @@ async function createSessionStore(): Promise<SessionStore> {
       const redisClient = createClient({ url: redisUrl });
 
       redisClient.on('error', (err: Error) => {
-        console.error('[Redis] Connection error:', err);
+        logger.error({ err }, 'Redis connection error');
       });
 
       redisClient.on('connect', () => {
-        console.log('[Redis] Connected successfully');
+        logger.info('Redis connected successfully');
       });
 
       await redisClient.connect();
 
-      console.log('[Auth] Using Redis session store (high performance mode)');
+      logger.info('Using Redis session store (high performance mode)');
 
       return new RedisStore({
         client: redisClient,
         prefix: 'cofin:sess:',
-        ttl: 30 * 60, // 30 minutes in seconds
+        ttl: SESSION_CONFIG.INACTIVITY_TIMEOUT_SEC, // 2 hours (microfinance standard)
       });
     } catch (error) {
-      console.warn('[Auth] Redis connection failed, falling back to PostgreSQL:', error);
+      logger.warn({ err: error }, 'Redis connection failed, falling back to PostgreSQL');
       // Fall through to PostgreSQL
     }
   }
 
   // PostgreSQL fallback
-  console.log('[Auth] Using PostgreSQL session store');
+  logger.info('Using PostgreSQL session store');
   return new PostgresStore({
     pool,
     tableName: 'session',
@@ -183,9 +222,9 @@ export async function setupAuth(app: Express) {
   try {
     await pool.query(createTableSQL);
     await pool.query(createIndexSQL);
-    console.log('[Auth] PostgreSQL session table ready');
+    logger.info('PostgreSQL session table ready');
   } catch (err) {
-    console.error("Failed to create session table:", err);
+    logger.error({ err }, 'Failed to create session table');
   }
 
   // Create the appropriate session store (Redis or PostgreSQL)
@@ -205,7 +244,7 @@ export async function setupAuth(app: Express) {
     cookie: {
       secure: isProduction, // __Host- requires true, but localhost dev might be http
       httpOnly: true,
-      maxAge: 30 * 60 * 1000, // 30 minutes
+      maxAge: SESSION_CONFIG.INACTIVITY_TIMEOUT_MS, // 2 hours (rolling resets on activity)
       sameSite: 'lax',
       // Don't set domain - let browser handle it automatically
     },
@@ -219,7 +258,7 @@ export async function setupAuth(app: Express) {
     return sessionMiddleware!(req, res, next);
   });
 
-  console.log(`[Auth] Session middleware configured (store: ${sessionStoreType})`);
+  logger.info({ sessionStoreType }, 'Session middleware configured');
 }
 
 export async function hashPassword(password: string): Promise<string> {

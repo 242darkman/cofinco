@@ -3,7 +3,9 @@ import { db } from "../db";
 import { comptes, produitsCompte, mouvementsFinanciers, evenementsOutbox, transactionsCompte } from "@shared/schema";
 import { eq, and, gt, sql } from "drizzle-orm";
 import { executeWithLedger, updateCompteSolde } from "./ledger";
-import { log } from "../logger";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('InterestScheduler');
 import { StatutCompte } from "@shared/enum/status-constants";
 import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 
@@ -26,14 +28,14 @@ export class InterestSchedulerService {
       this.runMonthlyCapitalization();
     });
 
-    log("InterestSchedulerService started: Daily accrual @ 00:00, Monthly capitalization @ 01:00 (1st of month)");
+    logger.info('Service started: Daily accrual @ 00:00, Monthly capitalization @ 01:00 (1st of month)');
   }
 
   /**
    * Tâche quotidienne: Calculer les intérêts latents (accrued_interest)
    */
   public async runDailyAccrual() {
-    log("Starting Daily Interest Accrual Job...");
+    logger.info('Starting Daily Interest Accrual Job');
     
     try {
       const activeAccounts = await db
@@ -82,9 +84,9 @@ export class InterestSchedulerService {
         }
       }
 
-      log(`Daily Interest Accrual Job completed. Processed ${processed} - accounts.`);
+      logger.info({ processed }, 'Daily Interest Accrual Job completed');
     } catch (error) {
-      console.error("Error in Daily Interest Accrual Job:", error);
+      logger.error({ err: error }, 'Error in Daily Interest Accrual Job');
     }
   }
 
@@ -92,7 +94,7 @@ export class InterestSchedulerService {
    * Tâche mensuelle: Capitaliser les intérêts (verser sur le solde)
    */
   public async runMonthlyCapitalization() {
-    log("Starting Monthly Capitalization Job...");
+    logger.info('Starting Monthly Capitalization Job');
 
     try {
       // Sélectionner les comptes ayant des intérêts accumulés
@@ -142,6 +144,7 @@ export class InterestSchedulerService {
                             compteId: compte.id,
                             mouvementId: mouvement.id,
                             typePaiement: "INTEREST_PAYMENT",
+                            sens: "CREDIT", // Interest is money coming in
                             montant: montantAcrediter.toString(),
                             soldeApres: nouveauSolde,
                             methodePaiement: "TRANSFER",
@@ -172,13 +175,13 @@ export class InterestSchedulerService {
 
             processed++;
         } catch (err) {
-            console.error(`Failed to capitalize for account ${compte.id}:`, err);
+            logger.error({ err, accountId: compte.id }, 'Failed to capitalize for account');
         }
       }
 
-      log(`Monthly Capitalization Job completed. Capitalized for ${processed} accounts.`);
+      logger.info({ processed }, 'Monthly Capitalization Job completed');
     } catch (error) {
-      console.error("Error in Monthly Capitalization Job:", error);
+      logger.error({ err: error }, 'Error in Monthly Capitalization Job');
     }
   }
 }

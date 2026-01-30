@@ -5,7 +5,7 @@ import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { authService } from '../../../lib/auth';
 import { api } from '../../../lib/api';
-import { sessionCaisseApi } from '../../../lib/api-client';
+import { sessionCaisseApi, caisseAccessCodeApi } from '../../../lib/api-client';
 import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -98,6 +98,13 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
   // Mode d'ouverture sélectionné (direct = sans coffre, request = avec coffre)
   const [openingMode, setOpeningMode] = useState<OpeningMode>('direct');
 
+  // Code de secours superviseur
+  const [showSupervisorCode, setShowSupervisorCode] = useState(false);
+  const [supervisorCode, setSupervisorCode] = useState('');
+  const [supervisorValidated, setSupervisorValidated] = useState(false);
+  const [supervisorLoading, setSupervisorLoading] = useState(false);
+  const [supervisorError, setSupervisorError] = useState('');
+
   // Charger les agences pour Admin
   useEffect(() => {
     if (isAdmin) {
@@ -180,6 +187,33 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
     );
   };
 
+  // ========== VALIDATION CODE SUPERVISEUR ==========
+  const handleValidateSupervisorCode = async () => {
+    if (!supervisorCode || supervisorCode.length < 6) {
+      setSupervisorError('Code invalide (minimum 6 caractères)');
+      return;
+    }
+    setSupervisorLoading(true);
+    setSupervisorError('');
+    try {
+      const result = await caisseAccessCodeApi.validateCode(
+        supervisorCode,
+        selectedCaisseId || undefined,
+        selectedAgenceId || currentUser?.agenceId
+      );
+      if (result.success) {
+        setSupervisorValidated(true);
+        setSupervisorError('');
+      } else {
+        setSupervisorError(result.error || 'Code invalide ou expiré');
+      }
+    } catch (err: any) {
+      setSupervisorError(err.message || 'Erreur de validation');
+    } finally {
+      setSupervisorLoading(false);
+    }
+  };
+
   // ========== PHASE A: Authentification + Demande de fonds ==========
   const handleRequestOpening = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +264,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         montantDemande,
         agenceId: selectedAgenceId || currentUser?.agenceId,
         observations,
+        ...(supervisorValidated && { supervisorOverride: true }),
       });
 
       setSession(result.session);
@@ -390,6 +425,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         caisseId: selectedCaisseId,
         agenceId: selectedAgenceId || currentUser?.agenceId,
         observations,
+        ...(supervisorValidated && { supervisorOverride: true }),
       });
 
       setSession(result.session);
@@ -680,6 +716,76 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                           </div>
                         )}
                      </div>
+                  </div>
+
+                  {/* 4. CODE DE SECOURS SUPERVISEUR (optionnel) */}
+                  <div className="border-t border-slate-800 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowSupervisorCode(!showSupervisorCode)}
+                      className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      <KeyRound size={14} />
+                      <span>Code de secours superviseur</span>
+                      <span className="text-[10px]">{showSupervisorCode ? '▲' : '▼'}</span>
+                      {supervisorValidated && (
+                        <span className="ml-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold">
+                          Autorisé
+                        </span>
+                      )}
+                    </button>
+
+                    {showSupervisorCode && (
+                      <div className="mt-3 space-y-2 animate-in slide-in-from-top-2">
+                        <div className="relative flex gap-2">
+                          <div className="relative flex-1">
+                            <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                            <input
+                              type="text"
+                              placeholder="Code 8 caractères"
+                              maxLength={8}
+                              value={supervisorCode}
+                              onChange={(e) => {
+                                setSupervisorCode(e.target.value.toUpperCase());
+                                setSupervisorValidated(false);
+                                setSupervisorError('');
+                              }}
+                              disabled={supervisorValidated}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-white font-mono tracking-widest text-sm focus:border-amber-500 outline-none transition-all placeholder-slate-700 disabled:opacity-50"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleValidateSupervisorCode}
+                            disabled={supervisorLoading || supervisorValidated || supervisorCode.length < 6}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                          >
+                            {supervisorLoading ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : supervisorValidated ? (
+                              <Check size={14} />
+                            ) : (
+                              'Valider'
+                            )}
+                          </button>
+                        </div>
+                        {supervisorError && (
+                          <p className="text-xs text-red-400 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            {supervisorError}
+                          </p>
+                        )}
+                        {supervisorValidated && (
+                          <p className="text-xs text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 size={12} />
+                            Autorisation superviseur accordée
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-600">
+                          Demandez ce code à votre superviseur pour un accès d'urgence.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -13,7 +13,7 @@ import { resolveStorageUrl } from '@/lib/format';
 const VALIDATION_PATTERNS = {
   email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   phone: /^\+?[0-9]{8,15}$/, // Format international ou local (8-15 chiffres, + optionnel)
-  cnss: /^[A-Z0-9]{6,20}$/i, // Format alphanumérique (6-20 caractères)
+  cnss: /^[A-Z0-9-]{6,20}$/i, // Format alphanumérique avec tirets (6-20 caractères)
 };
 
 // Âge minimum légal pour embauche (18 ans)
@@ -167,8 +167,8 @@ export default function EmployeeForm({
     }));
   }, [allEmployes, editingEmploye?.id, wouldCreateCircularReference]);
 
-  // Fonction de validation
-  const validateForm = useCallback((scope: 'all' | 'identity' | 'contract' = 'all'): boolean => {
+  // Fonction de validation - retourne l'objet errors pour usage immédiat
+  const validateForm = useCallback((scope: 'all' | 'identity' | 'contract' = 'all'): Record<string, string> => {
     const errors: Record<string, string> = {};
 
     // --- VALIDATION IDENTITÉ (Tab 1) ---
@@ -267,41 +267,58 @@ export default function EmployeeForm({
       }
     }
 
-    // Mise à jour des erreurs: SI on valide 'all', on remplace tout. Si on valide partiel, on merge ou on remplace ?
-    // Pour ne pas perdre les erreurs de l'autre tab, on merge si partiel.
+    // Mise à jour des erreurs: SI on valide 'all', on remplace tout. Si on valide partiel, on merge.
     if (scope === 'all') {
       setValidationErrors(errors);
     } else {
-      setValidationErrors(prev => {
-        // Supprimer les erreurs de la scope actuelle des erreurs précédentes pour les remplacer par les nouvelles de cette scope
-        // C'est un peu tricky. Simplifions : On valide tout à la fin de toute façon.
-        // Pour la navigation "Next", on veut juste savoir si c'est bon.
-        return { ...prev, ...errors };
-      });
+      setValidationErrors(prev => ({ ...prev, ...errors }));
     }
-    
-    return Object.keys(errors).length === 0;
+
+    // Retourne l'objet errors pour usage immédiat (car setState est async)
+    return errors;
   }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId]);
 
   const handleNextTab = () => {
-    // Valider Tab Identity uniquement
-    const valid = validateForm('identity');
-    if (valid) {
-      setActiveTab('contract');
-      // Scroll top
-      const modalBody = document.querySelector('.overflow-y-auto');
-      if (modalBody) modalBody.scrollTop = 0;
-    } else {
-       toast.error('Veuillez corriger les erreurs avant de continuer');
-    }
+    // Passer directement à l'onglet suivant sans bloquer
+    setActiveTab('contract');
+    // Scroll top
+    const modalBody = document.querySelector('.overflow-y-auto');
+    if (modalBody) modalBody.scrollTop = 0;
   };
+
+  // Vérifier si le formulaire est complet pour activer le bouton de soumission
+  const isFormComplete = useMemo(() => {
+    // Vérifications Tab 1 - Identité
+    if (!editingEmploye && !selectedUserId) return false;
+    if (!editingEmploye && selectedUser && !selectedUser.agenceId) return false;
+    if (editingEmploye && !agenceId) return false;
+    if (!formData.nom) return false;
+    if (formData.email && !VALIDATION_PATTERNS.email.test(formData.email)) return false;
+    if (formData.phone) {
+      const cleanPhone = formData.phone.replace(/[\s.-]/g, '');
+      if (!VALIDATION_PATTERNS.phone.test(cleanPhone)) return false;
+    }
+
+    // Vérifications Tab 2 - Contrat
+    if (!selectedJobPositionId) return false;
+    if (!formData.dateEmbauche) return false;
+    const salary = parseFloat(formData.salaireBase);
+    if (isNaN(salary) || salary < 0) return false;
+    if (formData.numeroCnss && !VALIDATION_PATTERNS.cnss.test(formData.numeroCnss)) return false;
+
+    return true;
+  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation avant soumission
-    if (!validateForm()) {
-      toast.error('Veuillez corriger les erreurs de validation');
+    const errors = validateForm('all');
+    if (Object.keys(errors).length > 0) {
+      const errorMessages = Object.entries(errors)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join(', ');
+      toast.error(`Veuillez corriger: ${errorMessages}`);
       return;
     }
 
@@ -336,12 +353,24 @@ export default function EmployeeForm({
 
   // Mise à jour de la référence et reset du formulaire quand le modal s'ouvre ou l'employé change
   // On utilise editingEmploye?.id pour éviter de se déclencher à chaque render
+  // On compare le JSON stringifié de initialData pour détecter les vrais changements
+  const initialDataJson = JSON.stringify(initialData);
+  const prevInitialDataJsonRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!isOpen) return; // Ne rien faire si le modal est fermé
+    // Réinitialiser la ref quand le modal se ferme
+    if (!isOpen) {
+      prevInitialDataJsonRef.current = null;
+      return;
+    }
+
+    // Ne réinitialiser que si initialData a vraiment changé
+    if (prevInitialDataJsonRef.current === initialDataJson) return;
+    prevInitialDataJsonRef.current = initialDataJson;
 
     setFormData(initialData);
     setPhotoPreview(initialData.photoProfile || editingEmploye?.photoProfile || null);
-    initialDataRef.current = JSON.stringify(initialData);
+    initialDataRef.current = initialDataJson;
     setValidationErrors({});
 
     // Reset user selection for new employee
@@ -367,7 +396,7 @@ export default function EmployeeForm({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editingEmploye?.id]);
+  }, [isOpen, editingEmploye?.id, initialDataJson]);
 
   // Charger les agences
   useEffect(() => {
@@ -758,7 +787,7 @@ export default function EmployeeForm({
               </div>
   
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <SelectField label="Sexe" name="sexe" value={formData.sexe || 'M'} onChange={(e) => updateField('sexe', e.target.value as 'M' | 'F')} options={[{ value: 'M', label: 'Masculin' }, { value: 'F', label: 'Féminin' }]} required disabled={!!selectedUser && !editingEmploye} />
+                <SelectField label="Sexe" name="sexe" value={formData.sexe || 'M'} onChange={(e) => updateField('sexe', e.target.value as 'M' | 'F')} options={[{ value: 'M', label: 'Masculin' }, { value: 'F', label: 'Féminin' }]} required />
                 <FormField label="Email" name="email" type="email" value={formData.email || ''} onChange={(e) => updateField('email', e.target.value)} readOnly={!!selectedUser && !editingEmploye} error={validationErrors.email} className="py-1" />
                 <FormField label="Téléphone" name="phone" type="tel" value={formData.phone || ''} onChange={(e) => updateField('phone', e.target.value)} readOnly={!!selectedUser && !editingEmploye} error={validationErrors.phone} className="py-1" />
               </div>
@@ -907,7 +936,7 @@ export default function EmployeeForm({
                   Suivant <ChevronRight size={16} />
                 </Button>
              ) : (
-                <Button type="submit" variant="primary" disabled={saving}>
+                <Button type="submit" variant="primary" disabled={saving || !isFormComplete}>
                   <Save size={18} className="mr-2" />
                   {saving ? '...' : 'Sauvegarder'}
                 </Button>

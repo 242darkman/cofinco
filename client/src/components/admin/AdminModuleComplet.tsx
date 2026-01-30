@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin, 
-  MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock, 
-  AlertTriangle, ShieldCheck, LayoutGrid, UserCog, Lock, ChevronLeft, ChevronRight 
+import {
+  Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin,
+  MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock,
+  AlertTriangle, ShieldCheck, LayoutGrid, UserCog, Lock, ChevronLeft, ChevronRight, Percent
 } from 'lucide-react';
 import { Button, ConfirmDialog } from '../ui';
 
@@ -31,6 +31,7 @@ import AdminTontinesGestion from './AdminTontinesGestion';
 import AdminGestionAgences from './AdminGestionAgences';
 import AdminGestionZones from './AdminGestionZones';
 import AdminNotificationsMonitor from './AdminNotificationsMonitor';
+import NotificationTemplatesAdmin from './notifications/NotificationTemplatesAdmin';
 import AdminVersionInfo from './AdminVersionInfo';
 import { SystemRole } from '@shared/types/roles';
 import AdminCaisseAccessCodes from './AdminCaisseAccessCodes';
@@ -39,8 +40,11 @@ import AdminCreditsGestion from './AdminCreditsGestion';
 import RolesPermissionsManager from './permissions/RolesPermissionsManager';
 import ModulePermissionsView from './permissions/ModulePermissionsView';
 import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
+import TemporaryPermissionsManager from './permissions/TemporaryPermissionsManager';
+import PermissionAnalyticsDashboard from './permissions/PermissionAnalyticsDashboard';
 import RegularizationDashboard from './RegularizationDashboard';
 import AdminClientCredentials from './AdminClientCredentials';
+import AdminProductRates from './AdminProductRates';
 
 interface AdminModuleCompletProps {
   activeView?: string;
@@ -48,7 +52,7 @@ interface AdminModuleCompletProps {
 
 export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
   const [activeTab, setActiveTab] = useState<AdminTabId>('dashboard');
-  const [accessViewMode, setAccessViewMode] = useState<'roles' | 'modules' | 'users'>('roles');
+  const [accessViewMode, setAccessViewMode] = useState<'roles' | 'modules' | 'users' | 'temporary' | 'analytics'>('roles');
   const [selectedRole, setSelectedRole] = useState<SystemRole>(SystemRole.ADMIN);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -354,10 +358,13 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'codes' && <AdminCaisseAccessCodes onClose={() => setActiveTab('dashboard')} />}
                   {activeTab === 'maintenance' && <AdminMaintenanceMode />}
                   {activeTab === 'settings' && <AdminSystemSettings />}
-                  {activeTab === 'notifications' && <AdminNotificationsMonitor />}
+                  {activeTab === 'notifications' && (
+                    <NotificationsSection />
+                  )}
                   {activeTab === 'updates' && <AdminVersionInfo />}
                   {activeTab === 'regularisation' && <RegularizationDashboard />}
                   {activeTab === 'client-credentials' && <AdminClientCredentials />}
+                  {activeTab === 'product-rates' && <AdminProductRates />}
 
                   {activeTab === 'roles' && (
                     <div className="flex flex-col h-full overflow-hidden space-y-4">
@@ -369,6 +376,8 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                                 { id: 'roles' as const, label: 'Par Rôle', icon: ShieldCheck },
                                 { id: 'modules' as const, label: 'Vue Globale', icon: LayoutGrid },
                                 { id: 'users' as const, label: 'Exceptions', icon: UserCog },
+                                { id: 'temporary' as const, label: 'Temporaires', icon: Clock },
+                                { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
                               ].map((tab) => {
                                 const isActive = accessViewMode === tab.id;
                                 return (
@@ -434,6 +443,16 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                             confirmMessage={confirmMessage}
                             />
                         )}
+
+                        {accessViewMode === 'temporary' && (
+                            <TemporaryPermissionsManager
+                            users={users}
+                            />
+                        )}
+
+                        {accessViewMode === 'analytics' && (
+                            <PermissionAnalyticsDashboard />
+                        )}
                       </div>
                     </div>
                   )}
@@ -451,6 +470,50 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
         variant={confirmState.variant || 'warning'}
         confirmText={confirmState.confirmText || 'Confirmer'}
       />
+    </div>
+  );
+}
+
+// Internal component for notifications section with tabs
+function NotificationsSection() {
+  const [notifView, setNotifView] = useState<'monitor' | 'templates'>('monitor');
+
+  return (
+    <div className="flex flex-col h-full space-y-4">
+      {/* Sub-tabs for notifications */}
+      <div className="flex items-center gap-4 border-b border-slate-800 pb-2 shrink-0">
+        <span className="text-sm text-slate-400 font-medium">Vue :</span>
+        <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+          <button
+            onClick={() => setNotifView('monitor')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              notifView === 'monitor'
+                ? 'bg-slate-800 text-white'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Activity size={14} />
+            Monitoring
+          </button>
+          <button
+            onClick={() => setNotifView('templates')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              notifView === 'templates'
+                ? 'bg-slate-800 text-white'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MessageSquare size={14} />
+            Templates
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
+        {notifView === 'monitor' && <AdminNotificationsMonitor />}
+        {notifView === 'templates' && <NotificationTemplatesAdmin />}
+      </div>
     </div>
   );
 }

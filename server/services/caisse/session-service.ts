@@ -21,6 +21,9 @@ import {
   isOutgoingOperation,
 } from "@shared/config/caisse-operations";
 import { postGlForMouvement } from "../accounting-posting-service";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('SessionService');
 
 // ============================================================================
 // TYPES & CONSTANTES
@@ -364,7 +367,7 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
       }
     }
 
-    console.error("Erreur ouverture session:", error);
+    logger.error({ err: error }, 'Error opening session');
     return {
       success: false,
       error: error.message || "Erreur lors de l'ouverture de la session",
@@ -552,7 +555,7 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
               }
             } catch (glError: unknown) {
               const message = glError instanceof Error ? glError.message : "Unknown GL error";
-              console.error(`[SessionService] GL posting failed for écart mouvement ${mouvementAjustement.id}: ${message}`);
+              logger.error({ mouvementId: mouvementAjustement.id, error: message }, 'GL posting failed for ecart mouvement');
               await tx.update(mouvementsFinanciers)
                 .set({ glPostingStatus: "FAILED", glPostingError: message })
                 .where(eq(mouvementsFinanciers.id, mouvementAjustement.id));
@@ -641,7 +644,7 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
       ecartAlert: result.ecartAlert,
     };
   } catch (error: any) {
-    console.error("Erreur fermeture session:", error);
+    logger.error({ err: error }, 'Error closing session');
     return {
       success: false,
       error: error.message || "Erreur lors de la fermeture de la session",
@@ -666,7 +669,7 @@ export async function updateSessionHeartbeat(sessionId: string): Promise<boolean
 
     return !!updated;
   } catch (error) {
-    console.error("Erreur mise à jour heartbeat:", error);
+    logger.error({ err: error }, 'Error updating heartbeat');
     return false;
   }
 }

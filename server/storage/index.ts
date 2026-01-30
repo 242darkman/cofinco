@@ -66,7 +66,10 @@ export interface IStorage {
     // Credits
     getCredit(id: string): Promise<Credit | undefined>;
     getCreditsByClient(clientId: string): Promise<Credit[]>;
-    getAllCredits(filter?: { agence?: string }): Promise<Credit[]>;
+    getAllCredits(
+      filter?: { agence?: string; clientId?: string },
+      options?: { search?: string; page?: number; limit?: number; statut?: string }
+    ): Promise<finance.PaginatedCredits>;
     getUpcomingEcheances(filter?: { agence?: string }): Promise<{ client: string; amount: number; date: string; status: string }[]>;
     createCredit(credit: InsertCredit): Promise<Credit>;
     updateCredit(id: string, credit: Partial<InsertCredit>): Promise<Credit | undefined>;
@@ -276,6 +279,7 @@ export interface IStorage {
     getOperationsBySessionWithSens(sessionId: string): Promise<any[]>;
     getAllOperationsCaisse(): Promise<OperationCaisse[]>;
     getOperationsCaisseByDateRange(start: Date, end: Date): Promise<OperationCaisse[]>;
+    getOperationsCaisseToday(caisseId: string): Promise<OperationCaisse[]>;
     getOperationsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: string): Promise<OperationCaisse[]>;
     getMouvementsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: 'retrait' | 'depot' | string): Promise<any[]>;
     createOperationCaisse(operation: InsertOperationCaisse): Promise<OperationCaisse>;
@@ -503,6 +507,7 @@ export interface IStorage {
 
     // Accounting
     getAllComptesComptables(): Promise<CompteComptable[]>;
+    getAllComptesComptablesWithBalances(): Promise<(CompteComptable & { soldeActuel: number })[]>;
     getComptesComptablesByClasse(classe: number): Promise<CompteComptable[]>;
     createCompteComptable(compte: InsertCompteComptable): Promise<CompteComptable>;
 
@@ -542,7 +547,7 @@ export interface IStorage {
     assignAvantage(data: any): Promise<any>;
 
     getPresenceAujourdhui(): Promise<any>;
-    checkIn(employeId: string): Promise<any>;
+    checkIn(employeId: string, gps?: { latitude?: number | null; longitude?: number | null; accuracy?: number | null; gpsSource?: string }): Promise<any>;
     checkOut(employeId: string): Promise<any>;
     startBreak(employeId: string): Promise<any>;
     endBreak(employeId: string): Promise<any>;

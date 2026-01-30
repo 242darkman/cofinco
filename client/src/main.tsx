@@ -82,35 +82,55 @@ const patchJsonResponse = (response: Response): Response => {
   return response;
 };
 
+// Maximum retries for network failures before giving up
+const MAX_NETWORK_RETRIES = 2;
+
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const healthBridge = getServerHealthBridge();
   const isHealthCheck = isHealthCheckRequest(input);
+  let retryCount = 0;
 
-  while (true) {
-    if (healthBridge && !isHealthCheck && !healthBridge.getIsServerReachable()) {
-      await healthBridge.waitForReachable();
-    }
-
+  while (retryCount <= MAX_NETWORK_RETRIES) {
     try {
       const response = await nativeFetch(input, {
         ...init,
         credentials: init?.credentials ?? 'include',
       });
 
+      // Report success to reset failure counter (skip for health checks)
       if (healthBridge && !isHealthCheck) {
         healthBridge.reportSuccess();
       }
 
       return patchJsonResponse(response);
     } catch (error) {
+      // Only retry network failures, not other errors
       if (healthBridge && !isHealthCheck && isNetworkFailure(error)) {
-        healthBridge.reportFailure(error);
-        await healthBridge.waitForReachable();
+        retryCount++;
+
+        // If we've exhausted retries, report failure and throw
+        if (retryCount > MAX_NETWORK_RETRIES) {
+          healthBridge.reportFailure(error);
+          throw error;
+        }
+
+        // Report failure after 2nd attempt to trigger overlay if needed
+        if (retryCount >= 2) {
+          healthBridge.reportFailure(error);
+        }
+
+        // Wait before retrying (exponential backoff: 1s, 2s)
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
         continue;
       }
+
+      // Non-network errors are thrown immediately
       throw error;
     }
   }
+
+  // Should never reach here, but just in case
+  throw new Error('Max retries exceeded');
 };
 
 createRoot(document.getElementById('root')!).render(

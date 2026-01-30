@@ -4,9 +4,17 @@
  *
  * MTN utilise Basic Auth (userId:apiKey) pour obtenir un Bearer token
  * Le token est caché en mémoire avec refresh automatique avant expiration
+ *
+ * Token Expiration:
+ * - Access Token: 3600 secondes (1 heure)
+ * - API User/Key: Pas d'expiration
+ * - Subscription Key: Pas d'expiration
  */
 
 import * as crypto from "crypto";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger('MtnAuth');
 
 export interface MtnTokenResponse {
   access_token: string;
@@ -18,6 +26,7 @@ export interface MtnAuthConfig {
   baseUrl: string;
   apiUserId: string;
   apiKey: string;
+  subscriptionKey: string; // Added for auto-refresh
   environment: "sandbox" | "production";
 }
 
@@ -25,20 +34,44 @@ interface CachedToken {
   accessToken: string;
   expiresAt: number; // timestamp ms
   product: string;
+  createdAt: number; // timestamp ms - when token was generated
+  refreshCount: number; // number of times this token was refreshed
 }
 
 // Cache en mémoire des tokens par produit
 const tokenCache = new Map<string, CachedToken>();
 
-// Buffer de sécurité avant expiration (2 minutes)
-const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000;
+// Buffer de sécurité avant expiration (5 minutes avant)
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+// Intervalle de vérification pour le refresh proactif (toutes les 50 minutes)
+const PROACTIVE_REFRESH_INTERVAL_MS = 50 * 60 * 1000;
+
+// Registre des instances pour le refresh automatique
+const authInstances = new Map<string, MtnAuthService>();
+
+// Timer global pour le refresh proactif
+let proactiveRefreshTimer: NodeJS.Timeout | null = null;
 
 export class MtnAuthService {
   private config: MtnAuthConfig;
+  private instanceId: string;
 
   constructor(config: MtnAuthConfig) {
     this.config = config;
+    this.instanceId = `${config.apiUserId}_${config.environment}`;
     this.validateConfig();
+
+    // Enregistrer cette instance pour le refresh automatique
+    authInstances.set(this.instanceId, this);
+
+    // Démarrer le refresh proactif si pas déjà actif
+    MtnAuthService.startProactiveRefresh();
+
+    logger.info({
+      environment: config.environment,
+      instanceId: this.instanceId,
+    }, 'MTN Auth Service initialized');
   }
 
   /**
@@ -93,11 +126,22 @@ export class MtnAuthService {
    */
   private async refreshToken(
     product: "collection" | "disbursement" | "remittance",
-    subscriptionKey: string
+    subscriptionKey: string,
+    isProactive: boolean = false
   ): Promise<string> {
     const tokenEndpoint = this.getTokenEndpoint(product);
+    const cacheKey = this.getCacheKey(product);
+    const existingToken = tokenCache.get(cacheKey);
+    const refreshCount = (existingToken?.refreshCount || 0) + 1;
+    const now = Date.now();
 
-    console.log(`[MTN Auth] Requesting new token for ${product}...`);
+    logger.info({
+      product,
+      environment: this.config.environment,
+      isProactiveRefresh: isProactive,
+      refreshCount,
+      previousTokenAge: existingToken ? Math.round((now - existingToken.createdAt) / 1000 / 60) : null,
+    }, '🔄 MTN Token refresh initiated');
 
     // Basic Auth: base64(apiUserId:apiKey)
     const credentials = Buffer.from(
@@ -120,33 +164,45 @@ export class MtnAuthService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[MTN Auth] Token request failed: ${response.status}`, {
+        logger.error({
           product,
           status: response.status,
-          // Ne pas logger le message d'erreur complet qui pourrait contenir des secrets
-          hasError: !!errorText,
-        });
+          environment: this.config.environment,
+          isProactiveRefresh: isProactive,
+          errorPreview: errorText.substring(0, 200),
+        }, '❌ MTN Token request failed');
         throw new Error(`MTN_AUTH_FAILED: HTTP ${response.status}`);
       }
 
       const data: MtnTokenResponse = await response.json();
 
       // Calculer l'expiration
-      const expiresAt = Date.now() + data.expires_in * 1000;
+      const expiresAt = now + data.expires_in * 1000;
+      const expiresAtDate = new Date(expiresAt);
 
-      // Mettre en cache
-      const cacheKey = this.getCacheKey(product);
+      // Mettre en cache avec métadonnées
       tokenCache.set(cacheKey, {
         accessToken: data.access_token,
         expiresAt,
         product,
+        createdAt: now,
+        refreshCount,
       });
 
-      console.log(`[MTN Auth] Token obtained for ${product}, expires in ${data.expires_in}s`);
+      logger.info({
+        product,
+        environment: this.config.environment,
+        expiresInSeconds: data.expires_in,
+        expiresAt: expiresAtDate.toISOString(),
+        nextRefreshAt: new Date(expiresAt - TOKEN_REFRESH_BUFFER_MS).toISOString(),
+        refreshCount,
+        isProactiveRefresh: isProactive,
+      }, '✅ MTN Token obtained successfully');
 
       return data.access_token;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
+        logger.error({ product, environment: this.config.environment }, '⏱️ MTN Token request timeout');
         throw new Error("MTN_AUTH_TIMEOUT: Request timed out");
       }
       throw error;
@@ -178,7 +234,7 @@ export class MtnAuthService {
   invalidateToken(product: "collection" | "disbursement" | "remittance"): void {
     const cacheKey = this.getCacheKey(product);
     tokenCache.delete(cacheKey);
-    console.log(`[MTN Auth] Token invalidated for ${product}`);
+    logger.info({ product }, 'Token invalidated');
   }
 
   /**
@@ -186,7 +242,7 @@ export class MtnAuthService {
    */
   invalidateAllTokens(): void {
     tokenCache.clear();
-    console.log("[MTN Auth] All tokens invalidated");
+    logger.info('All tokens invalidated');
   }
 
   /**
@@ -210,6 +266,146 @@ export class MtnAuthService {
    */
   static generateCallbackToken(): string {
     return crypto.randomBytes(32).toString("hex");
+  }
+
+  /**
+   * Rafraîchit proactivement un token pour un produit donné
+   * Utilisé par le scheduler automatique
+   */
+  async proactiveRefresh(product: "collection" | "disbursement" | "remittance"): Promise<void> {
+    const cacheKey = this.getCacheKey(product);
+    const cached = tokenCache.get(cacheKey);
+
+    if (!cached) {
+      logger.debug({ product }, 'No cached token to refresh proactively');
+      return;
+    }
+
+    const now = Date.now();
+    const timeUntilExpiry = cached.expiresAt - now;
+    const tokenAgeMinutes = Math.round((now - cached.createdAt) / 1000 / 60);
+
+    // Si le token expire dans moins de 10 minutes, le rafraîchir
+    if (timeUntilExpiry < TOKEN_REFRESH_BUFFER_MS + (5 * 60 * 1000)) {
+      logger.info({
+        product,
+        tokenAgeMinutes,
+        timeUntilExpiryMinutes: Math.round(timeUntilExpiry / 1000 / 60),
+      }, '🔄 Proactive token refresh triggered');
+
+      try {
+        await this.refreshToken(product, this.config.subscriptionKey, true);
+      } catch (error) {
+        logger.error({
+          product,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }, '❌ Proactive token refresh failed');
+      }
+    }
+  }
+
+  /**
+   * Démarre le refresh proactif global
+   * Vérifie tous les tokens toutes les 50 minutes et les rafraîchit si nécessaire
+   */
+  static startProactiveRefresh(): void {
+    if (proactiveRefreshTimer) {
+      return; // Déjà actif
+    }
+
+    logger.info({
+      intervalMinutes: PROACTIVE_REFRESH_INTERVAL_MS / 1000 / 60,
+    }, '🚀 MTN Proactive token refresh scheduler started');
+
+    proactiveRefreshTimer = setInterval(async () => {
+      const now = new Date();
+      logger.info({
+        timestamp: now.toISOString(),
+        instanceCount: authInstances.size,
+        cachedTokenCount: tokenCache.size,
+      }, '⏰ MTN Proactive refresh cycle started');
+
+      // Parcourir toutes les instances et rafraîchir leurs tokens
+      for (const [instanceId, instance] of authInstances) {
+        for (const product of ['collection', 'disbursement', 'remittance'] as const) {
+          try {
+            await instance.proactiveRefresh(product);
+          } catch (error) {
+            logger.error({
+              instanceId,
+              product,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            }, 'Proactive refresh error for instance/product');
+          }
+        }
+      }
+
+      logger.info({
+        timestamp: new Date().toISOString(),
+      }, '✅ MTN Proactive refresh cycle completed');
+    }, PROACTIVE_REFRESH_INTERVAL_MS);
+
+    // Ne pas bloquer le processus
+    proactiveRefreshTimer.unref();
+  }
+
+  /**
+   * Arrête le refresh proactif global
+   */
+  static stopProactiveRefresh(): void {
+    if (proactiveRefreshTimer) {
+      clearInterval(proactiveRefreshTimer);
+      proactiveRefreshTimer = null;
+      logger.info('🛑 MTN Proactive token refresh scheduler stopped');
+    }
+  }
+
+  /**
+   * Retourne les statistiques des tokens en cache
+   */
+  static getTokenStats(): Array<{
+    product: string;
+    createdAt: string;
+    expiresAt: string;
+    ageMinutes: number;
+    timeUntilExpiryMinutes: number;
+    refreshCount: number;
+  }> {
+    const now = Date.now();
+    const stats: Array<{
+      product: string;
+      createdAt: string;
+      expiresAt: string;
+      ageMinutes: number;
+      timeUntilExpiryMinutes: number;
+      refreshCount: number;
+    }> = [];
+
+    for (const [_key, token] of tokenCache) {
+      stats.push({
+        product: token.product,
+        createdAt: new Date(token.createdAt).toISOString(),
+        expiresAt: new Date(token.expiresAt).toISOString(),
+        ageMinutes: Math.round((now - token.createdAt) / 1000 / 60),
+        timeUntilExpiryMinutes: Math.round((token.expiresAt - now) / 1000 / 60),
+        refreshCount: token.refreshCount,
+      });
+    }
+
+    return stats;
+  }
+
+  /**
+   * Nettoie les ressources de cette instance
+   */
+  destroy(): void {
+    authInstances.delete(this.instanceId);
+    logger.info({ instanceId: this.instanceId }, 'MTN Auth Service instance destroyed');
+
+    // Si plus aucune instance, arrêter le scheduler
+    if (authInstances.size === 0) {
+      MtnAuthService.stopProactiveRefresh();
+    }
   }
 }
 

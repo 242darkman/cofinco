@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Award, Plus, Check, X, BarChart3, DollarSign } from 'lucide-react';
-import { StatutObjectif, STATUT_OBJECTIF_LABELS } from '@shared/enum/status-constants';
+import { Target, TrendingUp, Award, Plus, Check, BarChart3, DollarSign, RefreshCw, Loader2 } from 'lucide-react';
+import { StatutObjectif } from '@shared/enum/status-constants';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 interface Objectif {
@@ -25,6 +25,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedPeriode, setSelectedPeriode] = useState(new Date().toISOString().slice(0, 7));
+  const [recalculating, setRecalculating] = useState<string | null>(null); // objectif id or 'all'
 
   const [formData, setFormData] = useState({
     agent_id: agentId || '',
@@ -48,7 +49,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       if (selectedPeriode) params.append('periode', selectedPeriode);
       if (params.toString()) url += `?${params.toString()}`;
 
-      const response = await fetch(url);
+      const response = await fetch(url, { credentials: 'include' });
       if (response.ok) {
         const data = await response.json();
         setObjectifs(data || []);
@@ -71,6 +72,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       const response = await fetch('/api/agent-objectifs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
           valeur_realisee: 0,
@@ -80,7 +82,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la création');
+        throw new Error(errorData.error || 'Erreur lors de la creation');
       }
 
       setShowForm(false);
@@ -94,7 +96,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         recompense: 0
       });
     } catch (error: any) {
-      alert('Erreur: ' + error.error);
+      alert('Erreur: ' + (error.message || error.error));
     } finally {
       setLoading(false);
     }
@@ -106,13 +108,14 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       if (!objectif) return;
 
       const pourcentage = (valeur / objectif.valeur_objectif) * 100;
-      let statut = 'En cours';
-      if (pourcentage >= 100) statut = 'Atteint';
-      if (pourcentage > 110) statut = 'Dépassé';
+      let statut = 'IN_PROGRESS';
+      if (pourcentage >= 110) statut = 'Depasse';
+      else if (pourcentage >= 100) statut = 'Atteint';
 
       const response = await fetch(`/api/agent-objectifs/${objectifId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           valeur_realisee: valeur,
           statut
@@ -121,19 +124,65 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la mise à jour');
+        throw new Error(errorData.error || 'Erreur lors de la mise a jour');
       }
 
       loadObjectifs();
     } catch (error: any) {
-      alert('Erreur: ' + error.error);
+      alert('Erreur: ' + (error.message || error.error));
     }
   };
 
-  const objectifsAtteints = objectifs.filter(o => o.statut === 'Atteint' || o.statut === 'Dépassé').length;
+  const recalculateOne = async (objectifId: string) => {
+    try {
+      setRecalculating(objectifId);
+      const response = await fetch(`/api/agent-objectifs/${objectifId}/recalculate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors du recalcul');
+      }
+
+      await loadObjectifs();
+    } catch (error: any) {
+      alert('Erreur recalcul: ' + (error.message || error.error));
+    } finally {
+      setRecalculating(null);
+    }
+  };
+
+  const recalculateAll = async () => {
+    if (!agentId) return;
+    try {
+      setRecalculating('all');
+      const response = await fetch('/api/agent-objectifs/recalculate-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ agentId, periode: selectedPeriode }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors du recalcul');
+      }
+
+      await loadObjectifs();
+    } catch (error: any) {
+      alert('Erreur recalcul: ' + (error.message || error.error));
+    } finally {
+      setRecalculating(null);
+    }
+  };
+
+  const objectifsAtteints = objectifs.filter(o => o.statut === 'Atteint' || o.statut === 'Depasse').length;
   const totalRecompenses = objectifs
-    .filter(o => o.statut === 'Atteint' || o.statut === 'Dépassé')
-    .reduce((sum, o) => sum + o.recompense, 0);
+    .filter(o => o.statut === 'Atteint' || o.statut === 'Depasse')
+    .reduce((sum, o) => sum + Number(o.recompense || 0), 0);
   const tauxReussite = objectifs.length > 0
     ? (objectifsAtteints / objectifs.length) * 100
     : 0;
@@ -165,27 +214,42 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
             <DollarSign size={20} />
           </div>
           <div className="text-3xl font-bold mb-1">{totalRecompenses.toLocaleString()} FCFA</div>
-          <div className="text-emerald-100 text-sm">Récompenses</div>
+          <div className="text-emerald-100 text-sm">Recompenses</div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between mb-2">
             <TrendingUp size={24} />
             <BarChart3 size={20} />
           </div>
           <div className="text-3xl font-bold mb-1">{tauxReussite.toFixed(1)}%</div>
-          <div className="text-emerald-100 text-sm">Taux de Réussite</div>
+          <div className="text-cyan-100 text-sm">Taux de Reussite</div>
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-3">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors"
         >
           <Plus size={20} />
           Nouvel Objectif
         </button>
+
+        {objectifs.length > 0 && agentId && (
+          <button
+            onClick={recalculateAll}
+            disabled={recalculating !== null}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-2 transition-colors"
+          >
+            {recalculating === 'all' ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <RefreshCw size={18} />
+            )}
+            Recalculer Tout
+          </button>
+        )}
 
         <input
           type="month"
@@ -201,7 +265,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Période</label>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">Periode</label>
                 <input
                   type="month"
                   value={formData.periode}
@@ -238,7 +302,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Unité</label>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">Unite</label>
                 <select
                   value={formData.unite}
                   onChange={(e) => setFormData({ ...formData, unite: e.target.value })}
@@ -253,7 +317,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Récompense (FC)</label>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">Recompense (FC)</label>
                 <input
                   type="number"
                   value={formData.recompense}
@@ -285,7 +349,11 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
 
       <div className="grid gap-4">
         {objectifs.map((objectif) => {
-          const pourcentage = (objectif.valeur_realisee / objectif.valeur_objectif) * 100;
+          const pourcentage = objectif.valeur_objectif > 0
+            ? (Number(objectif.valeur_realisee) / Number(objectif.valeur_objectif)) * 100
+            : 0;
+          const isRecalculating = recalculating === objectif.id;
+
           return (
             <div key={objectif.id} className="bg-slate-800 rounded-xl p-6 border border-slate-700">
               <div className="flex items-start justify-between mb-4">
@@ -295,7 +363,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                       {objectif.type_objectif}
                     </span>
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      objectif.statut === 'Atteint' || objectif.statut === 'Dépassé'
+                      objectif.statut === 'Atteint' || objectif.statut === 'Depasse'
                         ? 'bg-green-500/20 text-green-400'
                         : 'bg-cyan-500/20 text-cyan-400'
                     }`}>
@@ -311,16 +379,29 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                     </p>
                   )}
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-right flex flex-col items-end gap-2">
+                  <div className="text-2xl font-bold text-white">
                     {pourcentage.toFixed(1)}%
                   </div>
-                  {objectif.recompense > 0 && (
+                  {Number(objectif.recompense) > 0 && (
                     <div className="text-green-400 text-sm font-semibold flex items-center gap-1">
                       <Award size={14} />
-                      {objectif.recompense.toLocaleString()} FCFA
+                      {Number(objectif.recompense).toLocaleString()} FCFA
                     </div>
                   )}
+                  <button
+                    onClick={() => recalculateOne(objectif.id)}
+                    disabled={recalculating !== null}
+                    className="px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 disabled:opacity-50 text-indigo-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    title="Recalculer depuis les donnees reelles"
+                  >
+                    {isRecalculating ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={12} />
+                    )}
+                    Recalculer
+                  </button>
                 </div>
               </div>
 
@@ -328,7 +409,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 <div className="flex justify-between text-sm text-slate-300 mb-2">
                   <span>Progression</span>
                   <span>
-                    {objectif.valeur_realisee.toLocaleString()} / {objectif.valeur_objectif.toLocaleString()} {objectif.unite}
+                    {Number(objectif.valeur_realisee).toLocaleString()} / {Number(objectif.valeur_objectif).toLocaleString()} {objectif.unite}
                   </span>
                 </div>
                 <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
@@ -347,9 +428,9 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 <div className="flex gap-2">
                   <input
                     type="number"
-                    placeholder="Valeur réalisée"
+                    placeholder="Valeur realisee"
                     className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                    onKeyPress={(e) => {
+                    onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const value = Number((e.target as HTMLInputElement).value);
                         if (value > 0) {
@@ -360,7 +441,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                     }}
                   />
                   <button
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors"
                     onClick={(e) => {
                       const input = e.currentTarget.previousElementSibling as HTMLInputElement;
                       const value = Number(input.value);
@@ -370,7 +451,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                       }
                     }}
                   >
-                    Mettre à jour
+                    Mettre a jour
                   </button>
                 </div>
               )}
@@ -381,7 +462,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         {objectifs.length === 0 && (
           <div className="text-center py-12 bg-slate-800 rounded-xl border border-slate-700">
             <Target size={48} className="mx-auto text-slate-600 mb-4" />
-            <p className="text-slate-400">Aucun objectif pour cette période</p>
+            <p className="text-slate-400">Aucun objectif pour cette periode</p>
           </div>
         )}
       </div>

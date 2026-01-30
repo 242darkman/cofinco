@@ -23,7 +23,7 @@ export type StorageFileType =
 /**
  * Types d'entités qui peuvent avoir des fichiers
  */
-export type StorageEntityType = 'client' | 'user' | 'employe' | 'credit' | 'tontine' | 'prospection';
+export type StorageEntityType = 'client' | 'user' | 'employe' | 'credit' | 'tontine' | 'prospection' | 'incident' | 'conversation';
 
 /**
  * Configuration de bucket par type de fichier
@@ -100,7 +100,7 @@ export function parseStoragePath(path: string): {
 
   if (!fileTypeEntry) return null;
 
-  const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine', 'prospection'];
+  const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine', 'prospection', 'incident', 'conversation'];
   if (!validEntityTypes.includes(entityType as StorageEntityType)) return null;
 
   return {

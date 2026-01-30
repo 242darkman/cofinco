@@ -15,6 +15,9 @@
  */
 
 import { db } from "../../db";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('RemiseSettlement');
 import {
   remisesTerrain,
   remiseItems,
@@ -588,6 +591,7 @@ export class RemiseSettlementService {
       compteId: paiement.compteId!,
       mouvementId: mouvementCompte.id,
       typePaiement: paiement.typePaiement,
+      sens: "CREDIT", // Settlement credits the account
       statut: StatutTransaction.POSTED,
       montant: paiement.montant,
       methodePaiement: "CASH",
@@ -694,7 +698,7 @@ export class RemiseSettlementService {
             });
           } catch (error) {
             // Log but don't fail - accounting can be reconciled later
-            console.error(`Erreur posting comptable pour paiement ${paiement.id}:`, error);
+            logger.error({ paiementId: paiement.id, err: error }, 'Error posting payment');
           }
         }
       }

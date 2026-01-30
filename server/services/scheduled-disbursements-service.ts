@@ -8,6 +8,9 @@ import {
   CreditStatus,
 } from "@shared/machines/credit-workflow";
 import { TypeCompte, StatutCompte, StatutCredit } from "@shared/enum/status-constants";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('ScheduledDisbursement');
 
 /**
  * Exécute un décaissement programmé pour un crédit donné
@@ -106,7 +109,7 @@ export async function executeScheduledDisbursement(
       validateCreditTransition(credit.statut, CreditStatus.ACTIVE);
     } catch (error) {
       if (error instanceof CreditTransitionError) {
-        console.warn(`[Scheduled Disbursement] State machine warning: ${error.message}`);
+        logger.warn({ creditId, error: error.message }, 'State machine warning');
         // Continue anyway for disbursement - status might already be correct
       } else {
         throw error;
@@ -126,7 +129,7 @@ export async function executeScheduledDisbursement(
     return { success: true, mouvementId: result.mouvement.id };
     
   } catch (error) {
-    console.error('[Scheduled Disbursement] Erreur:', error);
+    logger.error({ err: error }, 'Disbursement error');
     
     // Enregistrer l'échec dans l'historique
     try {
@@ -160,7 +163,7 @@ export async function executeScheduledDisbursement(
           .where(eq(credits.id, creditId));
       }
     } catch (logError) {
-      console.error('[Scheduled Disbursement] Erreur lors de l\'enregistrement de l\'échec:', logError);
+      logger.error({ err: logError }, 'Error recording failure');
     }
     
     return { 

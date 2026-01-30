@@ -12,6 +12,9 @@ import {
 } from "@shared/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { StatutCaisseAgent } from "@shared/enum/status-constants";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('CaisseAgentService');
 
 export class CaisseAgentService {
   /**
@@ -65,7 +68,7 @@ export class CaisseAgentService {
 
       return { success: true, caisseAgent };
     } catch (error: any) {
-      console.error("Erreur création caisse agent:", error);
+      logger.error({ err: error }, 'Error creating agent caisse');
       return {
         success: false,
         error: error.message || "Erreur interne",

@@ -1,4 +1,6 @@
 import type { DomainEvent, DomainEventType } from "./event-types";
+import { getWsInstance } from "../../../ws-server";
+import { createLogger } from "../../../lib/logger";
 import {
   handleCreditRequestCreated,
   handleCreditApproved,
@@ -41,6 +43,9 @@ import {
   handleEmployeeCreated,
   handleProspectionCreated,
   handlePaiementTerrainValidated,
+  handleHrSanctionCreated,
+  handleHrSanctionNotified,
+  handleHrSanctionFinalized,
 } from "./event-handlers";
 
 // ============================================================================
@@ -89,9 +94,98 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
   USER_REGISTERED: handleUserRegistered,
   USER_PASSWORD_CHANGED: handleUserPasswordChanged,
   EMPLOYEE_CREATED: handleEmployeeCreated,
+  HR_SANCTION_CREATED: handleHrSanctionCreated,
+  HR_SANCTION_NOTIFIED: handleHrSanctionNotified,
+  HR_SANCTION_FINALIZED: handleHrSanctionFinalized,
   PROSPECTION_CREATED: handleProspectionCreated,
   PAIEMENT_TERRAIN_VALIDATED: handlePaiementTerrainValidated,
 };
+
+const logger = createLogger('DomainEvents');
+
+// ============================================================================
+// WS BRIDGE: Map domain events to WebSocket message types
+// ============================================================================
+
+const domainEventToWsType: Record<string, string> = {
+  // Credit events → CREDIT_UPDATE
+  CREDIT_REQUEST_CREATED: "CREDIT_UPDATE",
+  CREDIT_APPROVED: "CREDIT_UPDATE",
+  CREDIT_REJECTED: "CREDIT_UPDATE",
+  CREDIT_DISBURSED: "CREDIT_UPDATE",
+  CREDIT_OVERDUE: "CREDIT_UPDATE",
+  CREDIT_INVESTIGATION_ASSIGNED: "CREDIT_UPDATE",
+  CREDIT_PAID_OFF: "CREDIT_UPDATE",
+  CREDIT_REFUND_APPROVED: "CREDIT_UPDATE",
+  CREDIT_REFUND_PAID: "CREDIT_UPDATE",
+
+  // Tontine events → TONTINE_UPDATE
+  TONTINE_MEMBER_JOINED: "TONTINE_UPDATE",
+  TONTINE_CONTRIBUTION_RECEIVED: "TONTINE_UPDATE",
+  TONTINE_CONTRIBUTION_OVERDUE: "TONTINE_UPDATE",
+  TONTINE_PENALTY_APPLIED: "TONTINE_UPDATE",
+  TONTINE_DISTRIBUTION_APPROVED: "TONTINE_UPDATE",
+  TONTINE_DISTRIBUTION_PAID: "TONTINE_UPDATE",
+  TONTINE_CYCLE_STARTED: "TONTINE_UPDATE",
+
+  // Account events → COMPTE_UPDATE
+  ACCOUNT_CREATED: "COMPTE_UPDATE",
+  ACCOUNT_ACTIVATED: "COMPTE_UPDATE",
+  ACCOUNT_DEPOSIT: "COMPTE_UPDATE",
+  ACCOUNT_WITHDRAWAL: "COMPTE_UPDATE",
+  ACCOUNT_BLOCKED: "COMPTE_UPDATE",
+  ACCOUNT_UNBLOCKED: "COMPTE_UPDATE",
+  ACCOUNT_CLOSED: "COMPTE_UPDATE",
+  INTEREST_CAPITALIZED: "COMPTE_UPDATE",
+
+  // Transfer events → CAISSE_UPDATE
+  TRANSFER_REQUESTED: "CAISSE_UPDATE",
+  TRANSFER_VALIDATED: "CAISSE_UPDATE",
+  TRANSFER_REJECTED: "CAISSE_UPDATE",
+  TRANSFER_EXECUTED: "CAISSE_UPDATE",
+  SCHEDULED_TRANSFER_EXECUTED: "CAISSE_UPDATE",
+  SCHEDULED_TRANSFER_FAILED: "CAISSE_UPDATE",
+
+  // HR events → HR_UPDATE
+  HR_LEAVE_REQUESTED: "HR_UPDATE",
+  HR_LEAVE_APPROVED: "HR_UPDATE",
+  HR_LEAVE_REJECTED: "HR_UPDATE",
+  HR_SANCTION_CREATED: "HR_UPDATE",
+  HR_SANCTION_NOTIFIED: "HR_UPDATE",
+  HR_SANCTION_FINALIZED: "HR_UPDATE",
+
+  // Client events → CLIENT_UPDATE
+  CLIENT_CREATED: "CLIENT_UPDATE",
+
+  // Employee events → EMPLOYE_UPDATE
+  EMPLOYEE_CREATED: "EMPLOYE_UPDATE",
+
+  // Operations terrain → OPERATIONS_UPDATE
+  PROSPECTION_CREATED: "OPERATIONS_UPDATE",
+  PAIEMENT_TERRAIN_VALIDATED: "OPERATIONS_UPDATE",
+};
+
+function broadcastDomainEvent(event: DomainEvent): void {
+  try {
+    const ws = getWsInstance();
+    if (!ws) return;
+
+    const wsType = domainEventToWsType[event.type];
+    if (wsType) {
+      ws.broadcast({
+        type: wsType,
+        payload: {
+          domainEvent: event.type,
+          entity: event.data?.entity || undefined,
+          agenceId: event.data?.agenceId || undefined,
+          timestamp: event.timestamp?.toISOString() || new Date().toISOString(),
+        },
+      });
+    }
+  } catch {
+    // Non-blocking: WS broadcast failure should never break the event pipeline
+  }
+}
 
 // ============================================================================
 // DISPATCH
@@ -100,6 +194,7 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
 /**
  * Dispatch a domain event to its registered handler.
  * Non-blocking: errors are logged but don't propagate (fire-and-forget).
+ * Also broadcasts the event via WebSocket for real-time UI updates.
  *
  * Usage:
  * ```ts
@@ -113,17 +208,15 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
 export function dispatchDomainEvent(event: DomainEvent): void {
   const handler = handlerRegistry[event.type];
   if (!handler) {
-    console.warn(
-      `[DomainEvents] No handler registered for event type: ${event.type}`
-    );
+    logger.warn({ eventType: event.type }, 'No handler registered for event type');
     return;
   }
 
+  // Broadcast via WS immediately (before async handler completes)
+  broadcastDomainEvent(event);
+
   // Fire-and-forget: don't block the caller
   handler(event.data).catch((error) => {
-    console.error(
-      `[DomainEvents] Error handling ${event.type}:`,
-      error.message || error
-    );
+    logger.error({ eventType: event.type, err: error }, 'Error handling event');
   });
 }

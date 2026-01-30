@@ -3,6 +3,9 @@ import { clients, users, employes, credits, membresTontine, comptes, virementsPr
 import { eq, inArray, and, isNull } from "drizzle-orm";
 import { emitNotificationEvent } from "../notification-service";
 import { logNotificationEvent } from "../audit/notification-audit";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger('EventHandlers');
 import type {
   CreditRequestCreatedData,
   CreditApprovedData,
@@ -45,6 +48,9 @@ import type {
   EmployeeCreatedData,
   ProspectionCreatedData,
   PaiementTerrainValidatedData,
+  HrSanctionCreatedData,
+  HrSanctionNotifiedData,
+  HrSanctionFinalizedData,
 } from "./event-types";
 
 // ============================================================================
@@ -346,7 +352,7 @@ export async function handleCreditOverdue(data: CreditOverdueData) {
       });
     }
   } catch (error: any) {
-    console.error("[CreditOverdue] Error sending overdue notifications:", error.message);
+    logger.error({ err: error }, 'Error sending overdue notifications');
   }
 
   logNotificationEvent("warn", "Domain event: CREDIT_OVERDUE", {
@@ -714,7 +720,7 @@ export async function handleTontineCycleStarted(data: TontineCycleStartedData) {
       });
     }
   } catch (error: any) {
-    console.error("[TontineCycleStarted] Error notifying members:", error.message);
+    logger.error({ err: error }, 'Error notifying members for cycle start');
   }
 
   logNotificationEvent("info", "Domain event: TONTINE_CYCLE_STARTED", {
@@ -1214,6 +1220,84 @@ export async function handleHrLeaveRejected(data: HrLeaveRejectedData) {
 
   logNotificationEvent("info", "Domain event: HR_LEAVE_REJECTED", {
     correlationId: `hr-leave-rejected-${data.congeId}`,
+    status: "DISPATCHED",
+  });
+}
+
+// ============================================================================
+// HR SANCTION EVENT HANDLERS
+// ============================================================================
+
+export async function handleHrSanctionCreated(data: HrSanctionCreatedData) {
+  const employee = await getEmployeeContact(data.employeId);
+  if (!employee) return;
+
+  const payload = {
+    employeeName: data.employeNom,
+    sanctionType: data.type,
+    gravite: data.gravite,
+    motif: data.motif,
+  };
+
+  await emitNotificationEvent("HR_SANCTION_CREATED", data as any, {
+    smsRecipients: [],
+    emailRecipients: employee.email
+      ? [{ email: employee.email, templateCode: "HR_SANCTION_CREATED", payload, agenceId: data.agenceId }]
+      : [],
+  });
+
+  logNotificationEvent("info", "Domain event: HR_SANCTION_CREATED", {
+    correlationId: `hr-sanction-created-${data.sanctionId}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleHrSanctionNotified(data: HrSanctionNotifiedData) {
+  const employee = await getEmployeeContact(data.employeId);
+  if (!employee) return;
+
+  const payload = {
+    employeeName: data.employeNom,
+    sanctionType: data.type,
+    gravite: data.gravite,
+  };
+
+  await emitNotificationEvent("HR_SANCTION_NOTIFIED", data as any, {
+    smsRecipients: employee.phone
+      ? [{ phone: employee.phone, templateCode: "HR_SANCTION_NOTIFIED", payload, userId: employee.userId || undefined, agenceId: data.agenceId }]
+      : [],
+    emailRecipients: employee.email
+      ? [{ email: employee.email, templateCode: "HR_SANCTION_NOTIFIED", payload, agenceId: data.agenceId }]
+      : [],
+  });
+
+  logNotificationEvent("warn", "Domain event: HR_SANCTION_NOTIFIED", {
+    correlationId: `hr-sanction-notified-${data.sanctionId}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleHrSanctionFinalized(data: HrSanctionFinalizedData) {
+  const employee = await getEmployeeContact(data.employeId);
+  if (!employee) return;
+
+  const payload = {
+    employeeName: data.employeNom,
+    sanctionType: data.type,
+    gravite: data.gravite,
+  };
+
+  await emitNotificationEvent("HR_SANCTION_FINALIZED", data as any, {
+    smsRecipients: employee.phone
+      ? [{ phone: employee.phone, templateCode: "HR_SANCTION_FINALIZED", payload, userId: employee.userId || undefined, agenceId: data.agenceId }]
+      : [],
+    emailRecipients: employee.email
+      ? [{ email: employee.email, templateCode: "HR_SANCTION_FINALIZED", payload, agenceId: data.agenceId }]
+      : [],
+  });
+
+  logNotificationEvent("info", "Domain event: HR_SANCTION_FINALIZED", {
+    correlationId: `hr-sanction-finalized-${data.sanctionId}`,
     status: "DISPATCHED",
   });
 }

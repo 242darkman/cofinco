@@ -30,9 +30,10 @@ export function useCredits() {
   const { data: credits = [], isLoading: loading, error, refetch } = useQuery<Credit[]>({
     queryKey: creditKeys.all,
     queryFn: async () => {
-      const response = await fetch('/api/credits');
+      const response = await fetch('/api/credits?limit=1000');
       if (!response.ok) throw new Error('Erreur serveur');
-      return response.json();
+      const result = await response.json();
+      return Array.isArray(result) ? result : result.data ?? [];
     }
   });
 

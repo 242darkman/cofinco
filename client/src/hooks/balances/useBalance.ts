@@ -6,7 +6,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useCallback } from 'react';
 import { api } from '../../lib/api-client';
-import type { Balance, BalanceEntityType, CashPosition, BalanceUpdatePayload } from '@shared/types/balances';
+import type { Balance, BalanceEntityType, BalanceUpdatePayload } from '@shared/types/balances';
 import { balanceKeys } from '../../lib/query-keys';
 
 // ============================================
@@ -42,10 +42,8 @@ const balanceApi = {
     return api.get<Balance>(`/api/balances/caisse-agent/${caisseAgentId}`);
   },
 
-  getGlobalCashPosition: (agenceId?: string): Promise<CashPosition> => {
-    const params = agenceId && agenceId !== 'all' ? `?agenceId=${agenceId}` : '';
-    return api.get<CashPosition>(`/api/balances/cash-position${params}`);
-  }
+  // SUPPRIMÉ: getGlobalCashPosition
+  // Utiliser useEncaisse() de hooks/treasury/useEncaisse.ts pour l'encaisse GL
 };
 
 // Helper pour mapper entityType vers les clés centralisées
@@ -210,38 +208,9 @@ export function useCaisseAgentBalance(caisseAgentId: string | undefined, options
 
 // ============================================
 // Global Cash Position Hook
+// SUPPRIMÉ: Utiliser useEncaisse() de hooks/treasury/useEncaisse.ts
+// L'encaisse est maintenant calculée depuis le Grand Livre (GL)
 // ============================================
-
-/**
- * Hook pour la position de trésorerie globale
- * Utilisé principalement dans le dashboard et la supervision
- */
-export function useGlobalCashPosition(agenceId?: string, options?: UseBalanceOptions) {
-  const queryClient = useQueryClient();
-  const { enabled = true, staleTime = 60 * 1000, refetchInterval = 30000 } = options || {};
-
-  // Écoute des événements BALANCE_UPDATED pour invalidation
-  useEffect(() => {
-    const handler = (event: CustomEvent<BalanceUpdatePayload>) => {
-      const { entityType } = event.detail;
-      // Invalider si changement sur caisse, coffre, ou session
-      if (['caisse', 'session_caisse', 'coffre', 'caisse_agent'].includes(entityType)) {
-        queryClient.invalidateQueries({ queryKey: balanceKeys.cashPosition() });
-      }
-    };
-
-    window.addEventListener('balance-updated', handler as EventListener);
-    return () => window.removeEventListener('balance-updated', handler as EventListener);
-  }, [queryClient]);
-
-  return useQuery({
-    queryKey: balanceKeys.cashPosition(agenceId),
-    queryFn: () => balanceApi.getGlobalCashPosition(agenceId),
-    enabled,
-    staleTime,
-    refetchInterval,
-  });
-}
 
 // ============================================
 // Utility Hooks

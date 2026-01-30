@@ -51,7 +51,11 @@ export default function PendingDisbursements({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState('');
 
-  // Fetch pending disbursements
+  // Batch selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false);
+
+  // Fetch pending disbursements (must be declared before callbacks that use it)
   const {
     data: pendingData,
     isLoading,
@@ -66,6 +70,25 @@ export default function PendingDisbursements({
     refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 10000
   });
+
+  const toggleSelect = useCallback((creditId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(creditId)) next.delete(creditId);
+      else next.add(creditId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    const pendingCredits: PendingCredit[] = pendingData?.data || [];
+    if (selectedIds.size === pendingCredits.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingCredits.map(c => c.id)));
+    }
+  }, [pendingData, selectedIds]);
 
   // Listen for WebSocket updates
   useEffect(() => {
@@ -150,6 +173,32 @@ export default function PendingDisbursements({
     }
   });
 
+  // Mutation for batch payout
+  const batchPayoutMutation = useMutation({
+    mutationFn: async (creditIds: string[]) => {
+      const response = await api.post<{ success: boolean; message: string; successCount: number; failCount: number }>('/api/credits/batch-disburse', {
+        creditIds,
+        sessionCaisseId,
+      });
+      return response;
+    },
+    onSuccess: (data) => {
+      if (data.failCount === 0) {
+        toast.success(`${data.successCount} décaissement(s) effectué(s) avec succès`);
+      } else {
+        toast.warning(`${data.successCount} réussi(s), ${data.failCount} erreur(s)`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['pending-disbursements'] });
+      queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
+      setSelectedIds(new Set());
+      setShowBatchConfirm(false);
+      onDisbursementComplete?.();
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors du décaissement groupé');
+    }
+  });
+
   const pendingCredits: PendingCredit[] = pendingData?.data || [];
   const count = pendingCredits.length;
 
@@ -225,8 +274,30 @@ export default function PendingDisbursements({
                 </div>
                 
                 {count > 0 ? (
-                    <div className="text-xs text-slate-400">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-slate-400">
                         <span className="font-bold text-white">{count}</span> dossiers à traiter
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedIds.size > 0 && (
+                          <button
+                            onClick={() => setShowBatchConfirm(true)}
+                            disabled={batchPayoutMutation.isPending}
+                            className="px-2 py-1 text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg hover:bg-orange-500/30 transition"
+                          >
+                            {batchPayoutMutation.isPending ? 'Traitement...' : `Décaisser (${selectedIds.size})`}
+                          </button>
+                        )}
+                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.size === count && count > 0}
+                            onChange={toggleSelectAll}
+                            className="w-3 h-3 rounded border-slate-600 text-orange-500 focus:ring-orange-500/30"
+                          />
+                          Tout
+                        </label>
+                      </div>
                     </div>
                 ) : (
                     <div className="text-[10px] text-slate-500 italic">Aucun dossier en attente</div>
@@ -242,16 +313,25 @@ export default function PendingDisbursements({
                             onClick={() => {
                                 setSelectedCredit(credit);
                                 setReceiptNumber('');
-                                setShowPayoutConfirm(false); // Reset internal modal states just in case
+                                setShowPayoutConfirm(false);
                             }}
                             className={`p-3 rounded-xl border cursor-pointer transition-all group ${
                                 selectedCredit?.id === credit.id
                                 ? 'bg-orange-950/30 border-orange-500/50 shadow-lg shadow-orange-900/10'
+                                : selectedIds.has(credit.id)
+                                ? 'bg-orange-950/20 border-orange-500/30'
                                 : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
                             }`}
                         >
                             <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedIds.has(credit.id)}
+                                      onClick={(e) => toggleSelect(credit.id, e)}
+                                      onChange={() => {}}
+                                      className="w-3.5 h-3.5 rounded border-slate-600 text-orange-500 focus:ring-orange-500/30 shrink-0"
+                                    />
                                     <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
                                         {credit.client.photoUrl ? (
                                             <img src={credit.client.photoUrl} className="w-full h-full object-cover" alt="" />
@@ -434,9 +514,25 @@ export default function PendingDisbursements({
         }}
         onClose={() => {
           setShowCancelConfirm(false);
-          // Don't deselect, just close modal
         }}
         variant="danger"
+      />
+
+      {/* Batch Payout Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showBatchConfirm}
+        title="Décaissement groupé"
+        message={(() => {
+          const selected = pendingCredits.filter(c => selectedIds.has(c.id));
+          const totalMontant = selected.reduce((sum, c) => sum + parseFloat(c.montant), 0);
+          return `Voulez-vous décaisser ${selectedIds.size} crédit(s) pour un total de ${formatMoney(totalMontant)} ? Cette action débitera le coffre-fort.`;
+        })()}
+        confirmText={`Décaisser ${selectedIds.size} crédit(s)`}
+        onConfirm={() => {
+          batchPayoutMutation.mutate(Array.from(selectedIds));
+        }}
+        onClose={() => setShowBatchConfirm(false)}
+        variant="warning"
       />
     </div>
   );

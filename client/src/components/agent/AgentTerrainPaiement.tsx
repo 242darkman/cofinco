@@ -10,7 +10,7 @@ import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi, clientApi, agentTerrainApi } from '../../lib/api-client';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { usePOSPrint } from '@/hooks/usePOSPrint';
-import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
+import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
 
 // MM Payment status types
 type MMPaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
@@ -508,8 +508,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       const data = await clientApi.getById(formData.client_id);
       if (data) {
         setSelectedClient(data);
-        if (formData.methode_paiement !== 'Espèces' && !formData.numero_telephone) {
-          setFormData(prev => ({ ...prev, numero_telephone: data.phone }));
+        // Toujours pré-remplir le numéro de téléphone avec celui du client
+        if (data.phone || data.telephone) {
+          setFormData(prev => ({ ...prev, numero_telephone: data.phone || data.telephone || '' }));
         }
       }
     } catch (error) {
@@ -1086,7 +1087,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     onChange={(v) => setFormData({ ...formData, compte_id: v })}
                     options={clientComptes.map((c: any) => ({
                       value: c.id,
-                      label: `${c.typeCompte || 'Compte'} - ${(c.numeroCompte || c.id).slice(-8)}`
+                      label: `${TYPE_COMPTE_LABELS[c.typeCompte as TypeCompteType] || c.typeCompte || 'Compte'} - ${(c.numeroCompte || c.id).slice(-8)}`
                     }))}
                     placeholder={loadingComptes ? 'Chargement...' : 'Sélectionner compte'}
                     error={errors.compte_id}
@@ -1157,7 +1158,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                         onClick={() => setFormData({
                           ...formData,
                           methode_paiement: m.id,
-                          numero_telephone: selectedClient?.phone || '',
+                          numero_telephone: selectedClient?.phone || selectedClient?.telephone || formData.numero_telephone || '',
                           numero_transaction: ''
                         })}
                         className={`

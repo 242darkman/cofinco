@@ -593,15 +593,14 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 </div>
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-purple-500/50 transition-colors">
                     <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                        <Wallet size={14} className="text-purple-400" /> Mensualité Est
+                        <Wallet size={14} className="text-purple-400" />
+                        {['Journalier', 'DAILY'].includes(demande.frequence_remboursement) ? 'Échéance Journalière' :
+                         ['Hebdomadaire', 'WEEKLY'].includes(demande.frequence_remboursement) ? 'Échéance Hebdo' :
+                         ['Bimensuel', 'BIMONTHLY'].includes(demande.frequence_remboursement) ? 'Échéance Bimensuelle' :
+                         ['Trimestriel', 'QUARTERLY'].includes(demande.frequence_remboursement) ? 'Échéance Trimestrielle' :
+                         'Mensualité Est'}
                     </div>
                     <div className="text-lg md:text-xl font-bold text-white">{formatMoney(mensualite)}</div>
-                    <div className="text-[10px] text-slate-500">
-                        {demande.frequence_remboursement === 'DAILY' ? 'Journalier' : 
-                         demande.frequence_remboursement === 'WEEKLY' ? 'Hebdomadaire' : 
-                         demande.frequence_remboursement === 'MONTHLY' ? 'Mensuel' : 
-                         demande.frequence_remboursement}
-                    </div>
                 </div>
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-emerald-500/50 transition-colors">
                     <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">

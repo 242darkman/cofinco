@@ -55,7 +55,7 @@ export default function AppShell({
   }, [isMobile, sidebarOpen]);
 
   return (
-    <div className="relative min-h-[100svh] w-full bg-surface-base text-content-primary overflow-hidden transition-colors duration-300">
+    <div className="relative min-h-[100svh] w-full bg-surface-base text-content-primary overflow-x-hidden transition-colors duration-300">
       {/* Mobile overlay */}
       <div
         className={`lg:hidden fixed inset-0 z-40 bg-black/50 dark:bg-black/60 backdrop-blur-[2px] transition-opacity duration-200 ${

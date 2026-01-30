@@ -51,6 +51,9 @@ import {
   type GuardContext,
 } from "./coffre/coffre-guard";
 import { getWsInstance } from "../ws-server";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('AgencyMigration');
 
 // ============================================
 // TYPES & INTERFACES
@@ -969,7 +972,7 @@ export class AgencyMigrationService {
    * Exécuter la migration avec atomicité totale
    */
   async processMigration(migrationId: string, ctx?: Partial<MigrationContext>): Promise<void> {
-    console.log(`[AgencyMigration] Starting job ${migrationId}`);
+    logger.info({ migrationId }, 'Starting job');
     const startTime = Date.now();
 
     // Récupérer la migration
@@ -1036,7 +1039,7 @@ export class AgencyMigrationService {
         durationMs,
       };
       logs.push(log);
-      console.log(`[AgencyMigration] ${step} - ${success ? "OK" : "FAILED"}${count ? ` (${count})` : ""}`);
+      logger.info({ step, success, count }, 'Step completed');
     };
 
     try {
@@ -1603,13 +1606,13 @@ export class AgencyMigrationService {
         durationMs: endTime - startTime,
       });
 
-      console.log(`[AgencyMigration] Job ${migrationId} COMPLETED in ${endTime - startTime}ms`);
+      logger.info({ migrationId, durationMs: endTime - startTime }, 'Job completed');
       this.broadcastMigrationStatus(migrationId, migration.sourceAgencyId, "COMPLETED", {
         reference: migration.reference,
         durationMs: endTime - startTime,
       });
     } catch (error: any) {
-      console.error(`[AgencyMigration] Job ${migrationId} FAILED`, error);
+      logger.error({ err: error, migrationId }, 'Job failed');
 
       const canRetry = migration.retryCount < migration.maxRetries;
 
@@ -1917,7 +1920,7 @@ export class AgencyMigrationService {
         rollbackReport,
       });
 
-      console.log(`[AgencyMigration] Migration ${migrationId} ROLLED_BACK in ${rollbackReport.durationMs}ms`);
+      logger.info({ migrationId, durationMs: rollbackReport.durationMs }, 'Migration rolled back');
       this.broadcastMigrationStatus(migrationId, migration.sourceAgencyId, "ROLLED_BACK", {
         reference: migration.reference,
         durationMs: rollbackReport.durationMs,

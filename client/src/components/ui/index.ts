@@ -80,3 +80,7 @@ export type { ThemeToggleProps } from './ThemeToggle';
 // Tooltip
 export { default as Tooltip } from './Tooltip';
 export type { TooltipProps } from './Tooltip';
+
+// Feature Header (with descriptions)
+export { FeatureHeader, FEATURE_DESCRIPTIONS, getFeatureDescription } from './FeatureHeader';
+export type { FeatureKey } from './FeatureHeader';

@@ -1,4 +1,4 @@
-import { pgTable, varchar, text, date, timestamp, integer, serial, uuid, boolean, json, numeric, inet } from "drizzle-orm/pg-core";
+import { pgTable, varchar, text, date, timestamp, integer, serial, uuid, boolean, json, numeric, inet, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
@@ -68,7 +68,42 @@ export const formationParticipants = pgTable("formation_participants", {
   dateInscription: timestamp("date_inscription").defaultNow().notNull(),
   presence: varchar("presence").default("Non noté"), // 'Présent', 'Absent', 'Non noté'
   evaluation: text("evaluation"), // Notes ou feedback post-formation
+  scoreEvaluation: integer("score_evaluation"), // 0-100
+  competencesAcquises: text("competences_acquises"), // JSON array
+  recommandation: varchar("recommandation", { length: 30 }), // EXCELLENT, SATISFAISANT, INSUFFISANT, NON_EVALUE
+  evaluateurId: uuid("evaluateur_id"),
+  evaluatedAt: timestamp("evaluated_at"),
 });
+
+// Certificats de formation
+export const formationCertificates = pgTable("formation_certificates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  formationId: integer("formation_id").notNull().references(() => formations.id, { onDelete: "cascade" }),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  employeNom: varchar("employe_nom").notNull(),
+  numeroCertificat: varchar("numero_certificat", { length: 50 }).notNull().unique(),
+  titre: text("titre").notNull(),
+  dateEmission: date("date_emission").notNull().defaultNow(),
+  dateExpiration: date("date_expiration"),
+  competences: text("competences"),
+  statut: varchar("statut", { length: 20 }).notNull().default("ISSUED"), // ISSUED, REVOKED, EXPIRED
+  revoquePar: uuid("revoque_par"),
+  revoqueAt: timestamp("revoque_at"),
+  motifRevocation: text("motif_revocation"),
+  fichierUrl: text("fichier_url"), // MinIO storage key
+  emisPar: uuid("emis_par"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type FormationCertificate = typeof formationCertificates.$inferSelect;
+
+export const RecommandationLevel = {
+  EXCELLENT: 'EXCELLENT',
+  SATISFAISANT: 'SATISFAISANT',
+  INSUFFISANT: 'INSUFFISANT',
+  NON_EVALUE: 'NON_EVALUE',
+} as const;
 
 // Sanctions disciplinaires
 export const sanctions = pgTable("sanctions", {
@@ -81,8 +116,40 @@ export const sanctions = pgTable("sanctions", {
   gravite: varchar("gravite").notNull(), // 'Faible', 'Moyenne', 'Grave'
   emetteurId: uuid("emetteur_id"), // User ID qui a émis la sanction
   documentsJoints: text("documents_joints"), // URLs séparées par virgules
+  // Workflow: DRAFT -> NOTIFIED -> ACKNOWLEDGED -> APPEALED -> FINAL
+  statutWorkflow: varchar("statut_workflow", { length: 30 }).default("DRAFT"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  appealedAt: timestamp("appealed_at"),
+  appealReason: text("appeal_reason"),
+  finalizedAt: timestamp("finalized_at"),
+  finalizedBy: uuid("finalized_by").references(() => users.id, { onDelete: "set null" }),
+  // Escalation tracking
+  escalatedFromId: integer("escalated_from_id"), // Self-reference to original sanction
+  autoEscalated: boolean("auto_escalated").default(false),
+  escalationRuleId: uuid("escalation_rule_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Règles d'escalade automatique des sanctions
+export const sanctionEscalationRules = pgTable("sanction_escalation_rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  sanctionCountThreshold: integer("sanction_count_threshold").notNull(), // Nb sanctions avant escalade
+  periodMonths: integer("period_months").default(12), // Période de comptage
+  sourceGravite: varchar("source_gravite", { length: 20 }).notNull(), // Gravité source
+  escalateToGravite: varchar("escalate_to_gravite", { length: 20 }).notNull(), // Gravité cible
+  notificationRequired: boolean("notification_required").default(true),
+  autoApply: boolean("auto_apply").default(false),
+  actif: boolean("actif").default(true),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SanctionEscalationRule = typeof sanctionEscalationRules.$inferSelect;
+export type InsertSanctionEscalationRule = typeof sanctionEscalationRules.$inferInsert;
 
 // Candidatures
 export const candidatures = pgTable("candidatures", {
@@ -101,9 +168,101 @@ export const candidatures = pgTable("candidatures", {
   notes: text("notes"), // Notes internes du recruteur
   dateEntretien: date("date_entretien"),
   responsableRhId: uuid("responsable_rh_id"), // User ID du RH en charge
+  // Hiring approval workflow
+  currentApprovalLevel: integer("current_approval_level").default(0),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("NOT_STARTED"), // NOT_STARTED, IN_PROGRESS, APPROVED, REJECTED
+  finalApprovedAt: timestamp("final_approved_at"),
+  finalApprovedBy: uuid("final_approved_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Types pour le workflow d'approbation embauche
+export interface HiringApprovalLevel {
+  level: number;
+  role: string;
+  required: boolean;
+}
+
+// Configuration des niveaux d'approbation par agence
+export const hiringApprovalConfig = pgTable("hiring_approval_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  approvalLevels: json("approval_levels").$type<HiringApprovalLevel[]>().notNull().default([]),
+  minSalaryThreshold: numeric("min_salary_threshold"),
+  actif: boolean("actif").default(true),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Instances d'approbation pour chaque candidature
+export const hiringApprovals = pgTable("hiring_approvals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  candidatureId: integer("candidature_id").notNull().references(() => candidatures.id, { onDelete: "cascade" }),
+  level: integer("level").notNull(),
+  approverRole: varchar("approver_role", { length: 50 }).notNull(),
+  approverId: uuid("approver_id").references(() => users.id),
+  statut: varchar("statut", { length: 20 }).default("PENDING"), // PENDING, APPROVED, REJECTED, SKIPPED
+  commentaire: text("commentaire"),
+  decidedAt: timestamp("decided_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Relations types
+export type HiringApprovalConfig = typeof hiringApprovalConfig.$inferSelect;
+export type InsertHiringApprovalConfig = typeof hiringApprovalConfig.$inferInsert;
+export type HiringApproval = typeof hiringApprovals.$inferSelect;
+export type InsertHiringApproval = typeof hiringApprovals.$inferInsert;
+
+// Types pour le pipeline d'onboarding
+export interface OnboardingChecklistItem {
+  name: string;
+  required: boolean;
+  category?: string;
+  order: number;
+}
+
+export interface OnboardingCompletedItem {
+  itemName: string;
+  completedAt: string;
+  completedBy?: string;
+  notes?: string;
+}
+
+// Checklist templates pour l'onboarding
+export const onboardingChecklists = pgTable("onboarding_checklists", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  items: json("items").$type<OnboardingChecklistItem[]>().notNull().default([]),
+  actif: boolean("actif").default(true),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Instances d'onboarding pour suivi individuel
+export const onboardingInstances = pgTable("onboarding_instances", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  candidatureId: integer("candidature_id").references(() => candidatures.id, { onDelete: "set null" }),
+  employeId: uuid("employe_id").references(() => employes.id, { onDelete: "cascade" }),
+  checklistId: uuid("checklist_id").references(() => onboardingChecklists.id),
+  completedItems: json("completed_items").$type<OnboardingCompletedItem[]>().default([]),
+  statut: varchar("statut", { length: 20 }).default("NOT_STARTED"), // NOT_STARTED, IN_PROGRESS, COMPLETED, CANCELLED
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  assignedTo: uuid("assigned_to").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type OnboardingChecklist = typeof onboardingChecklists.$inferSelect;
+export type InsertOnboardingChecklist = typeof onboardingChecklists.$inferInsert;
+export type OnboardingInstance = typeof onboardingInstances.$inferSelect;
+export type InsertOnboardingInstance = typeof onboardingInstances.$inferInsert;
 
 // Bulletins de paie (archivage)
 export const bulletinsPaie = pgTable("bulletins_paie", {
@@ -173,6 +332,11 @@ export const presences = pgTable("presences", {
   heuresSupplementaires: integer("heures_supplementaires").default(0), // En minutes
   retardJustifie: boolean("retard_justifie").default(false),
   commentaire: text("commentaire"),
+  // GPS tracking
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  accuracy: doublePrecision("accuracy"),
+  gpsSource: varchar("gps_source", { length: 20 }).default("manual"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -186,6 +350,41 @@ export const horairesTravail = pgTable("horaires_travail", {
   pauseMinutes: integer("pause_minutes").default(60), // Durée pause déjeuner en minutes
   actif: boolean("actif").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Modèles d'horaires réutilisables
+export const shiftTemplates = pgTable("shift_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  horaires: json("horaires").$type<ShiftTemplateHoraire[]>().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export interface ShiftTemplateHoraire {
+  jourSemaine: number; // 0-6
+  heureDebut: string;  // "HH:MM"
+  heureFin: string;    // "HH:MM"
+  pauseMinutes: number;
+}
+
+// Historique versionné des taux salariaux
+export const salaryRateHistory = pgTable("salary_rate_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  salaireBase: numeric("salaire_base").notNull(),
+  tauxHoraire: numeric("taux_horaire"),
+  tauxJournalier: numeric("taux_journalier"),
+  modeCalcul: varchar("mode_calcul", { length: 20 }).notNull().default("MONTHLY"),
+  effectiveFrom: date("effective_from").notNull(),
+  effectiveTo: date("effective_to"), // NULL = actuellement en vigueur
+  motifChangement: text("motif_changement"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // ============================================
@@ -295,6 +494,16 @@ export type Presence = typeof presences.$inferSelect;
 export const insertHoraireTravailSchema = createInsertSchema(horairesTravail).omit({ id: true, createdAt: true });
 export type InsertHoraireTravail = z.infer<typeof insertHoraireTravailSchema>;
 export type HoraireTravail = typeof horairesTravail.$inferSelect;
+
+// Shift Templates
+export const insertShiftTemplateSchema = createInsertSchema(shiftTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertShiftTemplate = z.infer<typeof insertShiftTemplateSchema>;
+export type ShiftTemplate = typeof shiftTemplates.$inferSelect;
+
+// Salary Rate History
+export const insertSalaryRateHistorySchema = createInsertSchema(salaryRateHistory).omit({ id: true, createdAt: true });
+export type InsertSalaryRateHistory = z.infer<typeof insertSalaryRateHistorySchema>;
+export type SalaryRateHistory = typeof salaryRateHistory.$inferSelect;
 
 export const insertBulletinPaieSchema = createInsertSchema(bulletinsPaie).omit({ id: true, createdAt: true });
 export type InsertBulletinPaie = z.infer<typeof insertBulletinPaieSchema>;
@@ -443,3 +652,110 @@ export const updatePayrollConfigSchema = z.object({
   nightShiftRate: z.number().min(1).optional(),
   holidayRate: z.number().min(1).optional(),
 });
+
+// ============================================
+// AVANCES SUR SALAIRE
+// ============================================
+
+export const avancesSalaire = pgTable("avances_salaire", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  montant: integer("montant").notNull(),
+  motif: text("motif").notNull(),
+  dateDemande: date("date_demande").notNull().defaultNow(),
+  dateRemboursement: date("date_remboursement"),
+  moisDeduction: varchar("mois_deduction", { length: 7 }), // 'YYYY-MM'
+  statut: varchar("statut", { length: 20 }).notNull().default("PENDING"),
+  approuvePar: uuid("approuve_par").references(() => users.id, { onDelete: "set null" }),
+  approuveAt: timestamp("approuve_at"),
+  payeAt: timestamp("paye_at"),
+  rejeteMotif: text("rejete_motif"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAvanceSalaireSchema = createInsertSchema(avancesSalaire).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  approuvePar: true,
+  approuveAt: true,
+  payeAt: true,
+});
+export type InsertAvanceSalaire = z.infer<typeof insertAvanceSalaireSchema>;
+export type AvanceSalaire = typeof avancesSalaire.$inferSelect;
+
+export const StatutAvance = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  PAID: 'PAID',
+  DEDUCTED: 'DEDUCTED',
+  REJECTED: 'REJECTED',
+} as const;
+
+// =============================================================================
+// EMPLOYEE DOCUMENTS
+// =============================================================================
+
+export const TypeDocument = {
+  CONTRACT: 'CONTRACT',
+  ID_CARD: 'ID_CARD',
+  DIPLOMA: 'DIPLOMA',
+  CERTIFICATE: 'CERTIFICATE',
+  MEDICAL: 'MEDICAL',
+  OTHER: 'OTHER',
+} as const;
+
+export const CategorieDocument = {
+  ADMINISTRATIF: 'ADMINISTRATIF',
+  FORMATION: 'FORMATION',
+  MEDICAL: 'MEDICAL',
+  JURIDIQUE: 'JURIDIQUE',
+  GENERAL: 'GENERAL',
+} as const;
+
+export const StatutDocument = {
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export const employeeDocuments = pgTable("employee_documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+
+  nom: text("nom").notNull(),
+  typeDocument: varchar("type_document", { length: 50 }).notNull(),
+  categorie: varchar("categorie", { length: 50 }).default("GENERAL"),
+  description: text("description"),
+
+  storageKey: text("storage_key").notNull(),
+  bucket: varchar("bucket", { length: 20 }).notNull().default("private"),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: varchar("mime_type", { length: 100 }),
+
+  dateEmission: date("date_emission"),
+  dateExpiration: date("date_expiration"),
+  statut: varchar("statut", { length: 20 }).notNull().default("PENDING"),
+  verifiePar: uuid("verifie_par").references(() => users.id),
+  verifieAt: timestamp("verifie_at"),
+  motifRejet: text("motif_rejet"),
+
+  ajoutePar: uuid("ajoute_par").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEmployeeDocumentSchema = createInsertSchema(employeeDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  verifiePar: true,
+  verifieAt: true,
+  motifRejet: true,
+});
+
+export type InsertEmployeeDocument = z.infer<typeof insertEmployeeDocumentSchema>;
+export type EmployeeDocument = typeof employeeDocuments.$inferSelect;

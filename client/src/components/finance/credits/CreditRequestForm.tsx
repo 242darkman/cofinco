@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { DollarSign, Calendar, FileText, TrendingUp, AlertCircle, Save, RefreshCw } from 'lucide-react';
+import { DollarSign, TrendingUp, Save, RefreshCw } from 'lucide-react';
 import { clientSearchApi, demandeCreditApi, creditPlanApi, clientApi } from '../../../lib/api-client';
-import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../ui';
+import { Modal, SelectField, Button, SearchableSelect } from '../../ui';
 import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS, normalizeDureeUnite, normalizeFrequenceRemboursement } from '@shared/enum/status-constants';
 import useSmartDuration from '../../../hooks/credits/useSmartDuration';
-import DurationSelector from './DurationSelector';
+
 
 interface Client {
   id: string;
@@ -24,6 +24,10 @@ interface Client {
   compteCourantId?: string;
   compteCourantNumero?: string;
   compteCourantSolde?: number;
+  // Revenus du client
+  revenuMensuel?: number;
+  revenuJournalier?: number;
+  typeRevenu?: string;
 }
 
 
@@ -244,7 +248,11 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         compteCourantNumero: c.compteCourantNumero || c.compte_courant_numero,
         compteCourantSolde: parseFloat(c.compteCourantSolde || c.compte_courant_solde) || 0,
         isEligible: c.isEligible !== undefined ? c.isEligible : true, // Par défaut éligible si vient de /eligible-credit
-        ineligibilityReason: c.ineligibilityReason
+        ineligibilityReason: c.ineligibilityReason,
+        // Revenus du client
+        revenuMensuel: parseFloat(c.revenuMensuel || c.revenu_mensuel) || 0,
+        revenuJournalier: parseFloat(c.revenuJournalier || c.revenu_journalier) || 0,
+        typeRevenu: c.typeRevenu || c.type_revenu || 'Mensuel'
       }));
       setClients(enrichedClients);
     } catch (error) {
@@ -285,19 +293,26 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       const montantEcheance = nombreEcheances > 0 ? montantTotal / nombreEcheances : 0;
       const capaciteRemboursement = revenus - charges;
 
-      // Calcul du montant mensuel equivalent pour le taux d'endettement
+      // --- FORMULE ENDETTEMENT (PRO) ---
+      // Etape 1: Mensualité du credit (ramené au mois)
       let montantEcheanceMensuel = montantEcheance;
       if (formData.frequence_remboursement === 'DAILY') {
-        montantEcheanceMensuel = montantEcheance * 30;
+        montantEcheanceMensuel = montantEcheance * 26; // 26 jours ouvrables business standard
       } else if (formData.frequence_remboursement === 'WEEKLY') {
-        montantEcheanceMensuel = montantEcheance * 4;
+        montantEcheanceMensuel = montantEcheance * 4.33; // 52 semaines / 12 mois
       } else if (formData.frequence_remboursement === 'BI_MONTHLY') {
         montantEcheanceMensuel = montantEcheance * 2;
       } else if (formData.frequence_remboursement === 'QUARTERLY') {
         montantEcheanceMensuel = montantEcheance / 3;
       }
+      
+      // Etape 2: Total Charges réelles (Charges existantes + Nouvelle Mensualité)
+      // On s'assure de ne pas compter deux fois si "charges" inclut déjà le futur crédit (erreur commune), 
+      // ici on part du principe que "charges_mensuelles" = charges actuelles HORS ce crédit.
+      const totalDettesMensuelles = charges + montantEcheanceMensuel;
 
-      const tauxEndettement = revenus > 0 ? (montantEcheanceMensuel / revenus) * 100 : 0;
+      // Etape 3: Ratio d'endettement
+      const tauxEndettement = revenus > 0 ? (totalDettesMensuelles / revenus) * 100 : 0;
 
       setCalculatedData({
         montantTotal,
@@ -426,6 +441,25 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
   const selectedClient = clients.find(c => c.id === formData.client_id);
 
+  // Pre-fill revenue fields when client changes
+  useEffect(() => {
+    if (selectedClient && formData.client_id) {
+      const isJournalier = selectedClient.typeRevenu === 'Journalier';
+      const revenuMensuel = selectedClient.revenuMensuel || 0;
+      const revenuJournalier = selectedClient.revenuJournalier || 0;
+
+      // Only update if client has revenue data
+      if (revenuMensuel > 0 || revenuJournalier > 0) {
+        setFormData(prev => ({
+          ...prev,
+          revenus_mensuels: revenuMensuel > 0 ? String(revenuMensuel) : (revenuJournalier > 0 ? String(revenuJournalier * 26) : ''),
+          revenu_journalier: revenuJournalier > 0 ? String(revenuJournalier) : '',
+          type_revenu: isJournalier ? 'DAILY' : 'MONTHLY'
+        }));
+      }
+    }
+  }, [selectedClient?.id, formData.client_id]);
+
   const clientOptions = useMemo(() => clients.map(client => ({
     value: client.id,
     label: client.nom,
@@ -468,532 +502,439 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     }
   };
 
+  // --- WIZARD STATE ---
+  const [step, setStep] = useState(1);
+  const TOTAL_STEPS = 3;
+
+  // --- NAVIGATION ---
+  const handleNext = () => {
+    if (validateStep(step)) {
+      setStep(prev => Math.min(prev + 1, TOTAL_STEPS));
+    }
+  };
+
+  const handleBack = () => {
+    setStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const validateStep = (currentStep: number) => {
+     // TODO: Implement thorough validation per step
+     // For now, simpler checks
+     const newErrors: Record<string, string> = {};
+     let isValid = true;
+
+     if (currentStep === 1) {
+        if (!formData.client_id) { newErrors.client_id = 'Client requis'; isValid = false; }
+        if (clients.find(c => c.id === formData.client_id)?.isEligible === false) { 
+            newErrors.client_id = 'Client inéligible'; isValid = false; 
+        }
+        if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) {
+            newErrors.montant_demande = 'Montant requis'; isValid = false;
+        }
+        if (!formData.objet_credit.trim()) { newErrors.objet_credit = 'Objet requis'; isValid = false; }
+     }
+     
+     if (currentStep === 2) {
+        if (!formData.frequence_remboursement) { newErrors.frequence_remboursement = 'Frequence requise'; isValid = false; }
+        if (!formData.duree_valeur) { newErrors.duree_valeur = 'Durée requise'; isValid = false; }
+     }
+
+     if (!isValid) {
+        setErrors(newErrors);
+        const first = Object.values(newErrors)[0];
+        if(first) toast.error(first);
+     } else {
+        setErrors({});
+     }
+     return isValid;
+  };
+
+  // --- RENDER HELPERS ---
+  const StepIndicator = ({ stepNumber, current, label }: { stepNumber: number, current: number, label: string }) => {
+    const active = current >= stepNumber;
+    const isCurrent = current === stepNumber;
+    return (
+      <div className="flex items-center gap-2">
+         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+            active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-800 text-slate-500 border border-slate-700'
+         } ${isCurrent ? 'ring-2 ring-indigo-500/50 scale-110' : ''}`}>
+           {active && !isCurrent && stepNumber < current ? (
+               <TrendingUp size={14} className="text-white" /> 
+           ) : stepNumber}
+         </div>
+         <span className={`text-xs font-bold uppercase tracking-wider hidden sm:block transition-colors ${
+            active ? 'text-white' : 'text-slate-600'
+         }`}>{label}</span>
+      </div>
+    );
+  };
+
   return (
-    <Modal
-      isOpen={true}
-      onClose={onClose}
-      title="Nouvelle Demande de Credit"
-      size="2xl"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Annuler</Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || calculatedData.tauxEndettement > 50}
-            icon={Save}
-            variant="primary"
-            className={calculatedData.tauxEndettement > 50 
-              ? "bg-slate-600 cursor-not-allowed opacity-50" 
-              : "bg-green-600 hover:bg-green-700"
-            }
-          >
-            {loading ? 'Creation...' : calculatedData.tauxEndettement > 50 ? 'Taux d\'endettement trop élevé' : 'Creer la Demande'}
-          </Button>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-6">
-
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Client Selection */}
-          <div className="md:col-span-2">
-             <SelectField
-              label="Plan de Crédit (Optionnel)"
-              name="creditPlanId"
-              value={formData.credit_plan_id}
-              onChange={(e) => handleApplyPlan(e.target.value)}
-              options={[
-                { value: '', label: '-- Sélectionner un modèle --' },
-                ...creditPlans.map(p => ({ value: p.id, label: `${p.nom} (Taux: ${p.tauxInteret || p.taux_interet}%)` }))
-              ]}
-              className="bg-teal-500/10 border-teal-500/30 text-teal-100"
-            />
-          </div>
-
-          <div className="md:col-span-2 flex items-start gap-2">
-            <div className="flex-1">
-              <SearchableSelect
-                label="Client"
-                name="client_id"
-                value={formData.client_id}
-                onChange={(value) => setFormData({ ...formData, client_id: String(value) })}
-                options={clientOptions}
-                onSearchChange={handleSearchChange}
-                onDisabledClick={handleIneligibleClick}
-                isLoading={searchLoading}
-                disabled={!!clientId}
-                required
-                error={errors.client_id}
-                placeholder="Rechercher un client (Nom ou Tél)..."
-              />
-            </div>
-            <Button 
-                type="button" 
-                variant="secondary" 
-                icon={RefreshCw} 
-                onClick={() => loadClients("")}
-                className="mt-7" // Align with input
-                title="Actualiser la liste des clients"
-            />
-          </div>
-
-          {/* Client Info Card */}
-          {selectedClient && (
-            <div className="md:col-span-2 bg-slate-700/30 p-4 rounded-lg border border-slate-600 mb-2">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-slate-600 rounded-full flex items-center justify-center overflow-hidden border-2 border-slate-500">
-                  {getPhotoUrl(selectedClient.photo_url) ? (
-                    <img src={getPhotoUrl(selectedClient.photo_url)} alt={selectedClient.nom} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xl font-bold text-white">{selectedClient.nom.charAt(0)}</span>
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-lg">{selectedClient.nom}</h3>
-                  <div className="text-sm text-slate-400">Taux Remboursement: <span className="text-cyan-400">{selectedClient.taux_remboursement}%</span></div>
-                  <div className="text-sm text-slate-400">Segment: {selectedClient.segment}</div>
-                </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      
+      <div className="w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        
+        {/* 1. HEADER (Stepper) */}
+        <div className="bg-slate-900/50 border-b border-slate-800 p-6">
+           <div className="flex justify-between items-center mb-6">
+              <div>
+                  <h2 className="text-xl font-bold text-white tracking-tight">Nouvelle Demande</h2>
+                  <p className="text-xs text-slate-500 mt-1">Créez un dossier de crédit en 3 étapes simples</p>
               </div>
-            </div>
-          )}
+              <button 
+                onClick={onClose} 
+                className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-white transition-colors"
+                type="button"
+              >
+                  <span className="sr-only">Fermer</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 18 18"/></svg>
+              </button>
+           </div>
 
-          {/* Type Credit */}
-          <SelectField
-            label="Type de Credit"
-            name="type_credit"
-            value={formData.type_credit}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, type_credit: e.target.value })}
-            options={typeCreditOptions}
-            required
-          />
-
-          {/* Montant */}
-          {/* Montant avec validation min/max stricte */}
-          <div className="space-y-1">
-            <FormField
-              label="Montant Demande (FCFA)"
-              name="montant_demande"
-              type="number"
-              value={formData.montant_demande ?? ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                let val = e.target.value;
-                // Clamp Max immediately
-                if (selectedPlan && (selectedPlan.montantMax || selectedPlan.montant_max)) {
-                   const max = selectedPlan.montantMax || selectedPlan.montant_max;
-                   if (parseFloat(val) > max) val = String(max);
-                }
-                setFormData({ ...formData, montant_demande: val });
-              }}
-              onBlur={() => {
-                // Clamp Min on blur
-                if (selectedPlan && (selectedPlan.montantMin || selectedPlan.montant_min)) {
-                   const min = selectedPlan.montantMin || selectedPlan.montant_min;
-                   if (formData.montant_demande && parseFloat(formData.montant_demande) < min) {
-                      setFormData(prev => ({ ...prev, montant_demande: String(min) }));
-                   }
-                }
-              }}
-              placeholder="100000"
-              error={errors.montant_demande}
-              required
-              icon={DollarSign}
-            />
-            
-            {selectedPlan && (
-               <div className="flex flex-wrap gap-2">
-                  {(selectedPlan.montantMin || selectedPlan.montant_min) && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({...prev, montant_demande: String(selectedPlan.montantMin || selectedPlan.montant_min)}))}
-                      className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded-md border border-slate-600 transition-colors flex items-center gap-1"
-                    >
-                      Min: <span className="font-bold text-white">{(selectedPlan.montantMin || selectedPlan.montant_min).toLocaleString()} FCFA</span>
-                    </button>
-                  )}
-                  {(selectedPlan.montantMax || selectedPlan.montant_max) && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({...prev, montant_demande: String(selectedPlan.montantMax || selectedPlan.montant_max)}))}
-                      className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded-md border border-slate-600 transition-colors flex items-center gap-1"
-                    >
-                      Max: <span className="font-bold text-white">{(selectedPlan.montantMax || selectedPlan.montant_max).toLocaleString()} FCFA</span>
-                    </button>
-                  )}
-               </div>
-            )}
-          </div>
-
-          {/* FREQUENCE DE REMBOURSEMENT - AVANT LA DUREE */}
-          <div className="md:col-span-2">
-            <SelectField
-              label="Frequence de Remboursement"
-              name="frequence_remboursement"
-              value={formData.frequence_remboursement}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                const newFrequence = e.target.value;
-                setFormData({
-                  ...formData,
-                  frequence_remboursement: newFrequence,
-                  // Reset duree when frequence changes
-                  duree_valeur: '',
-                  duree_unite: 'MONTH'
-                });
-              }}
-              options={frequenceOptions}
-              required
-              error={errors.frequence_remboursement}
-              helperText={!formData.frequence_remboursement ? "Selectionnez une frequence pour voir les durees suggerees" : undefined}
-            />
-          </div>
-
-          {/* DUREE SELECTOR */}
-          {formData.frequence_remboursement && (
-            <div className="md:col-span-2">
-              <DurationSelector
-                options={suggestedDurations}
-                selectedDuration={parseInt(formData.duree_valeur) || 0}
-                selectedUnit={formData.duree_unite}
-                amount={parseFloat(formData.montant_demande) || 0}
-                interestRate={parseFloat(formData.taux_interet) || suggestedRate}
-                frequence={formData.frequence_remboursement}
-                onSelect={(val, unit) => setFormData(prev => ({
-                  ...prev,
-                  duree_valeur: String(val),
-                  duree_unite: unit as 'DAY' | 'WEEK' | 'MONTH'
-                }))}
-                manualValue={formData.duree_valeur}
-                onManualChange={(val) => setFormData(prev => ({ ...prev, duree_valeur: val }))}
-                manualUnit={formData.duree_unite}
-                onUnitChange={(unit) => setFormData(prev => ({ ...prev, duree_unite: unit as 'DAY' | 'WEEK' | 'MONTH' }))}
-                validationResult={durationValidation}
-                calculateInstallment={calculateInstallment}
-                planColor={selectedPlan ? 'border-teal-500 bg-teal-600' : undefined}
-              />
-            </div>
-          )}
-
-          {/* Taux propose */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
-              <TrendingUp size={16} className="inline mr-2" />
-              Taux propose (%) *
-              {selectedPlan && (
-                <span className="text-teal-400 text-xs ml-2 font-normal">
-                  (Plan: {selectedPlan.nom})
-                </span>
-              )}
-            </label>
-            <div className={`w-full border rounded-lg px-4 py-2 text-white h-11 flex items-center ${
-              selectedPlan 
-                ? 'bg-teal-500/20 border-teal-500/50' 
-                : 'bg-slate-700 border-slate-600'
-            }`}>
-              {selectedPlan 
-                ? `${selectedPlan.tauxInteret || selectedPlan.taux_interet} %`
-                : `${suggestedRate.toFixed(1)} %`
-              }
-            </div>
-          </div>
-
-          {/* Frais de dossier du plan - Affiché uniquement si un plan avec frais est sélectionné */}
-          {selectedPlan && (selectedPlan.fraisDossier || selectedPlan.frais_dossier) && (
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                <DollarSign size={16} className="inline mr-2" />
-                Frais de dossier
-                <span className="text-orange-400 text-xs ml-2 font-normal">
-                  (Défini par le plan)
-                </span>
-              </label>
-              <div className="w-full bg-orange-500/20 border border-orange-500/50 rounded-lg px-4 py-2 text-orange-300 h-11 flex items-center font-semibold">
-                {Number(selectedPlan.fraisDossier || selectedPlan.frais_dossier).toLocaleString()} FCFA
+           {/* Progress Bar */}
+           <div className="flex items-center gap-3">
+              <StepIndicator stepNumber={1} current={step} label="Projet" />
+              <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                 <div className={`h-full bg-indigo-500 transition-all duration-500 ease-out ${step >= 2 ? 'w-full' : 'w-0'}`} />
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Ce montant sera demandé lors du paiement des frais d'engagement
-              </p>
-            </div>
-          )}
-
-          {/* Override taux */}
-          {canOverrideRate && (
-            <div className="md:col-span-2">
-              <label className="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rateOverrideEnabled}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRateOverrideEnabled(e.target.checked)}
-                  className="rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500"
-                />
-                Ajuster le taux propose
-              </label>
-            </div>
-          )}
-
-          {canOverrideRate && rateOverrideEnabled && (
-            <>
-              <FormField
-                label="Taux ajuste (%)"
-                name="taux_interet"
-                type="number"
-                step="0.1"
-                value={formData.taux_interet ?? ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, taux_interet: e.target.value })}
-                error={errors.taux_interet}
-                required
-                icon={TrendingUp}
-              />
-
-              <div className="md:col-span-2">
-                <FormField
-                  label="Motif de l'ajustement"
-                  name="taux_override_reason"
-                  value={rateOverrideReason ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRateOverrideReason(e.target.value)}
-                  placeholder="Ex: dossier prioritaire, garantie solide"
-                  error={errors.taux_override_reason}
-                  required
-                />
+              <StepIndicator stepNumber={2} current={step} label="Modalités" />
+              <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                 <div className={`h-full bg-indigo-500 transition-all duration-500 ease-out ${step >= 3 ? 'w-full' : 'w-0'}`} />
               </div>
-            </>
-          )}
-
-          {/* Revenus et Charges */}
-          <div className="md:col-span-2 space-y-4">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-semibold text-slate-300">
-                    <TrendingUp size={16} className="inline mr-2" />
-                    {formData.type_revenu === 'DAILY' ? 'Revenu Journalier' : 'Revenus Mensuels'} *
-                  </label>
-                  <div className="flex bg-slate-700/50 p-0.5 rounded-lg border border-slate-600/50">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, type_revenu: 'MONTHLY' })}
-                      className={`px-3 py-1 rounded text-xs font-medium transition ${
-                        formData.type_revenu === 'MONTHLY'
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Mensuel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, type_revenu: 'DAILY' })}
-                      className={`px-3 py-1 rounded text-xs font-medium transition ${
-                        formData.type_revenu === 'DAILY'
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Journalier
-                    </button>
-                  </div>
-                </div>
- 
-                {formData.type_revenu === 'DAILY' ? (
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      name="revenu_journalier"
-                      type="number"
-                      value={formData.revenu_journalier}
-                      onChange={(e) => {
-                        const journalier = e.target.value;
-                        const mensuel = journalier ? (parseFloat(journalier) * 26).toString() : '';
-                        setFormData({
-                          ...formData,
-                          revenu_journalier: journalier,
-                          revenus_mensuels: mensuel
-                        });
-                      }}
-                      placeholder="10000"
-                      className="w-full bg-slate-700/50 border border-slate-600 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                  </div>
-                ) : (
-                  <div className="relative">
-                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                     <input
-                      name="revenus_mensuels"
-                      type="number"
-                      value={formData.revenus_mensuels}
-                      onChange={(e) => setFormData({ ...formData, revenus_mensuels: e.target.value })}
-                      placeholder="50000"
-                      className={`w-full bg-slate-700/50 border ${errors.revenus_mensuels ? 'border-red-500' : 'border-slate-600'} rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
-                    />
-                  </div>
-                )}
-                {errors.revenus_mensuels && <p className="text-red-400 text-xs mt-1">{errors.revenus_mensuels}</p>}
-
-                {formData.type_revenu === 'Journalier' && formData.revenu_journalier && (
-                  <div className="text-xs text-blue-400 flex items-center gap-1 mt-1 bg-blue-500/10 px-2 py-1 rounded w-fit">
-                    <span>Est. mensuel (26j):</span>
-                    <span className="font-bold">{(parseFloat(formData.revenu_journalier) * 26).toLocaleString()} FCFA</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-300 h-[26px] flex items-center">
-                  Charges Mensuelles (FCFA)
-                </label>
-                <div className="relative">
-                  <input
-                    name="charges_mensuelles"
-                    type="number"
-                    value={formData.charges_mensuelles}
-                    onChange={(e) => setFormData({ ...formData, charges_mensuelles: e.target.value })}
-                    placeholder="20000"
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg py-2 px-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-
-
-          {/* Objet du credit */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
-              <FileText size={16} className="inline mr-2" />
-              Objet du Credit *
-            </label>
-            <textarea
-              value={formData.objet_credit}
-              onChange={(e) => setFormData({ ...formData, objet_credit: e.target.value })}
-              className={`w-full bg-slate-700 border ${errors.objet_credit ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              rows={3}
-              placeholder="Details de l'utilisation des fonds..."
-            />
-            {errors.objet_credit && <p className="text-red-400 text-sm mt-1">{errors.objet_credit}</p>}
-          </div>
+              <StepIndicator stepNumber={3} current={step} label="Analyse" />
+           </div>
         </div>
 
-        {/* Analyse Previsionnelle */}
-        {formData.montant_demande && formData.duree_valeur && formData.frequence_remboursement && (
-          <div className="bg-slate-700/50 rounded-lg p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white mb-4">Analyse Previsionnelle</h3>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">Montant Total a Rembourser</div>
-                <div className="text-2xl font-bold text-white">{calculatedData.montantTotal.toLocaleString()} FCFA</div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Capital: {parseFloat(formData.montant_demande).toLocaleString()} FCFA +
-                  Interets: {(calculatedData.montantTotal - parseFloat(formData.montant_demande || '0')).toLocaleString()} FCFA
-                </div>
-              </div>
-
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">
-                  Montant par {getFrequenceEcheanceLabel()}
-                </div>
-                <div className="text-2xl font-bold text-green-400">{Math.round(calculatedData.montantEcheance).toLocaleString()} FCFA</div>
-                <div className="text-xs text-slate-400 mt-1">
-                  {calculatedData.nombreEcheances} paiements
-                </div>
-              </div>
-
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">Capacite de Remboursement</div>
-                <div className="text-2xl font-bold text-cyan-400">{calculatedData.capaciteRemboursement.toLocaleString()} FCFA</div>
-              </div>
-
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">Taux d'Endettement</div>
-                <div className={`text-2xl font-bold ${calculatedData.tauxEndettement > 50 ? 'text-red-400' : calculatedData.tauxEndettement > 40 ? 'text-yellow-400' : 'text-green-400'}`}>
-                  {calculatedData.tauxEndettement.toFixed(1)}%
-                </div>
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* Analyse de Solvabilité (Detailed) */}
-        {calculatedData.montantEcheance > 0 && parseFloat(formData.revenus_mensuels) > 0 && (
-            <div className={`mt-4 rounded-xl p-4 border ${
-                calculatedData.tauxEndettement > 50 
-                  ? 'bg-red-500/10 border-red-500/30' 
-                  : calculatedData.tauxEndettement > 35 
-                    ? 'bg-amber-500/10 border-amber-500/30' 
-                    : 'bg-emerald-500/10 border-emerald-500/30'
-              }`}>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                    <TrendingUp size={16} />
-                    Analyse de Solvabilité
-                  </h4>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    calculatedData.tauxEndettement > 50 
-                      ? 'bg-red-500/20 text-red-400' 
-                      : calculatedData.tauxEndettement > 35 
-                        ? 'bg-amber-500/20 text-amber-400' 
-                        : 'bg-emerald-500/20 text-emerald-400'
-                  }`}>
-                    {calculatedData.tauxEndettement > 50 
-                      ? '⚠️ Risque élevé' 
-                      : calculatedData.tauxEndettement > 35 
-                        ? '⚡ Risque modéré' 
-                        : '✓ Acceptable'}
-                  </span>
-                </div>
+        {/* 2. BODY (Contenu Dynamique sans Scroll) */}
+        <div className="p-6 h-[450px] flex flex-col relative group">
+           
+           {/* STEP 1: LE PROJET */}
+           {step === 1 && (
+             <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300 h-full flex flex-col">
                 
-                {/* Barre de progression du taux d'endettement */}
-                <div className="mb-3">
-                  <div className="flex justify-between text-xs text-slate-400 mb-1">
-                    <span>Taux d'endettement</span>
-                    <span className={`font-bold ${
-                      calculatedData.tauxEndettement > 50 
-                        ? 'text-red-400' 
-                        : calculatedData.tauxEndettement > 35 
-                          ? 'text-amber-400' 
-                          : 'text-emerald-400'
-                    }`}>
-                      {calculatedData.tauxEndettement.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-700/50 rounded-full h-2.5">
-                    <div 
-                      className={`h-2.5 rounded-full transition-all duration-500 ${
-                        calculatedData.tauxEndettement > 50 
-                          ? 'bg-red-500' 
-                          : calculatedData.tauxEndettement > 35 
-                            ? 'bg-amber-500' 
-                            : 'bg-emerald-500'
-                      }`}
-                      style={{ width: `${Math.min(calculatedData.tauxEndettement, 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                    <span>0%</span>
-                    <span className="text-amber-500/70">35% (Attention)</span>
-                    <span className="text-red-500/70">50% (Max)</span>
-                  </div>
+                {/* Client Select */}
+                <div className="space-y-1.5">
+                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Client Principal</label>
+                   <div className="relative h-12 z-20">
+                      <SearchableSelect
+                        label=""
+                        name="client_id"
+                        value={formData.client_id}
+                        onChange={(value) => setFormData({ ...formData, client_id: String(value) })}
+                        options={clientOptions}
+                        onSearchChange={handleSearchChange}
+                        onDisabledClick={handleIneligibleClick}
+                        isLoading={searchLoading}
+                        disabled={!!clientId}
+                        required
+                        error={errors.client_id}
+                        placeholder="Rechercher un client..."
+                        className="h-12 text-base"
+                      />
+                   </div>
                 </div>
 
-                {/* Commentaire d'analyse */}
-                <p className={`text-xs leading-relaxed ${
-                  calculatedData.tauxEndettement > 50 
-                    ? 'text-red-300' 
-                    : calculatedData.tauxEndettement > 35 
-                      ? 'text-amber-300' 
-                      : 'text-emerald-300'
-                }`}>
-                  {calculatedData.tauxEndettement > 50 
-                    ? `⛔ Le client consacrerait ${calculatedData.tauxEndettement.toFixed(1)}% de ses revenus au remboursement. Ce niveau dépasse le seuil acceptable (50%) et expose à un risque élevé de défaut. La demande ne peut pas être créée.`
-                    : calculatedData.tauxEndettement > 35 
-                      ? `⚠️ Le taux d'endettement de ${calculatedData.tauxEndettement.toFixed(1)}% est modéré. Le client dispose d'environ ${calculatedData.capaciteRemboursement.toLocaleString()} FCFA après charges. Une enquête approfondie est recommandée.`
-                      : `✅ Profil favorable. Le client conserve une marge confortable avec ${calculatedData.capaciteRemboursement.toLocaleString()} FCFA de capacité de remboursement mensuelle.`
-                  }
-                </p>
-            </div>
-        )}
-      </form>
-    </Modal>
+                {/* Plan & Objet Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Plan de Crédit</label>
+                      <SelectField
+                        label=""
+                        name="creditPlanId"
+                        value={formData.credit_plan_id}
+                        onChange={(e) => handleApplyPlan(e.target.value)}
+                        options={[
+                            { value: '', label: 'Standard (Aucun plan)' },
+                            ...creditPlans.map(p => ({ value: p.id, label: p.nom }))
+                        ]}
+                        className="h-12 bg-slate-900 border-slate-700 text-white focus:border-indigo-500/50"
+                      />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Objet du financement</label>
+                      <input 
+                        className={`w-full h-12 bg-slate-900 border ${errors.objet_credit ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-600`}
+                        placeholder="Ex: Achat Stock"
+                        value={formData.objet_credit}
+                        onChange={e => setFormData({...formData, objet_credit: e.target.value})}
+                      />
+                   </div>
+                </div>
+
+                {/* Hero Amount */}
+                <div className="flex-1 flex flex-col justify-center pb-4">
+                   <label className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Montant Demandé (FCFA)</label>
+                   <div className="relative max-w-sm mx-auto w-full">
+                      <input 
+                        type="number" 
+                        value={formData.montant_demande}
+                        onChange={e => setFormData({...formData, montant_demande: e.target.value})}
+                        className={`w-full h-24 bg-slate-900/50 border-2 ${errors.montant_demande ? 'border-red-500/50' : 'border-slate-800'} focus:border-indigo-500/50 rounded-2xl pl-8 pr-8 text-5xl font-black text-white text-center outline-none transition-all placeholder:text-slate-800`}
+                        placeholder="0"
+                        autoFocus
+                      />
+                      <DollarSign className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 opacity-20" size={40} />
+                   </div>
+                </div>
+             </div>
+           )}
+
+           {/* STEP 2: MODALITÉS */}
+           {step === 2 && (
+             <div className="space-y-8 animate-in slide-in-from-right-4 fade-in duration-300">
+                <div className="grid grid-cols-2 gap-6">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Type d'amortissement</label>
+                      <SelectField
+                         label=""
+                         name="type_credit"
+                         value={formData.type_credit}
+                         onChange={(e) => setFormData({...formData, type_credit: e.target.value})}
+                         options={typeCreditOptions}
+                         className="h-12 bg-slate-900 border-slate-700 text-white"
+                      />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Fréquence remboursements</label>
+                      <SelectField
+                         label=""
+                         name="frequence_remboursement"
+                         value={formData.frequence_remboursement}
+                         onChange={(e) => setFormData({...formData, frequence_remboursement: e.target.value, duree_valeur: '', duree_unite: 'MONTH'})}
+                         options={frequenceOptions}
+                         className="h-12 bg-slate-900 border-slate-700 text-white"
+                         error={errors.frequence_remboursement}
+                      />
+                   </div>
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Durée du crédit</label>
+                   {formData.frequence_remboursement ? (
+                       <>
+                        <div className="flex gap-2 h-14">
+                            <input 
+                                type="number" 
+                                className="flex-1 h-full bg-slate-900 border border-slate-700 rounded-xl px-4 text-xl font-bold text-white focus:border-indigo-500 outline-none" 
+                                value={formData.duree_valeur}
+                                onChange={e => setFormData({...formData, duree_valeur: e.target.value})}
+                                placeholder="0"
+                            />
+                            <div className="w-40 h-full">
+                                <SelectField
+                                    label=""
+                                    name="duree_unite"
+                                    value={formData.duree_unite}
+                                    onChange={(e) => setFormData({...formData, duree_unite: e.target.value as any})}
+                                    options={[
+                                        { value: 'DAY', label: 'Jours' },
+                                        { value: 'WEEK', label: 'Semaines' },
+                                        { value: 'MONTH', label: 'Mois' }
+                                    ]}
+                                    className="!h-14 bg-slate-900 border-slate-700 text-white rounded-xl"
+                                />
+                            </div>
+                        </div>
+                        
+                        {/* Quick Chips */}
+                        <div className="flex gap-2">
+                            {[30, 60, 90, 180].map(d => (
+                                <button 
+                                    key={d} 
+                                    type="button"
+                                    onClick={() => setFormData({...formData, duree_valeur: String(d), duree_unite: 'DAY'})}
+                                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all"
+                                >
+                                    {d} jours
+                                </button>
+                            ))}
+                            <div className="h-8 w-px bg-slate-800 mx-2"></div>
+                            <div className="text-xs text-slate-500 flex items-center italic">
+                                {durationValidation && (
+                                    <span className={durationValidation.type === 'error' ? 'text-red-500' : 'text-amber-500'}>
+                                        {durationValidation.message}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                       </>
+                   ) : (
+                       <div className="p-4 border border-dashed border-slate-700 rounded-xl text-center text-slate-500 text-sm">
+                           Veuillez d'abord sélectionner une fréquence
+                       </div>
+                   )}
+                </div>
+             </div>
+           )}
+
+           {/* STEP 3: ANALYSE & VALIDATION */}
+           {step === 3 && (
+             <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300 h-full flex flex-col">
+                
+                {/* Financial Inputs Grid */}
+                <div className="grid grid-cols-2 gap-5">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Revenus {formData.type_revenu === 'DAILY' ? '(Journalier)' : '(Mensuel)'}</label>
+                      <div className="relative h-12">
+                          <input 
+                            type="number" 
+                            className="w-full h-full bg-slate-900 border border-slate-700 rounded-lg px-4 text-white focus:border-indigo-500 outline-none" 
+                            placeholder="0" 
+                            value={formData.type_revenu === 'DAILY' ? formData.revenu_journalier : formData.revenus_mensuels}
+                            onChange={(e) => {
+                                if (formData.type_revenu === 'DAILY') {
+                                   const j = e.target.value;
+                                   const m = j ? (parseFloat(j) * 26).toString() : '';
+                                   setFormData({ ...formData, revenu_journalier: j, revenus_mensuels: m });
+                                } else {
+                                   setFormData({ ...formData, revenus_mensuels: e.target.value });
+                                }
+                            }}
+                          />
+                          <button 
+                             type="button"
+                             onClick={() => setFormData(prev => ({ ...prev, type_revenu: prev.type_revenu === 'MONTHLY' ? 'DAILY' : 'MONTHLY' }))}
+                             className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-indigo-400 hover:text-white"
+                             title="Changer unité"
+                           >
+                             <RefreshCw size={14} />
+                           </button>
+                      </div>
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Charges Mensuelles</label>
+                      <input 
+                        type="number" 
+                        className="w-full h-12 bg-slate-900 border border-slate-700 rounded-lg px-4 text-white focus:border-indigo-500 outline-none" 
+                        placeholder="0" 
+                        value={formData.charges_mensuelles}
+                        onChange={e => setFormData({...formData, charges_mensuelles: e.target.value})}
+                      />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Taux d'intérêt (%)</label>
+                      <input 
+                        type="number" 
+                        className={`w-full h-12 bg-slate-900 border border-slate-700 rounded-lg px-4 text-white ${selectedPlan ? 'text-emerald-400 font-bold' : ''}`}
+                        value={formData.taux_interet}
+                        onChange={e => { setRateOverrideEnabled(true); setFormData({...formData, taux_interet: e.target.value}); }}
+                        readOnly={!!selectedPlan && !rateOverrideEnabled}
+                      />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Frais de dossier</label>
+                      <input 
+                        type="text" 
+                        className="w-full h-12 bg-slate-900 border border-slate-700 rounded-lg px-4 text-white" 
+                        value={selectedPlan?.fraisDossier || selectedPlan?.frais_dossier || '0'}
+                        readOnly
+                      />
+                   </div>
+                </div>
+
+                {/* Simulation Result Card (The "Wow" factor) */}
+                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-5 rounded-xl shadow-inner mt-auto">
+                   <div className="flex justify-between items-end mb-4">
+                      <div>
+                         <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Mensualité Estimée</div>
+                         <div className="text-3xl font-black text-emerald-400 tracking-tight">
+                            ~ {Math.round(calculatedData.montantEcheance).toLocaleString()} <span className="text-sm font-normal text-emerald-500/50">FCFA</span>
+                         </div>
+                      </div>
+                      <div className="text-right">
+                         <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Coût Total</div>
+                         <div className="text-xl font-bold text-white">
+                             {Math.round(calculatedData.montantTotal).toLocaleString()} <span className="text-xs font-normal text-slate-600">FCFA</span>
+                         </div>
+                      </div>
+                   </div>
+                   
+                   {/* Debt Ratio Bar */}
+                   <div>
+                      <div className="flex justify-between text-xs mb-2">
+                         <span className="text-slate-400 font-medium">Taux d'endettement</span>
+                         <span className={`font-bold ${
+                            calculatedData.tauxEndettement > 40 ? 'text-red-400' : 
+                            calculatedData.tauxEndettement > 30 ? 'text-amber-400' : 'text-emerald-400'
+                         }`}>{calculatedData.tauxEndettement.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800/50">
+                         <div 
+                           className={`h-full rounded-full transition-all duration-700 ease-out ${
+                               calculatedData.tauxEndettement > 50 ? 'bg-red-600' :
+                               calculatedData.tauxEndettement > 40 ? 'bg-red-500' :
+                               calculatedData.tauxEndettement > 30 ? 'bg-amber-500' : 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                           }`} 
+                           style={{ width: `${Math.min(calculatedData.tauxEndettement, 100)}%` }} 
+                         />
+                      </div>
+                      
+                      {/* Pro Feedback Label */}
+                      <div className="mt-2 text-right">
+                         <span className={`text-[10px] uppercase font-bold tracking-wide ${
+                            calculatedData.tauxEndettement > 50 ? 'text-red-500' :
+                            calculatedData.tauxEndettement > 40 ? 'text-red-400' :
+                            calculatedData.tauxEndettement > 30 ? 'text-amber-500' : 'text-emerald-600'
+                         }`}>
+                            {calculatedData.tauxEndettement > 50 ? "🚫 REFUS AUTOMATIQUE (SUR-ENDETTÉ)" :
+                             calculatedData.tauxEndettement > 40 ? "⚠️ RISQUÉ (BESOIN VALIDATION)" :
+                             calculatedData.tauxEndettement > 30 ? "✋ ACCEPTABLE AVEC PRUDENCE" : "✅ DOSSIER SAIN"}
+                         </span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+           )}
+
+        </div>
+
+        {/* 3. FOOTER (Navigation) */}
+        <div className="p-5 bg-slate-900/80 border-t border-slate-800 flex justify-between items-center backdrop-blur-sm">
+           {step > 1 ? (
+             <button 
+                type="button"
+                onClick={handleBack} 
+                className="px-6 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-2 font-medium"
+             >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg> 
+                Précédent
+             </button>
+           ) : (
+             <div /> // Spacer
+           )}
+
+           {step < 3 ? (
+             <button 
+                type="button"
+                onClick={handleNext} 
+                className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-900/20 hover:shadow-indigo-500/30 hover:translate-y-[-1px]"
+             >
+                Suivant 
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+             </button>
+           ) : (
+             <button 
+                onClick={handleSubmit}
+                disabled={loading || calculatedData.tauxEndettement > 55}
+                className={`px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg ${
+                    loading || calculatedData.tauxEndettement > 55
+                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20 hover:shadow-emerald-500/30 hover:translate-y-[-1px]'
+                }`}
+             >
+                {loading ? (
+                    <>Creating...</>
+                ) : (
+                    <>
+                        <Save size={18} /> Créer la Demande
+                    </>
+                )}
+             </button>
+           )}
+        </div>
+
+      </div>
+    </div>
   );
 }
+

@@ -1,5 +1,8 @@
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+
+const logger = createLogger('Routes:Clients');
 import {
   StatutCompte,
   StatutCredit,
@@ -25,7 +28,7 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema, parseP
 import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
-import { eq, sql, or, isNull, and, gte, desc } from "drizzle-orm";
+import { eq, sql, or, isNull, and, gte, lte, desc } from "drizzle-orm";
 import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
@@ -42,7 +45,7 @@ export function registerClientRoutes(app: Express) {
       const stats = await getClientStats(filter);
       res.json(stats);
     } catch (error) {
-      console.error("Error fetching client stats:", error);
+      logger.error({ err: error }, 'Error fetching client stats');
       res.status(500).json({ message: "Erreur lors de la récupération des statistiques" });
     }
   });
@@ -108,7 +111,7 @@ export function registerClientRoutes(app: Express) {
         })
       );
     } catch (error) {
-      console.error("Error fetching eligible clients:", error);
+      logger.error({ err: error }, 'Error fetching eligible clients');
       res.status(500).json({ message: "Erreur lors de la récupération des clients éligibles" });
     }
   });
@@ -133,7 +136,7 @@ export function registerClientRoutes(app: Express) {
         })
       );
     } catch (e) {
-      console.error(e);
+      logger.error({ err: e }, 'Failed to fetch clients');
       res.status(500).json({ message: "Failed to fetch clients" });
     }
   });
@@ -149,8 +152,7 @@ export function registerClientRoutes(app: Express) {
 
         const clients = await storage.getAllClients(filter);
         if (clients.length > 0) {
-            console.log("[Debug] First client keys:", Object.keys(clients[0]));
-            console.log("[Debug] First client sample:", JSON.stringify(clients[0], null, 2));
+            logger.debug({ keys: Object.keys(clients[0]), sample: clients[0] }, 'First client debug info');
         }
 
         const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -248,7 +250,7 @@ export function registerClientRoutes(app: Express) {
             });
         }
         
-        console.log(`[Search] Found ${enrichedResults.length} results (Enriched)`);
+        logger.debug({ count: enrichedResults.length }, 'Search results found (Enriched)');
         const { page, perPage, offset } = parsePagination(req.query);
         const total = enrichedResults.length;
         const paged = enrichedResults.slice(offset, offset + perPage);
@@ -319,7 +321,7 @@ export function registerClientRoutes(app: Express) {
       });
 
     } catch (error) {
-      console.error("Error fetching clients without credentials:", error);
+      logger.error({ err: error }, 'Error fetching clients without credentials');
       res.status(500).json({ message: "Erreur lors de la récupération des clients" });
     }
   });
@@ -328,12 +330,12 @@ export function registerClientRoutes(app: Express) {
    * POST /api/clients/generate-credentials
    * Génère username + password pour les clients sans accès portail
    *
-   * Body: { clientIds?: string[] } - Si vide, traite tous les clients sans credentials
-   * Returns: { generated: number, results: { clientId, username, password, error? }[] }
+   * Body: { clientIds?: string[], sendEmail?: boolean } - Si clientIds vide, traite tous les clients sans credentials
+   * Returns: { generated: number, results: { clientId, username, password, email?, emailSent?, error? }[] }
    */
   app.post("/api/clients/generate-credentials", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
-      const { clientIds } = req.body as { clientIds?: string[] };
+      const { clientIds, sendEmail = false } = req.body as { clientIds?: string[]; sendEmail?: boolean };
       const crypto = await import("crypto");
 
       // Récupérer les clients à traiter
@@ -360,8 +362,9 @@ export function registerClientRoutes(app: Express) {
         }
       }
 
-      const results: { clientId: string; nom: string; username?: string; password?: string; error?: string }[] = [];
+      const results: { clientId: string; nom: string; username?: string; password?: string; email?: string; emailSent?: boolean; error?: string }[] = [];
       let generatedCount = 0;
+      let emailsSentCount = 0;
 
       for (const client of clientsToProcess) {
         try {
@@ -424,11 +427,45 @@ export function registerClientRoutes(app: Express) {
             })
             .where(eq(users.id, user.id));
 
+          // Send email with credentials if requested and email is available
+          let emailSent = false;
+          const clientEmail = user.email;
+
+          if (sendEmail && clientEmail) {
+            try {
+              const { enqueueNotification } = await import("../services/notifications/notification-service");
+
+              await enqueueNotification({
+                channel: 'EMAIL',
+                templateCode: 'PORTAL_CREDENTIALS',
+                recipient: clientEmail,
+                payload: {
+                  clientNom: user.nom,
+                  clientPrenom: user.prenom || '',
+                  username: finalUsername,
+                  password: plainPassword,
+                  portalUrl: process.env.PORTAL_URL || 'https://portail.cofin.com',
+                  supportEmail: process.env.SUPPORT_EMAIL || 'support@cofin.com',
+                },
+                userId: user.id,
+                agenceId: client.agenceId || undefined,
+              });
+
+              emailSent = true;
+              emailsSentCount++;
+            } catch (emailError) {
+              logger.error({ err: emailError, email: clientEmail }, 'Failed to send credentials email');
+              // Don't fail the whole operation, just log the error
+            }
+          }
+
           results.push({
             clientId: client.id,
             nom: `${user.nom} ${user.prenom || ''}`.trim(),
             username: finalUsername,
             password: plainPassword,
+            email: clientEmail || undefined,
+            emailSent,
           });
           generatedCount++;
 
@@ -438,7 +475,7 @@ export function registerClientRoutes(app: Express) {
             "GENERATE_CLIENT_CREDENTIALS",
             "user",
             user.id,
-            { clientId: client.id, username: finalUsername },
+            { clientId: client.id, username: finalUsername, emailSent },
             "success",
             "high"
           );
@@ -455,11 +492,12 @@ export function registerClientRoutes(app: Express) {
       res.json({
         generated: generatedCount,
         total: clientsToProcess.length,
+        emailsSent: emailsSentCount,
         results,
       });
 
     } catch (error) {
-      console.error("Error generating client credentials:", error);
+      logger.error({ err: error }, 'Error generating client credentials');
       res.status(500).json({ message: "Erreur lors de la génération des identifiants" });
     }
   });
@@ -550,7 +588,7 @@ export function registerClientRoutes(app: Express) {
       
       res.json(addSnakeCaseAliasesDeep(comptes));
     } catch (error) {
-      console.error("Error fetching client comptes:", error);
+      logger.error({ err: error }, 'Error fetching client comptes');
       res.status(500).json({ message: "Erreur lors de la récupération des comptes" });
     }
   });
@@ -575,7 +613,7 @@ export function registerClientRoutes(app: Express) {
       const accounts = await getComptesByClient(req.params.id);
       res.json(accounts);
     } catch (error) {
-       console.error("Error fetching accounts:", error);
+       logger.error({ err: error }, 'Error fetching accounts');
        res.status(500).json({ message: "Erreur chargement comptes" });
     }
   });
@@ -645,7 +683,7 @@ export function registerClientRoutes(app: Express) {
         res.status(201).json(account);
       } catch (error) {
          if (error instanceof z.ZodError) return res.status(400).json(error);
-         console.error("Error creating account:", error);
+         logger.error({ err: error }, 'Error creating account');
          res.status(500).json({ message: "Erreur création compte" });
       }
   });
@@ -747,7 +785,7 @@ export function registerClientRoutes(app: Express) {
         res.json(updatedAccount);
       } catch (error) {
          if (error instanceof z.ZodError) return res.status(400).json(error);
-         console.error("Error updating account:", error);
+         logger.error({ err: error }, 'Error updating account');
          res.status(500).json({ message: "Erreur mise à jour compte" });
       }
   });
@@ -779,7 +817,7 @@ export function registerClientRoutes(app: Express) {
       });
     } catch (e) {
       if (e instanceof z.ZodError) return res.status(400).json(e);
-      console.error("Bulk import error:", e);
+      logger.error({ err: e }, 'Bulk import error');
       res.status(500).json({ message: "Bulk import failed" });
     }
   });
@@ -794,7 +832,7 @@ export function registerClientRoutes(app: Express) {
         if (data.documents && Array.isArray(data.documents)) {
           const docsResult = clientDocumentsArraySchema.safeParse(data.documents);
           if (!docsResult.success) {
-            console.warn("Documents validation failed:", docsResult.error);
+            logger.warn({ err: docsResult.error }, 'Documents validation failed');
             // Still allow creation, just log the validation issue
           } else {
             validatedDocuments = docsResult.data;
@@ -805,7 +843,7 @@ export function registerClientRoutes(app: Express) {
             validatedDocuments = validatedDocuments.map(doc => {
               // Ensure private docs have proper path format (not full URLs)
               if (doc.isPrivate && doc.documentUrl.startsWith('http')) {
-                console.warn(`Document ${doc.documentType} has full URL for private doc, should be object key`);
+                logger.warn({ documentType: doc.documentType }, 'Document has full URL for private doc, should be object key');
               }
               return doc;
             });
@@ -863,7 +901,7 @@ export function registerClientRoutes(app: Express) {
             // Cleanup any remaining temp files
             await StorageService.deleteEntityFiles('client', tempEntityId);
           } catch (relocateError) {
-            console.error(`⚠️ File relocation failed for client ${createdClient.id}:`, relocateError);
+            logger.error({ err: relocateError, clientId: createdClient.id }, 'File relocation failed');
           }
         }
 
@@ -884,9 +922,9 @@ export function registerClientRoutes(app: Express) {
             statut: StatutCompte.ACTIVE,
             agenceId: client.agenceId
           }, req.session.user?.id);
-          console.log(`✅ Compte courant ${compteCourant.numeroCompte} créé automatiquement pour le client ${client.nom}`);
+          logger.info({ numeroCompte: compteCourant.numeroCompte, clientNom: client.nom }, 'Compte courant created automatically for client');
         } catch (accountError) {
-          console.error(`⚠️ Échec création compte courant auto pour client ${client.id}:`, accountError);
+          logger.error({ err: accountError, clientId: client.id }, 'Failed to create automatic current account for client');
           // Ne pas bloquer la création du client si le compte échoue
         }
 
@@ -956,11 +994,11 @@ export function registerClientRoutes(app: Express) {
           const tempId = req.body?.tempEntityId || req.body?.temp_entity_id;
           if (tempId) {
             StorageService.deleteEntityFiles('client', tempId)
-              .catch(err => console.error("Cleanup temp files failed:", err));
+              .catch(err => logger.error({ err }, 'Cleanup temp files failed'));
           }
         }
         if (e instanceof z.ZodError) return res.status(400).json(e);
-        console.error("Create client error:", e);
+        logger.error({ err: e }, 'Create client error');
         res.status(500).json({ message: "Create client failed" });
       }
   });
@@ -1005,7 +1043,7 @@ export function registerClientRoutes(app: Express) {
              // If old photo was a URL (not base64), delete it
              if (!existing.photoProfile.startsWith('data:')) {
                  StorageService.deleteFileFromUrl(existing.photoProfile).catch((e: any) =>
-                    console.error("Failed to delete old profile photo:", e)
+                    logger.error({ err: e }, 'Failed to delete old profile photo')
                  );
              }
         }
@@ -1030,7 +1068,7 @@ export function registerClientRoutes(app: Express) {
                     });
                 }
             }
-            console.log(`🔒 Frozen ${accounts.length} accounts for client ${client.id} (status: ${client.statut})`);
+            logger.info({ accountCount: accounts.length, clientId: client.id, statut: client.statut }, 'Frozen accounts for client due to status change');
         }
         // ====== END BUSINESS LOGIC ======
 
@@ -1054,7 +1092,7 @@ export function registerClientRoutes(app: Express) {
 
         res.json(addSnakeCaseAliasesDeep(client));
       } catch (e) {
-          console.error("Update client error:", e);
+          logger.error({ err: e }, 'Update client error');
           res.status(500).json({ message: "Update failed" });
       }
   });
@@ -1100,12 +1138,7 @@ export function registerClientRoutes(app: Express) {
       try {
           const { telephone, email, numeroPiece, excludeClientId } = req.body;
 
-          console.log('[DEBUG_V2] Params:', {
-            phone: telephone,
-            piece: numeroPiece,
-            excludeId: excludeClientId,
-            excludeType: typeof excludeClientId
-          });
+          logger.debug({ phone: telephone, piece: numeroPiece, excludeId: excludeClientId, excludeType: typeof excludeClientId }, 'Check uniqueness params');
 
           const cleanPhone = telephone?.trim();
           const cleanEmail = email?.trim();
@@ -1139,24 +1172,19 @@ export function registerClientRoutes(app: Express) {
             .leftJoin(users, eq(clients.userId, users.id))
             .where(or(...allChecks));
 
-          console.log('[DEBUG_V2] Raw Conflicts:', conflicts.map(c => ({
-              id: c.id,
-              idType: typeof c.id,
-              nom: c.nom,
-              piece: c.numeroPiece
-          })));
+          logger.debug({ conflicts: conflicts.map(c => ({ id: c.id, idType: typeof c.id, nom: c.nom, piece: c.numeroPiece })) }, 'Raw conflicts found');
 
           // Filter out excluded client
           const realConflicts = conflicts.filter(c => {
              if (!excludeClientId) return true;
 
              const isSame = String(c.id) === String(excludeClientId);
-             console.log(`[DEBUG_V2] Comparing DB ID "${c.id}" vs Exclude "${excludeClientId}" => isSame? ${isSame}`);
+             logger.debug({ dbId: c.id, excludeId: excludeClientId, isSame }, 'Comparing DB ID vs Exclude ID');
 
              return !isSame;
           });
 
-          console.log('[DEBUG_V2] Final Conflicts:', realConflicts.length);
+          logger.debug({ count: realConflicts.length }, 'Final conflicts count');
 
 
           if (realConflicts.length > 0) {
@@ -1175,7 +1203,7 @@ export function registerClientRoutes(app: Express) {
 
           res.json({ available: true });
       } catch (error) {
-          console.error("Uniqueness check error:", error);
+          logger.error({ err: error }, 'Uniqueness check error');
           res.status(500).json({ message: "Validation error" });
       }
   });
@@ -1243,7 +1271,7 @@ export function registerClientRoutes(app: Express) {
 
         res.json(result);
       } catch (error) {
-          console.error("Score calculation error:", error);
+          logger.error({ err: error }, 'Score calculation error');
           res.status(500).json({ message: "Score calculation failed" });
       }
   });
@@ -1326,9 +1354,92 @@ export function registerClientRoutes(app: Express) {
 
         res.json(response);
       } catch (error) {
-          console.error("Analytics error:", error);
+          logger.error({ err: error }, 'Analytics error');
           res.status(500).json({ message: "Failed to generate analytics" });
       }
+  });
+
+  // Client Analytics - Period Comparison
+  app.get("/api/clients/:id/analytics/compare", requireAuth, async (req, res) => {
+    try {
+      const clientId = req.params.id;
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const preset = req.query.preset as string | undefined;
+      let pAStart: Date, pAEnd: Date, pBStart: Date, pBEnd: Date;
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+
+      if (preset === 'quarter') {
+        const currentQStart = new Date(year, Math.floor(month / 3) * 3, 1);
+        const prevQStart = new Date(year, Math.floor(month / 3) * 3 - 3, 1);
+        const prevQEnd = new Date(currentQStart.getTime() - 86400000);
+        pAStart = prevQStart; pAEnd = prevQEnd;
+        pBStart = currentQStart; pBEnd = now;
+      } else if (preset === 'year') {
+        pBStart = new Date(year, 0, 1); pBEnd = now;
+        pAStart = new Date(year - 1, 0, 1); pAEnd = new Date(year - 1, 11, 31);
+      } else {
+        // Default: month (current vs previous)
+        pBStart = new Date(year, month, 1); pBEnd = now;
+        pAStart = new Date(year, month - 1, 1); pAEnd = new Date(year, month, 0);
+      }
+
+      // Fetch mouvements for both periods + credits
+      const [mouvA, mouvB, allCredits] = await Promise.all([
+        storage.getMouvementsByClientAndDateRange(clientId, pAStart, pAEnd),
+        storage.getMouvementsByClientAndDateRange(clientId, pBStart, pBEnd),
+        getCreditsByClient(clientId),
+      ]);
+
+      const computeMetrics = (mouvements: any[], periodStart: Date, periodEnd: Date) => {
+        const deposits = mouvements
+          .filter(t => t.sens === 'CREDIT')
+          .reduce((sum, t) => sum + Number(t.montant), 0);
+        const withdrawals = mouvements
+          .filter(t => t.sens === 'DEBIT')
+          .reduce((sum, t) => sum + Number(t.montant), 0);
+        const creditsInPeriod = allCredits.filter(c => {
+          const d = c.createdAt ? new Date(c.createdAt) : null;
+          return d && d >= periodStart && d <= periodEnd;
+        });
+        return {
+          depots: deposits,
+          retraits: withdrawals,
+          fluxNet: deposits - withdrawals,
+          nombreTransactions: mouvements.length,
+          nombreCredits: creditsInPeriod.length,
+          montantCredits: creditsInPeriod.reduce((s, c) => s + Number(c.montant), 0),
+        };
+      };
+
+      const metricsA = computeMetrics(mouvA, pAStart, pAEnd);
+      const metricsB = computeMetrics(mouvB, pBStart, pBEnd);
+
+      const variations: Record<string, { periodA: number; periodB: number; change: number; changePercent: number }> = {};
+      for (const key of Object.keys(metricsA) as Array<keyof typeof metricsA>) {
+        const a = metricsA[key];
+        const b = metricsB[key];
+        variations[key] = {
+          periodA: a,
+          periodB: b,
+          change: b - a,
+          changePercent: a !== 0 ? Math.round(((b - a) / a) * 10000) / 100 : (b > 0 ? 100 : 0),
+        };
+      }
+
+      res.json({
+        periodA: { start: pAStart.toISOString(), end: pAEnd.toISOString(), metrics: metricsA },
+        periodB: { start: pBStart.toISOString(), end: pBEnd.toISOString(), metrics: metricsB },
+        variations,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Client comparison error');
+      res.status(500).json({ message: "Failed to generate comparison" });
+    }
   });
 
   // ============================================
@@ -1340,11 +1451,11 @@ export function registerClientRoutes(app: Express) {
     try {
       const client = await getClientByUserId(req.params.userId);
       if (!client) {
-        return res.status(404).json({ message: "Aucun profil client pour cet utilisateur" });
+        return res.json({ data: null, message: "Aucun profil client pour cet utilisateur" });
       }
-      res.json(addSnakeCaseAliasesDeep(client));
+      res.json({ data: addSnakeCaseAliasesDeep(client) });
     } catch (error) {
-      console.error("Error fetching client by userId:", error);
+      logger.error({ err: error }, 'Error fetching client by userId');
       res.status(500).json({ message: "Erreur lors de la récupération du client" });
     }
   });
@@ -1358,7 +1469,7 @@ export function registerClientRoutes(app: Express) {
       }
       res.json(addSnakeCaseAliasesDeep(client));
     } catch (error) {
-      console.error("Error fetching client with user:", error);
+      logger.error({ err: error }, 'Error fetching client with user');
       res.status(500).json({ message: "Erreur lors de la récupération du client" });
     }
   });
@@ -1443,7 +1554,7 @@ export function registerClientRoutes(app: Express) {
       res.status(201).json(addSnakeCaseAliasesDeep(result));
 
     } catch (error) {
-      console.error("Error creating client with user:", error);
+      logger.error({ err: error }, 'Error creating client with user');
       res.status(500).json({ message: "Erreur lors de la création du client" });
     }
   });
@@ -1503,8 +1614,188 @@ export function registerClientRoutes(app: Express) {
       res.status(201).json(addSnakeCaseAliasesDeep(client));
 
     } catch (error) {
-      console.error("Error creating client from user:", error);
+      logger.error({ err: error }, 'Error creating client from user');
       res.status(500).json({ message: "Erreur lors de la création du profil client" });
+    }
+  });
+
+  // ============================================
+  // CLIENT ALERTS (Server-Side Evaluation)
+  // ============================================
+
+  /**
+   * GET /api/clients/:id/alerts
+   * Evaluate and return active alerts for a client (server-side)
+   */
+  app.get("/api/clients/:id/alerts", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
+      }
+
+      const { evaluateClientAlerts } = await import("../services/client-alerts");
+      const alerts = await evaluateClientAlerts(req.params.id);
+      res.json(alerts);
+    } catch (error) {
+      logger.error({ err: error }, 'Error evaluating client alerts');
+      res.status(500).json({ message: "Erreur lors de l'evaluation des alertes" });
+    }
+  });
+
+  /**
+   * POST /api/clients/:id/alerts/:alertType/resolve
+   * Resolve (dismiss) a specific alert type for a client
+   */
+  app.post("/api/clients/:id/alerts/:alertType/resolve", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CLIENT), requireAgenceIdAccess(), async (req, res) => {
+    try {
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
+      }
+
+      const { resolveClientAlert } = await import("../services/client-alerts");
+      const success = await resolveClientAlert(
+        req.params.id,
+        req.params.alertType,
+        req.session.user?.id
+      );
+
+      if (!success) {
+        return res.status(500).json({ message: "Erreur resolution alerte" });
+      }
+
+      await logAudit(
+        req,
+        "RESOLVE_CLIENT_ALERT",
+        "client",
+        req.params.id,
+        { alertType: req.params.alertType },
+        "success",
+        "low"
+      );
+
+      res.json({ success: true, resolvedType: req.params.alertType });
+    } catch (error) {
+      logger.error({ err: error }, 'Error resolving client alert');
+      res.status(500).json({ message: "Erreur lors de la resolution de l'alerte" });
+    }
+  });
+
+  // ============================================
+  // CLIENT NOTIFICATION SENDING
+  // ============================================
+
+  /**
+   * POST /api/clients/:id/send-notification
+   * Send a notification (SMS or Email) to a client via the notification queue
+   */
+  app.post("/api/clients/:id/send-notification", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CLIENT), requireAgenceIdAccess(), async (req, res) => {
+    try {
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
+      }
+
+      const sendNotifSchema = z.object({
+        channel: z.enum(["SMS", "EMAIL"]),
+        subject: z.string().optional(),
+        message: z.string().min(1, "Le message est requis"),
+      });
+
+      const parsed = sendNotifSchema.parse(req.body);
+
+      // Determine recipient
+      let recipient: string | null = null;
+      if (parsed.channel === "SMS") {
+        recipient = client.telephone;
+      } else if (parsed.channel === "EMAIL") {
+        recipient = client.email;
+      }
+
+      if (!recipient) {
+        return res.status(400).json({
+          message: `Le client n'a pas de ${parsed.channel === "SMS" ? "telephone" : "email"} renseigne`,
+        });
+      }
+
+      // Enqueue notification via the notification service
+      const { enqueueNotification } = await import("../services/notifications/notification-service");
+
+      const correlationId = await enqueueNotification({
+        channel: parsed.channel,
+        templateCode: "CUSTOM_MESSAGE",
+        recipient,
+        payload: {
+          message: parsed.message,
+          subject: parsed.subject || "Message de COFIN",
+          clientNom: client.nom,
+          clientPrenom: client.prenom || "",
+          senderNom: req.session.user?.nom || "Systeme",
+        },
+        userId: client.userId || undefined,
+        agenceId: client.agenceId || undefined,
+      });
+
+      // Log the activity
+      const { logClientActivity } = await import("../storage/clients");
+      await logClientActivity({
+        clientId: req.params.id,
+        type: parsed.channel === "SMS" ? "sms" : "email",
+        description:
+          parsed.channel === "SMS"
+            ? `SMS envoye: ${parsed.message.substring(0, 50)}...`
+            : `Email envoye: ${parsed.subject || "Sans objet"}`,
+        metadata: JSON.stringify({
+          channel: parsed.channel,
+          message: parsed.message,
+          subject: parsed.subject,
+          correlationId,
+          sentBy: req.session.user?.id,
+        }),
+      });
+
+      await logAudit(
+        req,
+        "SEND_CLIENT_NOTIFICATION",
+        "client",
+        req.params.id,
+        { channel: parsed.channel, correlationId },
+        "success",
+        "medium"
+      );
+
+      res.json({
+        success: true,
+        correlationId,
+        channel: parsed.channel,
+        recipient,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json(error);
+      logger.error({ err: error }, 'Error sending client notification');
+      res.status(500).json({ message: "Erreur lors de l'envoi de la notification" });
     }
   });
 
@@ -1580,7 +1871,7 @@ export function registerClientRoutes(app: Express) {
             }
         });
     } catch (error) {
-        console.error("Global history error:", error);
+        logger.error({ err: error }, 'Global history error');
         res.status(500).json({ message: "Erreur lors de la récupération de l'historique" });
     }
   });

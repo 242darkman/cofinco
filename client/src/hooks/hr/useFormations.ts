@@ -22,6 +22,11 @@ export interface FormationParticipant {
   dateInscription: string;
   presence?: string;
   evaluation?: string;
+  scoreEvaluation?: number | null;
+  competencesAcquises?: string | null;
+  recommandation?: string | null;
+  evaluateurId?: string | null;
+  evaluatedAt?: string | null;
 }
 
 export function useFormations() {
@@ -176,6 +181,54 @@ export function useFormations() {
     }
   };
 
+  const updateFormation = async (formationId: number, data: Partial<Omit<Formation, 'id' | 'createdAt' | 'updatedAt' | 'participants'>>) => {
+    try {
+      const response = await fetch(`/api/hr/formations/${formationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
+      const updated = await response.json();
+      setFormations(prev => prev.map(f => f.id === formationId ? { ...f, ...updated } : f));
+      return true;
+    } catch (err) {
+      console.error('Erreur mise à jour formation:', err);
+      return false;
+    }
+  };
+
+  const deleteFormation = async (formationId: number) => {
+    try {
+      const response = await fetch(`/api/hr/formations/${formationId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Erreur lors de la suppression');
+      setFormations(prev => prev.filter(f => f.id !== formationId));
+      return true;
+    } catch (err) {
+      console.error('Erreur suppression formation:', err);
+      return false;
+    }
+  };
+
+  const evaluateParticipant = async (
+    formationId: number,
+    employeId: string,
+    data: { scoreEvaluation: number; recommandation: string; competencesAcquises?: string[]; evaluation?: string }
+  ) => {
+    try {
+      const response = await fetch(`/api/hr/formations/${formationId}/participants/${employeId}/evaluate`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Erreur lors de l\'évaluation');
+      return await response.json();
+    } catch (err) {
+      console.error('Erreur évaluation participant:', err);
+      return null;
+    }
+  };
+
   const getFormationsByStatut = (statut: Formation['statut']) => {
     return formations.filter(f => f.statut === statut);
   };
@@ -190,11 +243,14 @@ export function useFormations() {
     loading,
     error,
     createFormation,
+    updateFormation,
+    deleteFormation,
     toggleParticipant,
     addParticipant,
     removeParticipant,
     fetchParticipants,
     updateStatut,
+    evaluateParticipant,
     getFormationsByStatut,
     fetchFormations
   };

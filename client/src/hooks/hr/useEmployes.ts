@@ -118,9 +118,17 @@ export function useEmployes() {
         photoProfile: item.user?.photoProfile || null,
       }));
 
+      // Dédupliquer par ID d'employé (un employé peut avoir plusieurs rôles mais ne doit apparaître qu'une fois)
+      const employeMap = new Map<string, Employe>();
+      for (const emp of flattenedData as Employe[]) {
+        if (!employeMap.has(emp.id)) {
+          employeMap.set(emp.id, emp);
+        }
+      }
+      const uniqueEmployes = Array.from(employeMap.values());
+
       // Calculer le nom du manager pour chaque employé (enrichissement côté client)
-      const employeMap = new Map<string, Employe>(flattenedData.map((e: Employe) => [e.id, e]));
-      const enrichedData = flattenedData.map((emp: Employe) => {
+      const enrichedData = uniqueEmployes.map((emp: Employe) => {
         if (emp.managerId) {
           const manager = employeMap.get(emp.managerId);
           if (manager) {

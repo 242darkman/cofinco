@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, AlertCircle, CheckCircle, X, Wallet, Shield } from 'lucide-react';
-import { Modal, Button, FormField, Badge } from '../../ui';
+import React, { useState, useEffect, useMemo } from 'react';
+import { DollarSign, AlertCircle, CheckCircle, X, Wallet, Shield, CreditCard, Smartphone, ChevronRight, User, FileText, Banknote, Sparkles, ArrowLeft, Loader2, Lock, CheckCircle2, KeyRound, Phone, Clock } from 'lucide-react';
+import { Modal, Button, Badge } from '../../ui';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { computeSessionStatus, formatMoney } from '../../../lib/format';
 import { toast } from 'sonner';
-import { sessionCaisseApi, authApi } from '../../../lib/api-client';
+import { sessionCaisseApi, authApi, caisseAccessControlApi } from '../../../lib/api-client';
 import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { MethodePaiement, METHODE_PAIEMENT_LABELS, type MethodePaiementType } from '@shared/enum/status-constants';
+import mtnMomoLogo from '../../../assets/logos/momo_mtna.png';
+import airtelMoneyLogo from '../../../assets/logos/airtel-money.png';
 
 interface CreditFeesPaymentModalProps {
   demande: any;
@@ -17,49 +19,102 @@ interface CreditFeesPaymentModalProps {
   onNavigate?: (module: string, sub?: string, data?: any) => void;
 }
 
-export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, onNavigate }: CreditFeesPaymentModalProps) {
-  const { payerFrais } = useDemandes();
-  
-  // Utiliser les frais du plan s'ils sont définis, sinon 10% du montant
-  const calculatedFee = demande.montant_frais_engagement 
-    ? parseFloat(demande.montant_frais_engagement) 
-    : (demande.montant_demande || 0) * 0.10;
+type PaymentStep = 'caisse' | 'pin' | 'payment' | 'confirm' | 'waiting';
 
-  const [amount, setAmount] = useState(calculatedFee.toString());
-  const [method, setMethod] = useState<MethodePaiementType>(MethodePaiement.CASH);
+// Mobile Money providers
+type MobileMoneyProvider = 'mtn' | 'airtel';
+
+const PAYMENT_METHODS = [
+  { value: MethodePaiement.CASH, label: 'Espèces', icon: Banknote, color: 'emerald' },
+  { value: 'mtn' as const, label: 'MTN MoMo', img: mtnMomoLogo, color: 'yellow' },
+  { value: 'airtel' as const, label: 'Airtel Money', img: airtelMoneyLogo, color: 'red' },
+];
+
+export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: CreditFeesPaymentModalProps) {
+  const { payerFrais } = useDemandes();
+
+  // Calculer le montant des frais
+  const feeAmount = useMemo(() => {
+    if (demande.montant_frais_engagement) {
+      return parseFloat(demande.montant_frais_engagement);
+    }
+    if (demande.plan_credit?.frais_dossier) {
+      return parseFloat(demande.plan_credit.frais_dossier);
+    }
+    if (demande.frais_dossier) {
+      return parseFloat(demande.frais_dossier);
+    }
+    return (demande.montant_demande || 0) * 0.10;
+  }, [demande]);
+
+  const feeSource = useMemo(() => {
+    if (demande.montant_frais_engagement) return 'demande';
+    if (demande.plan_credit?.frais_dossier || demande.frais_dossier) return 'plan';
+    return 'calculated';
+  }, [demande]);
+
+  const [method, setMethod] = useState<MethodePaiementType | MobileMoneyProvider>(MethodePaiement.CASH);
+
+  // Helper to get actual payment method for API
+  const getPaymentMethod = (): MethodePaiementType => {
+    if (method === 'mtn' || method === 'airtel') {
+      return MethodePaiement.MOBILE_MONEY;
+    }
+    return method as MethodePaiementType;
+  };
+
+  // Helper to get provider label
+  const getMethodLabel = (): string => {
+    if (method === 'mtn') return 'MTN MoMo';
+    if (method === 'airtel') return 'Airtel Money';
+    return METHODE_PAIEMENT_LABELS[method as MethodePaiementType] || method;
+  };
   const [loading, setLoading] = useState(false);
-  
+  const [step, setStep] = useState<PaymentStep>('caisse');
+
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [paidFacture, setPaidFacture] = useState<any>(null);
-  const [factureId, setFactureId] = useState<string | undefined>(undefined);
-
-  // Sync amount when demande is available
-  useEffect(() => {
-    if (demande?.montant_demande) {
-      const calculatedFee = demande.montant_frais_engagement 
-        ? parseFloat(demande.montant_frais_engagement) 
-        : (demande.montant_demande || 0) * 0.10;
-      setAmount(calculatedFee.toString());
-    }
-  }, [demande?.montant_demande, demande?.montant_frais_engagement]);
 
   // Session State
   const [checkingSession, setCheckingSession] = useState(true);
-  const [userSession, setUserSession] = useState<any>(null); // The user's own session
-  const [takenSession, setTakenSession] = useState<any>(null); // The session user decided to take over
+  const [userSession, setUserSession] = useState<any>(null);
+  const [takenSession, setTakenSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<SystemRole>(SystemRole.CLIENT);
-  
+
   // Caisse List State
-  const [showCaisseList, setShowCaisseList] = useState(false);
   const [agencyCaisses, setAgencyCaisses] = useState<any[]>([]);
   const [loadingCaisses, setLoadingCaisses] = useState(false);
 
-  // Opening Caisse State
-  const [openingCaisseId, setOpeningCaisseId] = useState<string | null>(null);
-  const [soldeInitial, setSoldeInitial] = useState('0');
-  const [loadingOpen, setLoadingOpen] = useState(false);
+  // PIN Auth State (for opening closed caisse)
+  const [selectedCaisse, setSelectedCaisse] = useState<any>(null);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
+
+  // Supervisor code (optional override)
+  const [showSupervisorCode, setShowSupervisorCode] = useState(false);
+  const [supervisorCode, setSupervisorCode] = useState('');
+  const [supervisorValidated, setSupervisorValidated] = useState(false);
+  const [supervisorLoading, setSupervisorLoading] = useState(false);
+  const [supervisorError, setSupervisorError] = useState('');
+
+  // Mobile Money state
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [paymentIntent, setPaymentIntent] = useState<any>(null);
+
+  // Check if mobile money is selected
+  const isMobileMoney = method === 'mtn' || method === 'airtel';
+
+  // Auto-fill phone number when selecting Mobile Money
+  useEffect(() => {
+    if (isMobileMoney && !phoneNumber) {
+      const clientPhone = demande.clients?.phone || demande.clients?.telephone || '';
+      if (clientPhone) {
+        setPhoneNumber(clientPhone.replace(/\D/g, ''));
+      }
+    }
+  }, [isMobileMoney, demande.clients]);
 
   useEffect(() => {
     checkSession();
@@ -72,10 +127,17 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
         sessionCaisseApi.getActive(),
         authApi.getMe()
       ]);
-      
+
       const status = session ? (session.computedStatus || computeSessionStatus(session)) : null;
-      setUserSession(status === 'OPEN' ? session : null);
+      const activeSession = status === 'OPEN' ? session : null;
+      setUserSession(activeSession);
       setUserRole(normalizeRole(user?.role) || SystemRole.CLIENT);
+
+      if (activeSession) {
+        setStep('payment');
+      } else {
+        fetchAgencyCaisses();
+      }
     } catch (e) {
       console.error("Error checking session", e);
     } finally {
@@ -84,30 +146,179 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
   };
 
   const activeSession = takenSession || userSession;
+  const isAdmin = userRole === SystemRole.ADMIN || userRole === SystemRole.CHEF_AGENCE;
+
+  const fetchAgencyCaisses = async () => {
+    const agenceId = demande.clients?.agenceId;
+    if (!agenceId) {
+      toast.error("Agence du client introuvable");
+      return;
+    }
+
+    setLoadingCaisses(true);
+    try {
+      const response = await fetch(`/api/caisses/status?agenceId=${agenceId}`, { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        setAgencyCaisses(data);
+      }
+    } catch (e) {
+      console.error("Error fetching caisses", e);
+      toast.error("Erreur chargement caisses");
+    } finally {
+      setLoadingCaisses(false);
+    }
+  };
+
+  const handleSelectCaisse = (caisse: any) => {
+    if (caisse.active_session) {
+      // Caisse already open - take control directly
+      setTakenSession(caisse.active_session);
+      setStep('payment');
+      toast.success(`Caisse "${caisse.nom}" sélectionnée`);
+    } else {
+      // Caisse closed - need PIN to open
+      setSelectedCaisse(caisse);
+      setPin('');
+      setPinError('');
+      setStep('pin');
+    }
+  };
+
+  // Validate supervisor override code
+  const handleValidateSupervisorCode = async () => {
+    if (supervisorCode.length < 6) return;
+
+    setSupervisorLoading(true);
+    setSupervisorError('');
+
+    try {
+      const result = await caisseAccessControlApi.validateCode(
+        supervisorCode,
+        selectedCaisse?.id,
+        demande.clients?.agenceId
+      );
+
+      if (result.success) {
+        setSupervisorValidated(true);
+        toast.success('Code superviseur validé');
+      } else {
+        setSupervisorError(result.error || 'Code invalide');
+      }
+    } catch (err: any) {
+      setSupervisorError(err.message || 'Erreur de validation');
+    } finally {
+      setSupervisorLoading(false);
+    }
+  };
+
+  // Open caisse with PIN validation
+  const handleOpenCaisseWithPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedCaisse) {
+      setPinError("Aucune caisse sélectionnée");
+      return;
+    }
+
+    if (!pin || pin.length < 4) {
+      setPinError("Veuillez entrer votre PIN à 6 chiffres");
+      return;
+    }
+
+    setPinLoading(true);
+    setPinError('');
+
+    try {
+      // 1. Verify PIN
+      const pinRes = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ pin })
+      });
+
+      const pinData = await pinRes.json();
+      if (!pinRes.ok) {
+        if (pinData?.requirePinSetup) {
+          setPinError('Aucun PIN configuré. Définissez votre PIN dans Paramètres > Sécurité.');
+        } else {
+          setPinError(pinData?.error || 'PIN incorrect');
+        }
+        setPinLoading(false);
+        return;
+      }
+
+      // 2. Open caisse directly (with existing balance if any)
+      const result = await sessionCaisseApi.openDirect({
+        caisseId: selectedCaisse.id,
+        agenceId: demande.clients?.agenceId,
+        observations: `Ouverture pour paiement frais - ${demande.numero_demande}`,
+        ...(supervisorValidated && { supervisorOverride: true }),
+      });
+
+      // 3. Set session and proceed to payment
+      const newSession = {
+        ...result.session,
+        caisse_nom: selectedCaisse.nom,
+        caissier_nom: 'Moi'
+      };
+
+      setTakenSession(newSession);
+      setStep('payment');
+      toast.success(`Caisse "${selectedCaisse.nom}" ouverte avec succès`);
+
+    } catch (err: any) {
+      setPinError(err.message || "Erreur lors de l'ouverture de la caisse");
+    } finally {
+      setPinLoading(false);
+    }
+  };
 
   const handlePayment = async () => {
+    // Validate phone for Mobile Money
+    if (isMobileMoney && !phoneNumber.trim()) {
+      toast.error('Veuillez entrer le numéro de téléphone Mobile Money');
+      return;
+    }
+
     setLoading(true);
     try {
-      // If we took a session, pass its ID. otherwise pass nothing (backend uses user's active session)
       const targetSessionId = takenSession?.id;
-      const result = await payerFrais(demande.id, parseFloat(amount), method, targetSessionId);
+      const provider = (method === 'mtn' || method === 'airtel') ? method : undefined;
+      const phone = isMobileMoney ? phoneNumber : undefined;
+      const result = await payerFrais(
+        demande.id,
+        feeAmount,
+        getPaymentMethod(),
+        targetSessionId,
+        provider,
+        phone
+      );
+
       if (result.success) {
-        toast.success(`Frais de ${formatMoney(parseFloat(amount))} payés avec succès`);
+        // Mobile Money: Payment pending, waiting for confirmation
+        if (result.paymentPending && result.paymentIntent) {
+          setPaymentIntent(result.paymentIntent);
+          setStep('waiting');
+          toast.info(result.message || 'Veuillez confirmer le paiement sur votre téléphone');
+          return;
+        }
+
+        // Cash/Transfer: Immediate success
+        toast.success(`Frais de ${formatMoney(feeAmount)} encaissés`);
         if (result.facture) {
-          // Show success modal with facture
           setPaidFacture(result.facture);
-          setFactureId(result.facture.id); // Store factureId
           setShowSuccessModal(true);
         }
         onSuccess();
-        // Don't close immediately if showing success modal, let the modal handle it or user close it
         if (!result.facture) {
-            onClose();
+          onClose();
         }
       }
-    } catch (error) {
-       console.error(error);
-       toast.error("Erreur lors du paiement des frais");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erreur lors du paiement des frais");
     } finally {
       setLoading(false);
     }
@@ -118,305 +329,538 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
     onClose();
   };
 
-  const fetchAgencyCaisses = async () => {
-      let agenceId = demande.clients?.agenceId;
-      // Fallback logic could go here
-      
-      if (!agenceId) {
-          toast.error("Agence du client introuvable");
-          return;
-      }
+  // Client info
+  const clientName = [demande.clients?.nom, demande.clients?.prenom].filter(Boolean).join(' ') || 'Client';
+  const clientAgence = demande.clients?.agence || 'Siège';
 
-      setLoadingCaisses(true);
-      setShowCaisseList(true);
-      try {
-          const response = await fetch(`/api/caisses/status?agenceId=${agenceId}`);
-          if (response.ok) {
-              const data = await response.json();
-              setAgencyCaisses(data);
-          }
-      } catch (e) {
-          console.error("Error fetching caisses", e);
-          toast.error("Erreur chargement caisses");
-      } finally {
-          setLoadingCaisses(false);
-      }
+  // Step count for indicators (pin step is part of caisse flow)
+  const getStepIndex = () => {
+    if (step === 'caisse' || step === 'pin') return 0;
+    if (step === 'payment') return 1;
+    return 2;
   };
-
-  const handleTakeControl = (caisse: any) => {
-      if (caisse.active_session) {
-          // Already open, just take it
-          setTakenSession(caisse.active_session);
-          setShowCaisseList(false);
-          toast.success(`Caisse "${caisse.nom}" prise en main`);
-      } else {
-          // Closed, need to open
-          setOpeningCaisseId(caisse.id);
-      }
-  };
-
-  const confirmOpenCaisse = async () => {
-      if (!openingCaisseId) return;
-      setLoadingOpen(true);
-      try {
-          const response = await fetch('/api/sessions-caisse', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ caisseId: openingCaisseId, soldeInitial: parseFloat(soldeInitial) })
-          });
-          
-          if (response.ok) {
-              const newSession = await response.json();
-              // Backend returns session, we format it slightly if needed, but usually it matches
-              // We need it to look like `active_session`
-              const caisse = agencyCaisses.find(c => c.id === openingCaisseId);
-              
-              const sessionObj = {
-                  ...newSession,
-                  caisse_nom: caisse?.nom,
-                  // We just opened it, so we are the cashier
-                  caissier_nom: 'Moi' 
-              };
-              
-              setTakenSession(sessionObj);
-              setOpeningCaisseId(null);
-              setShowCaisseList(false);
-              toast.success("Caisse ouverte et prise en main");
-          } else {
-              toast.error("Erreur ouverture caisse");
-          }
-      } catch (e) {
-          console.error(e);
-          toast.error("Erreur technique");
-      } finally {
-          setLoadingOpen(false);
-      }
-  };
-
-  const isAdmin = userRole === SystemRole.ADMIN || userRole === SystemRole.CHEF_AGENCE;
 
   return (
     <>
-    <Modal isOpen={true} onClose={onClose} title="Paiement des Frais d'Engagement" size="md">
-        <div className="space-y-4">
-            <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <div className="font-bold text-white">{demande.numero_demande}</div>
-                        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                            Client: <span className="text-white">{demande.clients?.nom} {demande.clients?.prenom}</span>
-                            <Badge value={demande.clients?.agence || 'N/A'} variant="neutral" className="text-[10px] py-0 px-1.5" />
-                        </div>
-                    </div>
-                    <div className="text-right">
-                         <div className="font-bold text-emerald-400">{formatMoney(demande.montant_demande)}</div>
-                    </div>
+      <Modal isOpen={true} onClose={onClose} title="" size="md" className="overflow-hidden">
+        <div className="relative">
+          {/* Header avec montant */}
+          <div className="bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent -mx-6 -mt-6 px-6 pt-5 pb-4 border-b border-emerald-500/20">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <FileText size={16} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Frais d'Engagement</h2>
+                    <p className="text-[10px] text-emerald-300/70">{demande.numero_demande}</p>
+                  </div>
                 </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-black text-emerald-400">{formatMoney(feeAmount)}</div>
+                <p className="text-[9px] text-slate-400 uppercase tracking-wide">
+                  {feeSource === 'plan' ? 'Selon plan crédit' : feeSource === 'demande' ? 'Montant fixe' : '10% du crédit'}
+                </p>
+              </div>
             </div>
 
+            {/* Client info */}
+            <div className="mt-3 flex items-center gap-2 bg-slate-900/50 rounded-lg p-2">
+              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                <User size={14} className="text-slate-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{clientName}</p>
+                <p className="text-[10px] text-slate-400">Crédit: {formatMoney(demande.montant_demande)}</p>
+              </div>
+              <Badge value={clientAgence} variant="neutral" className="text-[9px]" />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="py-4 min-h-[220px]">
             {checkingSession ? (
-                <div className="py-6 text-center text-slate-400 animate-pulse text-sm">Vérification de la caisse...</div>
-            ) : !activeSession && !showCaisseList ? (
-                <div className="space-y-3">
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex flex-col items-center text-center gap-1.5">
-                        <Wallet className="text-amber-500" size={24} />
-                        <h3 className="font-bold text-amber-500 text-sm">Aucune Caisse Active</h3>
-                        <div className="text-xs text-amber-200/80">
-                             Pour encaisser, il faut une caisse active.
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
+                <Loader2 size={24} className="text-emerald-500 animate-spin" />
+                <p className="text-sm text-slate-400">Vérification de la caisse...</p>
+              </div>
+            ) : step === 'caisse' ? (
+              /* Étape 1: Sélection de caisse */
+              <div className="space-y-3 animate-in fade-in duration-200">
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-2">
+                    <Wallet size={20} className="text-amber-400" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white">Aucune caisse active</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Sélectionnez une caisse pour encaisser</p>
+                </div>
+
+                {loadingCaisses ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 size={20} className="text-slate-500 animate-spin" />
+                  </div>
+                ) : agencyCaisses.length === 0 ? (
+                  <div className="text-center py-4 text-slate-500 text-sm">
+                    Aucune caisse disponible
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
+                    {agencyCaisses.map(c => {
+                      const lastKnownBalance = parseFloat(c.solde || '0');
+                      return (
+                        <div
+                          key={c.id}
+                          className="flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer bg-slate-800/50 border-slate-700/50 hover:border-slate-600"
+                          onClick={() => handleSelectCaisse(c)}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                              c.active_session ? 'bg-emerald-500/20' : 'bg-slate-700/50'
+                            }`}>
+                              <CreditCard size={14} className={c.active_session ? 'text-emerald-400' : 'text-slate-500'} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-white">{c.nom}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`w-1.5 h-1.5 rounded-full ${c.active_session ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                                <span className={`text-[10px] ${c.active_session ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                  {c.active_session ? 'Ouverte' : 'Fermée'}
+                                </span>
+                                {c.active_session?.caissier_nom && (
+                                  <span className="text-[10px] text-slate-500">• {c.active_session.caissier_nom}</span>
+                                )}
+                                {/* Afficher le solde reporté pour les caisses fermées */}
+                                {!c.active_session && lastKnownBalance > 0 && (
+                                  <span className="text-[10px] text-cyan-400 font-medium">
+                                    • Solde: {formatMoney(lastKnownBalance)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-slate-500" />
                         </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : step === 'pin' ? (
+              /* Étape PIN: Authentification pour ouvrir une caisse fermée */
+              <form onSubmit={handleOpenCaisseWithPin} className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div className="text-center mb-2">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-2">
+                    <Shield size={20} className="text-emerald-400" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white">Ouverture Sécurisée</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Caisse: <span className="text-white font-medium">{selectedCaisse?.nom}</span>
+                  </p>
+                </div>
+
+                {/* Affichage du solde reporté */}
+                {selectedCaisse && (
+                  <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 text-center">
+                    <p className="text-[10px] text-cyan-300/70 uppercase tracking-wide mb-1">Solde Reporté</p>
+                    <p className="text-lg font-bold text-cyan-400">
+                      {formatMoney(parseFloat(selectedCaisse.solde || '0'))}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      La caisse s'ouvrira avec ce montant (fonds existant)
+                    </p>
+                  </div>
+                )}
+
+                {/* PIN Input */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Code PIN Agent</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <input
+                      type="password"
+                      placeholder="••••••"
+                      maxLength={6}
+                      value={pin}
+                      onChange={(e) => { setPin(e.target.value); setPinError(''); }}
+                      autoFocus
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3.5 text-white tracking-[0.5em] font-mono text-xl text-center focus:border-emerald-500 outline-none transition-all placeholder-slate-700"
+                    />
+                    {pin.length === 6 && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                        <CheckCircle2 size={20} />
+                      </div>
+                    )}
+                  </div>
+                  {pinError && (
+                    <p className="text-xs text-red-400 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      {pinError}
+                    </p>
+                  )}
+                </div>
+
+                {/* Supervisor Override Code (optional) */}
+                <div className="border-t border-slate-800 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSupervisorCode(!showSupervisorCode)}
+                    className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    <KeyRound size={14} />
+                    <span>Code de secours superviseur</span>
+                    <span className="text-[10px]">{showSupervisorCode ? '▲' : '▼'}</span>
+                    {supervisorValidated && (
+                      <span className="ml-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold">
+                        Autorisé
+                      </span>
+                    )}
+                  </button>
+
+                  {showSupervisorCode && (
+                    <div className="mt-3 space-y-2 animate-in slide-in-from-top-2">
+                      <div className="relative flex gap-2">
+                        <div className="relative flex-1">
+                          <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                          <input
+                            type="text"
+                            placeholder="Code 8 caractères"
+                            maxLength={8}
+                            value={supervisorCode}
+                            onChange={(e) => {
+                              setSupervisorCode(e.target.value.toUpperCase());
+                              setSupervisorValidated(false);
+                              setSupervisorError('');
+                            }}
+                            disabled={supervisorValidated}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-white font-mono tracking-widest text-sm focus:border-amber-500 outline-none transition-all placeholder-slate-700 disabled:opacity-50"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleValidateSupervisorCode}
+                          disabled={supervisorLoading || supervisorValidated || supervisorCode.length < 6}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                        >
+                          {supervisorLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : supervisorValidated ? (
+                            <CheckCircle size={14} />
+                          ) : (
+                            'Valider'
+                          )}
+                        </button>
+                      </div>
+                      {supervisorError && (
+                        <p className="text-xs text-red-400 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          {supervisorError}
+                        </p>
+                      )}
                     </div>
-
-                    {isAdmin && (
-                        <Button variant="outline" size="sm" onClick={fetchAgencyCaisses} className="w-full justify-center border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10">
-                            <Shield size={14} className="mr-1.5" />
-                            Prendre en main une caisse ({demande.clients?.agence || 'Agence Client'})
-                        </Button>
-                    )}
+                  )}
                 </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setStep('caisse'); setSelectedCaisse(null); }}
+                    disabled={pinLoading}
+                    className="flex-1"
+                  >
+                    <ArrowLeft size={14} className="mr-1" />
+                    Retour
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={pinLoading || pin.length < 4}
+                    isLoading={pinLoading}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                  >
+                    <Lock size={14} className="mr-1" />
+                    Ouvrir la caisse
+                  </Button>
+                </div>
+              </form>
+            ) : step === 'payment' ? (
+              /* Étape 2: Méthode de paiement */
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+                {/* Caisse active */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={14} className="text-emerald-400" />
+                    <span className="text-xs text-emerald-300">
+                      Caisse: <span className="font-semibold text-white">{activeSession?.caisse_nom || 'Ma Caisse'}</span>
+                    </span>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={() => { fetchAgencyCaisses(); setStep('caisse'); }}
+                      className="text-[10px] text-emerald-400 hover:text-emerald-300"
+                    >
+                      Changer
+                    </button>
+                  )}
+                </div>
+
+                {/* Méthodes de paiement */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 mb-2 block">Mode de paiement</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PAYMENT_METHODS.map((m) => {
+                      const isSelected = method === m.value;
+                      const Icon = 'icon' in m ? m.icon : undefined;
+                      const img = 'img' in m ? m.img : undefined;
+
+                      return (
+                        <button
+                          key={m.value}
+                          type="button"
+                          onClick={() => setMethod(m.value as any)}
+                          className={`relative p-3 rounded-lg border-2 transition-all ${
+                            isSelected
+                              ? `border-${m.color}-500 bg-${m.color}-500/10`
+                              : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className={`w-10 h-10 rounded-full mx-auto mb-1.5 flex items-center justify-center ${
+                            isSelected ? `bg-${m.color}-500/20` : 'bg-slate-700/50'
+                          }`}>
+                            {img ? (
+                              <img src={img} alt={m.label} className="h-6 w-6 object-contain" />
+                            ) : Icon ? (
+                              <Icon size={18} className={isSelected ? `text-${m.color}-400` : 'text-slate-500'} />
+                            ) : null}
+                          </div>
+                          <p className={`text-[10px] font-semibold ${isSelected ? 'text-white' : 'text-slate-400'}`}>
+                            {m.label}
+                          </p>
+                          {isSelected && (
+                            <div className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-${m.color}-400`} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Phone input for Mobile Money */}
+                {isMobileMoney && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                    <label className="text-xs font-semibold text-slate-400 mb-2 block">Numéro de téléphone {method === 'mtn' ? 'MTN' : 'Airtel'}</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                      <input
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                        placeholder={method === 'mtn' ? '066 XXX XX XX' : '05X XXX XX XX'}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:border-amber-500 outline-none transition-all"
+                        maxLength={12}
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Le client recevra une notification pour confirmer le paiement
+                    </p>
+                  </div>
+                )}
+
+
+                {/* Récapitulatif */}
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-400">Montant à encaisser</span>
+                    <span className="text-lg font-bold text-emerald-400">{formatMoney(feeAmount)}</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <Button variant="ghost" size="sm" onClick={onClose} className="flex-1">
+                    Annuler
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setStep('confirm')}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                    disabled={isMobileMoney && !phoneNumber.trim()}
+                  >
+                    Continuer
+                    <ChevronRight size={14} className="ml-1" />
+                  </Button>
+                </div>
+              </div>
+            ) : step === 'waiting' ? (
+              /* Étape Waiting: Attente confirmation Mobile Money */
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-3">
+                    <div className="relative">
+                      <Smartphone size={28} className="text-amber-400" />
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center animate-pulse">
+                        <Clock size={10} className="text-white" />
+                      </div>
+                    </div>
+                  </div>
+                  <h3 className="text-base font-bold text-white">Confirmation en attente</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Veuillez confirmer le paiement sur votre téléphone {method === 'mtn' ? 'MTN MoMo' : 'Airtel Money'}
+                  </p>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      {method === 'mtn' ? (
+                        <img src={mtnMomoLogo} alt="MTN" className="h-6 w-6 object-contain" />
+                      ) : (
+                        <img src={airtelMoneyLogo} alt="Airtel" className="h-6 w-6 object-contain" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{phoneNumber}</p>
+                      <p className="text-[10px] text-amber-300">En attente de validation</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-amber-500/20">
+                    <span className="text-xs text-slate-400">Montant</span>
+                    <span className="text-lg font-bold text-amber-400">{formatMoney(feeAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 text-slate-500 text-xs">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Veuillez patienter...</span>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setStep('payment'); setPaymentIntent(null); }}
+                  className="w-full"
+                >
+                  <ArrowLeft size={14} className="mr-1" />
+                  Annuler et réessayer
+                </Button>
+              </div>
             ) : (
-                <div className="space-y-3">
-                    {/* Active Session Display */}
-                    {activeSession && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 flex justify-between items-center text-emerald-400 text-sm">
-                            <div className="flex items-center gap-2">
-                                <CheckCircle className="shrink-0" size={16} />
-                                <div className="flex items-center gap-2">
-                                    <span className="font-medium">Caisse: {activeSession.caisse_nom || 'Ma Caisse'}</span>
-                                    <span className="text-xs opacity-70">({activeSession.caissier_nom})</span>
-                                </div>
-                            </div>
-                            {isAdmin && !showCaisseList && (
-                                <Button size="sm" variant="ghost" className="h-6 text-xs px-2 hover:bg-emerald-500/20" onClick={fetchAgencyCaisses}>Changer</Button>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Caisse Selection List */}
-                    {showCaisseList && (
-                        <div className="bg-slate-900 rounded-lg border border-slate-700 p-3 animate-in fade-in zoom-in-95">
-                            <div className="flex justify-between mb-2">
-                                <h4 className="text-sm font-medium text-slate-300">Choisir une caisse ({demande.clients?.agence})</h4>
-                                <button onClick={() => setShowCaisseList(false)}><X size={14} className="text-slate-500" /></button>
-                            </div>
-
-                            {loadingCaisses ? (
-                                <div className="text-center py-3 text-slate-500 text-sm">Chargement...</div>
-                            ) : (
-                                <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar">
-                                    {agencyCaisses.map(c => (
-                                        <div key={c.id} className="flex items-center justify-between px-2.5 py-2 rounded bg-slate-800 border border-slate-700">
-                                            <div>
-                                                <div className="text-sm font-medium text-white">{c.nom}</div>
-                                                <div className="text-xs text-slate-400 flex items-center gap-1">
-                                                    {c.active_session ? (
-                                                        <span className="text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Ouverte</span>
-                                                    ) : (
-                                                        <span className="text-slate-500 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-500"/> Fermée</span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {openingCaisseId === c.id ? (
-                                                <div className="flex items-center gap-1.5">
-                                                    <input
-                                                        type="number"
-                                                        className="w-16 bg-slate-950 border border-slate-600 rounded px-1.5 py-1 text-xs text-white"
-                                                        placeholder="Solde"
-                                                        value={soldeInitial}
-                                                        onChange={e => setSoldeInitial(e.target.value)}
-                                                        autoFocus
-                                                    />
-                                                    <Button size="sm" variant="primary" className="h-6 text-xs px-2" onClick={confirmOpenCaisse} disabled={loadingOpen}>OK</Button>
-                                                </div>
-                                            ) : (
-                                                <Button size="sm" variant="outline" className="h-6 text-xs px-2 border-slate-600 hover:bg-slate-700" onClick={() => handleTakeControl(c)}>
-                                                    {c.active_session ? 'Choisir' : 'Ouvrir'}
-                                                </Button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {!showCaisseList && !showConfirm && (
-                        <>
-                             <FormField
-                                label="Montant Frais (10% - Fixe)"
-                                name="amount"
-                                value={amount ? `${Number(amount).toLocaleString()} FCFA` : ''}
-                                readOnly
-                                disabled
-                                icon={DollarSign}
-                                className="bg-slate-800/30 border-slate-700/50 text-slate-500 font-bold opacity-80 cursor-not-allowed"
-                             />
-
-                             <div className="space-y-1">
-                                <label className="text-xs font-medium text-slate-300">Méthode de Paiement</label>
-                                <select
-                                    value={method}
-                                    onChange={(e) => setMethod(e.target.value as MethodePaiementType)}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                                >
-                                    <option value={MethodePaiement.CASH}>{METHODE_PAIEMENT_LABELS[MethodePaiement.CASH]}</option>
-                                    <option value={MethodePaiement.MOBILE_MONEY}>{METHODE_PAIEMENT_LABELS[MethodePaiement.MOBILE_MONEY]}</option>
-                                    <option value={MethodePaiement.TRANSFER}>{METHODE_PAIEMENT_LABELS[MethodePaiement.TRANSFER]}</option>
-                                </select>
-                             </div>
-
-                             <div className="flex gap-3 justify-center pt-3">
-                                <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>Annuler</Button>
-                                <Button
-                                    variant="primary"
-                                    onClick={() => setShowConfirm(true)}
-                                    disabled={loading || !amount || (!activeSession && !isAdmin)}
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[140px]"
-                                >
-                                    Suivant
-                                </Button>
-                            </div>
-                        </>
-                    )}
-
-                    {showConfirm && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 text-center">
-                                <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <AlertCircle className="text-emerald-500" size={24} />
-                                </div>
-                                <h3 className="font-bold text-white mb-1">Confirmation du paiement</h3>
-                                <p className="text-slate-400 text-xs">
-                                    Vous êtes sur le point de procéder au paiement automatique des frais d'engagement.
-                                </p>
-                            </div>
-
-                            <div className="bg-slate-900/50 rounded-lg border border-slate-700 p-3 space-y-2">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">Montant à payer</span>
-                                    <span className="text-white font-bold text-lg">{formatMoney(parseFloat(amount))}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">Mode de paiement</span>
-                                    <Badge value={METHODE_PAIEMENT_LABELS[method]} variant="neutral" />
-                                </div>
-                                <div className="h-px bg-slate-700/50" />
-                                <div className="flex justify-between items-center text-xs">
-                                    <span className="text-slate-500">Caisse utilisée</span>
-                                    <span className="text-emerald-400 font-medium">{activeSession?.caisse_nom || 'Ma Caisse'}</span>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 justify-center pt-2">
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => setShowConfirm(false)}
-                                    disabled={loading}
-                                >
-                                    Retour
-                                </Button>
-                                <Button
-                                    variant="primary"
-                                    onClick={handlePayment}
-                                    isLoading={loading}
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[140px]"
-                                >
-                                    Payer {formatMoney(parseFloat(amount))}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+              /* Étape 3: Confirmation */
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+                    <Sparkles size={24} className="text-emerald-400" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">Confirmer le paiement</h3>
+                  <p className="text-xs text-slate-400 mt-1">Vérifiez les informations avant d'encaisser</p>
                 </div>
-            )}
-        </div>
-    </Modal>
 
-    {/* Success Modal with Invoice/Receipt */}
-    {showSuccessModal && paidFacture && (
-      <UniversalPaymentSuccessModal
-        isOpen={showSuccessModal}
-        onClose={handleSuccessClose}
-        data={{
-          title: 'Reçu de Paiement',
-          reference: paidFacture.numero || `FRAIS-${demande.numero_demande}`,
-          date: paidFacture.date_facture || new Date(),
-          type: 'Frais d\'Engagement',
-          client: demande.clients ? {
-            nom: demande.clients.nom || '',
-            prenom: demande.clients.prenom || '',
-            telephone: demande.clients.phone || demande.clients.telephone,
-          } : undefined,
-          items: [{
-            description: `Frais d'engagement - Demande de crédit N° ${demande.numero_demande}`,
-            montant: parseFloat(paidFacture.montant_total || amount),
-          }],
-          total: parseFloat(paidFacture.montant_total || amount),
-          modePaiement: METHODE_PAIEMENT_LABELS[method],
-          devise: 'FCFA',
-          notes: `Demande de crédit: ${formatMoney(demande.montant_demande)}`,
-        } as ReceiptData}
-      />
-    )}
+                <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 divide-y divide-slate-700/50">
+                  <div className="flex justify-between items-center p-3">
+                    <span className="text-xs text-slate-400">Client</span>
+                    <span className="text-sm font-medium text-white">{clientName}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3">
+                    <span className="text-xs text-slate-400">Référence</span>
+                    <span className="text-sm font-mono text-slate-300">{demande.numero_demande}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3">
+                    <span className="text-xs text-slate-400">Mode de paiement</span>
+                    <Badge value={getMethodLabel()} variant="neutral" className="text-[10px]" />
+                  </div>
+                  {/* Mobile Money phone */}
+                  {isMobileMoney && (
+                    <div className="flex justify-between items-center p-3 bg-amber-500/5">
+                      <span className="text-xs text-slate-400">Téléphone</span>
+                      <span className="text-sm font-mono text-amber-400">{phoneNumber}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center p-3">
+                    <span className="text-xs text-slate-400">Caisse</span>
+                    <span className="text-sm font-medium text-emerald-400">{activeSession?.caisse_nom}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-emerald-500/5">
+                    <span className="text-sm font-semibold text-white">Total à encaisser</span>
+                    <span className="text-xl font-black text-emerald-400">{formatMoney(feeAmount)}</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStep('payment')}
+                    disabled={loading}
+                    className="flex-1"
+                  >
+                    <ArrowLeft size={14} className="mr-1" />
+                    Retour
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handlePayment}
+                    isLoading={loading}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                  >
+                    <CheckCircle size={14} className="mr-1" />
+                    Encaisser {formatMoney(feeAmount)}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Step indicators */}
+          {!checkingSession && (
+            <div className="flex justify-center gap-1.5 pb-2">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className={`h-1 rounded-full transition-all ${
+                    getStepIndex() === i ? 'w-6 bg-emerald-500' :
+                    getStepIndex() > i ? 'w-2 bg-emerald-500/50' : 'w-2 bg-slate-700'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      {showSuccessModal && paidFacture && (
+        <UniversalPaymentSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleSuccessClose}
+          data={{
+            title: 'Reçu de Paiement',
+            reference: paidFacture.numero || `FRAIS-${demande.numero_demande}`,
+            date: paidFacture.date_facture || new Date(),
+            type: 'Frais d\'Engagement',
+            client: demande.clients ? {
+              nom: demande.clients.nom || '',
+              prenom: demande.clients.prenom || '',
+              telephone: demande.clients.phone || demande.clients.telephone,
+            } : undefined,
+            items: [{
+              description: `Frais d'engagement - Demande de crédit N° ${demande.numero_demande}`,
+              montant: parseFloat(paidFacture.montant_total || feeAmount),
+            }],
+            total: parseFloat(paidFacture.montant_total || feeAmount),
+            modePaiement: getMethodLabel(),
+            devise: 'FCFA',
+            notes: `Demande de crédit: ${formatMoney(demande.montant_demande)}`,
+          } as ReceiptData}
+        />
+      )}
     </>
   );
 }

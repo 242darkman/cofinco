@@ -4,6 +4,9 @@
  */
 
 import { db } from "../db";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('CaisseLiquidation');
 import {
   caisses,
   sessionsCaisse,
@@ -181,7 +184,7 @@ export class CaisseLiquidationService {
         availableDestinations: destinations,
       };
     } catch (error: any) {
-      console.error("Erreur check liquidation:", error);
+      logger.error({ err: error }, 'Error checking liquidation');
       return {
         canDelete: false,
         soldeActuel: "0",
@@ -430,7 +433,7 @@ export class CaisseLiquidationService {
           typePaiement: 'LIQUIDATION',
         });
       } catch (e) {
-        console.error("[BROADCAST] Erreur broadcast liquidation:", e);
+        logger.error({ err: e }, 'Error broadcasting liquidation');
       }
 
       return {
@@ -441,7 +444,7 @@ export class CaisseLiquidationService {
         montantTransfere: result.montantTransfert.toString(),
       };
     } catch (error: any) {
-      console.error("Erreur execute liquidation:", error);
+      logger.error({ err: error }, 'Error executing liquidation');
       return {
         success: false,
         error: error.message || "Erreur interne",

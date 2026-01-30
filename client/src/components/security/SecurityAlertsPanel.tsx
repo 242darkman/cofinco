@@ -10,6 +10,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { addPdfLogoHeader } from '@/lib/pdf-logo';
 
 interface SecurityAlert {
   id: string;
@@ -129,17 +130,15 @@ export default function SecurityAlertsPanel() {
   const exportToPDF = () => {
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
-    
-    doc.setFontSize(18);
-    doc.setTextColor(30, 58, 138);
-    doc.text("RAPPORT D'ALERTES DE SÉCURITÉ - COFIN", 14, 20);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
     const activeCount = alerts.filter(a => a.status === 'active').length;
     const criticalCount = alerts.filter(a => a.severity === 'critical').length;
-    doc.text(`Date: ${dateExport} | Total: ${alerts.length} | Actives: ${activeCount} | Critiques: ${criticalCount}`, 14, 28);
-    
+
+    const startY = addPdfLogoHeader(doc, {
+      title: "RAPPORT D'ALERTES DE SÉCURITÉ",
+      subtitle: `Total: ${alerts.length} | Actives: ${activeCount} | Critiques: ${criticalCount}`,
+      dateRight: `Date: ${dateExport}`,
+    });
+
     const tableData = alerts.slice(0, 50).map((alert, idx) => [
       idx + 1,
       new Date(alert.created_at).toLocaleString('fr-FR'),
@@ -152,7 +151,7 @@ export default function SecurityAlertsPanel() {
     (doc as any).autoTable({
       head: [['N°', 'Date', 'Type', 'Sévérité', 'Statut', 'Utilisateur']],
       body: tableData,
-      startY: 35,
+      startY,
       styles: { fontSize: 7, cellPadding: 1 },
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }

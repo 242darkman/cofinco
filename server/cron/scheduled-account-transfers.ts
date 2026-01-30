@@ -15,6 +15,9 @@ import {
   getScheduledTransfersHealth,
 } from "../services/scheduled-transfers-service";
 import { getWsInstance } from "../ws-server";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Cron:ScheduledAccountTransfers');
 
 let mainCronJob: ReturnType<typeof cron.schedule> | null = null;
 let cleanupCronJob: ReturnType<typeof cron.schedule> | null = null;
@@ -27,7 +30,7 @@ let cleanupCronJob: ReturnType<typeof cron.schedule> | null = null;
 export function startScheduledAccountTransfersCron() {
   // Job principal - Execution des virements
   mainCronJob = cron.schedule("30 2 * * *", async () => {
-    console.log("[Virements Programmes] Demarrage du job d'execution...");
+    logger.info('Demarrage du job d\'execution');
 
     try {
       const results = await processScheduledTransfers(new Date());
@@ -36,14 +39,12 @@ export function startScheduledAccountTransfersCron() {
       const skipped = results.filter((r) => r.skipped).length;
       const failed = results.filter((r) => !r.success).length;
 
-      console.log(
-        `[Virements Programmes] Termine: ${success} succes, ${skipped} ignores, ${failed} echecs`
-      );
+      logger.info({ success, skipped, failed }, `Termine: ${success} succes, ${skipped} ignores, ${failed} echecs`);
 
       // Log des echecs
       results
         .filter((r) => !r.success && !r.skipped)
-        .forEach((r) => console.error(`[Virements Programmes] Echec ${r.id}: ${r.error}`));
+        .forEach((r) => logger.error({ id: r.id, error: r.error }, `Echec ${r.id}`));
 
       // Broadcast WebSocket pour mise a jour UI
       const wsInstance = getWsInstance();
@@ -59,7 +60,7 @@ export function startScheduledAccountTransfersCron() {
         });
       }
     } catch (error) {
-      console.error("[Virements Programmes] Erreur critique:", error);
+      logger.error({ err: error }, 'Erreur critique');
     }
   });
 
@@ -68,14 +69,14 @@ export function startScheduledAccountTransfersCron() {
     try {
       const cleaned = await cleanupStaleProcessingLocks(10);
       if (cleaned > 0) {
-        console.log(`[Virements Programmes] ${cleaned} verrous orphelins nettoyes`);
+        logger.info({ cleaned }, `${cleaned} verrous orphelins nettoyes`);
       }
     } catch (error) {
-      console.error("[Virements Programmes] Erreur nettoyage verrous:", error);
+      logger.error({ err: error }, 'Erreur nettoyage verrous');
     }
   });
 
-  console.log("[Virements Programmes] Cron jobs demarres (02h30 + cleanup 5min)");
+  logger.info('Cron jobs demarres (02h30 + cleanup 5min)');
 }
 
 /**
@@ -90,7 +91,7 @@ export function stopScheduledAccountTransfersCron() {
     cleanupCronJob.stop();
     cleanupCronJob = null;
   }
-  console.log("[Virements Programmes] Cron jobs arretes");
+  logger.info('Cron jobs arretes');
 }
 
 /**
@@ -98,16 +99,14 @@ export function stopScheduledAccountTransfersCron() {
  * Utile pour tests et debugging.
  */
 export async function runScheduledTransfersManually() {
-  console.log("[Virements Programmes] Execution manuelle...");
+  logger.info('Execution manuelle');
   const results = await processScheduledTransfers(new Date());
 
   const success = results.filter((r) => r.success && !r.skipped).length;
   const skipped = results.filter((r) => r.skipped).length;
   const failed = results.filter((r) => !r.success).length;
 
-  console.log(
-    `[Virements Programmes] Execution manuelle terminee: ${success} succes, ${skipped} ignores, ${failed} echecs`
-  );
+  logger.info({ success, skipped, failed }, `Execution manuelle terminee: ${success} succes, ${skipped} ignores, ${failed} echecs`);
 
   return results;
 }

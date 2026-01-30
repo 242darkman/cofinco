@@ -4,9 +4,12 @@ import { modules, permissions, rolePermissions } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { MODULES_DATA, PERMISSIONS_DATA, SEED_ROLE_PERMISSIONS } from '@shared/config/rbac';
 import type { SystemRole } from '@shared/types/roles';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('SeedRBAC');
 
 export async function seedRBAC() {
-  console.log('🔐 Seeding Modules & Permissions...');
+  logger.info('Seeding Modules & Permissions...');
   
   // 1. Sync Modules
   const insertedModules: Record<string, string> = {}; // Name -> ID
@@ -41,7 +44,7 @@ export async function seedRBAC() {
   for (const [moduleName, perms] of Object.entries(PERMISSIONS_DATA)) {
     const moduleId = insertedModules[moduleName];
     if (!moduleId) {
-      console.warn(`⚠️ Module ${moduleName} not found in MODULES_DATA but used in PERMISSIONS_DATA. Skipping.`);
+      logger.warn({ moduleName }, 'Module not found in MODULES_DATA but used in PERMISSIONS_DATA. Skipping.');
       continue;
     }
 
@@ -77,7 +80,7 @@ export async function seedRBAC() {
   }
 
   // 3. Sync Role Permissions
-  console.log('👥 Syncing Role Permissions...');
+  logger.info('Syncing Role Permissions...');
   
   // Clear existing role permissions to ensure a clean state based on config
   await db.delete(rolePermissions);
@@ -88,7 +91,7 @@ export async function seedRBAC() {
 
     if (codes.includes('*')) {
       // Grant ALL permissions
-      console.log(`   - Granting ALL permissions to ${role}`);
+      logger.info({ role }, 'Granting ALL permissions to role');
       for (const permId of allPermissionIds) {
         valuesToInsert.push({
           role: typedRole,
@@ -98,7 +101,7 @@ export async function seedRBAC() {
       }
     } else {
       // Grant specific permissions
-      console.log(`   - Granting specific permissions to ${role}`);
+      logger.info({ role }, 'Granting specific permissions to role');
       for (const code of codes) {
         const permId = insertedPermissions[code];
         if (permId) {
@@ -108,7 +111,7 @@ export async function seedRBAC() {
             granted: true
           });
         } else {
-          console.warn(`   ⚠️ Permission code '${code}' not found for role '${role}'`);
+          logger.warn({ code, role }, 'Permission code not found for role');
         }
       }
     }
@@ -119,5 +122,5 @@ export async function seedRBAC() {
     }
   }
 
-  console.log('   ✅ RBAC configured successfully');
+  logger.info('RBAC configured successfully');
 }

@@ -27,6 +27,7 @@ const RessourcesHumaines = lazy(() => import('./components/hr/RessourcesHumaines
 
 // Agent modules
 const AgentTerrain = lazy(() => import('./components/agent/AgentTerrain'));
+const AgentTerrainPortail = lazy(() => import('./components/agent/AgentTerrainPortail'));
 const AgentValidations = lazy(() => import('./components/agent/AgentValidations'));
 
 // Admin modules
@@ -53,6 +54,7 @@ import { getRouteByKey, canAccessRoute } from './lib/routes-config';
 import ForcePasswordChange from './components/auth/ForcePasswordChange';
 import { usePermissionsContext } from './contexts/PermissionsContext';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
+import ActiveSessionsModal from './components/shared/ActiveSessionsModal';
 
 // ========== MODULE LOADING FALLBACK ==========
 // Skeleton loader shown while modules are being fetched
@@ -122,6 +124,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [showMessagesPanel, setShowMessagesPanel] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedAgence, setSelectedAgence] = useState('centrale');
@@ -280,6 +283,12 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             <AgentTerrain activeView={currentSubModule} />
           </Suspense>
         );
+      case 'agentModules':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Gestion Agent" />}>
+            <AgentTerrainPortail />
+          </Suspense>
+        );
       case 'caisse':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Caisse" />}>
@@ -416,6 +425,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             onMessagesClick={() => setCurrentModule('messages')}
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
             onProfileClick={() => setCurrentModule('profil')}
+            onSessionsClick={() => setShowSessionsModal(true)}
             onLogout={onLogout}
             user={{
               nom: currentUser?.nom,
@@ -449,8 +459,11 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
         </Suspense>
       )}
 
-
-
+      {/* Sessions actives modal */}
+      <ActiveSessionsModal
+        isOpen={showSessionsModal}
+        onClose={() => setShowSessionsModal(false)}
+      />
 
 
       {showCreditRequestForm && (

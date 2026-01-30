@@ -16,6 +16,9 @@ import {
   StatutTacheRegularisation,
   Priorite,
 } from "@shared/enum/status-constants";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('InterCoffreTransfer');
 
 // ============================================================================
 // TYPES ET ERREURS PERSONNALISÉES
@@ -291,7 +294,7 @@ export async function executeDispatch(
           }
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : "Unknown GL error";
-          console.error(`[InterCoffre] GL dispatch failed for ${transfertId}: ${message}`);
+          logger.error({ transfertId, error: message }, 'GL dispatch failed');
           await tx.update(mouvementsFinanciers)
             .set({ glPostingStatus: "FAILED", glPostingError: message })
             .where(eq(mouvementsFinanciers.id, mouvementSource.id));
@@ -515,7 +518,7 @@ export async function executeReceive(
           }
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : "Unknown GL error";
-          console.error(`[InterCoffre] GL receive failed for ${transfertId}: ${message}`);
+          logger.error({ transfertId, error: message }, 'GL receive failed');
           await tx.update(mouvementsFinanciers)
             .set({ glPostingStatus: "FAILED", glPostingError: message })
             .where(eq(mouvementsFinanciers.id, mouvementDest.id));

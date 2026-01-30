@@ -3,6 +3,9 @@ import { db } from "../db";
 import { maintenanceModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { isAdminRole } from "@shared/types/roles";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Maintenance');
 
 // Cache valid for short duration to avoid DB hit every request
 let moduleCache: { [key: string]: boolean } = {};
@@ -25,7 +28,7 @@ const getModuleStatus = async () => {
     lastCacheUpdate = now;
     return newCache;
   } catch (error) {
-    console.error("Failed to refresh maintenance cache:", error);
+    logger.error({ err: error }, 'Failed to refresh maintenance cache');
     return moduleCache; // Return stale cache on error
   }
 };

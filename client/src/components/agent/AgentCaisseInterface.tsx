@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DollarSign, CheckCircle, AlertCircle, Search, CreditCard, Banknote, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 import AppShell from '../layout/AppShell';
 import AgentSidebarContent from '../layout/AgentSidebarContent';
@@ -20,8 +20,11 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetchAgentInfo();
@@ -48,32 +51,8 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
   }, [notification]);
 
   const fetchAgentInfo = async () => {
-    if (agentId.startsWith('demo-')) {
-      setAgent({
-        id: agentId,
-        code_agent: 'AG0001',
-        caisse_assignee: 'CAISSE_01',
-        limite_transaction_max: 500000,
-        peut_ouvrir_caisse: false,
-        peut_fermer_caisse: false,
-        peut_faire_versements: true,
-        peut_faire_retraits: true,
-        peut_faire_transferts: false,
-        peut_rembourser_credits: true,
-        peut_collecter_epargnes: true,
-        peut_voir_solde_caisse: false,
-        horaire_debut: '08:00',
-        horaire_fin: '17:00',
-        statut: 'ACTIVE',
-        user: {
-          nom_complet: 'Agent de Caisse Démo'
-        }
-      });
-      return;
-    }
-
     try {
-      const response = await fetch(`/api/agents-caisse/${agentId}`);
+      const response = await fetch(`/api/agents-caisse/${agentId}`, { credentials: 'include' });
       if (response.ok) {
         const data = await response.json();
         if (data) setAgent(data);
@@ -95,6 +74,38 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
     }
   };
 
+  const searchClients = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/clients?search=${encodeURIComponent(query)}&limit=10`, { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        const results = Array.isArray(data) ? data : (data.data || []);
+        setSearchResults(results);
+        setShowSearchResults(results.length > 0);
+      }
+    } catch (error) {
+      console.error('Erreur recherche clients:', error);
+    }
+  }, []);
+
+  const handleSearchChange = (value: string) => {
+    setSearchClient(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => searchClients(value), 300);
+  };
+
+  const selectClient = (client: any) => {
+    setSelectedClient(client);
+    setSearchClient(client.nom_complet || `${client.nom || ''} ${client.prenom || ''}`.trim());
+    setShowSearchResults(false);
+    setSearchResults([]);
+  };
+
   const handleTransaction = async () => {
     if (!selectedClient || !montant) {
       setNotification({ type: 'error', message: 'Veuillez sélectionner un client et saisir un montant' });
@@ -114,27 +125,35 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
 
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const response = await fetch('/api/caisse-agent/operations-terrain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: 'COLLECT_CASH',
+          agentId,
+          clientId: selectedClient.id,
+          montant: amount,
+          typePaiementClient: activeTab,
+          numeroRecu: reference || undefined,
+          observations: `${getTabLabel(activeTab)} via interface caisse`,
+          idempotencyKey: `${agentId}-${activeTab}-${Date.now()}`
+        })
+      });
 
-      const transaction = {
-        type: activeTab,
-        client_id: selectedClient.id,
-        montant: amount,
-        agent_id: agentId,
-        reference: reference || `TRX-${Date.now()}`,
-        statut: 'VALIDATED',
-        created_at: new Date().toISOString()
-      };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.message || 'Erreur lors de la transaction');
+      }
 
-      setNotification({ type: 'success', message: `${getTabLabel(activeTab)} de ${amount} FCFA effectué avec succès` });
-
+      setNotification({ type: 'success', message: `${getTabLabel(activeTab)} de ${amount.toLocaleString()} FCFA effectué avec succès` });
       setMontant('');
       setReference('');
       setSelectedClient(null);
       setSearchClient('');
       fetchRecentTransactions();
-    } catch (error) {
-      setNotification({ type: 'error', message: 'Erreur lors de la transaction' });
+    } catch (error: any) {
+      setNotification({ type: 'error', message: error.message || 'Erreur lors de la transaction' });
     } finally {
       setLoading(false);
     }
@@ -252,7 +271,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
               )}
 
               <div className="space-y-4">
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-semibold text-slate-300 mb-2">
                     <Search size={16} className="inline mr-1" />
                     Rechercher un client
@@ -261,14 +280,44 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                     type="text"
                     placeholder="Nom, téléphone ou email..."
                     value={searchClient}
-                    onChange={(e) => setSearchClient(e.target.value)}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+                    onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
                     className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 input-focus"
                     disabled={!canPerformAction()}
                   />
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                      {searchResults.map((client: any) => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          onClick={() => selectClient(client)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-700 transition border-b border-slate-700 last:border-b-0"
+                        >
+                          <p className="text-white font-semibold text-sm">
+                            {client.nom_complet || `${client.nom || ''} ${client.prenom || ''}`.trim()}
+                          </p>
+                          <p className="text-slate-400 text-xs">{client.telephone || client.phone || ''}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {selectedClient && (
-                    <div className="mt-2 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
-                      <p className="text-green-400 font-semibold">{selectedClient.nom}</p>
-                      <p className="text-sm text-slate-400">{selectedClient.phone}</p>
+                    <div className="mt-2 p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center justify-between">
+                      <div>
+                        <p className="text-green-400 font-semibold">
+                          {selectedClient.nom_complet || `${selectedClient.nom || ''} ${selectedClient.prenom || ''}`.trim()}
+                        </p>
+                        <p className="text-sm text-slate-400">{selectedClient.telephone || selectedClient.phone || ''}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedClient(null); setSearchClient(''); }}
+                        className="text-slate-400 hover:text-white text-sm"
+                      >
+                        &times;
+                      </button>
                     </div>
                   )}
                 </div>

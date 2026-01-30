@@ -1,6 +1,9 @@
 import type { Express, Router } from "express";
 import { Router as createRouter } from "express";
+import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Notifications');
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { db } from "../db";
@@ -207,7 +210,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.json(enrichedNotifications);
     } catch (error) {
-      console.error("Error fetching caisse notifications:", error);
+      logger.error({ err: error }, 'Error fetching caisse notifications');
       res.status(500).json({ error: "Erreur lors du chargement des notifications" });
     }
   });
@@ -258,7 +261,7 @@ export function registerNotificationsRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Données invalides", details: error.errors });
       }
-      console.error("Error updating notification:", error);
+      logger.error({ err: error }, 'Error updating notification');
       res.status(500).json({ error: "Erreur lors de la mise à jour" });
     }
   });
@@ -285,7 +288,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.json({ count: Number(result?.count || 0) });
     } catch (error) {
-      console.error("Error counting notifications:", error);
+      logger.error({ err: error }, 'Error counting notifications');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -331,7 +334,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.json(result);
     } catch (error) {
-      console.error("Error fetching notifications:", error);
+      logger.error({ err: error }, 'Error fetching notifications');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -370,7 +373,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.status(201).json(notification);
     } catch (error) {
-      console.error("Error creating notification:", error);
+      logger.error({ err: error }, 'Error creating notification');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -397,7 +400,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.json(updated);
     } catch (error) {
-      console.error("Error marking notification as read:", error);
+      logger.error({ err: error }, 'Error marking notification as read');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -417,7 +420,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Error marking all as read:", error);
+      logger.error({ err: error }, 'Error marking all as read');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -433,7 +436,7 @@ export function registerNotificationsRoutes(app: Express) {
       const metrics = await getNotificationMetrics();
       res.json(metrics);
     } catch (error) {
-      console.error("Error fetching notification metrics:", error);
+      logger.error({ err: error }, 'Error fetching notification metrics');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -474,7 +477,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.json(result);
     } catch (error) {
-      console.error("Error fetching outbox:", error);
+      logger.error({ err: error }, 'Error fetching outbox');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -487,7 +490,7 @@ export function registerNotificationsRoutes(app: Express) {
       const jobs = await getRecentFailedJobs(limit);
       res.json(jobs);
     } catch (error) {
-      console.error("Error fetching failed jobs:", error);
+      logger.error({ err: error }, 'Error fetching failed jobs');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -499,7 +502,7 @@ export function registerNotificationsRoutes(app: Express) {
       const count = await retryDeadLetterJobs();
       res.json({ success: true, retriedCount: count });
     } catch (error) {
-      console.error("Error retrying dead-letter:", error);
+      logger.error({ err: error }, 'Error retrying dead-letter');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -515,7 +518,7 @@ export function registerNotificationsRoutes(app: Express) {
       }
       res.json({ success: true });
     } catch (error) {
-      console.error("Error retrying job:", error);
+      logger.error({ err: error }, 'Error retrying job');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -528,7 +531,7 @@ export function registerNotificationsRoutes(app: Express) {
       const settings = await getNotificationSettingsForAgency(agenceId);
       res.json(settings || {});
     } catch (error) {
-      console.error("Error fetching notification settings:", error);
+      logger.error({ err: error }, 'Error fetching notification settings');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -586,7 +589,7 @@ export function registerNotificationsRoutes(app: Express) {
         .returning();
       res.json(created);
     } catch (error) {
-      console.error("Error updating notification settings:", error);
+      logger.error({ err: error }, 'Error updating notification settings');
       res.status(500).json({ error: "Erreur" });
     }
   });
@@ -621,7 +624,7 @@ export function registerNotificationsRoutes(app: Express) {
       const webhookSecret = process.env.MTN_SMS_WEBHOOK_SECRET;
       if (webhookSecret) {
         if (!signature) {
-          console.warn("[Webhook MTN-SMS] Missing signature header");
+          logger.warn('Webhook MTN-SMS missing signature header');
           return res.status(401).json({ error: "Missing signature" });
         }
 
@@ -635,7 +638,7 @@ export function registerNotificationsRoutes(app: Express) {
         const expectedBuffer = Buffer.from(expectedSig, "hex");
 
         if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-          console.warn("[Webhook MTN-SMS] Invalid signature");
+          logger.warn('Webhook MTN-SMS invalid signature');
           return res.status(401).json({ error: "Invalid signature" });
         }
       }
@@ -643,7 +646,7 @@ export function registerNotificationsRoutes(app: Express) {
       // Parse delivery notification
       const notification = body?.deliveryInfoNotification;
       if (!notification?.deliveryInfo) {
-        console.warn("[Webhook MTN-SMS] Invalid payload structure");
+        logger.warn('Webhook MTN-SMS invalid payload structure');
         return res.status(200).json({ received: true }); // Always 200 to prevent retries
       }
 
@@ -652,7 +655,7 @@ export function registerNotificationsRoutes(app: Express) {
       const receiverAddress = deliveryInfo.address || "";
       const correlationId = callbackData || "";
 
-      console.log(`[Webhook MTN-SMS] Delivery status: ${deliveryStatus} for correlator=${correlationId}`);
+      logger.info({ deliveryStatus, correlationId }, 'Webhook MTN-SMS delivery status');
 
       // Find the notification job by correlationId
       const { notificationJobs, notificationDeliveryReceipts } = await import("@shared/schema");
@@ -702,14 +705,14 @@ export function registerNotificationsRoutes(app: Express) {
               .where(eq(notificationJobs.id, job.id));
           }
         } else {
-          console.warn(`[Webhook MTN-SMS] No job found for correlator=${correlationId}`);
+          logger.warn({ correlationId }, 'Webhook MTN-SMS no job found for correlator');
         }
       }
 
       // Always return 200 to prevent MTN from retrying
       res.status(200).json({ received: true });
     } catch (error) {
-      console.error("[Webhook MTN-SMS] Error processing delivery receipt:", error);
+      logger.error({ err: error }, 'Webhook MTN-SMS error processing delivery receipt');
       res.status(200).json({ received: true }); // Always 200
     }
   });
@@ -733,7 +736,7 @@ export function registerNotificationsRoutes(app: Express) {
 
       res.json({ count: Number(result?.count || 0) });
     } catch (error) {
-      console.error("Error counting unread:", error);
+      logger.error({ err: error }, 'Error counting unread');
       res.status(500).json({ error: "Erreur" });
     }
   });

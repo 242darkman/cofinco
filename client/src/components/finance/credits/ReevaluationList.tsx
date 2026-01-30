@@ -4,13 +4,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle, 
+import {
+  RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle,
   Users, Filter, Search, ChevronRight, Loader2, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import { Pagination } from '../../ui';
+import { STATUT_REEVALUATION_LABELS } from '@shared/enum/status-constants';
 
 interface Reevaluation {
   id: string;
@@ -44,21 +45,17 @@ interface ReevaluationListProps {
 
 type StatutFilter = 'all' | 'pending' | 'approved' | 'rejected';
 
-// Status keys are from backend (English) but mapped to French UI
+// Status keys are from backend (English) — labels from centralized STATUT_REEVALUATION_LABELS
 const STATUT_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  // Backend statuses
-  'REQUESTED': { color: 'text-blue-400', bg: 'bg-blue-500/10', icon: <Clock size={13} />, label: 'Demandée' },
-  'ELIGIBILITY_CHECK': { color: 'text-amber-400', bg: 'bg-amber-500/10', icon: <Loader2 size={13} className="animate-spin" />, label: 'Vérification' },
-  'AUTHORIZED': { color: 'text-cyan-400', bg: 'bg-cyan-500/10', icon: <CheckCircle size={13} />, label: 'Autorisée' },
-  'REFUSED': { color: 'text-red-400', bg: 'bg-red-500/10', icon: <XCircle size={13} />, label: 'Refusée' },
-  'ADDITIONAL_INVESTIGATION': { color: 'text-purple-400', bg: 'bg-purple-500/10', icon: <Search size={13} />, label: 'Enquête' },
-  'IN_COMMITTEE': { color: 'text-orange-400', bg: 'bg-orange-500/10', icon: <Users size={13} />, label: 'Comité' },
-  'APPROVED': { color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: <CheckCircle size={13} />, label: 'Approuvée' },
-  'DEFINITIVELY_REJECTED': { color: 'text-red-400', bg: 'bg-red-500/10', icon: <XCircle size={13} />, label: 'Rejetée' },
-  'CANCELLED': { color: 'text-slate-400', bg: 'bg-slate-500/10', icon: <XCircle size={13} />, label: 'Annulée' },
-  
-  // Fallbacks just in case
-  'Demandée': { color: 'text-blue-400', bg: 'bg-blue-500/10', icon: <Clock size={13} />, label: 'Demandée' },
+  'REQUESTED': { color: 'text-blue-400', bg: 'bg-blue-500/10', icon: <Clock size={13} />, label: STATUT_REEVALUATION_LABELS.REQUESTED },
+  'ELIGIBILITY_CHECK': { color: 'text-amber-400', bg: 'bg-amber-500/10', icon: <Loader2 size={13} className="animate-spin" />, label: STATUT_REEVALUATION_LABELS.ELIGIBILITY_CHECK },
+  'AUTHORIZED': { color: 'text-cyan-400', bg: 'bg-cyan-500/10', icon: <CheckCircle size={13} />, label: STATUT_REEVALUATION_LABELS.AUTHORIZED },
+  'REFUSED': { color: 'text-red-400', bg: 'bg-red-500/10', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.REFUSED },
+  'ADDITIONAL_INVESTIGATION': { color: 'text-purple-400', bg: 'bg-purple-500/10', icon: <Search size={13} />, label: STATUT_REEVALUATION_LABELS.ADDITIONAL_INVESTIGATION },
+  'IN_COMMITTEE': { color: 'text-orange-400', bg: 'bg-orange-500/10', icon: <Users size={13} />, label: STATUT_REEVALUATION_LABELS.IN_COMMITTEE },
+  'APPROVED': { color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: <CheckCircle size={13} />, label: STATUT_REEVALUATION_LABELS.APPROVED },
+  'DEFINITIVELY_REJECTED': { color: 'text-red-400', bg: 'bg-red-500/10', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.DEFINITIVELY_REJECTED },
+  'CANCELLED': { color: 'text-slate-400', bg: 'bg-slate-500/10', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.CANCELLED },
 };
 
 export function ReevaluationList({ onSelect, demandeId, showFilters = true }: ReevaluationListProps) {

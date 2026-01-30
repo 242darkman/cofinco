@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Target, Plus, X, Calendar, DollarSign, TrendingUp, Trash2 } from 'lucide-react';
 import { Button, IconButton } from '../../ui';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
 import { objectifEpargneApi } from '../../../lib/api-client';
+import { compteKeys } from '../../../lib/query-keys';
 import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, validateDate, VALIDATION_LIMITS } from '../../../lib/validation';
 import { formatMoney, formatDate, getDaysRemaining } from '../../../lib/format';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
-import { StatutObjectif, StatutObjectifType, STATUT_OBJECTIF_LABELS } from '@shared/enum/status-constants';
+import { StatutObjectif, StatutObjectifType } from '@shared/enum/status-constants';
 
 interface Objectif {
   id: string;
@@ -37,8 +39,7 @@ interface FormErrors {
 }
 
 export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: EpargneSavingsGoalsProps) {
-  const [objectifs, setObjectifs] = useState<Objectif[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -52,22 +53,18 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
   // Confirmation dialog
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
-  useEffect(() => {
-    loadObjectifs();
-  }, [compteId]);
+  // --- React Query: Objectifs ---
+  const objectifsQuery = useQuery({
+    queryKey: compteKeys.objectifs(compteId),
+    queryFn: () => objectifEpargneApi.getByCompte(compteId),
+  });
 
-  const loadObjectifs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await objectifEpargneApi.getByCompte(compteId);
-      setObjectifs(data || []);
-    } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement des objectifs'));
-      setObjectifs([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [compteId]);
+  const objectifs: Objectif[] = objectifsQuery.data || [];
+  const loading = objectifsQuery.isLoading;
+
+  const invalidateObjectifs = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: compteKeys.objectifs(compteId) });
+  }, [queryClient, compteId]);
 
   const validateForm = useCallback((): boolean => {
     const newErrors: FormErrors = {};
@@ -119,7 +116,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
         setFormData({ nom: '', montantCible: '', dateCible: '', description: '' });
         setShowForm(false);
         setErrors({});
-        loadObjectifs();
+        invalidateObjectifs();
 
         toast.success('Objectif créé avec succès');
       } catch (error) {
@@ -128,7 +125,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
         setSubmitting(false);
       }
     },
-    [formData, compteId, validateForm, loadObjectifs]
+    [formData, compteId, validateForm, invalidateObjectifs]
   );
 
   const handleDelete = useCallback(
@@ -141,7 +138,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
         onConfirm: async () => {
           try {
             await objectifEpargneApi.delete(objectif.id);
-            loadObjectifs();
+            invalidateObjectifs();
             toast.success('Objectif supprimé');
           } catch (error) {
             toast.error(handleApiError(error, 'Erreur lors de la suppression'));
@@ -149,7 +146,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
         },
       });
     },
-    [loadObjectifs, openConfirm]
+    [invalidateObjectifs, openConfirm]
   );
 
   const updateObjectifProgression = useCallback(
@@ -162,13 +159,13 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
           montantActuel: progression,
           statut: nouveauStatut,
         });
-        loadObjectifs();
+        invalidateObjectifs();
         toast.success('Progression mise à jour');
       } catch (error) {
         toast.error(handleApiError(error, 'Erreur lors de la mise à jour'));
       }
     },
-    [compteSolde, loadObjectifs]
+    [compteSolde, invalidateObjectifs]
   );
 
   const getProgressionColor = useCallback((pourcentage: number) => {

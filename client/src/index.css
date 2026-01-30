@@ -1014,6 +1014,134 @@ body {
   @apply bg-slate-400 rounded-full hover:bg-emerald-500;
 }
 
+/* ==================== PROFESSIONAL DASHBOARD SCROLLBAR ==================== */
+/* Modern, minimal scrollbar with smooth appearance on all screen sizes */
+
+.pro-scrollbar {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+}
+
+.pro-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.pro-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 100px;
+  margin: 4px 0;
+}
+
+.pro-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 100px;
+  transition: background 0.2s ease;
+}
+
+.pro-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+.pro-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(34, 211, 238, 0.8);
+}
+
+/* Light mode variant */
+.light .pro-scrollbar {
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.light .pro-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+.light .pro-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+
+.light .pro-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(16, 185, 129, 0.8);
+}
+
+/* Scroll container with fade indicators */
+.scroll-fade-container {
+  position: relative;
+}
+
+.scroll-fade-container::before,
+.scroll-fade-container::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 6px;
+  height: 24px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+.scroll-fade-container::before {
+  top: 0;
+  background: linear-gradient(to bottom,
+    rgba(15, 23, 42, 0.95) 0%,
+    rgba(15, 23, 42, 0) 100%);
+}
+
+.scroll-fade-container::after {
+  bottom: 0;
+  background: linear-gradient(to top,
+    rgba(15, 23, 42, 0.95) 0%,
+    rgba(15, 23, 42, 0) 100%);
+}
+
+.scroll-fade-container.has-scroll-top::before {
+  opacity: 1;
+}
+
+.scroll-fade-container.has-scroll-bottom::after {
+  opacity: 1;
+}
+
+/* Light mode fade indicators */
+.light .scroll-fade-container::before {
+  background: linear-gradient(to bottom,
+    rgba(248, 250, 252, 0.95) 0%,
+    rgba(248, 250, 252, 0) 100%);
+}
+
+.light .scroll-fade-container::after {
+  background: linear-gradient(to top,
+    rgba(248, 250, 252, 0.95) 0%,
+    rgba(248, 250, 252, 0) 100%);
+}
+
+/* Mobile-specific scrollbar - slightly wider for touch */
+@media (max-width: 768px) {
+  .pro-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .pro-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.6);
+  }
+}
+
+/* Very small screens - hide scrollbar but keep scroll functionality */
+@media (max-width: 480px) {
+  .pro-scrollbar-mobile-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pro-scrollbar-mobile-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
 /* Fix pour les modals qui ne scrollent pas */
 .modal-overlay {
   @apply fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4;

@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { Card, Badge, IconButton, ProgressBar } from '../../ui';
-import { tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import {
-  FrequenceTontine,
-  FrequenceTontineType,
-  FREQUENCE_TONTINE_LABELS,
   StatutEcheanceTontine,
   StatutEcheanceTontineType,
   STATUT_ECHEANCE_TONTINE_LABELS,
@@ -29,14 +25,18 @@ interface EcheanceItem {
   contributionsAttendues: number;
 }
 
-// Helper pour obtenir le nombre de jours entre échéances
-const getFrequenceJours = (frequence: string): number => {
-  switch (frequence as FrequenceTontineType) {
-    case FrequenceTontine.DAILY: return 1;
-    case FrequenceTontine.WEEKLY: return 7;
-    case FrequenceTontine.BIWEEKLY: return 14;
-    case FrequenceTontine.MONTHLY: return 30;
-    default: return 30;
+// Map backend turn status to frontend display status
+const mapTurnStatus = (backendStatus: string): StatutEcheanceTontineType => {
+  switch (backendStatus) {
+    case 'PAID_OUT':
+    case 'SKIPPED':
+      return StatutEcheanceTontine.COMPLETED;
+    case 'READY':
+    case 'PARTIAL_PAID':
+      return StatutEcheanceTontine.IN_PROGRESS;
+    case 'SCHEDULED':
+    default:
+      return StatutEcheanceTontine.UPCOMING;
   }
 };
 
@@ -47,8 +47,6 @@ const getStatutEcheanceLabel = (statut: StatutEcheanceTontineType): string => {
 
 export default function TontineCalendar({
   tontineId,
-  dateDebut,
-  frequence,
   tourActuel,
   nombreMembres
 }: TontineCalendarProps) {
@@ -62,66 +60,41 @@ export default function TontineCalendar({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
 
-  const generateEcheances = useCallback(async () => {
+  const fetchEcheances = useCallback(async () => {
     if (!tontineId) return;
     setLoading(true);
     try {
-      const [membres, contributions] = await Promise.all([
-        tontineApi.getMembres(tontineId),
-        tontineApi.getContributions(tontineId)
-      ]);
+      const response = await fetch(`/api/tontines/${tontineId}/echeances`);
+      if (!response.ok) throw new Error('Erreur serveur');
+      const data: Array<{
+        tour: number;
+        date: string;
+        beneficiaire: string | null;
+        statut: string;
+        contributions_recues: number;
+        contributions_attendues: number;
+      }> = await response.json();
 
-      const joursFrequence = getFrequenceJours(frequence);
-      const startDate = new Date(dateDebut);
-      const echeancesList: EcheanceItem[] = [];
-
-      for (let i = 1; i <= totalMembres; i++) {
-        const echeanceDate = new Date(startDate);
-        echeanceDate.setDate(startDate.getDate() + ((i - 1) * joursFrequence));
-
-        const membre = (membres || []).find((m: any) => m.position_ordre === i);
-
-        // Count unique members who contributed to this tour
-        const contributors = new Set();
-        (contributions || []).forEach((c: any) => {
-           if (c.tour_numero === i) {
-               // Handle both camelCase and snake_case just in case
-               const id = c.clientId || c.client_id || c.client?.id;
-               if (id) contributors.add(id);
-           }
-        });
-        const contributionsTour = contributors.size;
-
-        let statut: StatutEcheanceTontineType;
-        if (i < currentTour) {
-          statut = StatutEcheanceTontine.COMPLETED;
-        } else if (i === currentTour) {
-          statut = StatutEcheanceTontine.IN_PROGRESS;
-        } else {
-          statut = StatutEcheanceTontine.UPCOMING;
-        }
-
-        echeancesList.push({
-          tour: i,
-          date: echeanceDate,
-          beneficiaire: membre?.clients?.nom ? `${membre.clients.nom} ${membre.clients.prenom}` : null,
-          statut,
-          contributionsRecues: contributionsTour,
-          contributionsAttendues: totalMembres
-        });
-      }
-
-      setEcheances(echeancesList);
+      setEcheances(
+        data.map((item) => ({
+          tour: item.tour,
+          date: new Date(item.date),
+          beneficiaire: item.beneficiaire,
+          statut: mapTurnStatus(item.statut),
+          contributionsRecues: item.contributions_recues,
+          contributionsAttendues: item.contributions_attendues,
+        }))
+      );
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur génération échéances'));
+      toast.error(handleApiError(error, 'Erreur chargement échéances'));
     } finally {
       setLoading(false);
     }
-  }, [tontineId, dateDebut, frequence, currentTour, totalMembres]);
+  }, [tontineId]);
 
   useEffect(() => {
-    generateEcheances();
-  }, [generateEcheances]);
+    fetchEcheances();
+  }, [fetchEcheances]);
 
   const getEcheancesForMonth = () => {
     return echeances.filter(e => {

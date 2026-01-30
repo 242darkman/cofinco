@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { addPdfLogoHeader } from '../lib/pdf-logo';
 
 export interface UserActivity {
   user_id: string;
@@ -111,16 +112,13 @@ export function useUserActivity() {
   const exportToPDF = () => {
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
-    
-    doc.setFontSize(18);
-    doc.setTextColor(30, 58, 138);
-    doc.text("RAPPORT D'ACTIVITÉ UTILISATEURS - COFIN", 14, 20);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Date d'export: ${dateExport}`, 14, 28);
-    doc.text(`Utilisateurs: ${stats.totalUsers} | Actifs aujourd'hui: ${stats.activeToday} | Total actions: ${stats.totalActions}`, 14, 34);
-    
+
+    const startY = addPdfLogoHeader(doc, {
+      title: "RAPPORT D'ACTIVITÉ UTILISATEURS",
+      subtitle: `Utilisateurs: ${stats.totalUsers} | Actifs aujourd'hui: ${stats.activeToday} | Total actions: ${stats.totalActions}`,
+      dateRight: `Export: ${dateExport}`,
+    });
+
     const tableData = activities.slice(0, 50).map((act, idx) => [
       idx + 1,
       act.user_email || 'N/A',
@@ -132,7 +130,7 @@ export function useUserActivity() {
     (doc as any).autoTable({
       head: [['N°', 'Utilisateur', 'Actions', 'Modules', 'Date']],
       body: tableData,
-      startY: 40,
+      startY,
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }

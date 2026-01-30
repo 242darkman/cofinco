@@ -3,6 +3,9 @@ import { db } from './db';
 import { userAgences, agences } from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { SystemRole, isAdminRole, normalizeRole } from '../shared/types/roles';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('Middleware');
 
 // Extend Express Request type to include user property and agency filter
 declare global {
@@ -105,7 +108,7 @@ export function requireAgenceAccess(entityAgenceField: string = "agence") {
     // 2. Utilisateurs sans agence définie : Accès bloqué par sécurité
     const primaryAgence = await resolvePrimaryAgence(req.user.id);
     if (!primaryAgence) {
-      console.warn(`[Security] User ${req.user.username} (${userRole}) has no agence assigned. Access denied.`);
+      logger.warn({ username: req.user.username, role: userRole }, 'User has no agence assigned - access denied');
       return res.status(403).json({
         error: 'Accès refusé',
         message: 'Aucune agence assignée à votre compte.'
@@ -243,7 +246,7 @@ export function requireAgenceIdAccess() {
             req.selectedAgenceId = anyAgence.agenceId;
             req.agenceFilter = { agenceId: anyAgence.agenceId };
           } else {
-            console.warn(`[Security] User ${req.user.username} has no agences assigned.`);
+            logger.warn({ username: req.user.username }, 'User has no agences assigned');
             return res.status(403).json({
               error: 'Accès refusé',
               message: 'Aucune agence assignée à votre compte.'
@@ -251,7 +254,7 @@ export function requireAgenceIdAccess() {
           }
         }
       } catch (err) {
-        console.error('[AgenceIdAccess] Error fetching user agences:', err);
+        logger.error({ err }, 'Error fetching user agences');
         return res.status(500).json({ error: 'Erreur interne' });
       }
 
@@ -285,7 +288,7 @@ export function requireAgenceIdAccess() {
         .limit(1);
 
       if (!userAgence) {
-        console.warn(`[Security] User ${req.user.username} tried to access agence ${selectedAgenceId} without permission`);
+        logger.warn({ username: req.user.username, selectedAgenceId }, 'User tried to access agence without permission');
         return res.status(403).json({
           error: 'Accès refusé',
           message: 'Vous n\'avez pas accès à cette agence.'
@@ -296,7 +299,7 @@ export function requireAgenceIdAccess() {
       req.agenceFilter = { agenceId: selectedAgenceId };
       next();
     } catch (err) {
-      console.error('[AgenceIdAccess] Error verifying agence access:', err);
+      logger.error({ err }, 'Error verifying agence access');
       return res.status(500).json({ error: 'Erreur interne' });
     }
   };

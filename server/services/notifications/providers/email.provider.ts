@@ -2,6 +2,9 @@ import type { EmailProvider, SendResult } from "./provider.interface";
 import { db } from "../../../db";
 import { emailProviderSettings } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger('EmailProvider');
 
 /**
  * SMTP configuration resolved from DB or env vars.
@@ -115,7 +118,7 @@ export class SmtpEmailProvider implements EmailProvider {
         messageId: info.messageId,
       };
     } catch (error: any) {
-      console.error("[EmailProvider] Send failed:", error.message);
+      logger.error({ err: error }, 'Send failed');
       return {
         success: false,
         error: error.message || "Email send failed",

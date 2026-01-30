@@ -13,6 +13,9 @@ import cron from "node-cron";
 import { paymentService } from "../services/mobile-money/payment-service";
 import { providerRegistry } from "../services/mobile-money/provider-registry";
 import * as storage from "../storage/mobile-money";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Cron:PaymentReconciliation');
 
 // Configuration
 const RECONCILIATION_INTERVAL = process.env.RECONCILIATION_INTERVAL_MINUTES || "10";
@@ -57,12 +60,15 @@ interface IntentProcessingLog {
 }
 
 function logReconciliation(entry: ReconciliationLogEntry): void {
-  const level = entry.phase === "error" ? "error" : "info";
-  console[level](`[Payment Reconciliation]`, entry);
+  if (entry.phase === "error") {
+    logger.error({ ...entry }, 'Reconciliation error');
+  } else {
+    logger.info({ ...entry }, 'Reconciliation status');
+  }
 }
 
 function logIntentProcessing(entry: IntentProcessingLog): void {
-  console.log(`[Payment Reconciliation] Intent processed`, entry);
+  logger.info({ ...entry }, 'Intent processed');
 }
 
 // ============================================
@@ -347,11 +353,11 @@ async function expireTimedOutPayments(): Promise<void> {
       return;
     }
 
-    console.log(`[Payment Reconciliation] Expiring ${expiredIntents.length} timed out payments`, {
+    logger.info({
       timestamp: new Date().toISOString(),
       count: expiredIntents.length,
       intentIds: expiredIntents.map(i => i.id),
-    });
+    }, `Expiring ${expiredIntents.length} timed out payments`);
 
     for (const intent of expiredIntents) {
       await storage.updatePaymentIntent(intent.id, {
@@ -371,13 +377,13 @@ async function expireTimedOutPayments(): Promise<void> {
       });
     }
 
-    console.log(`[Payment Reconciliation] Expired ${expiredIntents.length} payments in ${Date.now() - startTime}ms`);
+    logger.info({ count: expiredIntents.length, durationMs: Date.now() - startTime }, `Expired ${expiredIntents.length} payments`);
   } catch (error) {
-    console.error("[Payment Reconciliation] Error expiring payments:", {
+    logger.error({
+      err: error,
       timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : "Unknown error",
       durationMs: Date.now() - startTime,
-    });
+    }, 'Error expiring payments');
   }
 }
 
@@ -404,7 +410,7 @@ async function reconcileWithProviderSummary(): Promise<void> {
 
     const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
-    console.log(`[Payment Reconciliation] Fetching Airtel transactions summary...`);
+    logger.info('Fetching Airtel transactions summary');
 
     // Récupérer les transactions du provider
     const summary = await (airtelProvider as {
@@ -425,13 +431,11 @@ async function reconcileWithProviderSummary(): Promise<void> {
     }).getTransactionsSummary(formatDate(startDate), formatDate(endDate));
 
     if (!summary.transactions || summary.transactions.length === 0) {
-      console.log("[Payment Reconciliation] No Airtel transactions in summary");
+      logger.info('No Airtel transactions in summary');
       return;
     }
 
-    console.log(
-      `[Payment Reconciliation] Found ${summary.transactions.length} Airtel transactions to check`
-    );
+    logger.info({ count: summary.transactions.length }, `Found ${summary.transactions.length} Airtel transactions to check`);
 
     // Récupérer nos intents PENDING pour Airtel
     const pendingAirtelIntents = await storage.getPendingIntentsByProvider("AIRTEL");
@@ -487,14 +491,12 @@ async function reconcileWithProviderSummary(): Promise<void> {
       }
     }
 
-    console.log(
-      `[Payment Reconciliation] Summary reconciliation complete: ${reconciled} intents updated in ${Date.now() - startTime}ms`
-    );
+    logger.info({ reconciled, durationMs: Date.now() - startTime }, `Summary reconciliation complete: ${reconciled} intents updated`);
   } catch (error) {
-    console.error("[Payment Reconciliation] Summary reconciliation error:", {
-      error: error instanceof Error ? error.message : "Unknown error",
+    logger.error({
+      err: error,
       durationMs: Date.now() - startTime,
-    });
+    }, 'Summary reconciliation error');
   }
 }
 
@@ -503,7 +505,7 @@ async function reconcileWithProviderSummary(): Promise<void> {
  */
 export function startPaymentReconciliationCron(): void {
   if (cronJob) {
-    console.log("[Payment Reconciliation] Cron already running");
+    logger.info('Cron already running');
     return;
   }
 
@@ -520,7 +522,7 @@ export function startPaymentReconciliationCron(): void {
     }
   });
 
-  console.log(`[Payment Reconciliation] Cron job started (every ${RECONCILIATION_INTERVAL} minutes)`);
+  logger.info({ interval: RECONCILIATION_INTERVAL }, `Cron job started (every ${RECONCILIATION_INTERVAL} minutes)`);
 }
 
 /**
@@ -530,7 +532,7 @@ export function stopPaymentReconciliationCron(): void {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
-    console.log("[Payment Reconciliation] Cron job stopped");
+    logger.info('Cron job stopped');
   }
 }
 
@@ -539,7 +541,7 @@ export function stopPaymentReconciliationCron(): void {
  * Utile pour les tests ou les interventions manuelles
  */
 export async function runReconciliationNow(): Promise<void> {
-  console.log("[Payment Reconciliation] Manual run triggered");
+  logger.info('Manual run triggered');
   await reconcilePendingPayments();
   await expireTimedOutPayments();
 }

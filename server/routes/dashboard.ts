@@ -1,5 +1,8 @@
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Dashboard');
 import { db } from "../db";
 import {
   clients, credits, comptes, tontines, users, sessionsCaisse,
@@ -424,7 +427,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(stats);
 
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      logger.error({ err: error }, 'Error fetching dashboard stats');
       res.status(500).json({ 
         message: "Erreur lors de la récupération des statistiques",
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -503,7 +506,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(statsLight);
 
     } catch (error) {
-      console.error('Error fetching lightweight dashboard stats:', error);
+      logger.error({ err: error }, 'Error fetching lightweight dashboard stats');
       res.status(500).json({
         message: "Erreur lors de la récupération des statistiques légères",
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -589,7 +592,7 @@ export function registerDashboardRoutes(app: Express) {
 
       res.json(data);
     } catch (error) {
-      console.error('Error fetching balance history:', error);
+      logger.error({ err: error }, 'Error fetching balance history');
       res.status(500).json({ 
         message: "Erreur lors de la récupération de l'historique",
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -679,11 +682,223 @@ export function registerDashboardRoutes(app: Express) {
         agents: agentsResults.map(a => ({ ...a, type: 'agent' }))
       });
     } catch (error) {
-      console.error('Error in global search:', error);
-      res.status(500).json({ 
+      logger.error({ err: error }, 'Error in global search');
+      res.status(500).json({
         message: "Erreur lors de la recherche",
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
+
+  // ============================================
+  // COMPARATIVE ANALYTICS & FORECASTS
+  // ============================================
+
+  /**
+   * GET /api/dashboard/comparative
+   * Compare metrics between two time periods
+   * Query: periodA_start, periodA_end, periodB_start, periodB_end, agenceId?
+   */
+  app.get("/api/dashboard/comparative", requireAuth, async (req, res) => {
+    try {
+      const { periodA_start, periodA_end, periodB_start, periodB_end, agenceId } = req.query;
+
+      if (!periodA_start || !periodA_end || !periodB_start || !periodB_end) {
+        return res.status(400).json({ error: "Les 4 dates de période sont requises (periodA_start, periodA_end, periodB_start, periodB_end)" });
+      }
+
+      const pAStart = new Date(periodA_start as string);
+      const pAEnd = new Date(periodA_end as string);
+      const pBStart = new Date(periodB_start as string);
+      const pBEnd = new Date(periodB_end as string);
+
+      // Fetch metrics for both periods in parallel
+      const [metricsA, metricsB] = await Promise.all([
+        getPeriodMetrics(pAStart, pAEnd, agenceId as string | undefined),
+        getPeriodMetrics(pBStart, pBEnd, agenceId as string | undefined),
+      ]);
+
+      // Calculate variations
+      const variations: Record<string, { periodA: number; periodB: number; change: number; changePercent: number }> = {};
+      for (const key of Object.keys(metricsA) as Array<keyof typeof metricsA>) {
+        const a = metricsA[key];
+        const b = metricsB[key];
+        variations[key] = {
+          periodA: a,
+          periodB: b,
+          change: b - a,
+          changePercent: a !== 0 ? Math.round(((b - a) / a) * 10000) / 100 : (b > 0 ? 100 : 0),
+        };
+      }
+
+      res.json({
+        periodA: { start: pAStart, end: pAEnd, metrics: metricsA },
+        periodB: { start: pBStart, end: pBEnd, metrics: metricsB },
+        variations,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Comparative analytics error');
+      res.status(500).json({ error: 'Erreur analyse comparative' });
+    }
+  });
+
+  /**
+   * GET /api/dashboard/forecast
+   * Simple trend-based forecast from historical monthly data
+   * Query: months=6 (forecast horizon), agenceId?
+   */
+  app.get("/api/dashboard/forecast", requireAuth, async (req, res) => {
+    try {
+      const months = parseInt(req.query.months as string) || 6;
+      const agenceId = req.query.agenceId as string | undefined;
+      const lookbackMonths = 12; // Use last 12 months of data
+
+      // Get monthly aggregates for the last 12 months
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - lookbackMonths);
+
+      // Agence conditions with correct table aliases
+      const clientsAgenceCond = agenceId ? sql`AND c.agence_id = ${agenceId}` : sql``;
+      const creditsAgenceCond = agenceId ? sql`AND cr.agence_id = ${agenceId}` : sql``;
+      const comptesAgenceCond = agenceId ? sql`AND co.agence_id = ${agenceId}` : sql``;
+
+      // Monthly client creation counts
+      const clientsMonthly = await db.execute(sql`
+        SELECT TO_CHAR(c.created_at, 'YYYY-MM') as month, COUNT(*) as value
+        FROM clients c
+        WHERE c.created_at >= ${startDate} ${clientsAgenceCond}
+        GROUP BY TO_CHAR(c.created_at, 'YYYY-MM')
+        ORDER BY month
+      `);
+
+      // Monthly credit disbursement amounts
+      const creditsMonthly = await db.execute(sql`
+        SELECT TO_CHAR(cr.created_at, 'YYYY-MM') as month, COALESCE(SUM(CAST(cr.montant AS DECIMAL)), 0) as value
+        FROM credits cr
+        WHERE cr.created_at >= ${startDate} ${creditsAgenceCond}
+        GROUP BY TO_CHAR(cr.created_at, 'YYYY-MM')
+        ORDER BY month
+      `);
+
+      // Monthly savings deposit amounts - join with comptes to filter by agence
+      const depositsMonthly = await db.execute(sql`
+        SELECT TO_CHAR(tc.created_at, 'YYYY-MM') as month, COALESCE(SUM(CAST(tc.montant AS DECIMAL)), 0) as value
+        FROM transactions_compte tc
+        JOIN comptes co ON tc.compte_id = co.id
+        WHERE tc.created_at >= ${startDate}
+          AND tc.type_paiement IN ('DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'INITIAL_DEPOSIT')
+          AND tc.statut = 'POSTED'
+          ${comptesAgenceCond}
+        GROUP BY TO_CHAR(tc.created_at, 'YYYY-MM')
+        ORDER BY month
+      `);
+
+      // Calculate forecasts using linear regression
+      const forecastClients = linearForecast(clientsMonthly.rows as any[], months);
+      const forecastCredits = linearForecast(creditsMonthly.rows as any[], months);
+      const forecastDeposits = linearForecast(depositsMonthly.rows as any[], months);
+
+      res.json({
+        historical: {
+          clients: clientsMonthly.rows,
+          credits: creditsMonthly.rows,
+          deposits: depositsMonthly.rows,
+        },
+        forecast: {
+          clients: forecastClients,
+          credits: forecastCredits,
+          deposits: forecastDeposits,
+        },
+        parameters: {
+          lookbackMonths,
+          forecastMonths: months,
+          method: 'linear_regression',
+        },
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Forecast error');
+      res.status(500).json({ error: 'Erreur prévision' });
+    }
+  });
+
+  // Helper: get key metrics for a date range
+  async function getPeriodMetrics(start: Date, end: Date, agenceId?: string) {
+    // Agence conditions with correct table aliases
+    const clientsAgenceCond = agenceId ? sql`AND c.agence_id = ${agenceId}` : sql``;
+    const creditsAgenceCond = agenceId ? sql`AND cr.agence_id = ${agenceId}` : sql``;
+    const comptesAgenceCond = agenceId ? sql`AND co.agence_id = ${agenceId}` : sql``;
+
+    const [[newClients], [newCredits], [creditAmount], [depositAmount], [withdrawalAmount]] = await Promise.all([
+      db.execute(sql`
+        SELECT COUNT(*) as value FROM clients c
+        WHERE c.created_at >= ${start} AND c.created_at <= ${end} ${clientsAgenceCond}
+      `).then(r => r.rows),
+      db.execute(sql`
+        SELECT COUNT(*) as value FROM credits cr
+        WHERE cr.created_at >= ${start} AND cr.created_at <= ${end} ${creditsAgenceCond}
+      `).then(r => r.rows),
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(cr.montant AS DECIMAL)), 0) as value FROM credits cr
+        WHERE cr.created_at >= ${start} AND cr.created_at <= ${end} ${creditsAgenceCond}
+      `).then(r => r.rows),
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(tc.montant AS DECIMAL)), 0) as value
+        FROM transactions_compte tc
+        JOIN comptes co ON tc.compte_id = co.id
+        WHERE tc.created_at >= ${start} AND tc.created_at <= ${end}
+          AND tc.type_paiement IN ('DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'INITIAL_DEPOSIT')
+          AND tc.statut = 'POSTED'
+          ${comptesAgenceCond}
+      `).then(r => r.rows),
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(tc.montant AS DECIMAL)), 0) as value
+        FROM transactions_compte tc
+        JOIN comptes co ON tc.compte_id = co.id
+        WHERE tc.created_at >= ${start} AND tc.created_at <= ${end}
+          AND tc.type_paiement IN ('WITHDRAWAL_SAVINGS', 'WITHDRAWAL_CURRENT')
+          AND tc.statut = 'POSTED'
+          ${comptesAgenceCond}
+      `).then(r => r.rows),
+    ]);
+
+    return {
+      nouveauxClients: Number(newClients?.value || 0),
+      nouveauxCredits: Number(newCredits?.value || 0),
+      montantCredits: Number(creditAmount?.value || 0),
+      montantDepots: Number(depositAmount?.value || 0),
+      montantRetraits: Number(withdrawalAmount?.value || 0),
+    };
+  }
+
+  // Helper: linear regression forecast
+  function linearForecast(data: Array<{ month: string; value: string | number }>, forecastMonths: number) {
+    if (data.length < 2) {
+      return [];
+    }
+
+    const values = data.map((d, i) => ({ x: i, y: Number(d.value) }));
+    const n = values.length;
+    const sumX = values.reduce((s, v) => s + v.x, 0);
+    const sumY = values.reduce((s, v) => s + v.y, 0);
+    const sumXY = values.reduce((s, v) => s + v.x * v.y, 0);
+    const sumX2 = values.reduce((s, v) => s + v.x * v.x, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // Generate forecast months
+    const lastMonth = data[data.length - 1].month;
+    const forecasted: Array<{ month: string; value: number; isForecasted: boolean }> = [];
+
+    for (let i = 1; i <= forecastMonths; i++) {
+      const x = n - 1 + i;
+      const predicted = Math.max(0, Math.round(slope * x + intercept));
+      const date = new Date(lastMonth + '-01');
+      date.setMonth(date.getMonth() + i);
+      const month = date.toISOString().slice(0, 7);
+      forecasted.push({ month, value: predicted, isForecasted: true });
+    }
+
+    return forecasted;
+  }
 }

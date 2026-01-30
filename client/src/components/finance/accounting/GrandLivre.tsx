@@ -8,6 +8,7 @@ import Card from '../../ui/Card';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import { toast, handleApiError } from '../../../lib/toast';
+import { addPdfLogoHeader } from '../../../lib/pdf-logo';
 import { useChartOfAccounts, useGrandLivre, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 
 interface GrandLivreEntry {
@@ -135,41 +136,35 @@ export default function GrandLivre() {
     try {
       const doc = new jsPDF('landscape');
 
-      // Header
-      doc.setFontSize(20);
-      doc.setTextColor(30, 58, 138);
-      doc.text('GRAND LIVRE', 148, 20, { align: 'center' });
+      // Header with logo
+      const startY = addPdfLogoHeader(doc, {
+        title: 'GRAND LIVRE',
+        subtitle: `Compte: ${grandLivreData.numeroCompte} - ${grandLivreData.intitule}`,
+        dateRight: `Période: ${dateDebut} au ${dateFin}`,
+      });
 
-      doc.setFontSize(14);
-      doc.setTextColor(50);
-      doc.text(`Compte: ${grandLivreData.numeroCompte} - ${grandLivreData.intitule}`, 148, 30, { align: 'center' });
-
+      // Solde d'ouverture
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Periode: ${dateDebut} au ${dateFin}`, 148, 38, { align: 'center' });
-      doc.text(`Solde d'ouverture: ${soldeOuverture.toLocaleString('fr-FR')} FCFA`, 148, 44, { align: 'center' });
-      doc.text(`Edite le: ${new Date().toLocaleDateString('fr-FR')}`, 148, 50, { align: 'center' });
-
-      // Line separator
-      doc.setDrawColor(30, 58, 138);
-      doc.line(20, 55, 277, 55);
+      doc.text(`Solde d'ouverture: ${soldeOuverture.toLocaleString('fr-FR')} FCFA`, 14, startY);
 
       // Table header
+      const tableY = startY + 8;
       doc.setFontSize(9);
       doc.setTextColor(255);
       doc.setFillColor(30, 58, 138);
-      doc.rect(20, 60, 257, 10, 'F');
-      doc.text('Date', 25, 67);
-      doc.text('N Piece', 50, 67);
-      doc.text('Journal', 80, 67);
-      doc.text('Libelle', 100, 67);
-      doc.text('Debit', 180, 67);
-      doc.text('Credit', 210, 67);
-      doc.text('Solde', 245, 67);
+      doc.rect(20, tableY, 257, 10, 'F');
+      doc.text('Date', 25, tableY + 7);
+      doc.text('N Piece', 50, tableY + 7);
+      doc.text('Journal', 80, tableY + 7);
+      doc.text('Libelle', 100, tableY + 7);
+      doc.text('Debit', 180, tableY + 7);
+      doc.text('Credit', 210, tableY + 7);
+      doc.text('Solde', 245, tableY + 7);
 
       // Table content
       doc.setTextColor(0);
-      let y = 77;
+      let y = tableY + 17;
       const maxRows = Math.min(entries.length, 25);
 
       entries.slice(0, maxRows).forEach((m) => {

@@ -13,6 +13,8 @@ import CompteResultat from './CompteResultat';
 import DeclarationTVA from './DeclarationTVA';
 import TableauTresorerie from './TableauTresorerie';
 import TAFIRE from './TAFIRE';
+import CoffreOperationsPanel from './CoffreOperationsPanel';
+import PayrollSummaryPanel from './PayrollSummaryPanel';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import TabGroup from '../../ui/TabGroup';
@@ -406,7 +408,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
                                 </span>
                               </td>
                               <td className="py-1.5 hidden lg:table-cell text-white font-mono text-[10px]">
-                                {compte.solde_actuel ? compte.solde_actuel.toLocaleString() : '-'}
+                                {compte.solde_actuel != null ? compte.solde_actuel.toLocaleString() : '-'}
                               </td>
                             </tr>
                           ))}
@@ -1056,6 +1058,12 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
             </button>
           );
         })}
+      </div>
+
+      {/* Synthèses Opérationnelles */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+        <CoffreOperationsPanel />
+        <PayrollSummaryPanel />
       </div>
 
       {/* Clôture des Périodes */}

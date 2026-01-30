@@ -2,33 +2,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Employe } from './useEmployes';
 import { savePDFToLoge } from '../../lib/loge-storage';
+import { LOGO_BASE64 } from '../../lib/pdf-logo';
 
 export function useBulletinPDF() {
+  // Logo is now imported directly as base64, no async loading needed
   const loadLogoAsBase64 = async (): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          try {
-            const dataURL = canvas.toDataURL('image/png');
-            resolve(dataURL);
-          } catch (e) {
-            console.error('Erreur conversion logo:', e);
-            resolve('');
-          }
-        } else {
-          resolve('');
-        }
-      };
-      img.onerror = () => resolve('');
-      img.src = '/logo.png';
-    });
+    return LOGO_BASE64;
   };
 
   const generateBulletinPDF = async (employe: Employe, logoBase64?: string): Promise<jsPDF> => {
@@ -64,19 +43,11 @@ export function useBulletinPDF() {
     doc.setLineWidth(0.8);
     doc.line(0, 35, 210, 35);
     
-    // Logo de la plateforme
-    if (logoBase64) {
-      try {
-        doc.addImage(logoBase64, 'PNG', 10, 5, 25, 25);
-      } catch (e) {
-        doc.setFillColor(30, 58, 138);
-        doc.circle(22, 17, 10, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('C', 22, 20, { align: 'center' });
-      }
-    } else {
+    // Logo de la plateforme (utilise le logo partagé)
+    try {
+      doc.addImage(LOGO_BASE64, 'PNG', 10, 5, 25, 25);
+    } catch (e) {
+      // Fallback: cercle avec lettre C
       doc.setFillColor(30, 58, 138);
       doc.circle(22, 17, 10, 'F');
       doc.setTextColor(255, 255, 255);

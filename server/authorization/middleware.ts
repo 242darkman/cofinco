@@ -19,6 +19,9 @@ import {
   canDisburse,
   AbilityContext,
 } from './ability';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('Authorization');
 
 /**
  * Extend Express Request to include ability
@@ -73,7 +76,7 @@ export async function attachAbility(
 
     next();
   } catch (error) {
-    console.error('[CASL] Error building ability:', error);
+    logger.error({ err: error }, 'Error building ability');
     res.status(500).json({ error: 'Erreur lors de la vérification des permissions' });
   }
 }
@@ -139,7 +142,7 @@ export function requireAbility(
         });
         return;
       }
-      console.error('[CASL] Error checking ability:', error);
+      logger.error({ err: error }, 'Error checking ability');
       res.status(500).json({ error: 'Erreur lors de la vérification des permissions' });
     }
   };
@@ -185,7 +188,7 @@ export function requireAnyAbility(
 
       next();
     } catch (error) {
-      console.error('[CASL] Error checking abilities:', error);
+      logger.error({ err: error }, 'Error checking abilities');
       res.status(500).json({ error: 'Erreur lors de la vérification des permissions' });
     }
   };
@@ -225,7 +228,7 @@ export function requireAllAbilities(
 
       next();
     } catch (error) {
-      console.error('[CASL] Error checking abilities:', error);
+      logger.error({ err: error }, 'Error checking all abilities');
       res.status(500).json({ error: 'Erreur lors de la vérification des permissions' });
     }
   };
@@ -275,7 +278,7 @@ export function requireDisbursement() {
 
       next();
     } catch (error) {
-      console.error('[CASL] Error checking disbursement permission:', error);
+      logger.error({ err: error }, 'Error checking disbursement permission');
       res.status(500).json({ error: 'Erreur lors de la vérification des permissions' });
     }
   };
@@ -319,7 +322,7 @@ export function requireResetPassword() {
 
       next();
     } catch (error) {
-      console.error('[CASL] Error checking reset password permission:', error);
+      logger.error({ err: error }, 'Error checking reset password permission');
       res.status(500).json({ error: 'Erreur lors de la vérification des permissions' });
     }
   };

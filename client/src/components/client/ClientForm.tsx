@@ -1,6 +1,6 @@
 import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion, Briefcase, Calendar, DollarSign, Users } from 'lucide-react';
+import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion, Briefcase, Calendar, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import Modal from '../ui/Modal';
@@ -488,9 +488,9 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
       title={client ? 'Modifier le client' : 'Nouveau client'}
       size="2xl"
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Identité */}
-        <div className="grid md:grid-cols-2 gap-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Section 1: Identité - Grid compact */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <FormField
             label="Nom *"
             name="nom"
@@ -500,9 +500,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             onChange={(e) => handleChange('nom', e.target.value)}
             placeholder="Dupont"
             required
-            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
-
           <FormField
             label="Prénom"
             name="prenom"
@@ -510,9 +508,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             value={formData.prenom || ''}
             onChange={(e) => handleChange('prenom', e.target.value)}
             placeholder="Jean"
-            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
-
           <FormField
             label="Email"
             name="email"
@@ -521,21 +517,14 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             type="email"
             value={formData.email || ''}
             onChange={(e) => handleChange('email', e.target.value)}
-            placeholder="jean@example.com"
-            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+            placeholder="email@example.com"
           />
-
           <div>
-            <label className="block text-xs sm:text-sm font-semibold text-slate-300 mb-2">
-              Téléphone *
-              <span className="text-red-400 ml-1">*</span>
-            </label>
-            <div className="flex gap-2">
-              <div className="px-3 py-2.5 sm:py-3 bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg font-semibold text-slate-700 dark:text-slate-300 flex items-center">
-                +242
-              </div>
+            <label className="block text-[11px] font-semibold text-slate-400 mb-1">Téléphone * <span className="text-red-400">*</span></label>
+            <div className="flex gap-1">
+              <div className="px-2 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-xs font-semibold text-slate-300 flex items-center">+242</div>
               <div className="relative flex-1">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                <Phone className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
                 <input
                   type="tel"
                   name="telephone-input"
@@ -544,42 +533,31 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                     const num = e.target.value.replace(/[^\d]/g, '');
                     handleChange('telephone', '+242' + num);
                   }}
-                  className="w-full pl-10 pr-4 py-2 sm:py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm sm:text-base placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:border-cyan-500 focus:ring-cyan-500/30 transition-colors duration-200"
+                  className="w-full pl-7 pr-2 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
                   maxLength={9}
-                  aria-invalid={errors.telephone ? 'true' : 'false'}
                 />
               </div>
             </div>
-            {errors.telephone && (
-              <p className="mt-1.5 text-xs sm:text-sm text-red-400 flex items-center gap-1">
-                <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                {errors.telephone}
-              </p>
-            )}
+            {errors.telephone && <p className="mt-0.5 text-[10px] text-red-400">{errors.telephone}</p>}
           </div>
+        </div>
 
+        {/* Section 2: Adresse & Localisation */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <FormField
             label="Adresse Domicile"
             name="adresseDomicile"
             icon={MapPin}
             value={(formData.adresseDomicile as string) || ''}
             onChange={(e) => handleChange('adresseDomicile', e.target.value)}
-            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
-
           <SelectField
             label="Sexe"
             name="sexe"
             value={formData.sexe || ''}
             onChange={(e) => handleChange('sexe', e.target.value as 'M' | 'F' || null)}
-            options={[
-              { value: '', label: 'Sélectionner' },
-              ...SEXE_OPTIONS.map(s => ({ value: s.value, label: s.label }))
-            ]}
+            options={[{ value: '', label: 'Sélectionner...' }, ...SEXE_OPTIONS.map(s => ({ value: s.value, label: s.label }))]}
           />
-
           <FormField
             label="Date de Naissance"
             name="dateNaissance"
@@ -589,9 +567,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             onChange={(e) => handleChange('dateNaissance', e.target.value)}
             error={errors.dateNaissance}
             max={getMaxBirthDate()}
-            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
-
           <FormField
             label="Ville"
             name="ville"
@@ -599,466 +575,202 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             value={formData.ville || ''}
             onChange={(e) => handleChange('ville', e.target.value)}
             placeholder="Brazzaville"
-            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
+        </div>
 
+        {/* Section 3: Activité & Rattachement */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <FormField
             label="Lieu d'Activité"
             name="lieuActivite"
             icon={MapPin}
             value={formData.lieuActivite || ''}
             onChange={(e) => handleChange('lieuActivite', e.target.value)}
-            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
-
           <SelectField
             label="Secteur d'activité"
             name="typeMarcheId"
             value={formData.typeMarcheId || ''}
             onChange={(e) => handleChange('typeMarcheId', e.target.value === '' ? null : e.target.value)}
-            options={[
-              { value: '', label: 'Sélectionner un secteur' },
-              ...(typesMarches || []).map(tm => ({ value: tm.id, label: tm.nom }))
-            ]}
+            options={[{ value: '', label: 'Sélectionner...' }, ...(typesMarches || []).map(tm => ({ value: tm.id, label: tm.nom }))]}
           />
-
-          {isAdmin && (
+          {isAdmin ? (
             <SelectField
               label="Agence *"
               name="agenceId"
               value={formData.agenceId || ''}
               onChange={(e) => handleChange('agenceId', e.target.value)}
               error={errors.agenceId}
-              options={[
-                { value: '', label: "Sélectionner l'agence" },
-                ...agences.map(a => ({ value: a.id, label: a.nom }))
-              ]}
+              options={[{ value: '', label: "Sélectionner..." }, ...agences.map(a => ({ value: a.id, label: a.nom }))]}
             />
+          ) : (
+            <div /> // Placeholder for grid alignment
           )}
-
           <SelectField
             label="Segment"
             name="segment"
             value={formData.segment ?? 'Standard'}
             onChange={(e) => handleChange('segment', e.target.value)}
-            options={[
-              { value: 'Standard', label: 'Standard' },
-              { value: 'Premium', label: 'Premium' },
-              { value: 'VIP', label: 'VIP' }
-            ]}
+            options={[{ value: 'Standard', label: 'Standard' }, { value: 'Premium', label: 'Premium' }, { value: 'VIP', label: 'VIP' }]}
           />
         </div>
 
-        {/* Section Profil & Conformité */}
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-2 mb-4">
-            <Briefcase size={18} className="text-cyan-400" />
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Profil Professionnel & Conformité</h4>
+        {/* Section Profil Professionnel - Compact */}
+        <div className="pt-3 border-t border-slate-700/50">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Briefcase size={14} className="text-cyan-400" />
+            <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Profil Professionnel</h4>
           </div>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <FormField
               label="Profession"
               name="profession"
               icon={Briefcase}
               value={formData.profession || ''}
               onChange={(e) => handleChange('profession', e.target.value)}
-              placeholder="Ex: Commerçant, Enseignant..."
-              className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+              placeholder="Ex: Commerçant"
             />
-
             <FormField
               label="Employeur"
               name="employeur"
               icon={Briefcase}
               value={formData.employeur || ''}
               onChange={(e) => handleChange('employeur', e.target.value)}
-              placeholder="Nom de l'entreprise (si salarié)"
-              className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+              placeholder="Entreprise (si salarié)"
             />
-
-            <div className="space-y-2">
-              <label className="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Revenu (FCFA)
-              </label>
-              {/* Toggle Mensuel / Journalier */}
-              <div className="flex rounded-lg overflow-hidden border border-slate-300 dark:border-slate-600">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleChange('typeRevenu', 'Mensuel');
-                    // Recalculate: if daily exists, compute monthly
-                    if (formData.revenuJournalier) {
-                      const daily = parseFloat(formData.revenuJournalier);
-                      if (!isNaN(daily) && daily > 0) {
-                        handleChange('revenuMensuel', Math.round(daily * 26).toString());
-                      }
-                    }
-                  }}
-                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
-                    formData.typeRevenu !== 'Journalier'
-                      ? 'bg-cyan-500 text-white'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  Mensuel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleChange('typeRevenu', 'Journalier');
-                    // Recalculate: if monthly exists and no daily, compute daily
-                    if (formData.revenuMensuel && !formData.revenuJournalier) {
-                      const monthly = parseFloat(formData.revenuMensuel);
-                      if (!isNaN(monthly) && monthly > 0) {
-                        handleChange('revenuJournalier', Math.round(monthly / 26).toString());
-                      }
-                    }
-                  }}
-                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
-                    formData.typeRevenu === 'Journalier'
-                      ? 'bg-cyan-500 text-white'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  Journalier
-                </button>
+            {/* Revenu Compact */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Revenu (FCFA)</label>
+              <div className="flex rounded-lg overflow-hidden border border-slate-600 mb-1">
+                <button type="button" onClick={() => { handleChange('typeRevenu', 'Mensuel'); if (formData.revenuJournalier) { const d = parseFloat(formData.revenuJournalier); if (!isNaN(d) && d > 0) handleChange('revenuMensuel', Math.round(d * 26).toString()); }}}
+                  className={`flex-1 py-1 text-[10px] font-medium ${formData.typeRevenu !== 'Journalier' ? 'bg-cyan-500 text-white' : 'bg-slate-700 text-slate-400'}`}>Mensuel</button>
+                <button type="button" onClick={() => { handleChange('typeRevenu', 'Journalier'); if (formData.revenuMensuel && !formData.revenuJournalier) { const m = parseFloat(formData.revenuMensuel); if (!isNaN(m) && m > 0) handleChange('revenuJournalier', Math.round(m / 26).toString()); }}}
+                  className={`flex-1 py-1 text-[10px] font-medium ${formData.typeRevenu === 'Journalier' ? 'bg-cyan-500 text-white' : 'bg-slate-700 text-slate-400'}`}>Journalier</button>
               </div>
-
-              {formData.typeRevenu === 'Journalier' ? (
-                <div className="space-y-2">
-                  <FormField
-                    label="Revenu Journalier"
-                    name="revenuJournalier"
-                    type="number"
-                    icon={DollarSign}
-                    value={formData.revenuJournalier || ''}
-                    onChange={(e) => {
-                      const daily = e.target.value;
-                      handleChange('revenuJournalier', daily);
-                      const parsed = parseFloat(daily);
-                      handleChange('revenuMensuel', !isNaN(parsed) && parsed > 0 ? Math.round(parsed * 26).toString() : '');
-                    }}
-                    error={errors.revenuJournalier}
-                    placeholder="5000"
-                    min="0"
-                    className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
-                  />
-                  {formData.revenuJournalier && parseFloat(formData.revenuJournalier) > 0 && (
-                    <p className="text-xs text-slate-400">
-                      {parseFloat(formData.revenuJournalier).toLocaleString()} × 26j = <span className="text-cyan-400 font-semibold">{Math.round(parseFloat(formData.revenuJournalier) * 26).toLocaleString()} FCFA/mois</span>
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <FormField
-                  label="Revenu Mensuel"
-                  name="revenuMensuel"
-                  type="number"
-                  icon={DollarSign}
-                  value={formData.revenuMensuel || ''}
-                  onChange={(e) => handleChange('revenuMensuel', e.target.value)}
-                  error={errors.revenuMensuel}
-                  placeholder="150000"
-                  min="0"
-                  className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
-                />
+              <div className="relative">
+                <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <input type="number" value={formData.typeRevenu === 'Journalier' ? formData.revenuJournalier || '' : formData.revenuMensuel || ''}
+                  onChange={(e) => { if (formData.typeRevenu === 'Journalier') { handleChange('revenuJournalier', e.target.value); const p = parseFloat(e.target.value); handleChange('revenuMensuel', !isNaN(p) && p > 0 ? Math.round(p * 26).toString() : ''); } else { handleChange('revenuMensuel', e.target.value); }}}
+                  placeholder={formData.typeRevenu === 'Journalier' ? '5000' : '150000'} min="0"
+                  className="w-full pl-7 pr-2 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500" />
+              </div>
+              {formData.typeRevenu === 'Journalier' && formData.revenuJournalier && parseFloat(formData.revenuJournalier) > 0 && (
+                <p className="text-[10px] text-slate-500 mt-0.5">{parseFloat(formData.revenuJournalier).toLocaleString()} × 26j = <span className="text-cyan-400">{Math.round(parseFloat(formData.revenuJournalier) * 26).toLocaleString()}</span> F/mois</p>
               )}
             </div>
-
             <SelectField
               label="Agent Référent"
               name="agentReferentId"
               value={formData.agentReferentId || ''}
               onChange={(e) => handleChange('agentReferentId', e.target.value === '' ? null : e.target.value)}
-              options={[
-                { value: '', label: 'Sélectionner un agent référent' },
-                ...agentsReferents.map(a => ({ value: a.id, label: `${a.prenom} ${a.nom}` }))
-              ]}
-              helperText="Agent terrain ou chef d'agence responsable du client"
+              options={[{ value: '', label: 'Sélectionner...' }, ...agentsReferents.map(a => ({ value: a.id, label: `${a.prenom} ${a.nom}` }))]}
             />
           </div>
         </div>
 
-        {/* Accès Portail Client - Section verrouillée */}
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-          <div className="relative">
-            <div className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-200 dark:bg-slate-700 rounded-lg">
-                  <KeyRound size={20} className="text-slate-500" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">Créer un accès Portail Client</span>
-                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-500 text-[10px] font-bold rounded-full border border-amber-500/30 flex items-center gap-1">
-                      <Lock size={10} /> Bientôt disponible
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Permet au client de se connecter à son espace dédié
-                  </p>
-                  {formData.nom && formData.prenom && (
-                    <p className="text-xs text-cyan-500 mt-1 font-mono">
-                      Username prévu: {generateClientUsername(formData.nom, formData.prenom)}
-                    </p>
-                  )}
-                </div>
+        {/* Accès Portail Client - Compact */}
+        <div className="flex items-center justify-between p-2.5 bg-slate-800/50 rounded-lg border border-slate-700 opacity-60">
+          <div className="flex items-center gap-2">
+            <KeyRound size={16} className="text-slate-500" />
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-slate-300">Accès Portail Client</span>
+                <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-500 text-[9px] font-bold rounded-full flex items-center gap-0.5"><Lock size={8} /> Bientôt</span>
               </div>
-              <div className="relative">
-                <div className="w-12 h-6 bg-slate-300 dark:bg-slate-600 rounded-full">
-                  <div className="absolute left-1 top-1 w-4 h-4 bg-slate-400 dark:bg-slate-500 rounded-full"></div>
-                </div>
-              </div>
+              {formData.nom && formData.prenom && <p className="text-[10px] text-cyan-500 font-mono">@{generateClientUsername(formData.nom, formData.prenom)}</p>}
             </div>
           </div>
+          <div className="w-8 h-4 bg-slate-600 rounded-full relative"><div className="absolute left-0.5 top-0.5 w-3 h-3 bg-slate-500 rounded-full" /></div>
         </div>
 
-        {/* Photo & Identity Section - REDESIGNED */}
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-          <div className="grid md:grid-cols-2 gap-8">
-
-            {/* ========== AVATAR SECTION (Centered) ========== */}
-            <div className="flex flex-col items-center space-y-4">
-              <h4 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 self-start">
-                <User className="w-5 h-5" /> Photo de Profil
-              </h4>
-
-              <div className="relative">
-                {formData.photoProfile ? (
-                  // Has photo - Show avatar with edit/delete buttons
-                  <div className="relative">
-                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-700 shadow-xl">
-                      <img
-                        src={getFileDisplayUrl(formData.photoProfile)}
-                        className="w-full h-full object-cover"
-                        alt="Profil"
-                        onError={(e) => {
-                          const nameFallback = `${formData.prenom || ''} ${formData.nom || ''}`.trim();
-                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameFallback || 'Client')}&size=128&background=1e293b&color=94a3b8`;
-                        }}
-                      />
-                    </div>
-
-                    {/* Delete button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleChange('photoProfile', '');
-                        handleDocumentChange('AVATAR', null);
-                      }}
-                      className="absolute -top-1 -right-1 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-transform hover:scale-110"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-
-                    {/* Camera edit button */}
-                    <button
-                      type="button"
-                      onClick={() => setIsLivenessOpen(true)}
-                      className="absolute bottom-0 right-0 p-3 bg-cyan-500 hover:bg-cyan-400 text-white rounded-full shadow-lg transition-all hover:scale-110"
-                    >
-                      <Camera size={18} />
-                    </button>
-                  </div>
-                ) : (
-                  // No photo - Show Avatar upload component
-                  <div className="relative">
-                    <SmartDocumentUpload
-                      label="Photo"
-                      documentType="AVATAR"
-                      variant="avatar"
-                      isPrivate={false}
-                      fileType="profile"
-                      entityType="client"
-                      entityId={clientEntityId}
-                      onUploadComplete={handleAvatarUpload}
-                      onRemove={() => {
-                        handleChange('photoProfile', '');
-                        handleDocumentChange('AVATAR', null);
-                      }}
-                    />
-
-                    {/* Alternative: Camera/Liveness capture button */}
-                    <button
-                      type="button"
-                      onClick={() => setIsLivenessOpen(true)}
-                      className="absolute -bottom-2 -left-2 p-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-full shadow-lg transition-all hover:scale-110 border-2 border-slate-800"
-                      title="Prendre une photo"
-                    >
-                      <Video size={16} />
-                    </button>
-                  </div>
-                )}
+        {/* Photo & Documents Section - Compact Side by Side */}
+        <div className="pt-3 border-t border-slate-700/50">
+          <div className="grid md:grid-cols-5 gap-4">
+            {/* ========== AVATAR SECTION (Smaller) ========== */}
+            <div className="md:col-span-2 flex flex-col">
+              <div className="flex items-center gap-1.5 mb-2">
+                <User size={14} className="text-cyan-400" />
+                <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Photo de Profil</h4>
               </div>
-
-              <p className="text-xs text-slate-500 text-center max-w-[200px]">
-                Photo de profil visible sur la fiche client et les documents
-              </p>
+              <div className="flex items-start gap-3">
+                <div className="relative">
+                  {formData.photoProfile ? (
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-slate-600 shadow-lg">
+                        <img src={getFileDisplayUrl(formData.photoProfile)} className="w-full h-full object-cover" alt="Profil"
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client')}&size=80&background=1e293b&color=94a3b8`; }} />
+                      </div>
+                      <button type="button" onClick={() => { handleChange('photoProfile', ''); handleDocumentChange('AVATAR', null); }}
+                        className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow"><Trash2 size={10} /></button>
+                      <button type="button" onClick={() => setIsLivenessOpen(true)}
+                        className="absolute bottom-0 right-0 p-1.5 bg-cyan-500 hover:bg-cyan-400 text-white rounded-full shadow"><Camera size={12} /></button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <SmartDocumentUpload label="" documentType="AVATAR" variant="avatar" isPrivate={false} fileType="profile" entityType="client" entityId={clientEntityId}
+                        onUploadComplete={handleAvatarUpload} onRemove={() => { handleChange('photoProfile', ''); handleDocumentChange('AVATAR', null); }} />
+                      <button type="button" onClick={() => setIsLivenessOpen(true)} className="absolute -bottom-1 -left-1 p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-full shadow border border-slate-600" title="Caméra"><Video size={12} /></button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 flex-1 leading-tight mt-1">Photo visible sur la fiche client et les documents imprimés</p>
+              </div>
             </div>
 
-            {/* ========== IDENTITY DOCUMENTS SECTION ========== */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileText className="w-5 h-5" /> Pièces d'identité
-              </h4>
+            {/* ========== IDENTITY DOCUMENTS - Compact ========== */}
+            <div className="md:col-span-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <FileText size={14} className="text-cyan-400" />
+                <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Pièces d'identité</h4>
+              </div>
 
-              {/* ID Type Selector - Radio Cards */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* ID Type Selector - Compact */}
+              <div className="flex gap-1.5 mb-2">
                 {ID_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => handleChange('typePiece', value)}
-                    className={`
-                      flex flex-col items-center gap-1.5 p-3 rounded-xl font-medium transition-all duration-200
-                      ${formData.typePiece === value
-                        ? 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/25 scale-[1.02]'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
-                      }
-                    `}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-xs">{label}</span>
+                  <button key={value} type="button" onClick={() => handleChange('typePiece', value)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${formData.typePiece === value ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
+                    <Icon size={14} />{label}
                   </button>
                 ))}
               </div>
 
-              {/* ID Number - Floating Label Style */}
-              <div className="relative mt-4">
-                <input
-                  id="numeroPiece"
-                  type="text"
-                  value={formData.numeroPiece || ''}
-                  onChange={(e) => handleChange('numeroPiece', e.target.value)}
-                  placeholder=" "
-                  className={`
-                    peer w-full pt-5 pb-2 px-4 
-                    bg-slate-800 border-2 rounded-xl
-                    text-white text-sm
-                    placeholder-transparent
-                    focus:outline-none focus:ring-0
-                    transition-colors duration-200
-                    ${errors.numeroPiece
-                      ? 'border-red-500 focus:border-red-500'
-                      : 'border-slate-700 focus:border-cyan-500'
-                    }
-                  `}
-                />
-                <label
-                  htmlFor="numeroPiece"
-                  className={`
-                    absolute left-4 transition-all duration-200 pointer-events-none
-                    peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-sm
-                    peer-focus:top-2 peer-focus:text-xs peer-focus:-translate-y-0
-                    top-2 text-xs -translate-y-0
-                    ${errors.numeroPiece ? 'text-red-400' : 'text-slate-400 peer-focus:text-cyan-400'}
-                  `}
-                >
-                  {formData.typePiece === 'CNI' ? 'N° CNI' : formData.typePiece === 'PASSPORT' ? 'N° Passeport' : 'Numéro de pièce'}
-                </label>
-                {errors.numeroPiece && (
-                  <p className="mt-1 text-xs text-red-400">{errors.numeroPiece}</p>
-                )}
+              {/* ID Number - Compact */}
+              <div className="mb-2">
+                <input id="numeroPiece" type="text" value={formData.numeroPiece || ''} onChange={(e) => handleChange('numeroPiece', e.target.value)}
+                  placeholder={formData.typePiece === 'CNI' ? 'N° CNI' : formData.typePiece === 'PASSPORT' ? 'N° Passeport' : 'Numéro de pièce'}
+                  className={`w-full px-3 py-1.5 bg-slate-800 border rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 ${errors.numeroPiece ? 'border-red-500' : 'border-slate-700'}`} />
+                {errors.numeroPiece && <p className="text-[10px] text-red-400 mt-0.5">{errors.numeroPiece}</p>}
               </div>
 
-              {/* Document Upload Grid - Layout changes based on ID type */}
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                {/* Front document - Always visible */}
-                <SmartDocumentUpload
-                  label={formData.typePiece === 'PASSPORT' ? 'Page Principale' : 'Recto'}
-                  documentType="ID_CARD_FRONT"
-                  existingDocument={uploadedDocs.ID_CARD_FRONT}
-                  isPrivate={true}
-                  fileType="kyc"
-                  entityType="client"
-                  entityId={clientEntityId}
-                  aspectRatio="card"
-                  watermarkIcon="front"
-                  accept="image/png,image/jpeg,image/jpg,application/pdf"
-                  ctaText={formData.typePiece === 'PASSPORT' ? 'Scanner la Page' : 'Scanner le Recto'}
-                  onUploadComplete={(doc) => handleDocumentChange('ID_CARD_FRONT', doc)}
-                  onRemove={() => handleDocumentChange('ID_CARD_FRONT', null)}
-                />
-
-                {/* Back document - Hidden for Passport, replaced by Proof of Address */}
+              {/* Document Upload Grid - Compact */}
+              <div className="grid grid-cols-2 gap-2">
+                <SmartDocumentUpload label={formData.typePiece === 'PASSPORT' ? 'Page Principale' : 'Recto'} documentType="ID_CARD_FRONT" existingDocument={uploadedDocs.ID_CARD_FRONT}
+                  isPrivate={true} fileType="kyc" entityType="client" entityId={clientEntityId} aspectRatio="card" watermarkIcon="front" accept="image/png,image/jpeg,image/jpg,application/pdf"
+                  ctaText={formData.typePiece === 'PASSPORT' ? 'Scanner' : 'Scanner le Recto'} onUploadComplete={(doc) => handleDocumentChange('ID_CARD_FRONT', doc)} onRemove={() => handleDocumentChange('ID_CARD_FRONT', null)} />
                 <AnimatePresence mode="wait">
                   {showBackDocument ? (
-                    <motion.div
-                      key="back-document"
-                      initial={{ opacity: 0, scale: 0.9, x: 20 }}
-                      animate={{ opacity: 1, scale: 1, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, x: -20 }}
-                      transition={{ duration: 0.25, ease: 'easeOut' }}
-                    >
-                      <SmartDocumentUpload
-                        label="Verso"
-                        documentType="ID_CARD_BACK"
-                        existingDocument={uploadedDocs.ID_CARD_BACK}
-                        isPrivate={true}
-                        fileType="kyc"
-                        entityType="client"
-                        entityId={clientEntityId}
-                        aspectRatio="card"
-                        watermarkIcon="back"
-                        accept="image/png,image/jpeg,image/jpg,application/pdf"
-                        ctaText="Scanner le Verso"
-                        onUploadComplete={(doc) => handleDocumentChange('ID_CARD_BACK', doc)}
-                        onRemove={() => handleDocumentChange('ID_CARD_BACK', null)}
-                      />
+                    <motion.div key="back" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}>
+                      <SmartDocumentUpload label="Verso" documentType="ID_CARD_BACK" existingDocument={uploadedDocs.ID_CARD_BACK} isPrivate={true} fileType="kyc" entityType="client" entityId={clientEntityId}
+                        aspectRatio="card" watermarkIcon="back" accept="image/png,image/jpeg,image/jpg,application/pdf" ctaText="Scanner le Verso"
+                        onUploadComplete={(doc) => handleDocumentChange('ID_CARD_BACK', doc)} onRemove={() => handleDocumentChange('ID_CARD_BACK', null)} />
                     </motion.div>
                   ) : (
-                    <motion.div
-                      key="proof-address-inline"
-                      initial={{ opacity: 0, scale: 0.9, x: 20 }}
-                      animate={{ opacity: 1, scale: 1, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, x: -20 }}
-                      transition={{ duration: 0.25, ease: 'easeOut' }}
-                    >
-                      <SmartDocumentUpload
-                        label="Justificatif de Domicile"
-                        documentType="PROOF_OF_ADDRESS"
-                        existingDocument={uploadedDocs.PROOF_OF_ADDRESS}
-                        isPrivate={true}
-                        fileType="kyc"
-                        entityType="client"
-                        entityId={clientEntityId}
-                        aspectRatio="card"
-                        watermarkIcon="scan"
-                        accept="image/png,image/jpeg,image/jpg,application/pdf"
-                        ctaText="Ajouter un justificatif"
-                        onUploadComplete={(doc) => handleDocumentChange('PROOF_OF_ADDRESS', doc)}
-                        onRemove={() => handleDocumentChange('PROOF_OF_ADDRESS', null)}
-                      />
+                    <motion.div key="proof" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}>
+                      <SmartDocumentUpload label="Justificatif Domicile" documentType="PROOF_OF_ADDRESS" existingDocument={uploadedDocs.PROOF_OF_ADDRESS} isPrivate={true} fileType="kyc" entityType="client" entityId={clientEntityId}
+                        aspectRatio="card" watermarkIcon="scan" accept="image/png,image/jpeg,image/jpg,application/pdf" ctaText="Ajouter"
+                        onUploadComplete={(doc) => handleDocumentChange('PROOF_OF_ADDRESS', doc)} onRemove={() => handleDocumentChange('PROOF_OF_ADDRESS', null)} />
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
 
-              {/* Proof of Address - Only shown below for CNI/Other */}
+              {/* Proof of Address for CNI/Other */}
               <AnimatePresence>
                 {showBackDocument && (
-                  <motion.div 
-                    className="mt-3"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <SmartDocumentUpload
-                      label="Justificatif de Domicile"
-                      documentType="PROOF_OF_ADDRESS"
-                      existingDocument={uploadedDocs.PROOF_OF_ADDRESS}
-                      isPrivate={true}
-                      fileType="kyc"
-                      entityType="client"
-                      entityId={clientEntityId}
-                      aspectRatio="video"
-                      watermarkIcon="scan"
-                      accept="image/png,image/jpeg,image/jpg,application/pdf"
-                      ctaText="Ajouter un justificatif"
-                      onUploadComplete={(doc) => handleDocumentChange('PROOF_OF_ADDRESS', doc)}
-                      onRemove={() => handleDocumentChange('PROOF_OF_ADDRESS', null)}
-                    />
+                  <motion.div className="mt-2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}>
+                    <SmartDocumentUpload label="Justificatif de Domicile" documentType="PROOF_OF_ADDRESS" existingDocument={uploadedDocs.PROOF_OF_ADDRESS} isPrivate={true} fileType="kyc" entityType="client" entityId={clientEntityId}
+                      aspectRatio="video" watermarkIcon="scan" accept="image/png,image/jpeg,image/jpg,application/pdf" ctaText="Ajouter un justificatif"
+                      onUploadComplete={(doc) => handleDocumentChange('PROOF_OF_ADDRESS', doc)} onRemove={() => handleDocumentChange('PROOF_OF_ADDRESS', null)} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1066,15 +778,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700 mt-6">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Annuler</Button>
-          <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting}>
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Traitement...
-              </span>
-            ) : client ? 'Mettre à jour' : 'Enregistrer'}
+        {/* Footer Actions */}
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-700 mt-4">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} size="sm">Annuler</Button>
+          <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting} size="sm">
+            {isSubmitting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Traitement...</span> : client ? 'Mettre à jour' : 'Enregistrer'}
           </Button>
         </div>
       </form>

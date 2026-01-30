@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Filter, Download, Search, AlertTriangle, CheckCircle, XCircle, Clock, FileSpreadsheet, FileText } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { auditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
@@ -128,16 +129,13 @@ export default function AuditLogs() {
   const exportToPDF = () => {
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
-    
-    doc.setFontSize(18);
-    doc.setTextColor(30, 58, 138);
-    doc.text("JOURNAL D'AUDIT - COFIN", 14, 20);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Date d'export: ${dateExport}`, 14, 28);
-    doc.text(`Total: ${stats.total} | Succès: ${stats.success} | Échecs: ${stats.failure}`, 14, 34);
-    
+
+    const startY = addPdfLogoHeader(doc, {
+      title: "JOURNAL D'AUDIT",
+      subtitle: `Total: ${stats.total} | Succès: ${stats.success} | Échecs: ${stats.failure}`,
+      dateRight: `Export: ${dateExport}`,
+    });
+
     const tableData = filteredLogs.slice(0, 50).map((log, idx) => [
       idx + 1,
       formatLogDate(log),
@@ -146,11 +144,11 @@ export default function AuditLogs() {
       log.entity_type || log.resource || 'N/A',
       log.status
     ]);
-    
+
     (doc as any).autoTable({
       head: [['N°', 'Date/Heure', 'Utilisateur', 'Action', 'Entité', 'Statut']],
       body: tableData,
-      startY: 40,
+      startY,
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }

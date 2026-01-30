@@ -14,6 +14,7 @@ interface PlatformHeaderProps {
   onMessagesClick: () => void;
   onMenuToggle: () => void;
   onProfileClick: () => void;
+  onSessionsClick?: () => void;
   onLogout: () => void;
   user: {
     nom?: string;
@@ -31,6 +32,7 @@ export default function PlatformHeader({
   onMessagesClick,
   onMenuToggle,
   onProfileClick,
+  onSessionsClick,
   onLogout,
   user
 }: PlatformHeaderProps) {
@@ -110,6 +112,7 @@ export default function PlatformHeader({
           <UserProfileDropdown
             user={user}
             onProfileClick={onProfileClick}
+            onSessionsClick={onSessionsClick}
             onLogout={onLogout}
           />
         </div>

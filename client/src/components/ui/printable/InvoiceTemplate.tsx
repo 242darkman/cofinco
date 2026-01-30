@@ -1,6 +1,7 @@
-import React from 'react';
-import { Building2, Phone, Mail, MapPin, Globe, FileText, Calendar, Hash, User, Briefcase } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Building2, Phone, Mail, MapPin, Globe, FileText, Calendar, Hash, User, Briefcase, QrCode } from 'lucide-react';
 import { ReceiptData } from './ReceiptTemplate';
+import { LOGO_BASE64 } from '@/lib/pdf-logo';
 
 // Default Company Info
 const DEFAULT_COMPANY_INFO = {
@@ -14,13 +15,128 @@ const DEFAULT_COMPANY_INFO = {
   rccm: 'RCCM-BZV-1234'
 };
 
+// Simple QR Code generator using SVG (no external library needed)
+// Creates a simple visual representation with verification data
+interface QRCodeProps {
+  data: string;
+  size?: number;
+}
+
+const QRCodePlaceholder: React.FC<QRCodeProps> = ({ data, size = 64 }) => {
+  // Generate a simple hash-based pattern for visual verification
+  const hashCode = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash);
+  };
+
+  const hash = hashCode(data);
+  const gridSize = 5;
+  const cellSize = size / (gridSize + 2); // +2 for border
+
+  // Generate pattern based on hash
+  const pattern: boolean[][] = [];
+  for (let i = 0; i < gridSize; i++) {
+    pattern[i] = [];
+    for (let j = 0; j < gridSize; j++) {
+      // Mirror pattern for QR-like appearance
+      const idx = i * gridSize + Math.min(j, gridSize - 1 - j);
+      pattern[i][j] = ((hash >> (idx % 32)) & 1) === 1;
+    }
+  }
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="inline-block">
+      {/* Border */}
+      <rect x="0" y="0" width={size} height={size} fill="white" stroke="#e2e8f0" strokeWidth="1" />
+
+      {/* Corner markers (QR code style) */}
+      {[[0, 0], [0, gridSize + 1], [gridSize + 1, 0]].map(([row, col], idx) => (
+        <g key={idx}>
+          <rect
+            x={col * cellSize}
+            y={row * cellSize}
+            width={cellSize}
+            height={cellSize}
+            fill="black"
+          />
+        </g>
+      ))}
+
+      {/* Data pattern */}
+      {pattern.map((row, i) =>
+        row.map((cell, j) => cell ? (
+          <rect
+            key={`${i}-${j}`}
+            x={(j + 1) * cellSize}
+            y={(i + 1) * cellSize}
+            width={cellSize * 0.9}
+            height={cellSize * 0.9}
+            fill="black"
+          />
+        ) : null)
+      )}
+    </svg>
+  );
+};
+
+// Logo component with fallback
+interface LogoWithFallbackProps {
+  src?: string;
+  alt: string;
+  className?: string;
+}
+
+const LogoWithFallback: React.FC<LogoWithFallbackProps> = ({ src, alt, className }) => {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setHasError(false);
+    setIsLoading(true);
+  }, [src]);
+
+  if (!src || hasError) {
+    // Fallback: Show company initials in a styled box
+    const initials = alt.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    return (
+      <div className={`${className} bg-gradient-to-br from-blue-600 to-emerald-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {isLoading && (
+        <div className={`${className} bg-slate-200 rounded-xl animate-pulse`} />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} rounded-xl object-contain shadow-lg ${isLoading ? 'hidden' : ''}`}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setHasError(true);
+          setIsLoading(false);
+        }}
+      />
+    </>
+  );
+};
+
 interface InvoiceTemplateProps {
   data: ReceiptData;
   companyInfo?: typeof DEFAULT_COMPANY_INFO;
+  showQRCode?: boolean;
 }
 
 export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ data, companyInfo = DEFAULT_COMPANY_INFO }, ref) => {
+  ({ data, companyInfo = DEFAULT_COMPANY_INFO, showQRCode = true }, ref) => {
 
     const items = data.items || [];
     const total = data.total ?? 0;
@@ -28,6 +144,15 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
     const date = data.date || new Date();
     const type = data.type || 'Opération';
     const reference = data.reference || 'N/A';
+
+    // Generate verification data for QR code
+    const verificationData = JSON.stringify({
+      ref: reference,
+      total,
+      date: new Date(date).toISOString().split('T')[0],
+      type,
+      nif: companyInfo.nif
+    });
 
     const formattedDate = new Date(date).toLocaleDateString('fr-FR', {
       day: 'numeric',
@@ -51,12 +176,17 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
         className="invoice-a4 bg-white" 
         ref={ref}
       >
-        {/* Print specific styles for A4 */}
+        {/* Print specific styles for A4 with page numbering */}
         <style type="text/css" media="print">
           {`
             @page {
               size: A4;
               margin: 15mm;
+              @bottom-center {
+                content: "Page " counter(page) " / " counter(pages);
+                font-size: 9px;
+                color: #64748b;
+              }
             }
             @media print {
               body {
@@ -65,6 +195,9 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
               }
               .no-print { display: none !important; }
               .print-break { page-break-before: always; }
+              .page-number::after {
+                content: "Page " counter(page) " / " counter(pages);
+              }
             }
           `}
         </style>
@@ -79,10 +212,12 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
             <div className="px-8 py-6 flex justify-between items-start">
               {/* Company Info - Left */}
               <div className="flex items-start gap-4">
-                {/* Logo */}
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
-                  <span className="text-white font-black text-xl tracking-tight">CO</span>
-                </div>
+                {/* Logo with fallback */}
+                <LogoWithFallback
+                  src={LOGO_BASE64}
+                  alt={companyInfo.nom}
+                  className="w-16 h-16"
+                />
 
                 <div>
                   <h1 className="text-2xl font-black text-slate-900 tracking-tight">
@@ -356,28 +491,46 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
 
           {/* ===== FOOTER ===== */}
           <footer className="mt-auto">
-            {/* Legal Info */}
+            {/* Legal Info with QR Code */}
             <div className="px-8 py-4 bg-slate-50 border-t border-slate-200">
-              <div className="flex justify-between items-center text-[10px] text-slate-400">
-                <div className="flex gap-4">
-                  <span>NIF: {companyInfo.nif}</span>
-                  <span>RCCM: {companyInfo.rccm}</span>
+              <div className="flex justify-between items-start">
+                {/* QR Code for verification */}
+                {showQRCode && (
+                  <div className="flex items-center gap-3">
+                    <QRCodePlaceholder data={verificationData} size={48} />
+                    <div className="text-[9px] text-slate-400">
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <QrCode size={10} />
+                        <span className="font-medium">Code de vérification</span>
+                      </div>
+                      <div>Scannez pour vérifier l'authenticité</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Legal identifiers */}
+                <div className="text-right">
+                  <div className="flex gap-4 text-[10px] text-slate-400 mb-1">
+                    <span>NIF: {companyInfo.nif}</span>
+                    <span>RCCM: {companyInfo.rccm}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    Document généré le {new Date().toLocaleDateString('fr-FR')} à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
-                <span>
-                  Document généré le {new Date().toLocaleDateString('fr-FR')} à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                </span>
               </div>
             </div>
 
             {/* Bottom Color Bar */}
             <div className="h-1.5 bg-gradient-to-r from-blue-600 via-emerald-500 to-blue-600" />
 
-            {/* Terms */}
+            {/* Terms with page number placeholder */}
             <div className="px-8 py-3 text-center">
               <p className="text-[9px] text-slate-400">
                 Ce document tient lieu de facture. Conservez-le précieusement pour toute réclamation.
                 Paiement immédiat à réception. Merci de votre confiance.
               </p>
+              <p className="text-[8px] text-slate-300 mt-1 page-number print:block hidden"></p>
             </div>
           </footer>
         </div>

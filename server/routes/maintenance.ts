@@ -1,5 +1,8 @@
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
 import { db } from "../db";
+
+const logger = createLogger('Routes:Maintenance');
 import { maintenanceModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../auth";
@@ -18,7 +21,7 @@ maintenanceRouter.get("/", async (req, res) => {
     const modules = await db.select().from(maintenanceModules);
     res.json(modules);
   } catch (error) {
-    console.error("Error fetching maintenance status:", error);
+    logger.error({ err: error }, 'Error fetching maintenance status');
     res.status(500).json({ message: "Erreur lors de la récupération du statut maintenance" });
   }
 });
@@ -60,7 +63,7 @@ maintenanceRouter.patch("/:moduleId", requireAuth, attachAbility, requireAbility
                 validUserId = req.session.user.id;
             }
         } catch (e) {
-            console.warn("Could not verify user existence for lock, using system lock (null):", e);
+            logger.warn({ err: e }, 'Could not verify user existence for lock, using system lock');
         }
     }
 
@@ -101,13 +104,13 @@ maintenanceRouter.patch("/:moduleId", requireAuth, attachAbility, requireAbility
         });
       }
     } catch (wsError) {
-      console.error("Failed to notify maintenance update:", wsError);
+      logger.error({ err: wsError }, 'Failed to notify maintenance update');
     }
 
     res.json(updatedModule);
 
   } catch (error) {
-    console.error("Error toggling maintenance module:", error);
+    logger.error({ err: error }, 'Error toggling maintenance module');
     res.status(500).json({ message: "Erreur lors de la mise à jour du module" });
   }
 });
@@ -142,7 +145,7 @@ maintenanceRouter.patch("/:moduleId/platform", requireAuth, attachAbility, requi
                 validUserId = req.session.user.id;
             }
         } catch (e) {
-             console.warn("Could not verify user existence for platform lock, using system lock (null):", e);
+             logger.warn({ err: e }, 'Could not verify user existence for platform lock, using system lock');
         }
     }
 
@@ -184,13 +187,13 @@ maintenanceRouter.patch("/:moduleId/platform", requireAuth, attachAbility, requi
         });
       }
     } catch (wsError) {
-      console.error("Failed to notify platform lock:", wsError);
+      logger.error({ err: wsError }, 'Failed to notify platform lock');
     }
 
     res.json(updatedModule);
 
   } catch (error) {
-    console.error("Error toggling platform lock:", error);
+    logger.error({ err: error }, 'Error toggling platform lock');
     res.status(500).json({ message: "Erreur lors du verrouillage plateforme" });
   }
 });
@@ -229,7 +232,7 @@ maintenanceRouter.post("/seed", requireAuth, attachAbility, requireAbility(Actio
     res.json({ message: "Modules initialized", created: results });
 
   } catch (error) {
-    console.error("Error seeding modules:", error);
+    logger.error({ err: error }, 'Error seeding modules');
     res.status(500).json({ message: "Error seeding modules" });
   }
 });

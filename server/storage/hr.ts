@@ -133,13 +133,20 @@ export async function getPresenceAujourdhui(): Promise<any> {
     };
 }
 
-export async function checkIn(employeId: string): Promise<Presence> {
+export interface GpsData {
+    latitude?: number | null;
+    longitude?: number | null;
+    accuracy?: number | null;
+    gpsSource?: string;
+}
+
+export async function checkIn(employeId: string, gps?: GpsData): Promise<Presence> {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
-    
+
     // Check if already checked in
     const existing = await db.select().from(presences).where(and(eq(presences.employeId, employeId), eq(presences.date, today)));
-    
+
     if (existing.length > 0) return existing[0]; // Already present
 
     // Determine status based on time (e.g. after 9:00 is LATE)
@@ -151,9 +158,13 @@ export async function checkIn(employeId: string): Promise<Presence> {
         employeId,
         date: today,
         statut,
-        heureArrivee: now
+        heureArrivee: now,
+        latitude: gps?.latitude ?? null,
+        longitude: gps?.longitude ?? null,
+        accuracy: gps?.accuracy ?? null,
+        gpsSource: gps?.gpsSource ?? "manual",
     }).returning();
-    
+
     return presence;
 }
 

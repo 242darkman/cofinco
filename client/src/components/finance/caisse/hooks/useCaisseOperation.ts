@@ -54,6 +54,18 @@ interface OperationResult {
   message: string;
 }
 
+export interface DuplicateWarning {
+  message: string;
+  duplicates: Array<{
+    id: string;
+    reference: string;
+    montant: string;
+    sens: string;
+    createdAt: string;
+  }>;
+  canOverride: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -138,6 +150,8 @@ export function useCaisseOperation({
   // --- Form state ---
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<MethodePaiementType>(MethodePaiement.CASH);
+  const [mobileMoneyProvider, setMobileMoneyProvider] = useState<'MTN' | 'AIRTEL' | null>(null);
+  const [mobileMoneyPhone, setMobileMoneyPhone] = useState(client?.telephone || '');
   const [amount, setAmount] = useState('');
   const [observations, setObservations] = useState('');
 
@@ -147,6 +161,7 @@ export function useCaisseOperation({
   // --- Result state ---
   const [result, setResult] = useState<OperationResult | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState(() => uuidv4());
+  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
 
   // --- Derived ---
   const selectedAccount = useMemo(
@@ -187,8 +202,18 @@ export function useCaisseOperation({
       }
     }
 
+    // Mobile Money validation
+    if (paymentMethod === MethodePaiement.MOBILE_MONEY) {
+      if (!mobileMoneyProvider) {
+        errors.provider = 'Sélectionnez un opérateur';
+      }
+      if (!mobileMoneyPhone || mobileMoneyPhone.length < 9) {
+        errors.phone = 'Numéro de téléphone requis';
+      }
+    }
+
     return errors;
-  }, [selectedAccountId, selectedAccount, amount, parsedAmount, operationType, securityLimits]);
+  }, [selectedAccountId, selectedAccount, amount, parsedAmount, operationType, securityLimits, paymentMethod, mobileMoneyProvider, mobileMoneyPhone]);
 
   const canSubmit = Object.keys(validationErrors).length === 0 && parsedAmount > 0 && !!selectedAccountId;
 
@@ -196,12 +221,18 @@ export function useCaisseOperation({
   const mutation = useMutation({
     mutationFn: async () => {
       if (!selectedAccountId) throw new Error('Compte non sélectionné');
-      const payload = {
+      const payload: Record<string, any> = {
         montant: parsedAmount,
         methodePaiement: paymentMethod,
         observations: observations.trim() || undefined,
         idempotencyKey,
       };
+
+      // Add mobile money fields if applicable
+      if (paymentMethod === MethodePaiement.MOBILE_MONEY) {
+        payload.provider = mobileMoneyProvider;
+        payload.phone = mobileMoneyPhone;
+      }
 
       if (operationType === 'DEPOT') {
         return compteEpargneApi.depot(selectedAccountId, payload);
@@ -224,6 +255,16 @@ export function useCaisseOperation({
       queryClient.invalidateQueries({ queryKey: ['/api/sessions-caisse'] });
     },
     onError: (error: any) => {
+      // Detect duplicate warning (409 from duplicate-detection middleware)
+      if (error?.status === 409 && error?.data?.error === 'POTENTIAL_DUPLICATE') {
+        setDuplicateWarning({
+          message: error.data.message,
+          duplicates: error.data.duplicates || [],
+          canOverride: error.data.canOverride ?? false,
+        });
+        return;
+      }
+
       const msg =
         error?.response?.data?.message ||
         error?.message ||
@@ -247,15 +288,72 @@ export function useCaisseOperation({
     await mutation.mutateAsync();
   }, [mutation]);
 
+  // Force execute bypassing duplicate check (after user confirms)
+  const forceMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedAccountId) throw new Error('Compte non sélectionné');
+      const payload: Record<string, any> = {
+        montant: parsedAmount,
+        methodePaiement: paymentMethod,
+        observations: observations.trim() || undefined,
+        idempotencyKey,
+        skipDuplicateCheck: true,
+      };
+
+      // Add mobile money fields if applicable
+      if (paymentMethod === MethodePaiement.MOBILE_MONEY) {
+        payload.provider = mobileMoneyProvider;
+        payload.phone = mobileMoneyPhone;
+      }
+
+      if (operationType === 'DEPOT') {
+        return compteEpargneApi.depot(selectedAccountId, payload);
+      } else {
+        return compteEpargneApi.retrait(selectedAccountId, payload);
+      }
+    },
+    onSuccess: (data) => {
+      setDuplicateWarning(null);
+      setResult(data);
+      setPhase('RESULT');
+      toast.success(data.message || `${operationType === 'DEPOT' ? 'Dépôt' : 'Retrait'} effectué avec succès`);
+
+      if (client?.id) {
+        queryClient.invalidateQueries({ queryKey: ['clients', client.id] });
+        queryClient.invalidateQueries({ queryKey: ['comptes', 'client', client.id] });
+        queryClient.invalidateQueries({ queryKey: ['transactions', client.id] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/operations-caisse'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions-caisse'] });
+    },
+    onError: (error: any) => {
+      const msg = error?.message || 'Erreur lors de l\'opération';
+      toast.error(msg);
+    },
+  });
+
+  const forceExecute = useCallback(async () => {
+    setDuplicateWarning(null);
+    await forceMutation.mutateAsync();
+  }, [forceMutation]);
+
+  const dismissDuplicateWarning = useCallback(() => {
+    setDuplicateWarning(null);
+    setPhase('INPUT');
+  }, []);
+
   const reset = useCallback(() => {
     setSelectedAccountId(null);
     setPaymentMethod(MethodePaiement.CASH);
+    setMobileMoneyProvider(null);
+    setMobileMoneyPhone(client?.telephone || '');
     setAmount('');
     setObservations('');
     setPhase('INPUT');
     setResult(null);
+    setDuplicateWarning(null);
     setIdempotencyKey(uuidv4());
-  }, []);
+  }, [client?.telephone]);
 
   // --- Receipt data ---
   const receiptData = useMemo<ReceiptData | null>(() => {
@@ -309,6 +407,10 @@ export function useCaisseOperation({
     selectedAccount,
     paymentMethod,
     setPaymentMethod,
+    mobileMoneyProvider,
+    setMobileMoneyProvider,
+    mobileMoneyPhone,
+    setMobileMoneyPhone,
     amount,
     setAmount,
     observations,
@@ -327,8 +429,13 @@ export function useCaisseOperation({
     factureId,
 
     // Status
-    isSubmitting: mutation.isPending,
+    isSubmitting: mutation.isPending || forceMutation.isPending,
     error: mutation.error,
+
+    // Duplicate detection
+    duplicateWarning,
+    forceExecute,
+    dismissDuplicateWarning,
 
     // Validation
     validationErrors,

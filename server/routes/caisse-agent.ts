@@ -14,6 +14,9 @@
  */
 
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:CaisseAgent');
 import { z } from "zod";
 import {
   caisseAgentService,
@@ -105,7 +108,7 @@ caisseAgentRouter.get("/operations-terrain/pending/count", async (req, res) => {
     const result = await operationService.getPendingOperationsCount(user.id, user.role, user.agenceId);
     res.json(result);
   } catch (error: any) {
-    console.error("Erreur stats pending count:", error);
+    logger.error({ err: error }, 'Erreur stats pending count');
     res.status(500).json({ error: "Erreur interne" });
   }
 });
@@ -160,7 +163,7 @@ caisseAgentRouter.post(
         operation: result.operation,
       });
     } catch (error: any) {
-      console.error("Erreur création opération terrain:", error);
+      logger.error({ err: error }, 'Erreur création opération terrain');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -185,7 +188,7 @@ caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
     });
     res.json(result);
   } catch (error: any) {
-    console.error("Bulk approve error:", error);
+    logger.error({ err: error }, 'Bulk approve error');
     res.status(500).json({ error: error.message });
   }
 });
@@ -238,7 +241,7 @@ caisseAgentRouter.post(
         mouvements: result.mouvements,
       });
     } catch (error: any) {
-      console.error("Erreur approbation opération:", error);
+      logger.error({ err: error }, 'Erreur approbation opération');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -300,7 +303,7 @@ caisseAgentRouter.post(
         operation: result.operation,
       });
     } catch (error: any) {
-      console.error("Erreur rejet opération:", error);
+      logger.error({ err: error }, 'Erreur rejet opération');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -351,7 +354,7 @@ caisseAgentRouter.post(
         operation: result.operation,
       });
     } catch (error: any) {
-      console.error("Erreur annulation opération:", error);
+      logger.error({ err: error }, 'Erreur annulation opération');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -401,7 +404,7 @@ caisseAgentRouter.get(
         },
       });
     } catch (error: any) {
-      console.error("Erreur liste opérations:", error);
+      logger.error({ err: error }, 'Erreur liste opérations');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -440,7 +443,7 @@ caisseAgentRouter.get(
         auditLogs,
       });
     } catch (error: any) {
-      console.error("Erreur détails opération:", error);
+      logger.error({ err: error }, 'Erreur détails opération');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -473,17 +476,17 @@ caisseAgentRouter.get(
 
       // Si la caisse n'existe pas, la créer automatiquement
       if (!summary) {
-        console.log(`[caisse-agent] Caisse non trouvée pour agent ${agentId}, tentative de création...`);
+        logger.info({ agentId }, 'Caisse non trouvée pour agent, tentative de création');
         const createResult = await caisseAgentService.createCaisseAgent({
           agentId,
           createdBy: userId
         });
 
         if (createResult.success && createResult.caisseAgent) {
-          console.log(`[caisse-agent] Caisse créée avec succès: ${createResult.caisseAgent.id}`);
+          logger.info({ caisseAgentId: createResult.caisseAgent.id }, 'Caisse créée avec succès');
           summary = await caisseAgentService.getCaisseAgentSummary(agentId);
         } else {
-          console.log(`[caisse-agent] Échec création caisse: ${createResult.error} (${createResult.errorCode})`);
+          logger.warn({ error: createResult.error, errorCode: createResult.errorCode }, 'Échec création caisse');
         }
       }
 
@@ -495,7 +498,7 @@ caisseAgentRouter.get(
 
       res.json(summary);
     } catch (error: any) {
-      console.error("Erreur récupération caisse:", error);
+      logger.error({ err: error }, 'Erreur récupération caisse');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -546,7 +549,7 @@ caisseAgentRouter.post(
         caisseAgent: result.caisseAgent,
       });
     } catch (error: any) {
-      console.error("Erreur création caisse:", error);
+      logger.error({ err: error }, 'Erreur création caisse');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -592,7 +595,7 @@ caisseAgentRouter.get(
         total: result.total,
       });
     } catch (error: any) {
-      console.error("Erreur historique:", error);
+      logger.error({ err: error }, 'Erreur historique');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -643,7 +646,7 @@ caisseAgentRouter.post(
         caisseAgent: result.caisseAgent,
       });
     } catch (error: any) {
-      console.error("Erreur suspension caisse:", error);
+      logger.error({ err: error }, 'Erreur suspension caisse');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -693,7 +696,7 @@ caisseAgentRouter.post(
         caisseAgent: result.caisseAgent,
       });
     } catch (error: any) {
-      console.error("Erreur réactivation caisse:", error);
+      logger.error({ err: error }, 'Erreur réactivation caisse');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -712,7 +715,8 @@ const initiateMmPaymentSchema = z.object({
   clientId: z.string().uuid(),
   agenceId: z.string().uuid(),
   provider: z.enum(["MTN", "AIRTEL"]),
-  phone: z.string().regex(/^(\+242|0)[456]\d{7}$/, "Format téléphone invalide"),
+  // Congo phone formats: 06XXXXXXXX, 05XXXXXXXX, +24206XXXXXXXX, +2426XXXXXXXX
+  phone: z.string().regex(/^(?:\+242)?0?[456]\d{7,8}$/, "Format téléphone invalide (ex: 068188251 ou +242068188251)"),
   amount: z.number().positive("Le montant doit être positif"),
   typePaiement: z.enum(["CREDIT_REPAYMENT", "DEPOSIT_SAVINGS", "TONTINE_CONTRIBUTION"]),
   creditId: z.string().uuid().optional(),
@@ -787,7 +791,7 @@ caisseAgentRouter.post(
         message: "Paiement initié. Le client va recevoir une demande de confirmation.",
       });
     } catch (error: any) {
-      console.error("Erreur initiation paiement MM:", error);
+      logger.error({ err: error }, 'Erreur initiation paiement MM');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -840,7 +844,7 @@ caisseAgentRouter.get(
         },
       });
     } catch (error: any) {
-      console.error("Erreur liste paiements MM:", error);
+      logger.error({ err: error }, 'Erreur liste paiements MM');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -872,7 +876,7 @@ caisseAgentRouter.get(
 
       res.json({ payment });
     } catch (error: any) {
-      console.error("Erreur détails paiement MM:", error);
+      logger.error({ err: error }, 'Erreur détails paiement MM');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -908,7 +912,7 @@ caisseAgentRouter.post(
         payment: result.payment,
       });
     } catch (error: any) {
-      console.error("Erreur annulation paiement MM:", error);
+      logger.error({ err: error }, 'Erreur annulation paiement MM');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -938,7 +942,7 @@ caisseAgentRouter.get(
 
       res.json({ stats });
     } catch (error: any) {
-      console.error("Erreur statistiques MM:", error);
+      logger.error({ err: error }, 'Erreur statistiques MM');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });

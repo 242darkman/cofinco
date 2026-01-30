@@ -1,12 +1,14 @@
 import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState } from 'react';
-import { Phone, Mail, MessageSquare, Send, X, Copy, Check } from 'lucide-react';
-import { Card, Badge, IconButton } from '../ui';
+import { Phone, Mail, MessageSquare, Send, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Card, IconButton } from '../ui';
 
 interface ClientActionsProps {
   client: ClientWithIdentity;
   onActionComplete?: () => void;
 }
+
+type SendStatus = 'idle' | 'sending' | 'success' | 'error';
 
 export default function ClientActions({ client, onActionComplete }: ClientActionsProps) {
   const [showSMSModal, setShowSMSModal] = useState(false);
@@ -14,18 +16,18 @@ export default function ClientActions({ client, onActionComplete }: ClientAction
   const [smsMessage, setSmsMessage] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
-  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<SendStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleCall = async () => {
     try {
-      await fetch('/api/client-activities', {
+      await fetch(`/api/clients/${client.id}/activities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          client_id: client.id,
-          activity_type: 'call',
-          activity_description: `Appel téléphonique au ${client.telephone}`
+          type: 'call',
+          description: `Appel telephonique au ${client.telephone}`
         })
       });
 
@@ -39,75 +41,101 @@ export default function ClientActions({ client, onActionComplete }: ClientAction
   const handleSendSMS = async () => {
     if (!smsMessage.trim()) return;
 
-    setSending(true);
+    setSendStatus('sending');
+    setErrorMessage('');
     try {
-      await fetch('/api/client-activities', {
+      const res = await fetch(`/api/clients/${client.id}/send-notification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          client_id: client.id,
-          activity_type: 'sms',
-          activity_description: `SMS envoyé: ${smsMessage.substring(0, 50)}...`,
-          metadata: { message: smsMessage }
+          channel: 'SMS',
+          message: smsMessage,
         })
       });
 
-      window.open(`sms:${client.telephone}?body=${encodeURIComponent(smsMessage)}`);
-      setShowSMSModal(false);
-      setSmsMessage('');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Erreur inconnue' }));
+        throw new Error(err.message || 'Erreur envoi SMS');
+      }
+
+      setSendStatus('success');
+      setTimeout(() => {
+        setShowSMSModal(false);
+        setSmsMessage('');
+        setSendStatus('idle');
+      }, 1500);
       onActionComplete?.();
-    } catch (error) {
-      console.error('Erreur envoi SMS:', error);
-    } finally {
-      setSending(false);
+    } catch (error: any) {
+      setSendStatus('error');
+      setErrorMessage(error.message || 'Erreur envoi SMS');
     }
   };
 
   const handleSendEmail = async () => {
     if (!emailSubject.trim() || !emailBody.trim()) return;
 
-    setSending(true);
+    setSendStatus('sending');
+    setErrorMessage('');
     try {
-      await fetch('/api/client-activities', {
+      const res = await fetch(`/api/clients/${client.id}/send-notification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          client_id: client.id,
-          activity_type: 'email',
-          activity_description: `Email envoyé: ${emailSubject}`,
-          metadata: { subject: emailSubject, body: emailBody }
+          channel: 'EMAIL',
+          subject: emailSubject,
+          message: emailBody,
         })
       });
 
-      window.open(`mailto:${client.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Erreur inconnue' }));
+        throw new Error(err.message || 'Erreur envoi email');
+      }
+
+      setSendStatus('success');
+      setTimeout(() => {
+        setShowEmailModal(false);
+        setEmailSubject('');
+        setEmailBody('');
+        setSendStatus('idle');
+      }, 1500);
+      onActionComplete?.();
+    } catch (error: any) {
+      setSendStatus('error');
+      setErrorMessage(error.message || 'Erreur envoi email');
+    }
+  };
+
+  const resetAndClose = (modal: 'sms' | 'email') => {
+    setSendStatus('idle');
+    setErrorMessage('');
+    if (modal === 'sms') {
+      setShowSMSModal(false);
+      setSmsMessage('');
+    } else {
       setShowEmailModal(false);
       setEmailSubject('');
       setEmailBody('');
-      onActionComplete?.();
-    } catch (error) {
-      console.error('Erreur envoi email:', error);
-    } finally {
-      setSending(false);
     }
   };
 
   const smsTemplates = [
-    'Bonjour, nous vous rappelons votre échéance de paiement du...',
-    'Félicitations! Votre demande de crédit a été approuvée.',
-    'Votre épargne a bien été enregistrée. Merci de votre confiance.',
-    'Rappel: Réunion tontine prévue le...'
+    'Bonjour, nous vous rappelons votre echeance de paiement du...',
+    'Felicitations! Votre demande de credit a ete approuvee.',
+    'Votre epargne a bien ete enregistree. Merci de votre confiance.',
+    'Rappel: Reunion tontine prevue le...'
   ];
 
   const emailTemplates = [
     {
       subject: 'Rappel de paiement',
-      body: 'Bonjour,\n\nNous vous rappelons votre échéance de paiement.\n\nCordialement,\nL\'équipe COFIN'
+      body: 'Bonjour,\n\nNous vous rappelons votre echeance de paiement.\n\nCordialement,\nL\'equipe COFIN'
     },
     {
-      subject: 'Approbation de crédit',
-      body: 'Bonjour,\n\nNous avons le plaisir de vous informer que votre demande de crédit a été approuvée.\n\nCordialement,\nL\'équipe COFIN'
+      subject: 'Approbation de credit',
+      body: 'Bonjour,\n\nNous avons le plaisir de vous informer que votre demande de credit a ete approuvee.\n\nCordialement,\nL\'equipe COFIN'
     }
   ];
 
@@ -117,7 +145,7 @@ export default function ClientActions({ client, onActionComplete }: ClientAction
         {/* Actions Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Call Action */}
-            <button 
+            <button
                 onClick={handleCall}
                 className="group relative flex flex-col items-center justify-center p-6 rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-transparent hover:from-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300"
             >
@@ -129,7 +157,7 @@ export default function ClientActions({ client, onActionComplete }: ClientAction
             </button>
 
             {/* SMS Action */}
-            <button 
+            <button
                 onClick={() => setShowSMSModal(true)}
                 className="group relative flex flex-col items-center justify-center p-6 rounded-xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-transparent hover:from-blue-500/20 hover:border-blue-500/40 transition-all duration-300"
             >
@@ -137,11 +165,11 @@ export default function ClientActions({ client, onActionComplete }: ClientAction
                     <MessageSquare size={28} className="text-blue-400" />
                 </div>
                 <h3 className="text-lg font-bold text-white mb-1">Envoyer SMS</h3>
-                <p className="text-sm text-slate-400">Message direct</p>
+                <p className="text-sm text-slate-400">Via le serveur</p>
             </button>
 
             {/* Email Action */}
-            <button 
+            <button
                 onClick={() => setShowEmailModal(true)}
                 className="group relative flex flex-col items-center justify-center p-6 rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-transparent hover:from-purple-500/20 hover:border-purple-500/40 transition-all duration-300"
             >
@@ -165,54 +193,68 @@ export default function ClientActions({ client, onActionComplete }: ClientAction
                 </div>
                 <div>
                     <h3 className="text-lg font-bold text-white">Nouveau SMS</h3>
-                    <p className="text-xs text-slate-400">À: {client.telephone}</p>
+                    <p className="text-xs text-slate-400">A: {client.telephone}</p>
                 </div>
               </div>
-              <IconButton icon={X} size="sm" onClick={() => setShowSMSModal(false)} aria-label="Fermer" />
-
+              <IconButton icon={X} size="sm" onClick={() => resetAndClose('sms')} aria-label="Fermer" />
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Modèles Rapides</label>
-                <div className="flex flex-wrap gap-2">
-                  {smsTemplates.map((template, idx) => (
+            {sendStatus === 'success' ? (
+              <div className="text-center py-8">
+                <CheckCircle size={48} className="text-emerald-400 mx-auto mb-3" />
+                <p className="text-emerald-400 font-bold">SMS mis en file d'attente</p>
+                <p className="text-slate-400 text-sm mt-1">Le message sera envoye sous peu.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Modeles Rapides</label>
+                  <div className="flex flex-wrap gap-2">
+                    {smsTemplates.map((template, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSmsMessage(template)}
+                        className="px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300 hover:border-blue-500/50 hover:text-blue-400 transition-colors text-left truncate max-w-full"
+                      >
+                        {template.length > 30 ? template.substring(0, 30) + '...' : template}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Message</label>
+                  <textarea
+                    value={smsMessage}
+                    onChange={(e) => setSmsMessage(e.target.value)}
+                    className="w-full bg-slate-950 text-white px-4 py-3 rounded-xl border border-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[120px] placeholder:text-slate-600 resize-none text-sm"
+                    placeholder="Redigez votre message ici..."
+                    autoFocus
+                  />
+                  <div className="flex justify-between mt-2">
+                      <p className="text-xs text-slate-500">{smsMessage.length} caracteres</p>
+                  </div>
+                </div>
+
+                {sendStatus === 'error' && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                    <AlertTriangle size={16} />
+                    {errorMessage}
+                  </div>
+                )}
+
+                <div className="pt-2">
                     <button
-                      key={idx}
-                      onClick={() => setSmsMessage(template)}
-                      className="px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300 hover:border-blue-500/50 hover:text-blue-400 transition-colors text-left truncate max-w-full"
+                      onClick={handleSendSMS}
+                      disabled={sendStatus === 'sending' || !smsMessage.trim()}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
                     >
-                      {template.length > 30 ? template.substring(0, 30) + '...' : template}
+                      <Send size={18} />
+                      {sendStatus === 'sending' ? 'Envoi en cours...' : 'Envoyer Maintenant'}
                     </button>
-                  ))}
                 </div>
               </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Message</label>
-                <textarea
-                  value={smsMessage}
-                  onChange={(e) => setSmsMessage(e.target.value)}
-                  className="w-full bg-slate-950 text-white px-4 py-3 rounded-xl border border-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[120px] placeholder:text-slate-600 resize-none text-sm"
-                  placeholder="Rédigez votre message ici..."
-                  autoFocus
-                />
-                <div className="flex justify-between mt-2">
-                    <p className="text-xs text-slate-500">{smsMessage.length} caractères</p>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                  <button
-                    onClick={handleSendSMS}
-                    disabled={sending || !smsMessage.trim()}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
-                  >
-                    <Send size={18} />
-                    {sending ? 'Envoi en cours...' : 'Envoyer Maintenant'}
-                  </button>
-              </div>
-            </div>
+            )}
           </Card>
         </div>
       )}
@@ -228,66 +270,81 @@ export default function ClientActions({ client, onActionComplete }: ClientAction
                 </div>
                 <div>
                     <h3 className="text-lg font-bold text-white">Nouvel Email</h3>
-                    <p className="text-xs text-slate-400">À: {client.email}</p>
+                    <p className="text-xs text-slate-400">A: {client.email}</p>
                 </div>
               </div>
-              <IconButton icon={X} size="sm" onClick={() => setShowEmailModal(false)} aria-label="Fermer" />
+              <IconButton icon={X} size="sm" onClick={() => resetAndClose('email')} aria-label="Fermer" />
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Modèles Rapides</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {emailTemplates.map((template, idx) => (
+            {sendStatus === 'success' ? (
+              <div className="text-center py-8">
+                <CheckCircle size={48} className="text-emerald-400 mx-auto mb-3" />
+                <p className="text-emerald-400 font-bold">Email mis en file d'attente</p>
+                <p className="text-slate-400 text-sm mt-1">Le message sera envoye sous peu.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Modeles Rapides</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {emailTemplates.map((template, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setEmailSubject(template.subject);
+                          setEmailBody(template.body);
+                        }}
+                        className="text-left p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-purple-500/50 group transition-all"
+                      >
+                        <p className="font-semibold text-slate-300 text-sm group-hover:text-purple-400 transition-colors">{template.subject}</p>
+                        <p className="text-xs text-slate-500 mt-1 truncate">{template.body}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Objet</label>
+                      <input
+                      type="text"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      className="w-full bg-slate-950 text-white px-4 py-2.5 rounded-lg border border-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-slate-600 text-sm"
+                      placeholder="Objet de l'email"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Message</label>
+                      <textarea
+                      value={emailBody}
+                      onChange={(e) => setEmailBody(e.target.value)}
+                      className="w-full bg-slate-950 text-white px-4 py-3 rounded-xl border border-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[160px] placeholder:text-slate-600 resize-none text-sm"
+                      placeholder="Redigez votre email ici..."
+                      />
+                    </div>
+                </div>
+
+                {sendStatus === 'error' && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                    <AlertTriangle size={16} />
+                    {errorMessage}
+                  </div>
+                )}
+
+                <div className="pt-2">
                     <button
-                      key={idx}
-                      onClick={() => {
-                        setEmailSubject(template.subject);
-                        setEmailBody(template.body);
-                      }}
-                      className="text-left p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-purple-500/50 group transition-all"
+                      onClick={handleSendEmail}
+                      disabled={sendStatus === 'sending' || !emailSubject.trim() || !emailBody.trim()}
+                      className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20"
                     >
-                      <p className="font-semibold text-slate-300 text-sm group-hover:text-purple-400 transition-colors">{template.subject}</p>
-                      <p className="text-xs text-slate-500 mt-1 truncate">{template.body}</p>
+                      <Send size={18} />
+                      {sendStatus === 'sending' ? 'Envoi en cours...' : 'Envoyer Maintenant'}
                     </button>
-                  ))}
                 </div>
               </div>
-
-              <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Objet</label>
-                    <input
-                    type="text"
-                    value={emailSubject}
-                    onChange={(e) => setEmailSubject(e.target.value)}
-                    className="w-full bg-slate-950 text-white px-4 py-2.5 rounded-lg border border-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-slate-600 text-sm"
-                    placeholder="Objet de l'email"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Message</label>
-                    <textarea
-                    value={emailBody}
-                    onChange={(e) => setEmailBody(e.target.value)}
-                    className="w-full bg-slate-950 text-white px-4 py-3 rounded-xl border border-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 min-h-[160px] placeholder:text-slate-600 resize-none text-sm"
-                    placeholder="Rédigez votre email ici..."
-                    />
-                  </div>
-              </div>
-
-              <div className="pt-2">
-                  <button
-                    onClick={handleSendEmail}
-                    disabled={sending || !emailSubject.trim() || !emailBody.trim()}
-                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20"
-                  >
-                    <Send size={18} />
-                    {sending ? 'Envoi en cours...' : 'Envoyer Maintenant'}
-                  </button>
-              </div>
-            </div>
+            )}
           </Card>
         </div>
       )}

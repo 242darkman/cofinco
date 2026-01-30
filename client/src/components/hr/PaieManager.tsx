@@ -2,11 +2,13 @@ import React, { useState, useCallback } from 'react';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { usePaie, BulletinPaie } from '../../hooks/hr/usePaie';
 import { Card, Button, ResponsiveTable, Badge, TabGroup } from '../ui';
-import { FileText, Play, CheckCircle, Download, FileCheck, Calculator, AlertCircle } from 'lucide-react';
+import { FileText, Play, CheckCircle, Download, FileCheck, Calculator, AlertCircle, Banknote, Settings } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { isAdminRole } from '@shared/types/roles';
 import { StatutBulletin, STATUT_BULLETIN_LABELS } from '@shared/enum/status-constants';
+import SalaryAdvances from './SalaryAdvances';
+import PayrollConfigPanel from './PayrollConfigPanel';
 
 export default function PaieManager() {
   // RBAC permissions
@@ -89,7 +91,11 @@ export default function PaieManager() {
 
   const tabs = [
     { key: 'my', label: 'Mes Bulletins', icon: FileText },
-    ...(isRH ? [{ key: 'generate', label: 'Gestion Paie', icon: Calculator }] : [])
+    ...(isRH ? [
+      { key: 'generate', label: 'Gestion Paie', icon: Calculator },
+      { key: 'avances', label: 'Avances', icon: Banknote },
+      { key: 'config', label: 'Configuration', icon: Settings },
+    ] : [])
   ];
 
   return (
@@ -108,7 +114,15 @@ export default function PaieManager() {
         </div>
       )}
 
-      {activeTab === 'generate' && isRH ? (
+      {activeTab === 'config' && isRH ? (
+        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg overflow-y-auto">
+          <PayrollConfigPanel />
+        </div>
+      ) : activeTab === 'avances' && isRH ? (
+        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden">
+          <SalaryAdvances />
+        </div>
+      ) : activeTab === 'generate' && isRH ? (
         <div className="flex-1 overflow-y-auto min-h-0 pl-1 pr-2 pb-2">
           <div className="grid lg:grid-cols-3 gap-3">
              {/* Left Column (2/3) */}

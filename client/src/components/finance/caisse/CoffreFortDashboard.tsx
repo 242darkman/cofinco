@@ -87,6 +87,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showProvisionModal, setShowProvisionModal] = useState(false);
+  const [selectedTransfert, setSelectedTransfert] = useState<any>(null);
 
   const transferts = transfertsData?.data || [];
 
@@ -379,61 +380,63 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   }
 
   const columns = [
-    { 
-      key: 'createdAt', 
-      label: 'Date', 
+    {
+      key: 'createdAt',
+      label: 'Date',
+      hideOnMobile: true,
       format: (_: any, row: any) => (
-        <span className="text-sm text-slate-300">
+        <span className="text-xs sm:text-sm text-slate-300">
            {format(new Date(row.createdAt), "dd/MM/yyyy HH:mm", { locale: fr })}
         </span>
       )
     },
-    { 
-      key: 'typeTransfert', 
+    {
+      key: 'typeTransfert',
       label: 'Type',
       format: (_: any, row: any) => (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col xs:flex-row xs:items-center gap-0.5 xs:gap-2">
             {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
-                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={12} />} value="Sortie" />
+                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px]" />
             ) : (
-                <Badge variant="success" size="sm" icon={<ArrowUpRight size={12} />} value="Entrée" />
+                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px]" />
             )}
-            <span className="text-xs text-slate-400 hidden sm:inline">
+            <span className="text-[10px] sm:text-xs text-slate-400">
                 {row.typeTransfert === "COFFRE_VERS_CAISSE" ? "Vers Caisse" : "De Caisse"}
             </span>
         </div>
       )
     },
-    { 
-      key: 'trajet', 
-      label: 'Caisse Concernée',
+    {
+      key: 'trajet',
+      label: 'Caisse',
       format: (_: any, row: any) => (
-        <span className="font-medium text-white">
+        <span className="font-medium text-white text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none block">
           {row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}
         </span>
       )
     },
-    { 
-      key: 'montant', 
+    {
+      key: 'montant',
       label: 'Montant',
       align: 'right' as const,
       format: (val: any) => (
-        <span className="font-bold font-mono text-white">
-            {Number(val).toLocaleString()} FCFA
+        <span className="font-bold font-mono text-white text-xs sm:text-sm whitespace-nowrap">
+            {Number(val).toLocaleString()} <span className="text-[10px] text-slate-400">FCFA</span>
         </span>
       )
     },
-    { 
-      key: 'requestedByNom', 
+    {
+      key: 'requestedByNom',
       label: 'Initié par',
+      hideOnMobile: true,
       format: (_: any, row: any) => (
-        <span className="text-sm text-slate-400">
+        <span className="text-xs sm:text-sm text-slate-400 truncate max-w-[100px] block">
             {row.requestedByNom} {row.requestedByPrenom?.charAt(0)}.
         </span>
       )
     },
-    { 
-      key: 'statut', 
+    {
+      key: 'statut',
       label: 'Statut',
       format: (_: any, row: any) => {
         let variant: 'success' | 'warning' | 'danger' | 'neutral' = 'neutral';
@@ -441,149 +444,150 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         if (row.statut === StatutTransfertCoffre.REQUESTED) variant = 'warning';
         if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) variant = 'danger';
 
-        return <Badge variant={variant} value={row.statut} />;
+        return <Badge variant={variant} value={row.statut} className="text-[9px] sm:text-xs" />;
       }
     },
-    {
-      key: 'actions',
-      label: 'Actions',
-      align: 'right' as const,
-      format: (_: any, row: any) => {
-        const isLoading = actionLoading === row.id;
+  ];
 
-        // Actions pour les transferts en attente de validation
-        if (row.statut === StatutTransfertCoffre.REQUESTED) {
-          return (
-            <div className="flex justify-end items-center gap-2">
-              {canValidate && (
+  // Fonction d'actions extraite pour être réutilisée dans la prop actions (mobile + desktop)
+  const renderRowActions = (row: any) => {
+    const isLoading = actionLoading === row.id;
+
+    // Actions pour les transferts en attente de validation
+    if (row.statut === StatutTransfertCoffre.REQUESTED) {
+      return (
+        <div className="flex items-center gap-1 sm:gap-2">
+          {canValidate && (
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'validate', transfert: row }); }}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle2 size={12} className="lg:mr-1" />
+                    <span className="hidden lg:inline">Valider</span>
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'reject', transfert: row }); }}
+                disabled={isLoading}
+              >
+                <XCircle size={12} className="lg:mr-1" />
+                <span className="hidden lg:inline">Rejeter</span>
+              </Button>
+            </>
+          )}
+          {!canValidate && (
+            <span className="text-[9px] sm:text-xs text-slate-500 italic flex items-center gap-1">
+              <Clock size={10} />
+              <span className="hidden sm:inline">En attente</span>
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    // Actions pour les transferts validés (prêts à exécuter)
+    if (row.statut === StatutTransfertCoffre.VALIDATED) {
+      return (
+        <div className="flex items-center gap-1 sm:gap-2">
+          {canExecute ? (
+            <Button
+              size="sm"
+              variant="primary"
+              className="h-6 sm:h-7 px-2 sm:px-3 text-[10px] sm:text-xs font-medium shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all"
+              onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'execute', transfert: row }); }}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
                 <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-8 px-3 text-xs font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
-                    onClick={() => setConfirmAction({ type: 'validate', transfert: row })}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle2 size={14} className="mr-1.5" />
-                        Valider
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-8 px-3 text-xs font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
-                    onClick={() => setConfirmAction({ type: 'reject', transfert: row })}
-                    disabled={isLoading}
-                  >
-                    <XCircle size={14} className="mr-1.5" />
-                    Rejeter
-                  </Button>
+                  <Play size={12} className="lg:mr-1" />
+                  <span className="hidden lg:inline">Exécuter</span>
                 </>
               )}
-              {!canValidate && (
-                <span className="text-xs text-slate-500 italic flex items-center gap-1.5">
-                  <Clock size={12} />
-                  En attente de validation
-                </span>
-              )}
-            </div>
-          );
-        }
-
-        // Actions pour les transferts validés (prêts à exécuter)
-        if (row.statut === StatutTransfertCoffre.VALIDATED) {
-          return (
-            <div className="flex justify-end items-center gap-2">
-              {canExecute ? (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  className="h-8 px-4 text-xs font-medium shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all"
-                  onClick={() => setConfirmAction({ type: 'execute', transfert: row })}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <>
-                      <Play size={14} className="mr-1.5" />
-                      Exécuter
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <span className="text-xs text-amber-400/80 flex items-center gap-1.5 bg-amber-500/10 px-2.5 py-1.5 rounded-md">
-                  <Clock size={12} />
-                  En attente d'exécution
-                </span>
-              )}
-            </div>
-          );
-        }
-
-        // Statuts terminaux (Exécuté, Rejeté, Annulé)
-        if (row.statut === StatutTransfertCoffre.EXECUTED) {
-          return (
-            <span className="text-xs text-emerald-400/60 flex items-center justify-end gap-1.5">
-              <CheckCircle2 size={12} />
-              Terminé
+            </Button>
+          ) : (
+            <span className="text-[9px] sm:text-xs text-amber-400/80 flex items-center gap-1 bg-amber-500/10 px-1.5 sm:px-2.5 py-1 rounded-md">
+              <Clock size={10} />
+              <span className="hidden sm:inline">En attente</span>
             </span>
-          );
-        }
-
-        if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) {
-          return (
-            <span className="text-xs text-red-400/60 flex items-center justify-end gap-1.5">
-              <Ban size={12} />
-              {ALL_STATUS_LABELS[row.statut] || row.statut}
-            </span>
-          );
-        }
-
-        return <span className="text-slate-600">-</span>;
-      }
+          )}
+        </div>
+      );
     }
-  ];
+
+    // Statuts terminaux (Exécuté, Rejeté, Annulé)
+    if (row.statut === StatutTransfertCoffre.EXECUTED) {
+      return (
+        <span className="text-[10px] sm:text-xs text-emerald-400/60 flex items-center gap-1">
+          <CheckCircle2 size={10} />
+          <span className="hidden sm:inline">Terminé</span>
+        </span>
+      );
+    }
+
+    if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) {
+      return (
+        <span className="text-[10px] sm:text-xs text-red-400/60 flex items-center gap-1">
+          <Ban size={10} />
+          <span className="hidden sm:inline">{ALL_STATUS_LABELS[row.statut] || row.statut}</span>
+        </span>
+      );
+    }
+
+    return null;
+  };
 
 
 
   return (
     <div className="flex flex-col h-full overflow-hidden pt-1 space-y-2">
-      <div className="shrink-0 z-40 px-1 py-1 bg-slate-950/80 backdrop-blur-md border-b border-white/5">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-2">
-          <div className="flex items-center gap-3">
-              <div className="bg-blue-600/20 p-1.5 rounded-lg">
-                 <Vault className="w-5 h-5 text-blue-500" />
-              </div>
-               <div>
-                  <h2 className="text-lg font-bold tracking-tight text-white">Coffre-Fort</h2>
-                  <p className="text-[10px] text-slate-400 hidden sm:block">Gestion centralisée des fonds</p>
-               </div>
-               
-               {canConfigure && (
-                  <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="ml-2 h-7 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hidden lg:flex"
-                      onClick={() => setShowProvisionModal(true)}
-                  >
-                      <ArrowDownRight size={12} className="mr-1.5" />
-                      Approvisionner
-                  </Button>
-               )}
+      <div className="shrink-0 z-40 px-2 sm:px-1 py-2 sm:py-1 bg-slate-950/80 backdrop-blur-md border-b border-white/5">
+        <div className="flex flex-col gap-2">
+          {/* Row 1: Title + Approvisionner button */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-blue-600/20 p-1.5 rounded-lg shrink-0">
+                   <Vault className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+                </div>
+                 <div>
+                    <h2 className="text-base sm:text-lg font-bold tracking-tight text-white">Coffre-Fort</h2>
+                    <p className="text-[9px] sm:text-[10px] text-slate-400 hidden xs:block">Gestion centralisée des fonds</p>
+                 </div>
+            </div>
+
+            {canConfigure && (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                    onClick={() => setShowProvisionModal(true)}
+                >
+                    <ArrowDownRight size={12} className="sm:mr-1.5" />
+                    <span className="hidden sm:inline">Approvisionner</span>
+                </Button>
+            )}
           </div>
-          
-          <div className="overflow-x-auto scrollbar-hide">
-             <div className="flex space-x-1 bg-slate-900/50 p-0.5 rounded-lg border border-white/5">
+
+          {/* Row 2: Tabs */}
+          <div className="overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
+             <div className="flex space-x-0.5 sm:space-x-1 bg-slate-900/50 p-0.5 rounded-lg border border-white/5 w-fit">
                 {[
-                  { id: 'operations', label: 'Transferts', icon: ArrowRightLeft, short: 'Ops' },
+                  { id: 'operations', label: 'Transferts', icon: ArrowRightLeft, short: 'Transf.' },
                   { id: 'intercoffres', label: 'Inter-Coffres', icon: Vault, short: 'Inter' },
-                  { id: 'historique', label: 'Historique', icon: Clock, short: 'Hist' },
+                  { id: 'historique', label: 'Historique', icon: Clock, short: 'Hist.' },
                   ...(canSupervise ? [{ id: 'supervision', label: 'Supervision', icon: Shield, short: 'Sup.' }] : []),
                   ...(canConfigure ? [{ id: 'admin', label: 'Admin', icon: Settings, short: 'Admin' }] : [])
                 ].map(tab => (
@@ -591,15 +595,15 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                    key={tab.id}
                    onClick={() => setActiveTab(tab.id)}
                    className={`
-                      relative flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap
-                      ${activeTab === tab.id 
-                        ? 'text-white bg-blue-600/90 shadow-lg shadow-blue-900/20' 
+                      relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 text-[10px] sm:text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap
+                      ${activeTab === tab.id
+                        ? 'text-white bg-blue-600/90 shadow-lg shadow-blue-900/20'
                         : 'text-slate-400 hover:text-white hover:bg-white/5'}
                    `}
                  >
-                   <tab.icon size={14} className={activeTab === tab.id ? 'animate-in zoom-in-50 duration-200' : ''} />
-                   <span className="hidden sm:inline">{tab.label}</span>
-                   <span className="sm:hidden">{tab.short}</span>
+                   <tab.icon size={12} className={`sm:w-3.5 sm:h-3.5 ${activeTab === tab.id ? 'animate-in zoom-in-50 duration-200' : ''}`} />
+                   <span className="hidden md:inline">{tab.label}</span>
+                   <span className="md:hidden">{tab.short}</span>
                  </button>
                 ))}
             </div>
@@ -621,29 +625,29 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
              <CoffreFortHistorique agenceId={agenceId} />
           ) : (
             <>
-            {/* Header Stats - Compact */}
-            <div className="grid grid-cols-3 gap-2">
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 flex flex-col justify-center">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Solde Coffre</span>
+            {/* Header Stats - Compact & Responsive */}
+            <div className="grid grid-cols-1 xs:grid-cols-3 gap-2">
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2 sm:p-2.5 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Solde Coffre</span>
                   <div className="flex items-center gap-1.5">
-                     <Wallet className="text-blue-500" size={14} />
-                     <div className="text-base font-bold text-white max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
+                     <Wallet className="text-blue-500 hidden xs:block" size={14} />
+                     <div className="text-sm sm:text-base font-bold text-white max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
                         {isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}
                      </div>
                   </div>
                </div>
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 flex flex-col justify-center">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">En Attente</span>
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2 sm:p-2.5 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">En Attente</span>
                   <div className="flex items-center gap-1.5">
-                     <Clock className="text-amber-500" size={14} />
-                     <div className="text-base font-bold text-white">{pendingCount + (pendingOpeningRequests?.length || 0)}</div>
+                     <Clock className="text-amber-500 hidden xs:block" size={14} />
+                     <div className="text-sm sm:text-base font-bold text-white">{pendingCount + (pendingOpeningRequests?.length || 0)}</div>
                   </div>
                </div>
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 flex flex-col justify-center">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Mouvements J</span>
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2 sm:p-2.5 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Mouvements J</span>
                   <div className="flex items-center gap-1.5">
-                     <ArrowRightLeft className="text-emerald-500" size={14} />
-                     <div className="text-base font-bold text-white">{todayVolume.toLocaleString()} FCFA</div>
+                     <ArrowRightLeft className="text-emerald-500 hidden xs:block" size={14} />
+                     <div className="text-sm sm:text-base font-bold text-white truncate">{todayVolume.toLocaleString()} <span className="text-[10px] text-slate-400">FCFA</span></div>
                   </div>
                </div>
             </div>
@@ -651,21 +655,21 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             {/* Pending Opening Requests Section - New Secure Workflow */}
             {(pendingOpeningRequests?.length > 0 || isLoadingOpeningRequests) && (
               <Card className="overflow-hidden bg-gradient-to-br from-amber-500/5 to-orange-500/5 border-amber-500/30">
-                <div className="p-2 border-b border-amber-500/20 flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1 rounded-lg bg-amber-500/20">
+                <div className="p-2 border-b border-amber-500/20 flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1 rounded-lg bg-amber-500/20 shrink-0">
                       <KeyRound className="w-3 h-3 text-amber-400" />
                     </div>
-                    <div>
-                      <h3 className="font-bold text-white text-xs flex items-center gap-2">
-                        Ouverture de Caisse
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-white text-[11px] sm:text-xs flex items-center gap-2">
+                        <span className="truncate">Ouverture Caisse</span>
                         {pendingOpeningRequests?.length > 0 && (
-                          <span className="px-1.5 py-0 rounded-full bg-amber-500 text-white text-[9px] font-bold animate-pulse">
+                          <span className="px-1.5 py-0 rounded-full bg-amber-500 text-white text-[9px] font-bold animate-pulse shrink-0">
                             {pendingOpeningRequests.length}
                           </span>
                         )}
                       </h3>
-                      <p className="text-slate-400 text-[10px]">Caissiers en attente de dotation</p>
+                      <p className="text-slate-400 text-[9px] sm:text-[10px] hidden xs:block">Caissiers en attente de dotation</p>
                     </div>
                   </div>
                   <Button
@@ -673,13 +677,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                     size="sm"
                     onClick={() => refetchOpeningRequests()}
                     disabled={isLoadingOpeningRequests}
-                    className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                    className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10 shrink-0"
                   >
                     <Loader2
                       size={10}
-                      className={`mr-1 ${isLoadingOpeningRequests ? 'animate-spin' : ''}`}
+                      className={isLoadingOpeningRequests ? 'animate-spin' : ''}
                     />
-                    Actualiser
+                    <span className="hidden sm:inline ml-1">Actualiser</span>
                   </Button>
                 </div>
 
@@ -695,96 +699,140 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                         key={request.transfert?.id || request.session?.id}
                         className="p-2 hover:bg-amber-500/5 transition-colors"
                       >
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                        <div className="flex flex-col gap-2">
                           {/* Request Info */}
                           <div className="flex items-start gap-2">
-                            <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700">
+                            <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 shrink-0">
                               <User className="w-3 h-3 text-slate-400" />
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-white text-xs">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <span className="font-bold text-white text-[11px] sm:text-xs">
                                   {request.caissierNom || request.transfert?.requestedByNom || 'Caissier'}
                                 </span>
-                                <span className="text-slate-500 text-[10px] gap-1 flex items-center">
+                                <span className="text-slate-500 text-[9px] sm:text-[10px]">
                                    • {request.caisseNom || request.transfert?.caisseDestinationNom || 'Caisse'}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2 text-[10px]">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
                                 <span className="text-amber-400 font-bold">
                                   {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} FCFA
                                 </span>
                                 {request.soldeVeille > 0 && (
-                                  <span className="text-slate-500">
+                                  <span className="text-slate-500 hidden xs:inline">
                                     (+{Number(request.soldeVeille).toLocaleString()} veille)
                                   </span>
                                 )}
+                                {request.fundsRequestedAt && (
+                                  <span className="text-[9px] text-slate-500">
+                                    {format(new Date(request.fundsRequestedAt), "dd/MM HH:mm", { locale: fr })}
+                                  </span>
+                                )}
                               </div>
-                              {request.fundsRequestedAt && (
-                                <span className="text-[9px] text-slate-500 block">
-                                  {format(new Date(request.fundsRequestedAt), "dd/MM HH:mm", { locale: fr })}
+                            </div>
+
+                            {/* Actions - inline on larger screens */}
+                            <div className="hidden sm:flex items-center gap-1 shrink-0">
+                              {canValidate && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="h-6 px-2 text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                                    onClick={() => setConfirmAction({
+                                      type: 'validate-opening',
+                                      transfert: {
+                                        id: request.transfert?.id,
+                                        montant: request.montantDemande || request.transfert?.montant,
+                                        caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                        caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                        requestedByNom: request.transfert?.requestedByNom
+                                      }
+                                    })}
+                                    disabled={actionLoading === request.transfert?.id}
+                                  >
+                                    {actionLoading === request.transfert?.id ? (
+                                      <Loader2 size={10} className="animate-spin" />
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 size={10} className="mr-1" />
+                                        Valider
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="h-6 px-2 text-[9px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                                    onClick={() => setConfirmAction({
+                                      type: 'reject-opening',
+                                      transfert: {
+                                        id: request.transfert?.id,
+                                        montant: request.montantDemande || request.transfert?.montant,
+                                        caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                        caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                        requestedByNom: request.transfert?.requestedByNom
+                                      }
+                                    })}
+                                    disabled={actionLoading === request.transfert?.id}
+                                  >
+                                    <XCircle size={10} className="mr-1" />
+                                    Rejeter
+                                  </Button>
+                                </>
+                              )}
+                              {!canValidate && (
+                                <span className="text-[9px] text-slate-500 italic flex items-center gap-1">
+                                  <Clock size={10} />
+                                  En attente
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          {/* Actions */}
-                          <div className="flex items-center gap-1 ml-auto">
-                            {canValidate && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  className="h-6 px-2 text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
-                                  onClick={() => setConfirmAction({
-                                    type: 'validate-opening',
-                                    transfert: {
-                                      id: request.transfert?.id,
-                                      montant: request.montantDemande || request.transfert?.montant,
-                                      caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                      caissierNom: request.caissierNom || request.transfert?.requestedByNom,
-                                      requestedByNom: request.transfert?.requestedByNom
-                                    }
-                                  })}
-                                  disabled={actionLoading === request.transfert?.id}
-                                >
-                                  {actionLoading === request.transfert?.id ? (
-                                    <Loader2 size={10} className="animate-spin" />
-                                  ) : (
-                                    <>
-                                      <CheckCircle2 size={10} className="mr-1" />
-                                      Valid.
-                                    </>
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  className="h-6 px-2 text-[9px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
-                                  onClick={() => setConfirmAction({
-                                    type: 'reject-opening',
-                                    transfert: {
-                                      id: request.transfert?.id,
-                                      montant: request.montantDemande || request.transfert?.montant,
-                                      caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                      caissierNom: request.caissierNom || request.transfert?.requestedByNom,
-                                      requestedByNom: request.transfert?.requestedByNom
-                                    }
-                                  })}
-                                  disabled={actionLoading === request.transfert?.id}
-                                >
-                                  <XCircle size={10} className="mr-1" />
-                                  Rej.
-                                </Button>
-                              </>
-                            )}
-                            {!canValidate && (
-                              <span className="text-[9px] text-slate-500 italic flex items-center gap-1">
-                                <Clock size={10} />
-                                En attente
-                              </span>
-                            )}
-                          </div>
+                          {/* Actions - mobile only (full width buttons) */}
+                          {canValidate && (
+                            <div className="flex sm:hidden items-center gap-2 pl-8">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="flex-1 h-7 text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                onClick={() => setConfirmAction({
+                                  type: 'validate-opening',
+                                  transfert: {
+                                    id: request.transfert?.id,
+                                    montant: request.montantDemande || request.transfert?.montant,
+                                    caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                    caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                    requestedByNom: request.transfert?.requestedByNom
+                                  }
+                                })}
+                                disabled={actionLoading === request.transfert?.id}
+                              >
+                                <CheckCircle2 size={12} className="mr-1" />
+                                Valider
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="flex-1 h-7 text-[10px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20"
+                                onClick={() => setConfirmAction({
+                                  type: 'reject-opening',
+                                  transfert: {
+                                    id: request.transfert?.id,
+                                    montant: request.montantDemande || request.transfert?.montant,
+                                    caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                    caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                    requestedByNom: request.transfert?.requestedByNom
+                                  }
+                                })}
+                                disabled={actionLoading === request.transfert?.id}
+                              >
+                                <XCircle size={12} className="mr-1" />
+                                Rejeter
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -814,11 +862,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                    </Button>
               </div>
               
-              <ResponsiveTable 
+              <ResponsiveTable
                   data={transferts}
                   columns={columns}
                   emptyMessage="Aucune demande de transfert en cours."
                   density="compact"
+                  onRowClick={(row) => setSelectedTransfert(row)}
+                  actions={(row) => renderRowActions(row)}
               />
             </Card>
             </>
@@ -838,23 +888,33 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         isLoading={!!actionLoading}
       />
 
-      <ProvisionCoffreModal 
-        open={showProvisionModal} 
+      <ProvisionCoffreModal
+        open={showProvisionModal}
         onOpenChange={setShowProvisionModal}
         agenceId={agenceId}
       />
+
+      {/* Slider détails transfert */}
+      {selectedTransfert && (
+        <TransfertDetailPanel
+          transfert={selectedTransfert}
+          onClose={() => setSelectedTransfert(null)}
+        />
+      )}
     </div>
   );
 }
 
 function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
+    const [selectedMouvement, setSelectedMouvement] = useState<any>(null);
+
     const { data, isLoading, refetch, isRefetching } = useQuery({
         queryKey: coffreKeys.mouvements(agenceId),
         queryFn: () => coffreApi.getMouvements({ agenceId, limit: 100 }),
     });
 
     const mouvements = data?.data || [];
-    
+
     const columns = [
         {
             key: 'dateOperation',
@@ -877,8 +937,8 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
                 const isCredit = row.sens === 'CREDIT';
                 return (
                     <div className="flex items-center gap-1.5">
-                        <Badge 
-                            variant={isCredit ? 'success' : 'warning'} 
+                        <Badge
+                            variant={isCredit ? 'success' : 'warning'}
                             icon={isCredit ? <ArrowDownRight size={10} /> : <ArrowUpRight size={10} />}
                             className="px-1 py-0 text-[9px] h-4"
                             value={isCredit ? 'Entrée' : 'Sortie'}
@@ -891,7 +951,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             }
         },
         {
-            key: 'description', 
+            key: 'description',
             label: 'Description',
             format: (_: any, row: any) => (
                 <div className="flex flex-col max-w-[200px]">
@@ -925,36 +985,309 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
     );
 
     return (
-        <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-            <div className="p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/40">
-                <div className="flex items-center gap-2">
-                    <Clock className="text-slate-500" size={14} />
-                    <h3 className="font-bold text-white text-xs">Historique</h3>
+        <>
+            <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
+                <div className="p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/40">
+                    <div className="flex items-center gap-2">
+                        <Clock className="text-slate-500" size={14} />
+                        <h3 className="font-bold text-white text-xs">Historique</h3>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
+                        className="h-6 px-2 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800"
+                    >
+                        <Loader2
+                            size={10}
+                            className={`mr-1 ${isRefetching ? 'animate-spin text-blue-400' : 'text-slate-400'}`}
+                        />
+                        Act.
+                    </Button>
                 </div>
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => refetch()}
-                    disabled={isRefetching}
-                    className="h-6 px-2 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800"
-                >
-                    <Loader2 
-                        size={10} 
-                        className={`mr-1 ${isRefetching ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
+
+                <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                    <ResponsiveTable
+                        data={mouvements}
+                        columns={columns}
+                        emptyMessage="Aucun mouvement."
+                        density="compact"
+                        className="text-[10px]"
+                        onRowClick={(row) => setSelectedMouvement(row)}
                     />
-                    Act.
-                </Button>
-            </div>
-            
-            <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                <ResponsiveTable 
-                    data={mouvements}
-                    columns={columns}
-                    emptyMessage="Aucun mouvement."
-                    density="compact"
-                    className="text-[10px]"
+                </div>
+            </Card>
+
+            {/* Panneau de détails */}
+            {selectedMouvement && (
+                <MouvementDetailPanel
+                    mouvement={selectedMouvement}
+                    onClose={() => setSelectedMouvement(null)}
                 />
+            )}
+        </>
+    );
+}
+
+/** Slider de détails d'un mouvement coffre */
+function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose: () => void }) {
+    const isCredit = mouvement.sens === 'CREDIT';
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                onClick={onClose}
+            />
+
+            {/* Slider Panel */}
+            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[100vw] sm:max-w-sm bg-slate-900 border-l border-slate-700 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+                {/* Header */}
+                <div className={`p-3 sm:p-4 border-b border-slate-700 flex items-center justify-between ${isCredit ? 'bg-emerald-500/10' : 'bg-amber-500/10'} shrink-0`}>
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isCredit ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                            {isCredit ? (
+                                <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                            ) : (
+                                <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-white text-sm sm:text-base">
+                                {isCredit ? 'Entrée de fonds' : 'Sortie de fonds'}
+                            </h3>
+                            <p className="text-[10px] sm:text-xs text-slate-400 truncate">
+                                {getMouvementCoffreLabel(mouvement.typePaiement || mouvement.metadata?.type || mouvement.sourceModule)}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
+                    >
+                        <XCircle size={20} />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20">
+                    {/* Montant */}
+                    <div className="text-center py-3 sm:py-4 bg-slate-800/50 rounded-lg">
+                        <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide">Montant</span>
+                        <div className={`text-xl sm:text-2xl font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {isCredit ? '+' : '-'} {Number(mouvement.montant).toLocaleString()} FCFA
+                        </div>
+                    </div>
+
+                    {/* Détails */}
+                    <div className="space-y-1">
+                        <DetailRow
+                            label="Date & Heure"
+                            value={format(new Date(mouvement.dateOperation), "dd MMM yyyy HH:mm", { locale: fr })}
+                        />
+
+                        {(mouvement.metadata?.description || mouvement.metadata?.motif) && (
+                            <DetailRow
+                                label="Description"
+                                value={mouvement.metadata?.description || mouvement.metadata?.motif}
+                            />
+                        )}
+
+                        {mouvement.reference && (
+                            <DetailRow label="Référence" value={mouvement.reference} mono />
+                        )}
+
+                        {mouvement.initiator && (
+                            <DetailRow
+                                label="Effectué par"
+                                value={`${mouvement.initiator.prenom || ''} ${mouvement.initiator.nom || ''}`.trim() || 'Système'}
+                            />
+                        )}
+
+                        {mouvement.metadata?.numeroPiece && (
+                            <DetailRow label="N° Pièce" value={mouvement.metadata.numeroPiece} mono />
+                        )}
+
+                        {mouvement.sourceModule && (
+                            <DetailRow label="Module" value={mouvement.sourceModule} />
+                        )}
+
+                        {mouvement.soldeApres !== undefined && (
+                            <DetailRow
+                                label="Solde après"
+                                value={`${Number(mouvement.soldeApres).toLocaleString()} FCFA`}
+                                mono
+                            />
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900">
+                    <Button
+                        variant="secondary"
+                        className="w-full h-9 text-xs"
+                        onClick={onClose}
+                    >
+                        Fermer
+                    </Button>
+                </div>
             </div>
-        </Card>
+        </>
+    );
+}
+
+/** Slider de détails d'un transfert coffre */
+function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose: () => void }) {
+    const isSortie = transfert.typeTransfert === 'COFFRE_VERS_CAISSE';
+    const statusMap: Record<string, { color: string; bg: string; label: string }> = {
+        [StatutTransfertCoffre.REQUESTED]: { color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'En attente' },
+        [StatutTransfertCoffre.VALIDATED]: { color: 'text-blue-400', bg: 'bg-blue-500/10', label: 'Validé' },
+        [StatutTransfertCoffre.EXECUTED]: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Exécuté' },
+        [StatutTransfertCoffre.REJECTED]: { color: 'text-red-400', bg: 'bg-red-500/10', label: 'Rejeté' },
+        [StatutTransfertCoffre.CANCELLED]: { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Annulé' },
+    };
+    const statusVariant = statusMap[transfert.statut as string] || { color: 'text-slate-400', bg: 'bg-slate-500/10', label: transfert.statut };
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                onClick={onClose}
+            />
+
+            {/* Slider Panel */}
+            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[100vw] sm:max-w-sm bg-slate-900 border-l border-slate-700 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+                {/* Header */}
+                <div className={`p-3 sm:p-4 border-b border-slate-700 flex items-center justify-between shrink-0 ${isSortie ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isSortie ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}>
+                            {isSortie ? (
+                                <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                            ) : (
+                                <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-white text-sm sm:text-base">
+                                {isSortie ? 'Coffre → Caisse' : 'Caisse → Coffre'}
+                            </h3>
+                            <p className="text-[10px] sm:text-xs text-slate-400">Demande de transfert</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
+                    >
+                        <XCircle size={20} />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20">
+                    {/* Statut */}
+                    <div className={`text-center py-2 rounded-lg ${statusVariant.bg}`}>
+                        <span className={`text-xs sm:text-sm font-semibold ${statusVariant.color}`}>
+                            {statusVariant.label}
+                        </span>
+                    </div>
+
+                    {/* Montant */}
+                    <div className="text-center py-3 sm:py-4 bg-slate-800/50 rounded-lg">
+                        <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide">Montant</span>
+                        <div className={`text-xl sm:text-2xl font-bold font-mono ${isSortie ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {Number(transfert.montant).toLocaleString()} FCFA
+                        </div>
+                    </div>
+
+                    {/* Détails */}
+                    <div className="space-y-1">
+                        <DetailRow
+                            label="Date demande"
+                            value={format(new Date(transfert.createdAt), "dd MMM yyyy HH:mm", { locale: fr })}
+                        />
+
+                        <DetailRow
+                            label="Caisse"
+                            value={isSortie ? transfert.caisseDestinationNom : transfert.caisseSourceNom}
+                        />
+
+                        <DetailRow
+                            label="Demandé par"
+                            value={`${transfert.requestedByPrenom || ''} ${transfert.requestedByNom || ''}`.trim() || '-'}
+                        />
+
+                        {transfert.validatedByNom && (
+                            <DetailRow
+                                label="Validé par"
+                                value={`${transfert.validatedByPrenom || ''} ${transfert.validatedByNom || ''}`.trim()}
+                            />
+                        )}
+
+                        {transfert.validatedAt && (
+                            <DetailRow
+                                label="Date validation"
+                                value={format(new Date(transfert.validatedAt), "dd/MM/yyyy HH:mm", { locale: fr })}
+                            />
+                        )}
+
+                        {transfert.executedByNom && (
+                            <DetailRow
+                                label="Exécuté par"
+                                value={`${transfert.executedByPrenom || ''} ${transfert.executedByNom || ''}`.trim()}
+                            />
+                        )}
+
+                        {transfert.executedAt && (
+                            <DetailRow
+                                label="Date exécution"
+                                value={format(new Date(transfert.executedAt), "dd/MM/yyyy HH:mm", { locale: fr })}
+                            />
+                        )}
+
+                        {transfert.motif && (
+                            <DetailRow label="Motif" value={transfert.motif} />
+                        )}
+
+                        {transfert.reference && (
+                            <DetailRow label="Référence" value={transfert.reference} mono />
+                        )}
+
+                        {transfert.rejectionReason && (
+                            <div className="mt-3 p-2 sm:p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                                <span className="text-[10px] sm:text-xs text-red-400 font-medium block mb-1">Motif de rejet</span>
+                                <span className="text-xs sm:text-sm text-red-300">{transfert.rejectionReason}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900">
+                    <Button
+                        variant="secondary"
+                        className="w-full h-9 text-xs"
+                        onClick={onClose}
+                    >
+                        Fermer
+                    </Button>
+                </div>
+            </div>
+        </>
+    );
+}
+
+/** Ligne de détail réutilisable */
+function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+    return (
+        <div className="flex justify-between items-start gap-2 sm:gap-4 py-1.5 sm:py-2 border-b border-slate-800 last:border-0">
+            <span className="text-[10px] sm:text-xs text-slate-500 shrink-0">{label}</span>
+            <span className={`text-xs sm:text-sm text-white text-right break-words min-w-0 ${mono ? 'font-mono text-[10px] sm:text-xs' : ''}`}>
+                {value}
+            </span>
+        </div>
     );
 }

@@ -1,5 +1,8 @@
 import type { Express, Request, Response } from "express";
+import { createLogger } from "../lib/logger";
 import { storage } from "../storage";
+
+const logger = createLogger('Routes:Accounting');
 import { insertJournalSchema, insertDeclarationTvaSchema } from "@shared/schema";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, toHttpError, getErrorMessage, manualEntrySchema } from "./utils";
 import { requireAuth } from "../auth";
@@ -36,7 +39,8 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   app.get("/api/comptabilite/plan-ohada", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
-    const comptes = await storage.getAllComptesComptables();
+    // Return accounts with real-time calculated balances
+    const comptes = await storage.getAllComptesComptablesWithBalances();
     res.json(addSnakeCaseAliasesDeep(comptes));
   });
 
@@ -142,7 +146,7 @@ export function registerAccountingRoutes(app: Express) {
         type: resultatNet >= 0 ? 'benefice' : 'perte'
       });
     } catch (error: unknown) {
-      console.error('Erreur compte de résultat:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur compte de résultat');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -163,7 +167,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(entries));
     } catch (error: unknown) {
-      console.error('Erreur écritures journal:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur écritures journal');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -211,7 +215,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
-      console.error('Erreur tableau trésorerie:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur tableau trésorerie');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -264,7 +268,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
-      console.error('Erreur TAFIRE:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur TAFIRE');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -300,7 +304,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
-      console.error('Erreur Grand Livre:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur Grand Livre');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -328,7 +332,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
-      console.error('Erreur Balance:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur Balance');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -391,7 +395,7 @@ export function registerAccountingRoutes(app: Express) {
         dateFin,
       });
     } catch (error: unknown) {
-      console.error('Erreur Bilan:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur Bilan');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -416,7 +420,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(periods));
     } catch (error: unknown) {
-      console.error('Erreur récupération périodes:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur récupération périodes');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -455,7 +459,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json({ success: true, message: `Période ${month}/${year} clôturée` });
     } catch (error: unknown) {
-      console.error('Erreur clôture période:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur clôture période');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -500,7 +504,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
-      console.error('Erreur extourne:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur extourne');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -559,7 +563,7 @@ export function registerAccountingRoutes(app: Express) {
         is_balanced: Math.abs(totalDebit - totalCredit) < 0.01
       });
     } catch (error: unknown) {
-      console.error('Erreur détail écriture:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur détail écriture');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -604,7 +608,7 @@ export function registerAccountingRoutes(app: Express) {
         res.json({ posted: false });
       }
     } catch (error: unknown) {
-      console.error('Erreur vérification posting:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur vérification posting');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -649,7 +653,7 @@ export function registerAccountingRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(entries));
     } catch (error: unknown) {
-      console.error('Erreur récupération écritures par source:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur récupération écritures par source');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
     }
@@ -732,7 +736,7 @@ export function registerAccountingRoutes(app: Express) {
         ...result,
       });
     } catch (error: unknown) {
-      console.error('Erreur création écriture manuelle:', getErrorMessage(error));
+      logger.error({ err: error }, 'Erreur création écriture manuelle');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
     }
@@ -848,7 +852,7 @@ export function registerAccountingRoutes(app: Express) {
         },
       });
     } catch (error) {
-      console.error("[Coverage] Report generation failed:", error);
+      logger.error({ err: error }, 'Coverage report generation failed');
       res.status(500).json({ success: false, error: "Failed to generate coverage report" });
     }
   });
@@ -856,7 +860,7 @@ export function registerAccountingRoutes(app: Express) {
   const legacyTombstone = (_req: Request, res: Response) => {
     res.set("Deprecation", "true");
     res.set("Sunset", new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
-    console.warn(`[DEPRECATED] Legacy endpoint called: ${_req.method} ${_req.originalUrl}`);
+    logger.warn({ method: _req.method, url: _req.originalUrl }, 'Legacy endpoint called');
     res.status(410).json({
       code: "ENDPOINT_DEPRECATED",
       message: "Cette route est supprimée. Utilisez /api/comptabilite/v2/ecritures pour les écritures.",

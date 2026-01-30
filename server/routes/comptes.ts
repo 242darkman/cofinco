@@ -16,7 +16,10 @@
  */
 
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Comptes');
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { requireAgenceAccess, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
@@ -25,6 +28,10 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { z } from "zod";
 import comptesService, { CompteError } from "../services/comptes";
 import { createVirementProgramme, executeCompteTransfer } from "../services/compte-transfers";
+import { reverseOperation, canReverseOperation, ReversalError } from "../services/caisse/transaction-reversal-service";
+import { duplicateDetection } from "../middleware/duplicate-detection";
+import { enqueueNotification } from "../services/notifications/notification-service";
+import { mouvementsFinanciers, operationsCaisse } from "@shared/schema/finance";
 import { storage } from "../storage";
 import { aliasedTable, and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -171,7 +178,7 @@ export function registerComptesRoutes(app: Express) {
 
         res.json(result);
       } catch (error) {
-        console.error("Error fetching account stats:", error);
+        logger.error({ err: error }, 'Error fetching account stats');
         res.status(500).json({ message: "Erreur lors du chargement des statistiques" });
       }
     }
@@ -302,7 +309,7 @@ export function registerComptesRoutes(app: Express) {
             details: error.errors,
           });
         }
-        console.error("Error creating compte:", error);
+        logger.error({ err: error }, 'Error creating compte');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
@@ -337,7 +344,7 @@ export function registerComptesRoutes(app: Express) {
         const result = await storage.getAllComptesWithClients(filter, options);
         res.json(result);
       } catch (error: any) {
-        console.error("Error listing comptes:", error);
+        logger.error({ err: error }, 'Error listing comptes');
         res.status(500).json({ message: error.message });
       }
     }
@@ -386,7 +393,7 @@ export function registerComptesRoutes(app: Express) {
           ownerName: ownerName || 'Compte trouvé',
         });
       } catch (error: any) {
-        console.error("Error checking account number:", error);
+        logger.error({ err: error }, 'Error checking account number');
         res.status(500).json({ message: error.message });
       }
     }
@@ -478,11 +485,91 @@ export function registerComptesRoutes(app: Express) {
 
             res.json(formatted);
         } catch (error) {
-            console.error("Error fetching pending activations:", error);
+            logger.error({ err: error }, 'Error fetching pending activations');
             res.status(500).json({ message: "Erreur lors du chargement des activations en attente" });
         }
     }
   );
+
+  /**
+   * GET /api/clients/:clientId/kyc-status - Vérifie le statut KYC d'un client
+   * Retourne les documents requis, présents, manquants et le statut global
+   */
+  app.get("/api/clients/:clientId/kyc-status", requireAuth, async (req, res) => {
+    try {
+      const { clientId } = req.params;
+
+      const [client] = await db.select({
+        id: clients.id,
+        documents: clients.documents,
+      }).from(clients).where(eq(clients.id, clientId));
+
+      if (!client) return res.status(404).json({ error: "Client non trouvé" });
+
+      // Required document types for account activation
+      const requiredTypes = ['ID_CARD_FRONT', 'ID_CARD_BACK'];
+      const recommendedTypes = ['PROOF_OF_ADDRESS'];
+
+      // Parse documents from JSONB
+      const docs: Array<{ documentType: string; status: string; documentName?: string }> = Array.isArray(client.documents)
+        ? (client.documents as any[])
+        : [];
+
+      const verifiedDocs = docs.filter(d => d.status === 'verified');
+      const pendingDocs = docs.filter(d => d.status === 'pending');
+      const rejectedDocs = docs.filter(d => d.status === 'rejected');
+
+      const presentTypes = new Set(docs.map(d => d.documentType));
+      const verifiedTypes = new Set(verifiedDocs.map(d => d.documentType));
+
+      const missingRequired = requiredTypes.filter(t => !presentTypes.has(t));
+      const missingRecommended = recommendedTypes.filter(t => !presentTypes.has(t));
+      const unverifiedRequired = requiredTypes.filter(t => presentTypes.has(t) && !verifiedTypes.has(t));
+
+      const allRequiredVerified = requiredTypes.every(t => verifiedTypes.has(t));
+      const allRequiredPresent = requiredTypes.every(t => presentTypes.has(t));
+
+      let kycStatus: 'COMPLETE' | 'INCOMPLETE' | 'PENDING_VERIFICATION' | 'REJECTED';
+      if (allRequiredVerified) {
+        kycStatus = 'COMPLETE';
+      } else if (rejectedDocs.some(d => requiredTypes.includes(d.documentType))) {
+        kycStatus = 'REJECTED';
+      } else if (allRequiredPresent) {
+        kycStatus = 'PENDING_VERIFICATION';
+      } else {
+        kycStatus = 'INCOMPLETE';
+      }
+
+      res.json(addSnakeCaseAliasesDeep({
+        clientId,
+        kycStatus,
+        canActivate: allRequiredPresent, // Allow if docs present (even if not yet verified)
+        requiredDocuments: requiredTypes.map(type => ({
+          type,
+          label: type === 'ID_CARD_FRONT' ? 'Pièce d\'identité (recto)' : type === 'ID_CARD_BACK' ? 'Pièce d\'identité (verso)' : type,
+          present: presentTypes.has(type),
+          verified: verifiedTypes.has(type),
+        })),
+        recommendedDocuments: recommendedTypes.map(type => ({
+          type,
+          label: type === 'PROOF_OF_ADDRESS' ? 'Justificatif de domicile' : type,
+          present: presentTypes.has(type),
+          verified: verifiedTypes.has(type),
+        })),
+        summary: {
+          total: docs.length,
+          verified: verifiedDocs.length,
+          pending: pendingDocs.length,
+          rejected: rejectedDocs.length,
+          missingRequired: missingRequired.length,
+          missingRecommended: missingRecommended.length,
+        },
+      }));
+    } catch (error) {
+      logger.error({ err: error }, 'Erreur KYC status');
+      res.status(500).json({ error: "Erreur lors de la vérification KYC" });
+    }
+  });
 
   /**
    * GET /api/produits-compte - Liste des produits de compte (taux d'intérêt au niveau produit)
@@ -504,10 +591,60 @@ export function registerComptesRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep(produits));
     } catch (error: any) {
-      console.error("Error listing produits compte:", error);
+      logger.error({ err: error }, 'Error listing produits compte');
       res.status(500).json({ message: error.message });
     }
   });
+
+  /**
+   * PATCH /api/produits-compte/:id - Update product rates and fees (Admin only)
+   */
+  app.patch(
+    "/api/produits-compte/:id",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.SETTINGS),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const data = normalizeKeysDeep(req.body) as any;
+
+        // Get current product for audit
+        const [currentProduct] = await db.select().from(produitsCompte).where(eq(produitsCompte.id, id)).limit(1);
+        if (!currentProduct) {
+          return res.status(404).json({ error: "Produit non trouvé" });
+        }
+
+        // Build update object
+        const updateData: any = {};
+        if (data.tauxInteret !== undefined) updateData.tauxInteret = data.tauxInteret?.toString() || null;
+        if (data.frais !== undefined) updateData.frais = data.frais;
+        if (data.regles !== undefined) updateData.regles = data.regles;
+        if (data.actif !== undefined) updateData.actif = data.actif;
+
+        const [updated] = await db
+          .update(produitsCompte)
+          .set(updateData)
+          .where(eq(produitsCompte.id, id))
+          .returning();
+
+        // Log audit
+        await logAudit(req, 'UPDATE', 'produit_compte', id, {
+          before: {
+            tauxInteret: currentProduct.tauxInteret,
+            frais: currentProduct.frais,
+            regles: currentProduct.regles,
+          },
+          after: updateData,
+        }, 'success', 'high');
+
+        res.json(addSnakeCaseAliasesDeep(updated));
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error updating produit compte');
+        res.status(500).json({ error: error.message });
+      }
+    }
+  );
 
   /**
    * POST /api/comptes/transferts - Virement interne immediat ou programme
@@ -580,7 +717,7 @@ export function registerComptesRoutes(app: Express) {
           mouvementId: result.mouvementId,
         });
       } catch (error: any) {
-        console.error("Error compte transfer:", error);
+        logger.error({ err: error }, 'Error compte transfer');
         res.status(400).json({ message: error.message || "Erreur transfert" });
       }
     }
@@ -618,14 +755,17 @@ export function registerComptesRoutes(app: Express) {
             activeCount: sql<number>`sum(case when ${virementsProgrammes.actif} = true then 1 else 0 end)`.mapWith(Number),
             pausedCount: sql<number>`sum(case when ${virementsProgrammes.actif} = false then 1 else 0 end)`.mapWith(Number),
             failedCount: sql<number>`sum(case when ${virementsProgrammes.statutDernier} = 'FAILED' then 1 else 0 end)`.mapWith(Number),
-            // Weighted volume for ALL active transfers
+            // Weighted volume for ALL active transfers (monthly equivalent)
             currentWeightedVolume: sql<number>`sum(
-              case 
-                when ${virementsProgrammes.actif} = true then 
+              case
+                when ${virementsProgrammes.actif} = true then
                   case ${virementsProgrammes.frequence}
-                    when 'daily' then ${virementsProgrammes.montant} * 30
-                    when 'weekly' then ${virementsProgrammes.montant} * 4
-                    when 'monthly' then ${virementsProgrammes.montant}
+                    when 'DAILY' then ${virementsProgrammes.montant} * 30
+                    when 'WEEKLY' then ${virementsProgrammes.montant} * 4
+                    when 'BI_MONTHLY' then ${virementsProgrammes.montant} * 2
+                    when 'MONTHLY' then ${virementsProgrammes.montant}
+                    when 'QUARTERLY' then ${virementsProgrammes.montant} / 3
+                    when 'ONCE' then ${virementsProgrammes.montant}
                     else 0
                   end
                 else 0
@@ -633,12 +773,15 @@ export function registerComptesRoutes(app: Express) {
             )`.mapWith(Number),
             // Weighted volume for transfers created > 30 days ago (Old Baseline)
             oldWeightedVolume: sql<number>`sum(
-              case 
-                when ${virementsProgrammes.actif} = true and ${virementsProgrammes.createdAt} < NOW() - INTERVAL '30 days' then 
+              case
+                when ${virementsProgrammes.actif} = true and ${virementsProgrammes.createdAt} < NOW() - INTERVAL '30 days' then
                   case ${virementsProgrammes.frequence}
-                    when 'daily' then ${virementsProgrammes.montant} * 30
-                    when 'weekly' then ${virementsProgrammes.montant} * 4
-                    when 'monthly' then ${virementsProgrammes.montant}
+                    when 'DAILY' then ${virementsProgrammes.montant} * 30
+                    when 'WEEKLY' then ${virementsProgrammes.montant} * 4
+                    when 'BI_MONTHLY' then ${virementsProgrammes.montant} * 2
+                    when 'MONTHLY' then ${virementsProgrammes.montant}
+                    when 'QUARTERLY' then ${virementsProgrammes.montant} / 3
+                    when 'ONCE' then ${virementsProgrammes.montant}
                     else 0
                   end
                 else 0
@@ -682,7 +825,7 @@ export function registerComptesRoutes(app: Express) {
           trendUp: trend >= 0
         });
       } catch (error: any) {
-        console.error("Error fetching scheduled transfer stats:", error);
+        logger.error({ err: error }, 'Error fetching scheduled transfer stats');
         res.status(500).json({ message: "Erreur lors du chargement des statistiques" });
       }
     }
@@ -801,7 +944,7 @@ export function registerComptesRoutes(app: Express) {
           })
         );
       } catch (error: any) {
-        console.error("Error listing scheduled transfers:", error);
+        logger.error({ err: error }, 'Error listing scheduled transfers');
         res.status(500).json({ message: error.message || "Erreur chargement virements programmes" });
       }
     }
@@ -934,7 +1077,7 @@ export function registerComptesRoutes(app: Express) {
             details: error.errors,
           });
         }
-        console.error("Error updating scheduled transfer:", error);
+        logger.error({ err: error }, 'Error updating scheduled transfer');
         res.status(500).json({ message: error.message || "Erreur mise à jour virement programmé" });
       }
     }
@@ -1020,7 +1163,7 @@ export function registerComptesRoutes(app: Express) {
 
         res.json({ message: "Virement programmé annulé avec succès" });
       } catch (error: any) {
-        console.error("Error deleting scheduled transfer:", error);
+        logger.error({ err: error }, 'Error deleting scheduled transfer');
         res.status(500).json({ message: error.message || "Erreur suppression virement programmé" });
       }
     }
@@ -1131,7 +1274,7 @@ export function registerComptesRoutes(app: Express) {
           });
         }
       } catch (error: any) {
-        console.error("Error running scheduled transfer:", error);
+        logger.error({ err: error }, 'Error running scheduled transfer');
         res.status(500).json({ message: error.message || "Erreur exécution virement programmé" });
       }
     }
@@ -1187,7 +1330,7 @@ export function registerComptesRoutes(app: Express) {
           count: history.length,
         }));
       } catch (error: any) {
-        console.error("Error fetching scheduled transfer history:", error);
+        logger.error({ err: error }, 'Error fetching scheduled transfer history');
         res.status(500).json({ message: error.message || "Erreur chargement historique" });
       }
     }
@@ -1220,7 +1363,7 @@ export function registerComptesRoutes(app: Express) {
           ...health,
         });
       } catch (error: any) {
-        console.error("Error fetching scheduled transfers health:", error);
+        logger.error({ err: error }, 'Error fetching scheduled transfers health');
         res.status(500).json({
           status: "error",
           message: error.message || "Erreur vérification santé",
@@ -1266,7 +1409,7 @@ export function registerComptesRoutes(app: Express) {
 
         res.json(addSnakeCaseAliasesDeep(comptesTransformed));
       } catch (error: any) {
-        console.error("Error listing comptes bloqués:", error);
+        logger.error({ err: error }, 'Error listing comptes bloques');
         res.status(500).json({ message: error.message });
       }
     }
@@ -1297,6 +1440,11 @@ export function registerComptesRoutes(app: Express) {
         const compteAny = compte as any;
         const tauxFromProduit = Number(compteAny.produit?.tauxInteret || compteAny.produit?.taux_interet || compteAny.taux_interet || 0);
 
+        // Pénalité configurable par produit (regles.penaliteRetraitAnticipe), fallback 5%
+        const regles = compteAny.produit?.regles as Record<string, any> | null | undefined;
+        const penaliteProduit = Number(regles?.penaliteRetraitAnticipe);
+        const penaliteRetrait = !isNaN(penaliteProduit) && penaliteProduit >= 0 ? penaliteProduit : 5;
+
         const transformed = {
           id: compte.id,
           numero_compte: compte.numeroCompte,
@@ -1309,7 +1457,7 @@ export function registerComptesRoutes(app: Express) {
             ? Math.round((new Date(compte.blocageFin).getTime() - new Date(compte.createdAt!).getTime()) / (1000 * 60 * 60 * 24 * 30))
             : 0,
           statut: compte.statut,
-          penalite_retrait_anticipe: 5, // Default penalty
+          penalite_retrait_anticipe: penaliteRetrait,
           clients: client ? {
              id: client.id,
              nom: client.nom,
@@ -1322,14 +1470,14 @@ export function registerComptesRoutes(app: Express) {
 
         res.json(addSnakeCaseAliasesDeep(transformed));
       } catch (error: any) {
-        console.error("Error getting compte bloque detail:", error);
+        logger.error({ err: error }, 'Error getting compte bloque detail');
         res.status(500).json({ message: error.message });
       }
     }
   );
 
   /**
-   * GET /api/comptes/:id - Détails d'un compte avec permissions
+   * GET /api/comptes/:id - Détails d'un compte avec permissions et données client
    */
   app.get("/api/comptes/:id", requireAuth, async (req, res) => {
     try {
@@ -1338,6 +1486,39 @@ export function registerComptesRoutes(app: Express) {
         return res.status(404).json({ message: "Compte non trouvé" });
       }
 
+      // Récupérer les données du client associé (compte peut avoir clientId ou client_id)
+      // Note: Les données d'identité (nom, prénom, téléphone, email) sont dans la table users
+      const clientId = compte.clientId || (compte as any).client_id;
+      let clientData = null;
+      if (clientId) {
+        const [result] = await db
+          .select({
+            clientId: clients.id,
+            userId: clients.userId,
+            nom: users.nom,
+            prenom: users.prenom,
+            telephone: users.telephone,
+            email: users.email,
+          })
+          .from(clients)
+          .leftJoin(users, eq(clients.userId, users.id))
+          .where(eq(clients.id, clientId))
+          .limit(1);
+
+        if (result) {
+          clientData = {
+            id: result.clientId,
+            nom: result.nom,
+            prenom: result.prenom,
+            telephone: result.telephone,
+            phone: result.telephone,
+            email: result.email,
+          };
+        }
+      }
+
+      logger.debug({ clientId, clientData, compteId: compte.id }, 'Fetched client data for compte');
+
       // Ajouter les informations de permission de retrait
       const withdrawalCheck = comptesService.canWithdraw(compte);
       const depositCheck = comptesService.canDeposit(compte);
@@ -1345,6 +1526,7 @@ export function registerComptesRoutes(app: Express) {
       res.json(
         addSnakeCaseAliasesDeep({
           ...compte,
+          clients: clientData,
           permissions: {
             canWithdraw: withdrawalCheck.allowed,
             withdrawalBlockedReason: withdrawalCheck.reason,
@@ -1354,7 +1536,7 @@ export function registerComptesRoutes(app: Express) {
         })
       );
     } catch (error: any) {
-      console.error("Error getting compte:", error);
+      logger.error({ err: error }, 'Error getting compte');
       res.status(500).json({ message: error.message });
     }
   });
@@ -1372,6 +1554,7 @@ export function registerComptesRoutes(app: Express) {
     requireAuth,
     attachAbility,
     requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION),
+    duplicateDetection({ windowSeconds: 300 }),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1473,7 +1656,7 @@ export function registerComptesRoutes(app: Express) {
             code: "DUPLICATE_OPERATION",
           });
         }
-        console.error("Error depot:", error);
+        logger.error({ err: error }, 'Error depot');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
@@ -1501,6 +1684,26 @@ export function registerComptesRoutes(app: Express) {
                  return res.status(400).json({ message: "Session de caisse requise" });
             }
 
+            // KYC pre-check: warn if documents are missing (soft block unless force)
+            if (!data.skipKycCheck) {
+                const [compte] = await db.select({ clientId: comptes.clientId }).from(comptes).where(eq(comptes.id, req.params.id));
+                if (compte?.clientId) {
+                    const [client] = await db.select({ documents: clients.documents }).from(clients).where(eq(clients.id, compte.clientId));
+                    const docs: any[] = Array.isArray(client?.documents) ? (client.documents as any[]) : [];
+                    const requiredTypes = ['ID_CARD_FRONT', 'ID_CARD_BACK'];
+                    const presentTypes = new Set(docs.map(d => (d as any).documentType));
+                    const missingRequired = requiredTypes.filter(t => !presentTypes.has(t));
+                    if (missingRequired.length > 0) {
+                        return res.status(422).json({
+                            error: "KYC_INCOMPLETE",
+                            message: `Documents KYC manquants: ${missingRequired.map(t => t === 'ID_CARD_FRONT' ? 'Pièce identité (recto)' : 'Pièce identité (verso)').join(', ')}`,
+                            missingDocuments: missingRequired,
+                            canOverride: true,
+                        });
+                    }
+                }
+            }
+
             const result = await comptesService.payerDepotInitialCompte(
                 req.params.id,
                 {
@@ -1509,7 +1712,7 @@ export function registerComptesRoutes(app: Express) {
                     userId: req.session.user!.id
                 }
             );
-            
+
             // Domain event: account activated
             dispatchDomainEvent({
               type: "ACCOUNT_ACTIVATED",
@@ -1548,7 +1751,7 @@ export function registerComptesRoutes(app: Express) {
 
             res.json(addSnakeCaseAliasesDeep(result));
         } catch (error: any) {
-             console.error("Error depot initial:", error);
+             logger.error({ err: error }, 'Error depot initial');
              const message = error.message || "Erreur serveur";
              
              if (message.includes("Compte introuvable")) {
@@ -1564,6 +1767,129 @@ export function registerComptesRoutes(app: Express) {
   );
 
   /**
+   * POST /api/comptes/batch-activate - Activer plusieurs comptes en attente
+   * Permet l'activation groupée de comptes avec un dépôt initial
+   */
+  app.post(
+    "/api/comptes/batch-activate",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const { accountIds, sessionCaisseId, skipKycCheck } = req.body;
+
+        if (!Array.isArray(accountIds) || accountIds.length === 0) {
+          return res.status(400).json({ message: "Liste de comptes requise" });
+        }
+
+        if (!sessionCaisseId) {
+          return res.status(400).json({ message: "Session de caisse requise" });
+        }
+
+        const results: { success: any[]; failed: any[] } = { success: [], failed: [] };
+
+        for (const accountId of accountIds) {
+          try {
+            // Récupérer le compte et son montant initial requis
+            const [compte] = await db.select().from(comptes).where(eq(comptes.id, accountId));
+
+            if (!compte) {
+              results.failed.push({ accountId, error: "Compte non trouvé" });
+              continue;
+            }
+
+            if (compte.statut !== 'PENDING_ACTIVATION') {
+              results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Compte pas en attente d'activation" });
+              continue;
+            }
+
+            const montantInitial = Number(compte.soldeInitial || compte.depotInitialRequis || 0);
+            if (montantInitial <= 0) {
+              results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Montant initial non défini" });
+              continue;
+            }
+
+            // KYC check si pas ignoré
+            if (!skipKycCheck && compte.clientId) {
+              const [client] = await db.select({ documents: clients.documents }).from(clients).where(eq(clients.id, compte.clientId));
+              const docs: any[] = Array.isArray(client?.documents) ? (client.documents as any[]) : [];
+              const requiredTypes = ['ID_CARD_FRONT', 'ID_CARD_BACK'];
+              const presentTypes = new Set(docs.map(d => (d as any).documentType));
+              const missingRequired = requiredTypes.filter(t => !presentTypes.has(t));
+
+              if (missingRequired.length > 0) {
+                results.failed.push({
+                  accountId,
+                  numeroCompte: compte.numeroCompte,
+                  error: "KYC incomplet",
+                  missingDocuments: missingRequired
+                });
+                continue;
+              }
+            }
+
+            // Activer le compte
+            const result = await comptesService.payerDepotInitialCompte(accountId, {
+              montant: montantInitial,
+              sessionCaisseId,
+              userId: req.session.user!.id
+            });
+
+            results.success.push({
+              accountId,
+              numeroCompte: result.compte.numeroCompte,
+              montant: montantInitial
+            });
+
+            // Dispatch event
+            dispatchDomainEvent({
+              type: "ACCOUNT_ACTIVATED",
+              data: {
+                compteId: result.compte.id,
+                numeroCompte: result.compte.numeroCompte,
+                typeCompte: result.compte.typeCompte,
+                clientId: result.compte.clientId,
+                montantDepose: montantInitial,
+                agenceId: result.compte.agenceId || undefined,
+                batchActivation: true,
+              },
+              timestamp: new Date(),
+              agenceId: result.compte.agenceId || undefined,
+            });
+
+          } catch (error: any) {
+            results.failed.push({
+              accountId,
+              error: error.message || "Erreur d'activation"
+            });
+          }
+        }
+
+        // Broadcast update
+        const wsInstance = getWsInstance();
+        if (wsInstance && req.session.user?.agence) {
+          wsInstance.broadcastToAgency(req.session.user.agence, {
+            type: "DASHBOARD_UPDATE",
+            payload: { batchActivation: true, count: results.success.length }
+          });
+        }
+
+        res.json({
+          success: true,
+          activated: results.success.length,
+          failed: results.failed.length,
+          details: results
+        });
+
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error batch activation');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
    * POST /api/comptes/:id/retrait - Effectuer un retrait
    * CRITIQUE: Vérifie les règles de blocage pour les comptes bloqués
    */
@@ -1572,6 +1898,7 @@ export function registerComptesRoutes(app: Express) {
     requireAuth,
     attachAbility,
     requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION),
+    duplicateDetection({ windowSeconds: 300 }),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1686,7 +2013,7 @@ export function registerComptesRoutes(app: Express) {
             code: "DUPLICATE_OPERATION",
           });
         }
-        console.error("Error retrait:", error);
+        logger.error({ err: error }, 'Error retrait');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
@@ -1757,7 +2084,7 @@ export function registerComptesRoutes(app: Express) {
             code: error.code,
           });
         }
-        console.error("Error bloquer compte:", error);
+        logger.error({ err: error }, 'Error bloquer compte');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
@@ -1835,7 +2162,7 @@ export function registerComptesRoutes(app: Express) {
             code: error.code,
           });
         }
-        console.error("Error debloquer compte:", error);
+        logger.error({ err: error }, 'Error debloquer compte');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
@@ -1892,7 +2219,7 @@ export function registerComptesRoutes(app: Express) {
             code: error.code,
           });
         }
-        console.error("Error transfert agence:", error);
+        logger.error({ err: error }, 'Error transfert agence');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
@@ -1911,7 +2238,7 @@ export function registerComptesRoutes(app: Express) {
         );
         res.json(addSnakeCaseAliasesDeep(historique));
       } catch (error: any) {
-        console.error("Error getting historique agences:", error);
+        logger.error({ err: error }, 'Error getting historique agences');
         res.status(500).json({ message: error.message });
       }
     }
@@ -1926,14 +2253,20 @@ export function registerComptesRoutes(app: Express) {
    */
   app.get("/api/comptes/:id/transactions", requireAuth, async (req, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const transactions = await comptesService.getCompteTransactions(
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const cursor = req.query.cursor as string | undefined;
+      const result = await comptesService.getCompteTransactions(
         req.params.id,
-        limit
+        limit,
+        cursor
       );
-      res.json(addSnakeCaseAliasesDeep(transactions));
+      res.json({
+        data: addSnakeCaseAliasesDeep(result.data),
+        nextCursor: result.nextCursor,
+        hasMore: result.hasMore,
+      });
     } catch (error: any) {
-      console.error("Error getting transactions:", error);
+      logger.error({ err: error }, 'Error getting transactions');
       res.status(500).json({ message: error.message });
     }
   });
@@ -1947,7 +2280,7 @@ export function registerComptesRoutes(app: Express) {
       const portfolio = await comptesService.getClientPortfolio(req.params.id);
       res.json(addSnakeCaseAliasesDeep(portfolio));
     } catch (error: any) {
-      console.error("Error getting portfolio:", error);
+      logger.error({ err: error }, 'Error getting portfolio');
       res.status(500).json({ message: error.message });
     }
   });
@@ -2010,7 +2343,113 @@ export function registerComptesRoutes(app: Express) {
             code: error.code,
           });
         }
-        console.error("Error cloturer compte:", error);
+        logger.error({ err: error }, 'Error cloturer compte');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/comptes/:id/crediter-interets - Créditer des intérêts (atomique)
+   * Crée un mouvement financier + écriture GL + transaction compte en une seule TX.
+   */
+  app.post(
+    "/api/comptes/:id/crediter-interets",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const user = req.session.user;
+
+        const parsed = z.object({
+          montant: z.number().positive(),
+          periode: z.string().min(1),
+          tauxInteret: z.number().min(0),
+          observations: z.string().optional(),
+        }).parse(data);
+
+        const result = await comptesService.crediterInterets(
+          {
+            compteId: req.params.id,
+            montant: parsed.montant,
+            periode: parsed.periode,
+            tauxInteret: parsed.tauxInteret,
+            observations: parsed.observations,
+          },
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "CREDITER_INTERETS",
+          "compte",
+          req.params.id,
+          { montant: parsed.montant, periode: parsed.periode, tauxInteret: parsed.tauxInteret },
+          "success",
+          "medium"
+        );
+
+        // Domain event
+        {
+          const compteInfo = await storage.getCompte(req.params.id);
+          if (compteInfo) {
+            dispatchDomainEvent({
+              type: "INTEREST_CAPITALIZED",
+              data: {
+                compteId: req.params.id,
+                numeroCompte: compteInfo.numeroCompte,
+                clientId: compteInfo.clientId,
+                montantInteret: parsed.montant,
+                nouveauSolde: result.transaction.soldeApres,
+                agenceId: compteInfo.agenceId || undefined,
+              },
+              timestamp: new Date(),
+              agenceId: compteInfo.agenceId || undefined,
+            });
+          }
+        }
+
+        // WebSocket broadcast
+        const wsInstance = getWsInstance();
+        if (wsInstance && user?.agence) {
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "LIVE_ACTIVITY",
+            payload: {
+              action: `Intérêts crédités: ${parsed.montant.toLocaleString()} FCFA`,
+              user: user.nom || "Système",
+              type: "savings",
+              timestamp: new Date().toISOString(),
+            },
+          });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "DASHBOARD_UPDATE",
+            payload: {},
+          });
+        }
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            transaction: result.transaction,
+            mouvement_id: result.mouvement.id,
+            message: "Intérêts crédités avec succès",
+          })
+        );
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        if (error.message?.includes("Duplicate idempotency")) {
+          return res.status(409).json({
+            message: "Opération déjà effectuée (doublon détecté)",
+            code: "DUPLICATE_OPERATION",
+          });
+        }
+        logger.error({ err: error }, 'Error crediter interets');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
@@ -2031,7 +2470,7 @@ export function registerComptesRoutes(app: Express) {
       const stats = await comptesService.getCompteStats(req.params.id, period);
       res.json(stats); // Already JSON structure
     } catch (error: any) {
-      console.error("Error getting stats:", error);
+      logger.error({ err: error }, 'Error getting stats');
       res.status(500).json({ message: error.message });
     }
   });
@@ -2070,8 +2509,419 @@ export function registerComptesRoutes(app: Express) {
             : null,
         });
       } catch (error: any) {
-        console.error("Error checking compte eligibility:", error);
+        logger.error({ err: error }, 'Error checking compte eligibility');
         res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // ================================================================
+  // TRANSACTION REVERSAL / CANCELLATION
+  // ================================================================
+
+  /**
+   * GET /api/comptes/operations/:id/can-reverse
+   * Check if an operation can be reversed (for UI button visibility)
+   */
+  app.get(
+    "/api/comptes/operations/:id/can-reverse",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.EDIT, Subjects.CAISSE_OPERATION),
+    async (req, res) => {
+      try {
+        const result = await canReverseOperation(req.params.id);
+        res.json(result);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Erreur interne";
+        logger.error({ err: error }, 'Error checking reversibility');
+        res.status(500).json({ message });
+      }
+    }
+  );
+
+  /**
+   * POST /api/comptes/operations/:id/cancel
+   * Reverse/cancel a caisse operation by creating compensating entries.
+   * Requires RBAC permission on CAISSE_OPERATION + EDIT action.
+   */
+  app.post(
+    "/api/comptes/operations/:id/cancel",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.EDIT, Subjects.CAISSE_OPERATION),
+    async (req, res) => {
+      try {
+        const user = req.session.user;
+        if (!user) {
+          return res.status(401).json({ message: "Non authentifie" });
+        }
+
+        const cancelSchema = z.object({
+          reason: z.string().min(3, "Le motif doit contenir au moins 3 caracteres"),
+          sessionCaisseId: z.string().uuid().optional(),
+        });
+
+        const data = normalizeKeysDeep(req.body);
+        const parsed = cancelSchema.parse(data);
+
+        const result = await reverseOperation({
+          operationId: req.params.id,
+          reason: parsed.reason,
+          userId: user.id,
+          sessionCaisseId: parsed.sessionCaisseId,
+        });
+
+        await logAudit(
+          req,
+          "ANNULATION_OPERATION_CAISSE",
+          "operation_caisse",
+          req.params.id,
+          {
+            reversalId: result.reversalOperation.id,
+            reason: parsed.reason,
+            montant: result.reversalOperation.montant,
+          },
+          "success",
+          "critical"
+        );
+
+        // Broadcast real-time update
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+          wsInstance.broadcast({
+            type: "CAISSE_UPDATE",
+            payload: {
+              type: "operation_reversed",
+              operationId: req.params.id,
+              reversalId: result.reversalOperation.id,
+              sessionId: result.reversalOperation.sessionId,
+            },
+          });
+        }
+
+        res.json({
+          success: true,
+          reversal: addSnakeCaseAliasesDeep(result.reversalOperation),
+          original: addSnakeCaseAliasesDeep(result.originalOperation),
+          message: "Operation annulee avec succes",
+        });
+      } catch (error: unknown) {
+        if (error instanceof ReversalError) {
+          return res.status(error.httpStatus).json({
+            success: false,
+            code: error.code,
+            message: error.message,
+          });
+        }
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: error.errors.map((e) => e.message).join(", "),
+          });
+        }
+        const message = error instanceof Error ? error.message : "Erreur interne";
+        logger.error({ err: error }, 'Error reversing operation');
+        res.status(500).json({ success: false, message });
+      }
+    }
+  );
+
+  // ================================================================
+  // OPERATION CHAIN (LINKED OPERATIONS)
+  // ================================================================
+
+  /**
+   * GET /api/comptes/operations/:id/chain
+   * Returns a chain of linked operations (original + reversals) for traceability.
+   */
+  app.get(
+    "/api/comptes/operations/:id/chain",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.CAISSE_OPERATION),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        // Load the requested operation
+        const [operation] = await db
+          .select()
+          .from(operationsCaisse)
+          .where(eq(operationsCaisse.id, id));
+
+        if (!operation) {
+          return res.status(404).json({ message: "Opération introuvable" });
+        }
+
+        // Determine the root operation ID
+        const rootId = operation.reversalOfId || operation.id;
+
+        // Fetch the original and all its reversals
+        const chain = await db
+          .select()
+          .from(operationsCaisse)
+          .where(
+            or(
+              eq(operationsCaisse.id, rootId),
+              eq(operationsCaisse.reversalOfId, rootId)
+            )
+          )
+          .orderBy(operationsCaisse.createdAt);
+
+        res.json(chain.map(addSnakeCaseAliasesDeep));
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Erreur interne";
+        logger.error({ err: error }, 'Error fetching operation chain');
+        res.status(500).json({ message });
+      }
+    }
+  );
+
+  // ================================================================
+  // SEND RECEIPT VIA EMAIL/SMS
+  // ================================================================
+
+  /**
+   * POST /api/comptes/operations/:id/send-receipt
+   * Enqueue a receipt notification (SMS or Email) for a caisse operation.
+   */
+  app.post(
+    "/api/comptes/operations/:id/send-receipt",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.CAISSE_OPERATION),
+    async (req, res) => {
+      try {
+        const user = req.session.user;
+        if (!user) {
+          return res.status(401).json({ message: "Non authentifie" });
+        }
+
+        const sendReceiptSchema = z.object({
+          channel: z.enum(["SMS", "EMAIL"]),
+          recipient: z.string().min(1, "Destinataire requis"),
+        });
+
+        const parsed = sendReceiptSchema.parse(normalizeKeysDeep(req.body));
+
+        // Load the operation with its mouvement
+        const [operation] = await db
+          .select()
+          .from(operationsCaisse)
+          .where(eq(operationsCaisse.id, req.params.id));
+
+        if (!operation) {
+          return res.status(404).json({ message: "Operation introuvable" });
+        }
+
+        // Load linked mouvement for details
+        let montant = operation.montant;
+        let reference = operation.reference;
+        let clientName = "Client";
+        let accountNumber = "";
+        let balance = "";
+
+        if (operation.mouvementId) {
+          const [mvt] = await db
+            .select()
+            .from(mouvementsFinanciers)
+            .where(eq(mouvementsFinanciers.id, operation.mouvementId));
+
+          if (mvt?.compteId) {
+            const compte = await storage.getCompte(mvt.compteId);
+            if (compte) {
+              accountNumber = compte.numeroCompte;
+              balance = compte.soldeCourant;
+            }
+          }
+
+          if (mvt?.clientId) {
+            const client = await storage.getClient(mvt.clientId);
+            if (client) {
+              clientName = `${client.prenom || ""} ${client.nom || ""}`.trim() || "Client";
+            }
+          }
+        }
+
+        // Determine template based on operation type
+        const isDeposit = ["DEPOSIT", "DEPOT", "DEPOSIT_SAVINGS", "DEPOSIT_CURRENT"].some(
+          (t) => operation.typeOperation.toUpperCase().includes(t)
+        );
+        const templateCode = isDeposit ? "RECEIPT_DEPOSIT" : "RECEIPT_WITHDRAWAL";
+
+        const correlationId = await enqueueNotification({
+          channel: parsed.channel,
+          templateCode,
+          recipient: parsed.recipient,
+          payload: {
+            clientName,
+            accountNumber,
+            amount: montant,
+            balance,
+            reference,
+            date: new Date(operation.createdAt).toLocaleDateString("fr-FR"),
+            agentName: user.nom || "Agent",
+          },
+          userId: user.id,
+          agenceId: (user as Record<string, string>).agence || undefined,
+        });
+
+        await logAudit(
+          req,
+          "SEND_RECEIPT",
+          "operation_caisse",
+          req.params.id,
+          {
+            channel: parsed.channel,
+            recipient: parsed.recipient,
+            correlationId,
+          },
+          "success",
+          "low"
+        );
+
+        res.json({
+          success: true,
+          message: `Recu envoye par ${parsed.channel}`,
+          correlationId,
+        });
+      } catch (error: unknown) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            success: false,
+            message: error.errors.map((e) => e.message).join(", "),
+          });
+        }
+        const message = error instanceof Error ? error.message : "Erreur interne";
+        logger.error({ err: error }, 'Error sending receipt');
+        res.status(500).json({ success: false, message });
+      }
+    }
+  );
+
+  // ============================================================================
+  // RECONCILIATION ENDPOINT
+  // ============================================================================
+
+  /**
+   * GET /api/comptes/admin/reconcile-sens
+   * Vérifie la cohérence entre sens et typePaiement dans transactions_compte
+   * Retourne les anomalies détectées et optionnellement les corrige
+   */
+  app.get(
+    "/api/comptes/admin/reconcile-sens",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.manage, Subjects.all),
+    async (req, res) => {
+      try {
+        const { fix } = req.query;
+        const shouldFix = fix === 'true';
+
+        // Import deriveSensFromType for verification
+        const { deriveSensFromType } = await import("@shared/config/transaction-labels");
+        const { transactionsCompte } = await import("@shared/schema/finance");
+
+        // Get all transactions with their current sens and typePaiement
+        const allTransactions = await db
+          .select({
+            id: transactionsCompte.id,
+            sens: transactionsCompte.sens,
+            typePaiement: transactionsCompte.typePaiement,
+            compteId: transactionsCompte.compteId,
+            createdAt: transactionsCompte.createdAt,
+          })
+          .from(transactionsCompte)
+          .orderBy(desc(transactionsCompte.createdAt));
+
+        // Check for anomalies
+        const anomalies: Array<{
+          id: string;
+          compteId: string;
+          typePaiement: string;
+          currentSens: string | null;
+          expectedSens: string;
+          createdAt: Date | null;
+        }> = [];
+
+        const stats = {
+          total: allTransactions.length,
+          withSens: 0,
+          withoutSens: 0,
+          correct: 0,
+          incorrect: 0,
+        };
+
+        for (const tx of allTransactions) {
+          const expectedSens = deriveSensFromType(tx.typePaiement);
+
+          if (!tx.sens) {
+            stats.withoutSens++;
+            anomalies.push({
+              id: tx.id,
+              compteId: tx.compteId,
+              typePaiement: tx.typePaiement,
+              currentSens: null,
+              expectedSens,
+              createdAt: tx.createdAt,
+            });
+          } else {
+            stats.withSens++;
+            if (tx.sens === expectedSens) {
+              stats.correct++;
+            } else {
+              stats.incorrect++;
+              anomalies.push({
+                id: tx.id,
+                compteId: tx.compteId,
+                typePaiement: tx.typePaiement,
+                currentSens: tx.sens,
+                expectedSens,
+                createdAt: tx.createdAt,
+              });
+            }
+          }
+        }
+
+        // Fix anomalies if requested
+        let fixedCount = 0;
+        if (shouldFix && anomalies.length > 0) {
+          for (const anomaly of anomalies) {
+            await db
+              .update(transactionsCompte)
+              .set({ sens: anomaly.expectedSens as "DEBIT" | "CREDIT" })
+              .where(eq(transactionsCompte.id, anomaly.id));
+            fixedCount++;
+          }
+
+          await logAudit(
+            req,
+            "RECONCILE_SENS",
+            "transactions_compte",
+            "bulk",
+            { fixedCount, anomaliesCount: anomalies.length },
+            "success",
+            "medium"
+          );
+        }
+
+        res.json({
+          success: true,
+          stats,
+          anomaliesCount: anomalies.length,
+          anomalies: anomalies.slice(0, 100), // Limit to first 100 for response size
+          hasMore: anomalies.length > 100,
+          fixed: shouldFix ? fixedCount : 0,
+          message: shouldFix
+            ? `${fixedCount} transactions corrigées`
+            : `${anomalies.length} anomalies détectées. Ajoutez ?fix=true pour corriger.`,
+        });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Erreur interne";
+        logger.error({ err: error }, 'Error in reconciliation');
+        res.status(500).json({ success: false, message });
       }
     }
   );

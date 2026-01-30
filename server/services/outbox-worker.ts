@@ -2,6 +2,9 @@ import { db } from "../db";
 import { evenementsOutbox } from "@shared/schema";
 import { eq, isNull, asc, sql } from "drizzle-orm";
 import { getWsInstance } from "../ws-server";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Outbox');
 
 let isRunning = false;
 let pollInterval: NodeJS.Timeout | null = null;
@@ -83,7 +86,7 @@ async function processOutboxEvents(): Promise<number> {
               erreur: `Max retries exceeded: ${error.message}`
             })
             .where(eq(evenementsOutbox.id, event.id));
-          console.error(`[Outbox] Event ${event.id} failed permanently:`, error.message);
+          logger.error({ eventId: event.id, error: error.message }, 'Event failed permanently');
         } else {
           await db.update(evenementsOutbox)
             .set({ 
@@ -96,12 +99,12 @@ async function processOutboxEvents(): Promise<number> {
     }
 
     if (publishedCount > 0) {
-      console.log(`[Outbox] Published ${publishedCount} events`);
+      logger.info({ count: publishedCount }, 'Published events');
     }
 
     return publishedCount;
   } catch (error: any) {
-    console.error("[Outbox] Error processing events:", error.message);
+    logger.error({ error: error.message }, 'Error processing events');
     return 0;
   }
 }
@@ -111,12 +114,12 @@ async function processOutboxEvents(): Promise<number> {
  */
 export function startOutboxWorker(): void {
   if (isRunning) {
-    console.log("[Outbox] Worker already running");
+    logger.debug('Worker already running');
     return;
   }
 
   isRunning = true;
-  console.log("[Outbox] Worker started");
+  logger.info('Worker started');
 
   // Initial run
   processOutboxEvents();
@@ -144,7 +147,7 @@ export function stopOutboxWorker(): void {
     pollInterval = null;
   }
 
-  console.log("[Outbox] Worker stopped");
+  logger.info('Worker stopped');
 }
 
 /**

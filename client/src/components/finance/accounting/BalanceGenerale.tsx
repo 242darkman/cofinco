@@ -3,6 +3,7 @@ import { Download, Printer, Filter, Calendar, BarChart3, RefreshCw, ChevronDown 
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import { toast, handleApiError } from '../../../lib/toast';
+import { addPdfLogoHeader } from '../../../lib/pdf-logo';
 import { useBalanceGenerale, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 
 interface BalanceCompte {
@@ -109,33 +110,26 @@ export default function BalanceGenerale() {
     try {
       const doc = new jsPDF('landscape');
 
-      doc.setFontSize(22);
-      doc.setTextColor(30, 58, 138);
-      doc.text('BALANCE GENERALE OHADA', 148, 20, { align: 'center' });
-
-      doc.setFontSize(12);
-      doc.setTextColor(100);
-      doc.text('COFIN&CO-M - Systeme Comptable OHADA', 148, 30, { align: 'center' });
-      doc.text(`Periode: ${dateDebut} au ${dateFin}`, 148, 38, { align: 'center' });
-      doc.text(`Date: ${new Date().toLocaleDateString('fr-FR')}`, 148, 46, { align: 'center' });
-
-      doc.setDrawColor(30, 58, 138);
-      doc.line(20, 52, 277, 52);
+      const startY = addPdfLogoHeader(doc, {
+        title: 'BALANCE GÉNÉRALE OHADA',
+        subtitle: 'Système Comptable OHADA',
+        dateRight: `Période: ${dateDebut} au ${dateFin}`,
+      });
 
       doc.setFontSize(10);
       doc.setTextColor(255);
       doc.setFillColor(30, 58, 138);
-      doc.rect(20, 58, 257, 10, 'F');
-      doc.text('N° Compte', 25, 65);
-      doc.text('Intitule', 60, 65);
-      doc.text('Type', 140, 65);
-      doc.text('Debit', 175, 65);
-      doc.text('Credit', 205, 65);
-      doc.text('Solde D.', 235, 65);
-      doc.text('Solde C.', 260, 65);
+      doc.rect(20, startY, 257, 10, 'F');
+      doc.text('N° Compte', 25, startY + 7);
+      doc.text('Intitule', 60, startY + 7);
+      doc.text('Type', 140, startY + 7);
+      doc.text('Debit', 175, startY + 7);
+      doc.text('Credit', 205, startY + 7);
+      doc.text('Solde D.', 235, startY + 7);
+      doc.text('Solde C.', 260, startY + 7);
 
       doc.setTextColor(0);
-      let y = 75;
+      let y = startY + 17;
       const maxRows = Math.min(filteredBalance.length, 20);
 
       filteredBalance.slice(0, maxRows).forEach((compte) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Monitor, LogOut, MapPin, Clock, AlertCircle, CheckCircle, XCircle, Smartphone, Tablet, Globe, Laptop, AlertTriangle } from 'lucide-react';
-import { Card, Button, IconButton, ResponsiveTable } from '../ui';
+import { Card, Button, IconButton, ResponsiveTable, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { sessionApi } from '../../lib/api-client';
@@ -181,39 +181,40 @@ export default function AdminSessionsManager() {
       <Card variant="default" padding="none" className="overflow-hidden">
         {/* Header & Filters */}
         <div className="p-4 border-b border-edge bg-surface-muted/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
-                  <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-                </div>
-                <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-content-primary">Sessions</h2>
-                  <p className="text-xs sm:text-sm text-content-muted">Gestion des accès ({sessions.length})</p>
-                </div>
-             </div>
-
-             <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
-               {[
-                 { id: 'all', label: 'Toutes' },
-                 { id: 'active', label: 'Actives' },
-                 { id: 'idle', label: 'Inactives' }
-               ].map((tab) => (
-                 <button
-                   key={tab.id}
-                   onClick={() => setFilterStatus(tab.id as any)}
-                   className={`
-                     px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all
-                     ${filterStatus === tab.id 
-                       ? 'bg-primary text-white shadow-sm' 
-                       : 'text-content-muted hover:text-content-primary hover:bg-surface-muted'
-                     }
-                   `}
-                 >
-                   {tab.label}
-                 </button>
-               ))}
-             </div>
-          </div>
+          <FeatureHeader
+            featureKey="admin.sessions"
+            title={FEATURE_DESCRIPTIONS['admin.sessions'].title}
+            subtitle={`${FEATURE_DESCRIPTIONS['admin.sessions'].subtitle} (${sessions.length})`}
+            helpText={FEATURE_DESCRIPTIONS['admin.sessions'].helpText}
+            icon={
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
+                <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+              </div>
+            }
+            actions={
+              <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
+                {[
+                  { id: 'all', label: 'Toutes' },
+                  { id: 'active', label: 'Actives' },
+                  { id: 'idle', label: 'Inactives' }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setFilterStatus(tab.id as any)}
+                    className={`
+                      px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all
+                      ${filterStatus === tab.id
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'text-content-muted hover:text-content-primary hover:bg-surface-muted'
+                      }
+                    `}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            }
+          />
         </div>
 
         {/* Content */}

@@ -1,6 +1,9 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import { requireAuth } from './auth';
 import { logAudit } from './audit';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('MobileMoney');
 import {
   validateTransfer,
   checkBlacklist,
@@ -492,7 +495,7 @@ export function registerMobileMoneyRoutes(app: Express) {
 
       res.json(validation);
     } catch (error: any) {
-      console.error('Validation error:', error);
+      logger.error({ err: error }, 'Validation error');
       res.status(500).json({ 
         valid: false, 
         errors: ['Erreur de validation interne'],
@@ -629,8 +632,8 @@ export function registerMobileMoneyRoutes(app: Express) {
         });
         
         // En production: envoyer OTP par SMS via le service SMS
-        console.log(`[OTP] ${transferRequest.expediteurTelephone}: ${otp} (salt: ${salt})`);
-        
+        logger.info({ phone: transferRequest.expediteurTelephone }, 'OTP generated for transfer validation');
+
         return res.json({
           success: true,
           status: 'otp_required',
@@ -720,7 +723,7 @@ export function registerMobileMoneyRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error('Transfer error:', error);
+      logger.error({ err: error }, 'Transfer error');
       await logAudit(req, 'transfer_error', 'transfer', (req.session as any)?.userId, {
         error: error.message
       }, 'failure', 'high');
@@ -800,7 +803,7 @@ export function registerMobileMoneyRoutes(app: Express) {
         reference
       });
     } catch (error: any) {
-      console.error('OTP verification error:', error);
+      logger.error({ err: error }, 'OTP verification error');
       res.status(500).json({
         success: false,
         message: 'Erreur de vérification'
@@ -863,7 +866,7 @@ export function registerMobileMoneyRoutes(app: Express) {
       });
 
       // En production: envoyer par SMS via le service SMS
-      console.log(`[OTP Resent] Reference ${reference}: ${newOtp} (phone: ${existingOtp.phone})`);
+      logger.info({ reference, phone: existingOtp.phone }, 'OTP resent');
       
       await logAudit(req, 'otp_resent', 'transfer', userId, { reference }, 'success', 'low');
 
@@ -873,7 +876,7 @@ export function registerMobileMoneyRoutes(app: Express) {
         expiresIn: 300
       });
     } catch (error: any) {
-      console.error('Resend OTP error:', error);
+      logger.error({ err: error }, 'Resend OTP error');
       res.status(500).json({
         success: false,
         message: 'Erreur lors du renvoi du code'
@@ -899,7 +902,7 @@ export function registerMobileMoneyRoutes(app: Express) {
         limits: LIMITS_CEMAC.KYC_LEVEL_1
       });
     } catch (error: any) {
-      console.error('Get limits error:', error);
+      logger.error({ err: error }, 'Get limits error');
       res.status(500).json({ error: 'Erreur lors de la récupération des limites' });
     }
   });
@@ -922,7 +925,7 @@ export function registerMobileMoneyRoutes(app: Express) {
         }
       });
     } catch (error: any) {
-      console.error('History error:', error);
+      logger.error({ err: error }, 'History error');
       res.status(500).json({ error: 'Erreur lors de la récupération de l\'historique' });
     }
   });
@@ -940,5 +943,5 @@ export function registerMobileMoneyRoutes(app: Express) {
     }
   });
 
-  console.log('[Mobile Money] Routes sécurisées enregistrées avec rate limiting et OTP');
+  logger.info('Mobile Money routes registered with rate limiting and OTP');
 }

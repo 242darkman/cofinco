@@ -16,6 +16,8 @@ import { agences } from "./agences";
 import {
   notificationChannelEnum,
   notificationJobStatusEnum,
+  notificationScheduleStatusEnum,
+  scheduleSourceTypeEnum,
   otpPurposeEnum,
   otpChannelEnum,
   fallbackPolicyEnum,
@@ -244,3 +246,57 @@ export type InsertNotificationSettings = z.infer<
 >;
 export type NotificationSettings =
   typeof notificationSettings.$inferSelect;
+
+// ============================================================================
+// NOTIFICATION SCHEDULES (Planned reminders for credits & tontines)
+// ============================================================================
+
+export const notificationSchedules = pgTable(
+  "notification_schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceType: scheduleSourceTypeEnum("source_type").notNull(),
+    sourceId: uuid("source_id").notNull(), // credit.id or tontine.id
+    channel: notificationChannelEnum("channel").notNull().default("SMS"),
+    templateCode: text("template_code").notNull(),
+    recipient: text("recipient").notNull(), // phone or email
+    scheduledAt: timestamp("scheduled_at").notNull(), // when to send
+    dueDate: timestamp("due_date").notNull(), // the installment/contribution due date
+    installmentIndex: integer("installment_index").notNull().default(0),
+    dayOffset: integer("day_offset").notNull().default(0), // relative to due date
+    status: notificationScheduleStatusEnum("status").notNull().default("PENDING"),
+    notificationJobId: uuid("notification_job_id").references(() => notificationJobs.id),
+    payload: json("payload").$type<Record<string, unknown>>(),
+    scheduleVersion: integer("schedule_version").notNull().default(1),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    userId: uuid("user_id").references(() => users.id),
+    agenceId: uuid("agence_id").references(() => agences.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxStatusScheduled: index("idx_notif_sched_status_scheduled").on(
+      t.status,
+      t.scheduledAt
+    ),
+    idxSourceTypeId: index("idx_notif_sched_source").on(
+      t.sourceType,
+      t.sourceId
+    ),
+    idxSourceVersion: index("idx_notif_sched_source_version").on(
+      t.sourceId,
+      t.scheduleVersion
+    ),
+    idxUserId: index("idx_notif_sched_user").on(t.userId),
+  })
+);
+
+export const insertNotificationScheduleSchema = createInsertSchema(
+  notificationSchedules
+).omit({ id: true, createdAt: true, updatedAt: true, cancelledAt: true });
+export type InsertNotificationSchedule = z.infer<
+  typeof insertNotificationScheduleSchema
+>;
+export type NotificationSchedule =
+  typeof notificationSchedules.$inferSelect;

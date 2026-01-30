@@ -31,6 +31,9 @@ import { calculateBilletageTotal } from "./session-service";
 import { getWsInstance } from "../../ws-server";
 import { updateCoffreBalance, updateCaisseBalance } from "../coffre/coffre-guard";
 import { balanceService } from "../balance-service";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('SessionOpening');
 
 // ============================================================================
 // TYPES
@@ -319,7 +322,7 @@ export class SessionOpeningService {
             });
           }
         } catch (wsError) {
-          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+          logger.error({ err: wsError }, 'WebSocket notification failed');
         }
 
         return {
@@ -350,7 +353,7 @@ export class SessionOpeningService {
           errorCode: "DB_ERROR",
         };
       }
-      console.error("Error in requestSessionOpening:", error);
+      logger.error({ err: error }, 'Error in requestSessionOpening');
       return {
         success: false,
         error: error.message || "Erreur interne",
@@ -578,7 +581,7 @@ export class SessionOpeningService {
             });
           }
         } catch (wsError) {
-          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+          logger.error({ err: wsError }, 'WebSocket notification failed');
         }
 
         return {
@@ -588,7 +591,7 @@ export class SessionOpeningService {
         };
       });
     } catch (error: any) {
-      console.error("Error in validateOpeningTransfer:", error);
+      logger.error({ err: error }, 'Error in validateOpeningTransfer');
       return {
         success: false,
         error: error.message || "Erreur interne",
@@ -674,7 +677,7 @@ export class SessionOpeningService {
             // Si le transfert est déjà exécuté, on skip l'exécution
             // (cas où le chef d'agence a validé ET exécuté directement depuis le dashboard coffre)
             if (currentTransfert.statut === StatutTransfertCoffre.EXECUTED) {
-              console.log("[SessionOpeningService] Transfert déjà exécuté, on continue l'ouverture de session");
+              logger.info('Transfert already executed, continuing session opening');
             } else if (currentTransfert.statut === StatutTransfertCoffre.VALIDATED) {
               // Transfert validé mais pas encore exécuté - on l'exécute
               const execResult = await this.transfertService.executeTransfert({
@@ -823,7 +826,7 @@ export class SessionOpeningService {
             });
           }
         } catch (wsError) {
-          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+          logger.error({ err: wsError }, 'WebSocket notification failed');
         }
 
         return {
@@ -835,7 +838,7 @@ export class SessionOpeningService {
         };
       });
     } catch (error: any) {
-      console.error("Error in receiveFundsAndOpen:", error);
+      logger.error({ err: error }, 'Error in receiveFundsAndOpen');
       return {
         success: false,
         error: error.message || "Erreur interne",
@@ -1143,13 +1146,13 @@ export class SessionOpeningService {
             }
           }
         } catch (wsError) {
-          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+          logger.error({ err: wsError }, 'WebSocket notification failed');
         }
 
         return { success: true };
       });
     } catch (error: any) {
-      console.error("Error in cancelOpeningRequest:", error);
+      logger.error({ err: error }, 'Error in cancelOpeningRequest');
       return {
         success: false,
         error: error.message || "Erreur interne",
@@ -1430,7 +1433,7 @@ export class SessionOpeningService {
             });
           }
         } catch (wsError) {
-          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+          logger.error({ err: wsError }, 'WebSocket notification failed');
         }
 
         return {
@@ -1439,7 +1442,7 @@ export class SessionOpeningService {
         };
       });
     } catch (error: any) {
-      console.error("Error in openDirectWithExistingFunds:", error);
+      logger.error({ err: error }, 'Error in openDirectWithExistingFunds');
       return {
         success: false,
         error: error.message || "Erreur interne",

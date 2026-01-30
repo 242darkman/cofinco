@@ -14,6 +14,7 @@ import {
   dashboardKeys,
   agentKeys,
   scheduledTransferKeys,
+  treasuryKeys,
   getInvalidationKeysForEntity,
 } from '../lib/query-keys';
 
@@ -50,6 +51,11 @@ type MessageType =
   | "SETTINGS_UPDATE" | "RBAC_UPDATE"
 
   // =============================================
+  // AGENT MODULES
+  // =============================================
+  | "AGENT_MODULES_UPDATE"
+
+  // =============================================
   // LOCALISATION (Agents terrain)
   // =============================================
   | "LOCATION_UPDATE" | "USER_LOCATION"
@@ -59,6 +65,7 @@ type MessageType =
   // =============================================
   | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT"
   | "MAINTENANCE_UPDATE" | "FORCE_LOGOUT"
+  | "SESSION_HEARTBEAT" | "SESSION_HEARTBEAT_RESPONSE" | "SESSION_INVALID"
 
   // =============================================
   // COFFRE-FORT
@@ -69,14 +76,31 @@ type MessageType =
   // =============================================
   // BALANCE & RÉCONCILIATION
   // =============================================
-  | "BALANCE_UPDATED"
+  | "BALANCE_UPDATED" | "TREASURY_UPDATED"
   | "BALANCE_ALERT" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_ERROR"
+  | "TREASURY_RECONCILIATION_ALERT" | "TREASURY_RECONCILIATION_COMPLETE"
+
+  // =============================================
+  // RAPPELS & SCHEDULES
+  // =============================================
+  | "SCHEDULE_UPDATED"
 
   // =============================================
   // VIREMENTS PROGRAMMÉS
   // =============================================
   | "SCHEDULED_TRANSFER_UPDATED" | "SCHEDULED_TRANSFER_EXECUTED"
-  | "SCHEDULED_TRANSFERS_BATCH_COMPLETED";
+  | "SCHEDULED_TRANSFERS_BATCH_COMPLETED"
+
+  // =============================================
+  // MONITORING FINANCIER & ALERTES
+  // =============================================
+  | "MONITORING_ALERT" | "MONITORING_ALERT_UPDATED" | "MONITORING_ALERT_DISMISSED"
+  | "MONITORING_DASHBOARD" | "ALERT_CREATED"
+
+  // =============================================
+  // MIGRATION D'AGENCE
+  // =============================================
+  | "MIGRATION_PROGRESS" | "MIGRATION_STATUS";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -338,16 +362,55 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
   const handleMessage = (message: WebSocketMessage) => {
     switch (message.type) {
-      case "CHAT_MESSAGE":
-        const newMessage = message.payload;
-        queryClient.invalidateQueries({ queryKey: ["/api/messages", newMessage.senderId] });
-        queryClient.invalidateQueries({ queryKey: ["/api/messages", newMessage.receiverId] });
-        queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
-        
-        if (newMessage.senderId !== user?.id) {
-           toast.info(`Nouveau message reçu`);
+      case "CHAT_MESSAGE_V2": {
+        const v2Msg = message.payload;
+        queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
+        if (v2Msg.conversationId) {
+          queryClient.invalidateQueries({ queryKey: ["v2", "conversations", v2Msg.conversationId, "messages"] });
+        }
+        if (v2Msg.message?.senderId !== user?.id) {
+          toast.info(`Nouveau message reçu`);
         }
         break;
+      }
+
+      case "MESSAGE_EDITED":
+      case "MESSAGE_DELETED": {
+        const editPayload = message.payload;
+        if (editPayload.conversationId) {
+          queryClient.invalidateQueries({ queryKey: ["v2", "conversations", editPayload.conversationId, "messages"] });
+        }
+        queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
+        break;
+      }
+
+      case "MESSAGE_REACTION": {
+        const reactPayload = message.payload;
+        if (reactPayload.conversationId) {
+          queryClient.invalidateQueries({ queryKey: ["v2", "conversations", reactPayload.conversationId, "messages"] });
+        }
+        break;
+      }
+
+      case "CONVERSATION_UPDATE": {
+        queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
+        break;
+      }
+
+      case "READ_UPDATE": {
+        queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
+        break;
+      }
+
+      // Legacy V1 handler (backward compat for any remaining V1 code)
+      case "CHAT_MESSAGE": {
+        const newMessage = message.payload;
+        queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
+        if (newMessage.senderId !== user?.id) {
+          toast.info(`Nouveau message reçu`);
+        }
+        break;
+      }
 
       case "NOTIFICATION":
         // Handle forced logout from admin
@@ -409,10 +472,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         });
         break;
 
-      case "READ_RECEIPT":
-         const { readerId } = message.payload;
-         queryClient.invalidateQueries({ queryKey: ["/api/messages", readerId] }); 
+      case "READ_RECEIPT": {
+         queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
          break;
+      }
 
       case "CREDIT_UPDATE":
          // NOTE: Les mises à jour de solde crédit sont gérées par BALANCE_UPDATED
@@ -420,6 +483,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(creditKeys.all);
          // dashboard-stats est invalidé par BALANCE_UPDATED, pas besoin de le faire ici
          window.dispatchEvent(new CustomEvent('credit-update', { detail: message.payload }));
+
+         // Handle refund-related credit updates for sidebar badge
+         if (message.payload?.type === 'refund_created' || message.payload?.type === 'refund_approved') {
+           window.dispatchEvent(new CustomEvent('refund-update', { detail: message.payload }));
+           debounceInvalidate(["/api/credit-refunds"]);
+         }
          break;
 
       case "CLIENT_UPDATE":
@@ -502,6 +571,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(tontineKeys.all);
          break;
 
+      case "SCHEDULE_UPDATED":
+         // Invalidate credit and tontine schedules when reminder schedules change
+         debounceInvalidate(creditKeys.all);
+         debounceInvalidate(tontineKeys.all);
+         break;
+
       case "ACCOUNTING_UPDATE":
          debounceInvalidate(["/api/comptabilite"]);
          debounceInvalidate(["/api/factures"]);
@@ -515,6 +590,26 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          queryClient.invalidateQueries({ queryKey: ["/api/objectifs-mensuels"] });
          queryClient.invalidateQueries({ queryKey: ["/api/paiements-terrain"] });
          break;
+
+      case "AGENT_MODULES_UPDATE": {
+         // Invalidate all agent module queries
+         const agentEntity = message.payload?.entity;
+         if (agentEntity) {
+           debounceInvalidate([`/api/agent-${agentEntity}s`]);
+         } else {
+           // Full invalidation of all agent module queries
+           debounceInvalidate(["/api/agent-commissions"]);
+           debounceInvalidate(["/api/agent-objectifs"]);
+           debounceInvalidate(["/api/agent-planning"]);
+           debounceInvalidate(["/api/agent-rapports"]);
+           debounceInvalidate(["/api/agent-incidents"]);
+           debounceInvalidate(["/api/agent-materiel"]);
+           debounceInvalidate(["/api/agent-communications"]);
+           debounceInvalidate(["/api/agent-formations"]);
+         }
+         window.dispatchEvent(new CustomEvent('agent-modules-update', { detail: message.payload }));
+         break;
+      }
 
       case "SETTINGS_UPDATE":
          queryClient.invalidateQueries({ queryKey: ["/api/system-settings"] });
@@ -603,6 +698,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // NOTE: Les mises à jour de solde compte sont gérées par BALANCE_UPDATED
          // Ce handler reste pour les notifications non-financières
          debounceInvalidate(compteKeys.epargne());
+         debounceInvalidate(compteKeys.lists());
          window.dispatchEvent(new CustomEvent('compte-update', { detail: message.payload }));
          break;
 
@@ -657,6 +753,32 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          }
          break;
 
+      case "SESSION_INVALID":
+         // Session invalidated server-side via WebSocket heartbeat - immediate logout
+         toast.error("SESSION EXPIRÉE", {
+             description: message.payload.message || "Votre session a expiré. Veuillez vous reconnecter.",
+             duration: 5000
+         });
+         setTimeout(() => {
+             authService.logout();
+             window.location.href = '/login';
+         }, 1000);
+         break;
+
+      case "SESSION_HEARTBEAT_RESPONSE":
+         // WebSocket heartbeat response - logout if invalid
+         if (!message.payload.valid) {
+           toast.error("SESSION EXPIRÉE", {
+               description: "Votre session n'est plus valide.",
+               duration: 5000
+           });
+           setTimeout(() => {
+               authService.logout();
+               window.location.href = '/login';
+           }, 1000);
+         }
+         break;
+
       case "BALANCE_UPDATED":
          // Unified balance update handler - invalidates relevant queries based on entityType
          const { eventId, entityType, entityId, newBalance } = message.payload;
@@ -694,6 +816,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
            case 'compte':
              debounceInvalidate(balanceKeys.compte(entityId));
              debounceInvalidate(compteKeys.epargne());
+             debounceInvalidate(compteKeys.lists());
              debounceInvalidate(dashboardKeys.stats());
              break;
            case 'caisse':
@@ -702,6 +825,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
              debounceInvalidate(caisseKeys.sessionActive());
              debounceInvalidate(caisseKeys.operations());
              debounceInvalidate(dashboardKeys.stats());
+             // Invalider aussi l'encaisse Treasury v2 (Single Source of Truth)
+             debounceInvalidate(treasuryKeys.all);
              break;
            case 'credit':
              debounceInvalidate(creditKeys.all);
@@ -717,12 +842,50 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
              debounceInvalidate(coffreKeys.stats());
              debounceInvalidate(coffreKeys.transferts());
              debounceInvalidate(dashboardKeys.stats());
+             // Invalider aussi l'encaisse Treasury v2 (Single Source of Truth)
+             debounceInvalidate(treasuryKeys.all);
              break;
            case 'caisse_agent':
              debounceInvalidate(agentKeys.caisseAgent(entityId));
              break;
          }
          break;
+
+      // ============================================
+      // TREASURY v2 (Encaisse canonique depuis GL)
+      // ============================================
+
+      case "TREASURY_UPDATED":
+         // L'encaisse a changé suite à un posting GL confirmé
+         debounceInvalidate(treasuryKeys.all);
+         debounceInvalidate(dashboardKeys.stats());
+         // Dispatch custom event pour composants écoutant directement
+         window.dispatchEvent(new CustomEvent('treasury-updated', { detail: message.payload }));
+
+         // Log si écart de réconciliation détecté
+         if (message.payload?.reconciliation?.status && message.payload.reconciliation.status !== 'OK') {
+           console.warn('[WS] Écart de réconciliation Treasury:', message.payload.reconciliation);
+         }
+         break;
+
+      case "TREASURY_RECONCILIATION_ALERT": {
+         // Invalider les queries de réconciliation
+         debounceInvalidate(treasuryKeys.all);
+
+         // Dispatch custom event pour le panneau d'alertes (le message custom contrôle sa partie toast)
+         window.dispatchEvent(new CustomEvent('treasury-reconciliation-alert', { detail: message.payload }));
+         break;
+      }
+
+      case "TREASURY_RECONCILIATION_COMPLETE": {
+         // Réconciliation terminée - rafraîchir les données
+         const { summary, globalStatus } = message.payload || {};
+         debounceInvalidate(treasuryKeys.all);
+
+         // Dispatch custom event
+         window.dispatchEvent(new CustomEvent('treasury-reconciliation-complete', { detail: message.payload }));
+         break;
+      }
 
       // ============================================
       // VIREMENTS PROGRAMMÉS (Scheduled Transfers)
@@ -782,6 +945,19 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
              toast.success(`Virements programmés: ${success || 0} exécutés avec succès`);
            }
          }
+         break;
+
+      // ============================================
+      // RESTITUTION FRAIS (Credit Refunds)
+      // ============================================
+
+      case "REFUND_PENDING_CAISSE":
+      case "REFUND_PAID":
+         // Dispatch refund-update event for sidebar badge real-time update
+         window.dispatchEvent(new CustomEvent('refund-update', { detail: message.payload }));
+         // Invalidate refund queries
+         debounceInvalidate(["/api/credit-refunds"]);
+         debounceInvalidate(creditKeys.all);
          break;
     }
   };

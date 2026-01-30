@@ -540,7 +540,9 @@ export const frequenceVirementEnum = pgEnum("frequence_virement_enum", [
   "ONCE",
   "DAILY",
   "WEEKLY",
+  "BI_MONTHLY",
   "MONTHLY",
+  "QUARTERLY",
 ]);
 
 // ============================================
@@ -692,6 +694,18 @@ export const notificationJobStatusEnum = pgEnum("notification_job_status_enum", 
   "SENT",
   "FAILED",
   "DEAD_LETTER",
+]);
+
+export const notificationScheduleStatusEnum = pgEnum("notification_schedule_status_enum", [
+  "PENDING",
+  "SENT",
+  "CANCELLED",
+  "SKIPPED",
+]);
+
+export const scheduleSourceTypeEnum = pgEnum("schedule_source_type_enum", [
+  "CREDIT",
+  "TONTINE",
 ]);
 
 export const otpPurposeEnum = pgEnum("otp_purpose_enum", [

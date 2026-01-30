@@ -283,6 +283,62 @@ export class HrService {
   }
 
   /**
+   * Create 'Congé' presence entries for each business day of an approved leave.
+   * Skips days that already have a presence record.
+   */
+  async createLeavePresenceEntries(congeId: number): Promise<number> {
+    const [conge] = await db
+      .select()
+      .from(demandesConges)
+      .where(eq(demandesConges.id, congeId));
+
+    if (!conge) return 0;
+
+    const start = new Date(conge.dateDebut);
+    const end = new Date(conge.dateFin);
+    const current = new Date(start);
+    const datesToCreate: string[] = [];
+
+    while (current <= end) {
+      const day = current.getDay();
+      if (day !== 0 && day !== 6) {
+        datesToCreate.push(current.toISOString().split("T")[0]);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    if (datesToCreate.length === 0) return 0;
+
+    // Find existing presence entries for this employee in the date range
+    const existing = await db
+      .select({ date: presences.date })
+      .from(presences)
+      .where(
+        and(
+          eq(presences.employeId, conge.employeId),
+          gte(presences.date, conge.dateDebut),
+          lte(presences.date, conge.dateFin)
+        )
+      );
+
+    const existingDates = new Set(existing.map((e) => e.date));
+    const newDates = datesToCreate.filter((d) => !existingDates.has(d));
+
+    if (newDates.length === 0) return 0;
+
+    await db.insert(presences).values(
+      newDates.map((date) => ({
+        employeId: conge.employeId,
+        date,
+        statut: "Congé",
+        commentaire: `Congé ${conge.type} (#${conge.id})`,
+      }))
+    );
+
+    return newDates.length;
+  }
+
+  /**
    * Update leave balance when a leave request is submitted
    */
   async onLeaveRequested(employeId: string, dateDebut: string, dateFin: string): Promise<void> {

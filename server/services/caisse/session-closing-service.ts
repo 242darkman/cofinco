@@ -25,13 +25,21 @@ import {
   mouvementsFinanciers,
   operationsCaisse,
   comptageBillets,
+  mmBalanceReconciliations,
+  remisesTerrain,
 } from "@shared/schema";
-import { eq, and, isNull, desc, sql, count } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, count, inArray } from "drizzle-orm";
 import { StatutTransfertCoffre, StatutCaisse, isOperationCaisseEntree, STATUT_SESSION_CAISSE_LABELS, type StatutSessionCaisseType } from "@shared/enum/status-constants";
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
 import { createMouvementFinancier } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
+import { createLogger } from "../../lib/logger";
+import { getDigitalCaisseSummary } from "../mobile-money/mm-caisse-service";
+import { providerRegistry } from "../mobile-money/provider-registry";
+import { agencyClosureService } from "./agency-closure-service";
+
+const logger = createLogger('SessionClosing');
 
 // ============================================================================
 // TYPES
@@ -53,7 +61,34 @@ export interface InitiateCloseResult {
     | "NOT_YOUR_SESSION"
     | "INVALID_STATUS"
     | "PENDING_TRANSACTIONS"
+    | "PENDING_REMISES"
+    | "MM_DISCREPANCY"
     | "DB_ERROR";
+  // Données additionnelles pour le frontend
+  pendingRemises?: PendingRemiseInfo[];
+  mmReconciliation?: MMReconciliationInfo;
+}
+
+// Types pour les vérifications additionnelles
+export interface PendingRemiseInfo {
+  id: string;
+  reference: string;
+  agentId: string;
+  agentNom: string;
+  montantDeclare: number;
+  statut: string;
+  createdAt: Date;
+}
+
+export interface MMReconciliationInfo {
+  hasDiscrepancy: boolean;
+  providers: {
+    provider: 'MTN' | 'AIRTEL';
+    expectedBalance: number;
+    providerBalance: number | null;
+    ecart: number;
+    status: 'MATCHED' | 'DISCREPANCY' | 'API_FAILED';
+  }[];
 }
 
 export interface SubmitCountParams {
@@ -105,6 +140,32 @@ export interface FinalizeCloseResult {
     | "DB_ERROR";
 }
 
+export interface SubmitVerificationCountParams {
+  sessionId: string;
+  verifierId: string;
+  billetage: Record<string, number>;
+  observations?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export interface SubmitVerificationCountResult {
+  success: boolean;
+  verificationTotal?: number;
+  primaryTotal?: number;
+  ecartVerification?: number;
+  matched?: boolean;
+  error?: string;
+  errorCode?: string;
+}
+
+export interface SessionCountsResult {
+  primary: { total: number; billetage: any; countedBy?: string; countedAt?: string } | null;
+  verification: { total: number; billetage: any; countedBy?: string; countedAt?: string } | null;
+  ecartVerification: number | null;
+  matched: boolean | null;
+}
+
 export interface ValidateClosingTransferParams {
   transfertId: string;
   validatorId: string;
@@ -129,12 +190,214 @@ export interface ValidateClosingTransferResult {
 // Seuil d'écart considéré comme "mineur" (en FCFA)
 const ECART_MINEUR_SEUIL = 100;
 
+// Seuil d'écart Mobile Money pour avertissement (en FCFA)
+const MM_DISCREPANCY_THRESHOLD = 1000;
+
 // ============================================================================
 // SERVICE
 // ============================================================================
 
 export class SessionClosingService {
   private transfertService = new TransfertCoffreService();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VÉRIFICATIONS PRÉ-CLÔTURE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Vérifie s'il y a des remises terrain en attente pour cette caisse
+   */
+  async checkPendingAgentRemises(caisseId: string): Promise<{
+    hasPending: boolean;
+    count: number;
+    totalAmount: number;
+    remises: PendingRemiseInfo[];
+  }> {
+    try {
+      // Chercher les remises non réglées destinées à cette caisse
+      const pendingRemises = await db.select({
+        id: remisesTerrain.id,
+        reference: remisesTerrain.reference,
+        agentId: remisesTerrain.agentId,
+        montantDeclare: remisesTerrain.montantDeclare,
+        statut: remisesTerrain.statut,
+        createdAt: remisesTerrain.createdAt,
+        agentNom: users.nom,
+      })
+      .from(remisesTerrain)
+      .leftJoin(users, eq(remisesTerrain.agentId, users.id))
+      .where(and(
+        eq(remisesTerrain.caisseDestinationId, caisseId),
+        inArray(remisesTerrain.statut, ['DRAFT', 'PENDING', 'VALIDATED'])
+      ));
+
+      const totalAmount = pendingRemises.reduce(
+        (sum, r) => sum + Number(r.montantDeclare || 0),
+        0
+      );
+
+      return {
+        hasPending: pendingRemises.length > 0,
+        count: pendingRemises.length,
+        totalAmount,
+        remises: pendingRemises.map(r => ({
+          id: r.id,
+          reference: r.reference || '',
+          agentId: r.agentId,
+          agentNom: r.agentNom || 'Agent inconnu',
+          montantDeclare: Number(r.montantDeclare || 0),
+          statut: r.statut || '',
+          createdAt: r.createdAt || new Date(),
+        })),
+      };
+    } catch (error) {
+      logger.warn({ err: error, caisseId }, 'Erreur vérification remises terrain');
+      // En cas d'erreur, on ne bloque pas la clôture
+      return { hasPending: false, count: 0, totalAmount: 0, remises: [] };
+    }
+  }
+
+  /**
+   * Vérifie les soldes Mobile Money et compare avec les fournisseurs
+   */
+  async checkMobileMoneyBalances(sessionId: string, agenceId: string): Promise<MMReconciliationInfo> {
+    try {
+      // Récupérer les soldes des caisses digitales
+      const summary = await getDigitalCaisseSummary(agenceId);
+
+      const providers: MMReconciliationInfo['providers'] = [];
+      let hasDiscrepancy = false;
+
+      // Vérifier MTN
+      if (summary.mtn.total > 0) {
+        try {
+          const mtnProvider = providerRegistry.get('MTN');
+          if (mtnProvider && typeof mtnProvider.getBalance === 'function') {
+            const startTime = Date.now();
+            const balance = await mtnProvider.getBalance();
+            const responseTime = Date.now() - startTime;
+
+            const expectedBalance = summary.mtn.total;
+            const providerBalance = Number(balance.balance || 0);
+            const ecart = providerBalance - expectedBalance;
+
+            const status = Math.abs(ecart) > MM_DISCREPANCY_THRESHOLD ? 'DISCREPANCY' : 'MATCHED';
+            if (status === 'DISCREPANCY') hasDiscrepancy = true;
+
+            providers.push({
+              provider: 'MTN',
+              expectedBalance,
+              providerBalance,
+              ecart,
+              status,
+            });
+
+            // Enregistrer la réconciliation
+            await db.insert(mmBalanceReconciliations).values({
+              sessionId,
+              provider: 'MTN',
+              expectedBalance: expectedBalance.toString(),
+              providerBalance: providerBalance.toString(),
+              ecart: ecart.toString(),
+              apiCallSuccess: true,
+              apiResponseTimeMs: responseTime.toString(),
+              statut: status,
+            });
+          }
+        } catch (error: any) {
+          logger.warn({ err: error }, 'Erreur récupération balance MTN');
+          providers.push({
+            provider: 'MTN',
+            expectedBalance: summary.mtn.total,
+            providerBalance: null,
+            ecart: 0,
+            status: 'API_FAILED',
+          });
+
+          await db.insert(mmBalanceReconciliations).values({
+            sessionId,
+            provider: 'MTN',
+            expectedBalance: summary.mtn.total.toString(),
+            ecart: '0',
+            apiCallSuccess: false,
+            apiErrorMessage: error.message,
+            statut: 'API_FAILED',
+          });
+        }
+      }
+
+      // Vérifier Airtel
+      if (summary.airtel.total > 0) {
+        try {
+          const airtelProvider = providerRegistry.get('AIRTEL');
+          if (airtelProvider && typeof airtelProvider.getBalance === 'function') {
+            const startTime = Date.now();
+            const balance = await airtelProvider.getBalance();
+            const responseTime = Date.now() - startTime;
+
+            const expectedBalance = summary.airtel.total;
+            const providerBalance = Number(balance.balance || 0);
+            const ecart = providerBalance - expectedBalance;
+
+            const status = Math.abs(ecart) > MM_DISCREPANCY_THRESHOLD ? 'DISCREPANCY' : 'MATCHED';
+            if (status === 'DISCREPANCY') hasDiscrepancy = true;
+
+            providers.push({
+              provider: 'AIRTEL',
+              expectedBalance,
+              providerBalance,
+              ecart,
+              status,
+            });
+
+            await db.insert(mmBalanceReconciliations).values({
+              sessionId,
+              provider: 'AIRTEL',
+              expectedBalance: expectedBalance.toString(),
+              providerBalance: providerBalance.toString(),
+              ecart: ecart.toString(),
+              apiCallSuccess: true,
+              apiResponseTimeMs: responseTime.toString(),
+              statut: status,
+            });
+          }
+        } catch (error: any) {
+          logger.warn({ err: error }, 'Erreur récupération balance Airtel');
+          providers.push({
+            provider: 'AIRTEL',
+            expectedBalance: summary.airtel.total,
+            providerBalance: null,
+            ecart: 0,
+            status: 'API_FAILED',
+          });
+
+          await db.insert(mmBalanceReconciliations).values({
+            sessionId,
+            provider: 'AIRTEL',
+            expectedBalance: summary.airtel.total.toString(),
+            ecart: '0',
+            apiCallSuccess: false,
+            apiErrorMessage: error.message,
+            statut: 'API_FAILED',
+          });
+        }
+      }
+
+      // Mettre à jour la session avec le statut de réconciliation
+      const mmStatus = hasDiscrepancy ? 'DISCREPANCY' : (providers.length > 0 ? 'MATCHED' : 'SKIPPED');
+      await db.update(sessionsCaisse)
+        .set({
+          mmReconciliationStatus: mmStatus,
+          mmReconciliationCompletedAt: new Date(),
+        })
+        .where(eq(sessionsCaisse.id, sessionId));
+
+      return { hasDiscrepancy, providers };
+    } catch (error) {
+      logger.error({ err: error, sessionId, agenceId }, 'Erreur vérification balances MM');
+      return { hasDiscrepancy: false, providers: [] };
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // PHASE A: Initiation de la fermeture (Gel de la session)
@@ -204,6 +467,37 @@ export class SessionClosingService {
           };
         }
 
+        // 4b. Vérifier les remises terrain en attente (hors transaction pour permettre lecture)
+        const remisesCheck = await this.checkPendingAgentRemises(session.caisseId);
+        if (remisesCheck.hasPending) {
+          logger.info({
+            caisseId: session.caisseId,
+            pendingRemises: remisesCheck.count,
+            totalAmount: remisesCheck.totalAmount,
+          }, 'Remises terrain en attente détectées');
+
+          return {
+            success: false,
+            error: `${remisesCheck.count} remise(s) terrain en attente de règlement. Total: ${remisesCheck.totalAmount.toLocaleString()} XOF. Veuillez les traiter avant de fermer.`,
+            errorCode: "PENDING_REMISES" as const,
+            pendingRemises: remisesCheck.remises,
+          };
+        }
+
+        // 4c. Vérifier les soldes Mobile Money (informatif, ne bloque pas)
+        let mmReconciliation: MMReconciliationInfo | undefined;
+        if (session.agenceId) {
+          mmReconciliation = await this.checkMobileMoneyBalances(sessionId, session.agenceId);
+          if (mmReconciliation.hasDiscrepancy) {
+            logger.warn({
+              sessionId,
+              agenceId: session.agenceId,
+              providers: mmReconciliation.providers,
+            }, 'Écart Mobile Money détecté lors de la clôture');
+            // Note: On ne bloque pas la clôture pour les écarts MM, mais on les signale
+          }
+        }
+
         // 5. Calculer le solde théorique de fermeture
         // Solde théorique = Montant d'ouverture + Entrées - Sorties
         const operations = await tx
@@ -226,12 +520,7 @@ export class SessionClosingService {
         const montantOuverture = Number(session.montantOuverture || 0);
         const soldeTheorique = montantOuverture + totalEntrees - totalSorties;
 
-        console.log("[SessionClosingService] Calcul solde théorique:", {
-          montantOuverture,
-          totalEntrees,
-          totalSorties,
-          soldeTheorique,
-        });
+        logger.info({ montantOuverture, totalEntrees, totalSorties, soldeTheorique }, 'Calcul solde theorique');
 
         // 6. Geler la session (passer en CLOSING_COUNT) avec le solde théorique calculé
         const [updatedSession] = await tx
@@ -258,18 +547,25 @@ export class SessionClosingService {
             totalEntrees,
             totalSorties,
             soldeTheorique,
+            mmReconciliation: mmReconciliation || null,
           },
           ipAddress,
           userAgent,
         });
 
+        // 8. Mettre à jour la progression de clôture agence
+        if (session.agenceId) {
+          await agencyClosureService.updateClosureProgress(session.agenceId);
+        }
+
         return {
           success: true,
           session: updatedSession,
+          mmReconciliation,
         };
       });
     } catch (error: any) {
-      console.error("[SessionClosingService] initiateClose error:", error);
+      logger.error({ err: error }, 'initiateClose error');
       return {
         success: false,
         error: error.message || "Erreur lors de l'initiation de la fermeture",
@@ -424,7 +720,7 @@ export class SessionClosingService {
         };
       });
     } catch (error: any) {
-      console.error("[SessionClosingService] submitCount error:", error);
+      logger.error({ err: error }, 'submitCount error');
       return {
         success: false,
         error: error.message || "Erreur lors de la soumission du comptage",
@@ -624,7 +920,7 @@ export class SessionClosingService {
         };
       });
     } catch (error: any) {
-      console.error("[SessionClosingService] finalizeClose error:", error);
+      logger.error({ err: error }, 'finalizeClose error');
       return {
         success: false,
         error: error.message || "Erreur lors de la finalisation de la fermeture",
@@ -786,7 +1082,7 @@ export class SessionClosingService {
         }
       });
     } catch (error: any) {
-      console.error("[SessionClosingService] validateClosingTransfer error:", error);
+      logger.error({ err: error }, 'validateClosingTransfer error');
       return {
         success: false,
         error: error.message || "Erreur lors de la validation du transfert",
@@ -930,7 +1226,7 @@ export class SessionClosingService {
         )
       `);
     } catch (error) {
-      console.warn("[SessionClosingService] Écart audit recording failed (table may not exist):", error);
+      logger.warn({ err: error }, 'Ecart audit recording failed (table may not exist)');
       // Ne pas bloquer le processus si la table d'audit n'existe pas encore
     }
   }
@@ -993,7 +1289,7 @@ export class SessionClosingService {
           }
         } catch (glError: unknown) {
           const message = glError instanceof Error ? glError.message : "Unknown GL error";
-          console.error(`[SessionClosingService] GL posting failed for écart mouvement ${mouvement.id}: ${message}`);
+          logger.error({ mouvementId: mouvement.id, error: message }, 'GL posting failed for ecart mouvement');
           await tx.update(mouvementsFinanciers)
             .set({ glPostingStatus: "FAILED", glPostingError: message })
             .where(eq(mouvementsFinanciers.id, mouvement.id));
@@ -1001,9 +1297,163 @@ export class SessionClosingService {
         }
       }
     } catch (error) {
-      console.error("[SessionClosingService] Écart comptable creation failed:", error);
+      logger.error({ err: error }, 'Ecart comptable creation failed');
       // Ne pas bloquer le processus, mais logger l'erreur
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VERIFICATION COUNT: Second blind count by a different user (supervisor)
+  // ─────────────────────────────────────────────────────────────────────────
+  async submitVerificationCount(params: SubmitVerificationCountParams): Promise<SubmitVerificationCountResult> {
+    const { sessionId, verifierId, billetage, observations, ipAddress, userAgent } = params;
+
+    try {
+      return await db.transaction(async (tx) => {
+        const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionId));
+        if (!session) {
+          return { success: false, error: "Session introuvable", errorCode: "SESSION_NOT_FOUND" };
+        }
+
+        // Must be in CLOSING_VALIDATION (after primary count)
+        if (session.statut !== "CLOSING_VALIDATION") {
+          return { success: false, error: "La session doit être en phase de validation pour un comptage de vérification", errorCode: "INVALID_STATUS" };
+        }
+
+        // Verifier must be different from the cashier
+        if (session.caissierId === verifierId) {
+          return { success: false, error: "Le vérificateur doit être différent du caissier", errorCode: "SAME_USER" };
+        }
+
+        // Check if verification already submitted
+        const existingVerif = await tx
+          .select()
+          .from(comptageBillets)
+          .where(and(eq(comptageBillets.sessionId, sessionId), eq(comptageBillets.typeComptage, "VERIFICATION")));
+
+        if (existingVerif.length > 0) {
+          return { success: false, error: "Un comptage de vérification a déjà été soumis pour cette session", errorCode: "ALREADY_VERIFIED" };
+        }
+
+        const verificationTotal = calculateBilletageTotal(billetage);
+        const primaryTotal = Number(session.montantPhysique || 0);
+        const ecartVerification = verificationTotal - primaryTotal;
+
+        // Record verification count
+        await tx.insert(comptageBillets).values({
+          sessionId,
+          typeComptage: "VERIFICATION",
+          billets10000: billetage["10000"] || 0,
+          billets5000: billetage["5000"] || 0,
+          billets2000: billetage["2000"] || 0,
+          billets1000: billetage["1000"] || 0,
+          billets500: billetage["500"] || 0,
+          pieces250: billetage["250"] || 0,
+          pieces100: billetage["100"] || 0,
+          pieces50: billetage["50"] || 0,
+          pieces25: billetage["25"] || 0,
+          totalCalcule: verificationTotal.toString(),
+          totalDeclare: verificationTotal.toString(),
+          ecart: ecartVerification.toString(),
+          validePar: verifierId,
+          dateValidation: new Date(),
+          observations: observations || "Comptage de vérification",
+        });
+
+        // Audit log
+        await tx.insert(sessionsCaisseAuditLogs).values({
+          sessionId,
+          action: "VERIFICATION_COUNT_SUBMITTED",
+          userId: verifierId,
+          statutAvant: session.statut,
+          statutApres: session.statut, // no status change
+          details: {
+            verificationTotal,
+            primaryTotal,
+            ecartVerification,
+            matched: Math.abs(ecartVerification) <= ECART_MINEUR_SEUIL,
+          },
+          ipAddress,
+          userAgent,
+        });
+
+        return {
+          success: true,
+          verificationTotal,
+          primaryTotal,
+          ecartVerification,
+          matched: Math.abs(ecartVerification) <= ECART_MINEUR_SEUIL,
+        };
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'submitVerificationCount error');
+      return { success: false, error: error.message || "Erreur lors du comptage de vérification", errorCode: "DB_ERROR" };
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET COUNTS: Retrieve primary and verification counts for a session
+  // ─────────────────────────────────────────────────────────────────────────
+  async getSessionCounts(sessionId: string): Promise<SessionCountsResult> {
+    const counts = await db
+      .select({
+        typeComptage: comptageBillets.typeComptage,
+        totalCalcule: comptageBillets.totalCalcule,
+        ecart: comptageBillets.ecart,
+        validePar: comptageBillets.validePar,
+        dateValidation: comptageBillets.dateValidation,
+        billets10000: comptageBillets.billets10000,
+        billets5000: comptageBillets.billets5000,
+        billets2000: comptageBillets.billets2000,
+        billets1000: comptageBillets.billets1000,
+        billets500: comptageBillets.billets500,
+        pieces250: comptageBillets.pieces250,
+        pieces100: comptageBillets.pieces100,
+        pieces50: comptageBillets.pieces50,
+        pieces25: comptageBillets.pieces25,
+        observations: comptageBillets.observations,
+        createdAt: comptageBillets.createdAt,
+      })
+      .from(comptageBillets)
+      .where(eq(comptageBillets.sessionId, sessionId));
+
+    const primary = counts.find(c => c.typeComptage === "FERMETURE");
+    const verification = counts.find(c => c.typeComptage === "VERIFICATION");
+
+    const primaryTotal = primary ? Number(primary.totalCalcule) : null;
+    const verificationTotal = verification ? Number(verification.totalCalcule) : null;
+    const ecartVerification = primaryTotal !== null && verificationTotal !== null
+      ? verificationTotal - primaryTotal
+      : null;
+
+    return {
+      primary: primary ? {
+        total: Number(primary.totalCalcule),
+        billetage: {
+          "10000": primary.billets10000, "5000": primary.billets5000,
+          "2000": primary.billets2000, "1000": primary.billets1000,
+          "500": primary.billets500, "250": primary.pieces250,
+          "100": primary.pieces100, "50": primary.pieces50,
+          "25": primary.pieces25,
+        },
+        countedBy: primary.validePar || undefined,
+        countedAt: primary.createdAt?.toISOString(),
+      } : null,
+      verification: verification ? {
+        total: Number(verification.totalCalcule),
+        billetage: {
+          "10000": verification.billets10000, "5000": verification.billets5000,
+          "2000": verification.billets2000, "1000": verification.billets1000,
+          "500": verification.billets500, "250": verification.pieces250,
+          "100": verification.pieces100, "50": verification.pieces50,
+          "25": verification.pieces25,
+        },
+        countedBy: verification.validePar || undefined,
+        countedAt: verification.createdAt?.toISOString(),
+      } : null,
+      ecartVerification,
+      matched: ecartVerification !== null ? Math.abs(ecartVerification) <= ECART_MINEUR_SEUIL : null,
+    };
   }
 }
 

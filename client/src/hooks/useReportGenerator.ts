@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { requestListAll } from '../lib/api-client';
+import { addPdfLogoHeader, addPdfLogoFooter } from '../lib/pdf-logo';
 
 // ============================================================================
 // TYPES
@@ -40,7 +41,8 @@ export const reportTypes: ReportType[] = [
   { id: 'tontines', label: 'Rapport Tontines', icon: UsersRound, description: 'Activité des groupes de tontine' },
 ];
 
-const COMPANY_NAME = 'COFIN&CO';
+// Constants for HTML print template
+const COMPANY_NAME = 'COFIN&CO-M';
 const COMPANY_SUBTITLE = 'Établissement de Microfinance';
 
 // ============================================================================
@@ -305,47 +307,22 @@ export function useReportGenerator() {
       const H = doc.internal.pageSize.height;
 
       // ── Header ──
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, W, 44, 'F');
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.text(COMPANY_NAME, 14, 18);
-
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(148, 163, 184);
-      doc.text(COMPANY_SUBTITLE, 14, 25);
-
-      doc.setFontSize(12);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text(config.title, 14, 35);
-
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(148, 163, 184);
-      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, W - 14, 18, { align: 'right' });
-      doc.text(`Période: ${fmtDateRange(dateRange.start)} — ${fmtDateRange(dateRange.end)}`, W - 14, 25, { align: 'right' });
-      doc.text(`${data.length} enregistrement${data.length !== 1 ? 's' : ''}`, W - 14, 32, { align: 'right' });
+      const startY = addPdfLogoHeader(doc, {
+        title: config.title,
+        subtitle: `Période: ${fmtDateRange(dateRange.start)} — ${fmtDateRange(dateRange.end)} | ${data.length} enregistrement${data.length !== 1 ? 's' : ''}`,
+        dateRight: `Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`,
+      });
 
       // ── Table ──
       autoTable(doc, {
         head: [config.columns],
         body: data.map(item => config.getRowValues(item)),
-        startY: 52,
+        startY,
         theme: 'striped',
         headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', fontSize: 8, cellPadding: 4 },
         bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59], cellPadding: 3 },
         alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { top: 52, left: 14, right: 14 },
-        didDrawPage: (pd) => {
-          doc.setFontSize(7);
-          doc.setTextColor(148, 163, 184);
-          doc.text(`${COMPANY_NAME} — ${config.title}`, 14, H - 10);
-          doc.text(`Page ${pd.pageNumber} / ${doc.getNumberOfPages()}`, W - 14, H - 10, { align: 'right' });
-        },
+        margin: { top: startY, left: 14, right: 14 },
       });
 
       // ── Summary ──
@@ -376,10 +353,8 @@ export function useReportGenerator() {
         }
       }
 
-      // ── Confidentiality ──
-      doc.setFontSize(7);
-      doc.setTextColor(148, 163, 184);
-      doc.text('Document confidentiel — Ne pas diffuser — République du Congo', W / 2, H - 5, { align: 'center' });
+      // ── Footer ──
+      addPdfLogoFooter(doc, config.title);
 
       doc.save(`rapport_${reportType}_${dateRange.start}_${dateRange.end}.pdf`);
     } finally { setLoading(false); }

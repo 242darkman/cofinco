@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { createLogger } from '../lib/logger';
 import { StorageService } from '../services/storage-service';
 import { requireAuth } from '../auth';
 import { db } from '../db';
@@ -13,9 +14,11 @@ import {
   isPublicFileType
 } from '@shared/config/storage-paths';
 
+const logger = createLogger('Routes:Storage');
+
 // Derive valid types from config — single source of truth
 const validFileTypes = Object.keys(STORAGE_CONFIG) as StorageFileType[];
-const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine', 'prospection'];
+const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine', 'prospection', 'incident', 'conversation'];
 
 const router = Router();
 
@@ -88,7 +91,7 @@ router.get('/files/:key(*)', async (req, res) => {
     if (error?.name === 'NoSuchKey') {
       return res.status(404).json({ error: 'File not found' });
     }
-    console.error('Public file fetch error:', error);
+    logger.error({ err: error }, 'Public file fetch error');
     return res.status(500).json({ error: 'Failed to fetch file' });
   }
 });
@@ -175,7 +178,7 @@ router.get('/documents/:id/view', requireAuth, async (req, res) => {
 
     res.json({ url });
   } catch (error: any) {
-    console.error('Download URL error:', error);
+    logger.error({ err: error }, 'Download URL error');
     res.status(500).json({ error: error.message });
   }
 });
@@ -197,7 +200,7 @@ router.delete('/:key(*)', requireAuth, async (req, res) => {
 
     res.json({ success: true, deleted });
   } catch (error: any) {
-    console.error('Delete error:', error);
+    logger.error({ err: error }, 'Delete error');
     res.status(500).json({ error: error.message });
   }
 });
@@ -263,7 +266,7 @@ router.post('/entity/upload', requireAuth, upload.single('file'), async (req, re
       entityId,
     });
   } catch (error: any) {
-    console.error('Entity upload error:', error);
+    logger.error({ err: error }, 'Entity upload error');
     res.status(500).json({ error: error.message });
   }
 });
@@ -310,7 +313,7 @@ router.post('/entity/presigned-url', requireAuth, async (req, res) => {
       isPublic,
     });
   } catch (error: any) {
-    console.error('Entity presigned URL error:', error);
+    logger.error({ err: error }, 'Entity presigned URL error');
     res.status(500).json({ error: error.message });
   }
 });
@@ -348,7 +351,7 @@ router.delete('/entity/:entityType/:entityId', requireAuth, async (req, res) => 
       totalDeleted: result.publicDeleted + result.privateDeleted,
     });
   } catch (error: any) {
-    console.error('Entity files delete error:', error);
+    logger.error({ err: error }, 'Entity files delete error');
     res.status(500).json({ error: error.message });
   }
 });
@@ -373,7 +376,7 @@ router.get('/entity/:entityType/:entityId/files', requireAuth, async (req, res) 
 
     res.json({ entityType, entityId, files });
   } catch (error: any) {
-    console.error('Entity files list error:', error);
+    logger.error({ err: error }, 'Entity files list error');
     res.status(500).json({ error: error.message });
   }
 });
@@ -403,7 +406,7 @@ router.get('/entity/:entityType/:entityId/count', requireAuth, async (req, res) 
       total: count.public + count.private,
     });
   } catch (error: any) {
-    console.error('Entity files count error:', error);
+    logger.error({ err: error }, 'Entity files count error');
     res.status(500).json({ error: error.message });
   }
 });

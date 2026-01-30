@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, Calendar, BarChart3, AlertCircle, Zap, Building2 } from 'lucide-react';
-import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog } from '../ui';
+import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, Calendar, BarChart3, AlertCircle, Zap, Building2, Send, DollarSign } from 'lucide-react';
+import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
+import CreateClientModal from './CreateClientModal';
 import ClientFilters from './ClientFilters';
 import ClientStatsDashboard from './ClientStatsDashboard';
 import ClientExport from './ClientExport';
@@ -14,8 +15,11 @@ import ClientKYC from './ClientKYC';
 import ClientNotes from './ClientNotes';
 import ClientAnalytics from './ClientAnalytics';
 import ClientHistory from './ClientHistory';
+import ClientGlobalHistory from './ClientGlobalHistory';
 import ClientAlerts from './ClientAlerts';
 import ClientActions from './ClientActions';
+import ClientBulkCommunication from './ClientBulkCommunication';
+import ClientSearch from './ClientSearch';
 import { clientService } from '../../services/clientService';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
@@ -64,6 +68,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   const [activeView, setActiveView] = useState<'list' | 'map' | 'stats'>('list');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showBulkCommunication, setShowBulkCommunication] = useState(false);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -259,7 +265,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
             { id: 'kyc', label: 'KYC', icon: Shield },
             { id: 'notes', label: 'Notes', icon: Edit2 },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-            { id: 'historique', label: 'Historique', icon: Calendar },
+            { id: 'historique', label: 'Activité', icon: Calendar },
+            { id: 'transactions', label: 'Transactions', icon: DollarSign },
             { id: 'alertes', label: 'Alertes', icon: AlertCircle },
             { id: 'actions', label: 'Actions', icon: Zap },
           ].map(tab => (
@@ -284,6 +291,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
           {selectedTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
           {selectedTab === 'analytics' && <ClientAnalytics client={viewingClient} />}
           {selectedTab === 'historique' && <ClientHistory clientId={viewingClient.id} />}
+          {selectedTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
           {selectedTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} />}
           {selectedTab === 'actions' && <ClientActions client={viewingClient} onActionComplete={loadClients} />}
         </div>
@@ -303,7 +311,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
         {/* Edit Form Modal */}
         {showForm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3">
-            <div className="bg-white dark:bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {selectedClient ? (
               <ClientForm
                 client={selectedClient}
                 onSave={handleSaveClient}
@@ -312,7 +320,16 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                   setSelectedClient(null);
                 }}
               />
-            </div>
+            ) : (
+              <CreateClientModal
+                isOpen={true}
+                onClose={() => {
+                  setShowForm(false);
+                  setSelectedClient(null);
+                }}
+                onSave={handleSaveClient}
+              />
+            )}
           </div>
         )}
       </div>
@@ -322,82 +339,98 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   // List view (default)
   return (
     <div className="space-y-4 pb-20 sm:pb-0">
-      {/* Header Mobile-First - Ultra Compact */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div className="flex flex-col min-w-0">
-          <h1 className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent truncate leading-tight">
-            Gestion des Clients
-          </h1>
-          <p className="text-[10px] text-slate-500 font-medium truncate">
-            {clients.length === 0 ? 'Aucun client' : 
-             clients.length === 1 ? '1 client' : 
-             `${clients.length} clients`}
-          </p>
-        </div>
+      {/* Header with contextual help */}
+      <FeatureHeader
+        featureKey="client.list"
+        title={`${FEATURE_DESCRIPTIONS['client.list'].title} (${clients.length})`}
+        subtitle={FEATURE_DESCRIPTIONS['client.list'].subtitle}
+        helpText={FEATURE_DESCRIPTIONS['client.list'].helpText}
+        icon={<Users size={24} />}
+        actions={
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {canCreateClients && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={() => { setSelectedClient(null); setShowForm(true); }}
+                className="shadow-sm shadow-blue-500/20 h-7 text-xs px-2"
+              >
+                <span className="hidden sm:inline">Nouveau</span>
+                <span className="sm:hidden">Nouveau</span>
+              </Button>
+            )}
 
-        {/* Action Bar - Compact */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {canCreateClients && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => { setSelectedClient(null); setShowForm(true); }}
-              className="shadow-sm shadow-blue-500/20 h-7 text-xs px-2"
-            >
-              <span className="hidden sm:inline">Nouveau</span>
-              <span className="sm:hidden">Nouveau</span>
-            </Button>
-          )}
+            <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5" />
 
-          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-
-          <div className="flex items-center gap-0.5">
-            <IconButton
-              icon={activeView === 'list' ? MapPin : activeView === 'map' ? BarChart3 : List}
-              variant="secondary"
-              size="sm"
-              onClick={() => setActiveView(activeView === 'list' ? 'map' : activeView === 'map' ? 'stats' : 'list')}
-              title={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
-              aria-label={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
-              className="h-7 w-7"
-            />
-            <div className="hidden sm:flex items-center gap-0.5">
+            <div className="flex items-center gap-0.5">
               <IconButton
-                icon={RefreshCw}
+                icon={activeView === 'list' ? MapPin : activeView === 'map' ? BarChart3 : List}
                 variant="secondary"
                 size="sm"
-                onClick={loadClients}
-                title="Actualiser"
-                aria-label="Actualiser"
+                onClick={() => setActiveView(activeView === 'list' ? 'map' : activeView === 'map' ? 'stats' : 'list')}
+                title={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
+                aria-label={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
                 className="h-7 w-7"
               />
-              {canImportClients && (
+              <div className="hidden sm:flex items-center gap-0.5">
                 <IconButton
-                  icon={Upload}
+                  icon={Search}
                   variant="secondary"
                   size="sm"
-                  onClick={() => setShowImport(true)}
-                  title="Imp."
-                  aria-label="Importer"
+                  onClick={() => setShowAdvancedSearch(true)}
+                  title="Recherche avancée"
+                  aria-label="Recherche avancée"
                   className="h-7 w-7"
                 />
-              )}
-              {canExportClients && (
                 <IconButton
-                  icon={Download}
+                  icon={RefreshCw}
                   variant="secondary"
                   size="sm"
-                  onClick={() => setShowExport(true)}
-                  title="Exp."
-                  aria-label="Exporter"
+                  onClick={loadClients}
+                  title="Actualiser"
+                  aria-label="Actualiser"
                   className="h-7 w-7"
                 />
-              )}
+                {canImportClients && (
+                  <IconButton
+                    icon={Upload}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowImport(true)}
+                    title="Imp."
+                    aria-label="Importer"
+                    className="h-7 w-7"
+                  />
+                )}
+                {canExportClients && (
+                  <IconButton
+                    icon={Download}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowExport(true)}
+                    title="Exp."
+                    aria-label="Exporter"
+                    className="h-7 w-7"
+                  />
+                )}
+                {clients.length > 0 && (
+                  <IconButton
+                    icon={Send}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowBulkCommunication(true)}
+                    title="Com."
+                    aria-label="Communication en masse"
+                    className="h-7 w-7"
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        }
+        className="px-1"
+      />
 
       {/* Stats View */}
       {activeView === 'stats' && <ClientStatsDashboard />}
@@ -571,16 +604,27 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
       {/* Modals */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3">
-          <div className="bg-white dark:bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <ClientForm
-              client={selectedClient}
-              onSave={handleSaveClient}
-              onClose={() => {
-                setShowForm(false);
-                setSelectedClient(null);
-              }}
-            />
-          </div>
+          {selectedClient ? (
+            <div className="bg-white dark:bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <ClientForm
+                client={selectedClient}
+                onSave={handleSaveClient}
+                onClose={() => {
+                  setShowForm(false);
+                  setSelectedClient(null);
+                }}
+              />
+            </div>
+          ) : (
+             <CreateClientModal
+               isOpen={true}
+               onClose={() => {
+                 setShowForm(false);
+                 setSelectedClient(null);
+               }}
+               onSave={handleSaveClient}
+             />
+          )}
         </div>
       )}
 
@@ -607,6 +651,27 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
             />
           </div>
         </div>
+      )}
+
+      {/* Bulk Communication */}
+      {showBulkCommunication && clients.length > 0 && (
+        <ClientBulkCommunication
+          clients={clients}
+          onClose={() => setShowBulkCommunication(false)}
+          onComplete={() => setShowBulkCommunication(false)}
+        />
+      )}
+
+      {/* Advanced Search */}
+      {showAdvancedSearch && (
+        <ClientSearch
+          onSearch={(filters) => {
+            setSearchFilters(filters);
+            setCurrentPage(1);
+            setShowAdvancedSearch(false);
+          }}
+          onClose={() => setShowAdvancedSearch(false)}
+        />
       )}
 
       {/* Delete Confirmation */}

@@ -11,6 +11,9 @@ import {
   ListObjectsV2Command,
   DeleteObjectsCommand
 } from '@aws-sdk/client-s3';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('Storage');
 import {
   StorageFileType,
   StorageEntityType,
@@ -139,11 +142,11 @@ export class StorageService {
    * Initialize buckets on startup
    */
   static async initializeBuckets() {
-    console.log('🗄️  Initializing MinIO buckets...');
+    logger.info('Initializing MinIO buckets');
     await this.createBucketIfNotExists(PUBLIC_BUCKET, true);
     await this.createBucketIfNotExists(PRIVATE_BUCKET, false);
     await this.ensurePrivateBucket(PRIVATE_BUCKET);
-    console.log('✅ Buckets initialized');
+    logger.info('Buckets initialized');
   }
 
   /**
@@ -152,18 +155,18 @@ export class StorageService {
   private static async createBucketIfNotExists(bucket: string, isPublic: boolean) {
     try {
       await s3Client.send(new HeadBucketCommand({ Bucket: bucket }));
-      console.log(`   ✓ Bucket ${bucket} exists`);
+      logger.debug({ bucket }, 'Bucket exists');
     } catch (error: any) {
       if (error.name === 'NotFound' || error.name === 'NoSuchBucket') {
         await s3Client.send(new CreateBucketCommand({ Bucket: bucket }));
-        console.log(`   ✓ Created bucket ${bucket}`);
+        logger.info({ bucket }, 'Created bucket');
 
         if (isPublic) {
           await this.makePublicReadable(bucket);
-          console.log(`   ✓ Made ${bucket} publicly readable`);
+          logger.info({ bucket }, 'Made bucket publicly readable');
         }
       } else {
-        console.error(`   ✗ Error checking bucket ${bucket}:`, error.message);
+        logger.error({ err: error, bucket }, 'Error checking bucket');
       }
     }
   }
@@ -191,14 +194,14 @@ export class StorageService {
   private static async ensurePrivateBucket(bucket: string) {
     try {
       await s3Client.send(new DeleteBucketPolicyCommand({ Bucket: bucket }));
-      console.log(`   ✓ Removed bucket policy for ${bucket}`);
+      logger.debug({ bucket }, 'Removed bucket policy');
     } catch (error: any) {
       const noPolicy =
         error?.name === 'NoSuchBucketPolicy' ||
         error?.name === 'NoSuchBucket' ||
         error?.Code === 'NoSuchBucketPolicy';
       if (!noPolicy) {
-        console.error(`   ✗ Error removing policy for ${bucket}:`, error.message);
+        logger.error({ err: error, bucket }, 'Error removing policy');
       }
     }
   }
@@ -373,15 +376,15 @@ export class StorageService {
 
     try {
       await this.deleteFile(cleanKey, isPublic);
-      console.log(`🗑️  Deleted file: ${cleanKey} (${isPublic ? 'public' : 'private'})`);
+      logger.info({ key: cleanKey, bucket: isPublic ? 'public' : 'private' }, 'Deleted file');
       return true;
     } catch (error: any) {
       // Si le fichier n'existe pas, ce n'est pas une erreur critique
       if (error?.name === 'NoSuchKey') {
-        console.warn(`⚠️  File not found for deletion: ${cleanKey}`);
+        logger.warn({ key: cleanKey }, 'File not found for deletion');
         return false;
       }
-      console.error(`❌ Error deleting file ${cleanKey}:`, error?.message);
+      logger.error({ err: error, key: cleanKey }, 'Error deleting file');
       throw error;
     }
   }
@@ -526,7 +529,7 @@ export class StorageService {
         } catch (error: any) {
           // Ignorer les erreurs de listing (bucket/prefix inexistant)
           if (error?.name !== 'NoSuchBucket') {
-            console.warn(`⚠️  Error listing files for prefix ${prefix}:`, error?.message);
+            logger.warn({ err: error, prefix }, 'Error listing files for prefix');
           }
         }
       }
@@ -554,14 +557,14 @@ export class StorageService {
     const publicKeys = await this.listEntityFiles(PUBLIC_BUCKET, entityType, entityId);
     if (publicKeys.length > 0) {
       publicDeleted = await this.deleteMultipleFiles(PUBLIC_BUCKET, publicKeys);
-      console.log(`🗑️  Deleted ${publicDeleted} public files for ${entityType}/${entityId}`);
+      logger.info({ count: publicDeleted, entityType, entityId }, 'Deleted public files');
     }
 
     // Supprimer les fichiers privés
     const privateKeys = await this.listEntityFiles(PRIVATE_BUCKET, entityType, entityId);
     if (privateKeys.length > 0) {
       privateDeleted = await this.deleteMultipleFiles(PRIVATE_BUCKET, privateKeys);
-      console.log(`🗑️  Deleted ${privateDeleted} private files for ${entityType}/${entityId}`);
+      logger.info({ count: privateDeleted, entityType, entityId }, 'Deleted private files');
     }
 
     return { publicDeleted, privateDeleted };
@@ -615,14 +618,14 @@ export class StorageService {
 
           keyMapping.set(oldKey, newKey);
         } catch (error: any) {
-          console.error(`Failed to relocate ${oldKey} → ${newKey}:`, error?.message);
+          logger.error({ err: error, oldKey, newKey }, 'Failed to relocate file');
           // Continue with other files
         }
       }
     }
 
     if (keyMapping.size > 0) {
-      console.log(`📦 Relocated ${keyMapping.size} files for ${entityType}: ${oldEntityId} → ${newEntityId}`);
+      logger.info({ count: keyMapping.size, entityType, oldEntityId, newEntityId }, 'Relocated files');
     }
 
     return keyMapping;
@@ -659,10 +662,10 @@ export class StorageService {
         totalDeleted += batch.length - (response.Errors?.length || 0);
 
         if (response.Errors && response.Errors.length > 0) {
-          console.warn(`⚠️  Failed to delete some files:`, response.Errors);
+          logger.warn({ errors: response.Errors }, 'Failed to delete some files');
         }
       } catch (error: any) {
-        console.error(`❌ Error batch deleting files:`, error?.message);
+        logger.error({ err: error }, 'Error batch deleting files');
       }
     }
 
@@ -688,7 +691,7 @@ export class StorageService {
         Bucket: bucket,
         Key: key,
       }));
-      console.log(`🗑️  Deleted file: ${key}`);
+      logger.info({ key }, 'Deleted file');
       return true;
     } catch (error: any) {
       if (error?.name === 'NoSuchKey') {
@@ -753,7 +756,7 @@ export class StorageService {
           } while (continuationToken);
         } catch (error: any) {
           if (error?.name !== 'NoSuchBucket') {
-            console.warn(`Error listing public files for ${prefix}:`, error?.message);
+            logger.warn({ err: error, prefix }, 'Error listing public files');
           }
         }
       }
@@ -789,7 +792,7 @@ export class StorageService {
           } while (continuationToken);
         } catch (error: any) {
           if (error?.name !== 'NoSuchBucket') {
-            console.warn(`Error listing private files for ${prefix}:`, error?.message);
+            logger.warn({ err: error, prefix }, 'Error listing private files');
           }
         }
       }

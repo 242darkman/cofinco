@@ -12,11 +12,12 @@ import { WebSocketProvider } from './contexts/WebSocketContext';
 import { AgenceProvider } from './contexts/AgenceContext';
 import { PermissionsProvider } from './contexts/PermissionsContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { SessionProvider } from './contexts/SessionContext';
 import { UpdatePrompt } from './components/shared/UpdatePrompt';
 import { useServerHealth } from './contexts/ServerHealthContext';
 import NetworkOverlay from './components/shared/NetworkOverlay';
+import SessionExpirationWarning from './components/shared/SessionExpirationWarning';
 
-// Lazy load heavy components
 // Lazy load heavy components
 const COFINPlatform = lazy(() => import('./COFINPlatform'));
 const AgentCaisseInterface = lazy(() => import('./components/agent/AgentCaisseInterface'));
@@ -249,29 +250,36 @@ function App() {
         <AgenceProvider>
           <WebSocketProvider>
             <PermissionsProvider>
-              <ErrorBoundary>
-                <Toaster position="top-right" richColors closeButton />
-                <UpdatePrompt />
-                <LocationTracker />
-                <Suspense fallback={null}>
-                  {isAuthenticated && showSeasonalWelcome && (
-                    <SeasonalWelcome
-                      userName={currentUser?.prenom || currentUser?.username}
-                      onComplete={() => setShowSeasonalWelcome(false)}
-                    />
-                  )}
-                </Suspense>
-                <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
-                  {authService.isAgentCaisse() ? (
-                    <AgentCaisseInterface
-                      agentId={currentUser.id}
-                      onLogout={handleLogout}
-                    />
-                  ) : (
-                    <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
-                  )}
-                </Suspense>
-              </ErrorBoundary>
+              <SessionProvider
+                onSessionInvalid={(reason) => {
+                  handleSessionExpired(reason);
+                }}
+              >
+                <ErrorBoundary>
+                  <Toaster position="top-right" richColors closeButton />
+                  <UpdatePrompt />
+                  <LocationTracker />
+                  <SessionExpirationWarning />
+                  <Suspense fallback={null}>
+                    {isAuthenticated && showSeasonalWelcome && (
+                      <SeasonalWelcome
+                        userName={currentUser?.prenom || currentUser?.username}
+                        onComplete={() => setShowSeasonalWelcome(false)}
+                      />
+                    )}
+                  </Suspense>
+                  <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
+                    {authService.isAgentCaisse() ? (
+                      <AgentCaisseInterface
+                        agentId={currentUser.id}
+                        onLogout={handleLogout}
+                      />
+                    ) : (
+                      <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
+                    )}
+                  </Suspense>
+                </ErrorBoundary>
+              </SessionProvider>
             </PermissionsProvider>
           </WebSocketProvider>
         </AgenceProvider>

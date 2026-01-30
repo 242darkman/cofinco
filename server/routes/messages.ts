@@ -1,5 +1,8 @@
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Messages');
 import { db } from "../db";
 import { messages, users, userAgences, agences, userRoles, employes } from "@shared/schema";
 import { eq, or, and, desc, asc, sql, ne } from "drizzle-orm";
@@ -64,7 +67,7 @@ export function registerMessagesRoutes(app: Express) {
 
       res.json(conversations.rows);
     } catch (error) {
-      console.error("Error fetching conversations:", error);
+      logger.error({ err: error }, 'Error fetching conversations');
       res.status(500).json({ message: "Error fetching conversations" });
     }
   });
@@ -113,7 +116,7 @@ export function registerMessagesRoutes(app: Express) {
 
       res.json(chatHistory);
     } catch (error) {
-      console.error("Error fetching messages:", error);
+      logger.error({ err: error }, 'Error fetching messages');
       res.status(500).json({ message: "Error fetching messages" });
     }
   });
@@ -149,7 +152,7 @@ export function registerMessagesRoutes(app: Express) {
 
       res.json(newMessage);
     } catch (error) {
-      console.error("Error sending message:", error);
+      logger.error({ err: error }, 'Error sending message');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
@@ -205,7 +208,7 @@ export function registerMessagesRoutes(app: Express) {
 
       res.json(foundUsers);
     } catch (error) {
-      console.error("Error searching users:", error);
+      logger.error({ err: error }, 'Error searching users');
       res.status(500).json({ message: "Error searching users" });
     }
   });

@@ -17,17 +17,19 @@ import { getStatusLabel, ALL_STATUS_LABELS } from '@/lib/status-labels';
  * <Badge value="REJECTED" rawValue />  // Affiche "REJECTED" sans traduction
  */
 
-export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' | 'outline';
-export type BadgeSize = 'sm' | 'md' | 'lg';
+export type BadgeVariant = 'success' | 'warning' | 'danger' | 'error' | 'info' | 'neutral' | 'primary' | 'outline' | 'default';
+export type BadgeSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface BadgeProps {
-  value: string | React.ReactNode;
+  value?: string | React.ReactNode;
   variant?: BadgeVariant;
   size?: BadgeSize;
   className?: string;
   icon?: React.ReactNode;
   /** Si true, affiche la valeur brute sans traduction */
   rawValue?: boolean;
+  /** Alternative to value - supports children content */
+  children?: React.ReactNode;
 }
 
 const Badge: React.FC<BadgeProps> = ({
@@ -37,12 +39,16 @@ const Badge: React.FC<BadgeProps> = ({
   className = '',
   icon,
   rawValue = false,
+  children,
 }) => {
+  // Use children as fallback for value
+  const content = value ?? children;
+
   // Traduire la valeur EN -> FR si c'est une string
   const displayValue = React.useMemo(() => {
-    if (rawValue || typeof value !== 'string') return value;
-    return getStatusLabel(value, ALL_STATUS_LABELS, value);
-  }, [value, rawValue]);
+    if (rawValue || typeof content !== 'string') return content;
+    return getStatusLabel(content, ALL_STATUS_LABELS, content);
+  }, [content, rawValue]);
 
   // Auto-detect variant from value if not provided
   const getVariantFromValue = (val: string | React.ReactNode): BadgeVariant => {
@@ -94,21 +100,24 @@ const Badge: React.FC<BadgeProps> = ({
     return 'neutral';
   };
 
-  const detectedVariant = getVariantFromValue(value);
+  const detectedVariant = getVariantFromValue(content);
 
   // Variant color classes (mobile-first)
   const variantClasses = {
     success: 'bg-green-500/20 text-green-400 border-green-500/30',
     warning: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     danger: 'bg-red-500/20 text-red-400 border-red-500/30',
+    error: 'bg-red-500/20 text-red-400 border-red-500/30', // alias for danger
     info: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     neutral: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+    default: 'bg-slate-500/20 text-slate-400 border-slate-500/30', // alias for neutral
     primary: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
     outline: 'bg-transparent text-slate-600 border-slate-300',
   };
 
   // Size classes (mobile-first)
   const sizeClasses = {
+    xs: 'px-1.5 py-0.5 text-[9px] sm:text-[10px]',
     sm: 'px-2 py-0.5 text-[10px] sm:text-xs',
     md: 'px-2 py-1 text-[11px] sm:text-xs',
     lg: 'px-3 py-1.5 text-xs sm:text-sm',

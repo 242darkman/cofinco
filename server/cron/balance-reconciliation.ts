@@ -16,6 +16,9 @@ import cron from "node-cron";
 import { balanceService } from "../services/balance-service";
 import type { ReconciliationReport, ReconciliationResult } from "@shared/types/balances";
 import { getWsInstance } from "../ws-server";
+import { createLogger } from "../lib/logger";
+
+const pinoLogger = createLogger('Cron:BalanceReconciliation');
 
 // Configuration
 const RECONCILIATION_INTERVAL = process.env.BALANCE_RECONCILIATION_INTERVAL_MINUTES || "60";
@@ -39,8 +42,13 @@ interface ReconciliationLogEntry {
 }
 
 function logReconciliation(entry: ReconciliationLogEntry): void {
-  const level = entry.phase === "error" ? "error" : entry.phase === "alert" ? "warn" : "info";
-  console[level](`[Balance Reconciliation]`, entry);
+  if (entry.phase === "error") {
+    pinoLogger.error({ ...entry }, 'Reconciliation error');
+  } else if (entry.phase === "alert") {
+    pinoLogger.warn({ ...entry }, 'Reconciliation alert');
+  } else {
+    pinoLogger.info({ ...entry }, 'Reconciliation status');
+  }
 }
 
 // ============================================
@@ -113,11 +121,13 @@ async function autoCorrectMinorDiscrepancy(result: ReconciliationResult): Promis
 
   try {
     // Log l'action avant correction
-    console.log(`[Balance Reconciliation] Auto-correcting ${result.entityType}/${result.entityId}:`, {
+    pinoLogger.info({
+      entityType: result.entityType,
+      entityId: result.entityId,
       before: result.persistedBalance,
       after: result.calculatedBalance,
       diff: result.discrepancy,
-    });
+    }, `Auto-correcting ${result.entityType}/${result.entityId}`);
 
     // La correction dépend du type d'entité
     // Pour l'instant, on log seulement - la correction réelle serait implémentée
@@ -128,7 +138,7 @@ async function autoCorrectMinorDiscrepancy(result: ReconciliationResult): Promis
 
     return true;
   } catch (error) {
-    console.error(`[Balance Reconciliation] Auto-correction failed:`, error);
+    pinoLogger.error({ err: error }, 'Auto-correction failed');
     return false;
   }
 }
@@ -243,7 +253,7 @@ async function runBalanceReconciliation(): Promise<void> {
  */
 export function startBalanceReconciliationCron(): void {
   if (cronJob) {
-    console.log("[Balance Reconciliation] Cron already running");
+    pinoLogger.info('Cron already running');
     return;
   }
 
@@ -260,7 +270,7 @@ export function startBalanceReconciliationCron(): void {
     await runBalanceReconciliation();
   });
 
-  console.log(`[Balance Reconciliation] Cron job started (every ${RECONCILIATION_INTERVAL} minutes)`);
+  pinoLogger.info({ interval: RECONCILIATION_INTERVAL }, `Cron job started (every ${RECONCILIATION_INTERVAL} minutes)`);
 
   // Exécuter immédiatement au démarrage en mode développement
   if (process.env.NODE_ENV === "development") {
@@ -275,7 +285,7 @@ export function stopBalanceReconciliationCron(): void {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
-    console.log("[Balance Reconciliation] Cron job stopped");
+    pinoLogger.info('Cron job stopped');
   }
 }
 
@@ -284,7 +294,7 @@ export function stopBalanceReconciliationCron(): void {
  * Utile pour les tests ou les interventions manuelles
  */
 export async function runReconciliationNow(): Promise<ReconciliationReport> {
-  console.log("[Balance Reconciliation] Manual run triggered");
+  pinoLogger.info('Manual run triggered');
   await runBalanceReconciliation();
 
   // Retourner le dernier rapport

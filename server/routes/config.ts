@@ -1,6 +1,9 @@
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Config');
 import { addSnakeCaseAliasesDeep } from "./utils";
 import {
   DEFAULT_DURATIONS_CONFIG,
@@ -95,7 +98,7 @@ export function registerConfigRoutes(app: Express) {
         source: "database"
       });
     } catch (error) {
-      console.error("Error fetching durees suggerees:", error);
+      logger.error({ err: error }, 'Error fetching durees suggerees');
       res.status(500).json({ message: "Erreur lors de la recuperation des durees suggerees" });
     }
   });
@@ -114,7 +117,7 @@ export function registerConfigRoutes(app: Express) {
 
       res.json({ frequences });
     } catch (error) {
-      console.error("Error fetching frequences:", error);
+      logger.error({ err: error }, 'Error fetching frequences');
       res.status(500).json({ message: "Erreur lors de la recuperation des frequences" });
     }
   });
@@ -160,7 +163,7 @@ export function registerConfigRoutes(app: Express) {
         message: `${nombreEcheances} echeance${nombreEcheances > 1 ? 's' : ''}`
       });
     } catch (error) {
-      console.error("Error validating duree:", error);
+      logger.error({ err: error }, 'Error validating duree');
       res.status(500).json({ message: "Erreur lors de la validation" });
     }
   });
@@ -199,7 +202,7 @@ export function registerConfigRoutes(app: Express) {
         montantTotal: montantTotal ? Math.round(montantTotal) : null
       });
     } catch (error) {
-      console.error("Error calculating echeances:", error);
+      logger.error({ err: error }, 'Error calculating echeances');
       res.status(500).json({ message: "Erreur lors du calcul" });
     }
   });
@@ -254,7 +257,7 @@ export function registerSecurityConfigRoutes(app: Express) {
         presenceVerificationThreshold: SECURITY_CONFIG.PRESENCE_VERIFICATION_THRESHOLD
       });
     } catch (error) {
-      console.error("Error fetching security config:", error);
+      logger.error({ err: error }, 'Error fetching security config');
       res.status(500).json({ message: "Erreur lors de la récupération de la configuration de sécurité" });
     }
   });
@@ -284,7 +287,7 @@ export function registerSecurityConfigRoutes(app: Express) {
             : "Aucune validation supplémentaire requise"
       });
     } catch (error) {
-      console.error("Error checking presence requirement:", error);
+      logger.error({ err: error }, 'Error checking presence requirement');
       res.status(500).json({ message: "Erreur lors de la vérification" });
     }
   });

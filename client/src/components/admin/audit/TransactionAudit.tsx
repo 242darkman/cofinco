@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Filter, Download, Search, FileSpreadsheet, FileText, Shield } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { auditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 
@@ -119,16 +120,13 @@ export default function TransactionAudit() {
   const exportToPDF = () => {
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
-    
-    doc.setFontSize(18);
-    doc.setTextColor(30, 58, 138);
-    doc.text("AUDIT DES TRANSACTIONS - COFIN", 14, 20);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Date d'export: ${dateExport}`, 14, 28);
-    doc.text(`Total: ${stats.total} | Montant: ${stats.totalMontant.toLocaleString()} FCFA`, 14, 34);
-    
+
+    const startY = addPdfLogoHeader(doc, {
+      title: 'AUDIT DES TRANSACTIONS',
+      subtitle: `Total: ${stats.total} | Montant: ${stats.totalMontant.toLocaleString()} FCFA`,
+      dateRight: `Export: ${dateExport}`,
+    });
+
     const tableData = filteredTransactions.slice(0, 50).map((trans, idx) => [
       idx + 1,
       new Date(trans.timestamp).toLocaleDateString('fr-FR'),
@@ -136,11 +134,11 @@ export default function TransactionAudit() {
       trans.reference || '-',
       `${trans.montant?.toLocaleString() || 0} FCFA`
     ]);
-    
+
     (doc as any).autoTable({
       head: [['N°', 'Date', 'Type', 'Référence', 'Montant']],
       body: tableData,
-      startY: 40,
+      startY,
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }

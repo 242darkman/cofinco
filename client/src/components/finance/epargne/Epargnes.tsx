@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Users, DollarSign, Filter, Activity } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Users, DollarSign, Filter, Activity, PiggyBank } from 'lucide-react';
+import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import { toast } from 'sonner';
 import { compteEpargneApi, sessionCaisseApi } from '../../../lib/api-client';
 import EpargneAccountForm from './EpargneAccountForm';
@@ -10,15 +11,12 @@ import AccountsList, { ACCOUNT_STATUS_FILTER_OPTIONS } from './AccountsList';
 import EpargneInterestCalculator from './EpargneInterestCalculator';
 import EpargneSavingsGoals from './EpargneSavingsGoals';
 import ComptesBloquesSection from '../operations/ComptesBloquesSection';
-import PageHeader from '../../ui/PageHeader';
-import StatCard from '../../ui/StatCard';
-import TabGroup from '../../ui/TabGroup';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
 import { getAccountBalance } from '../../../lib/account-config';
 import { computeSessionStatus } from '../../../lib/format';
 import { TypeCompte, type TypeCompteType, StatutCompte, type StatutCompteType } from '@shared/enum/status-constants';
 import { AccountActivationModal } from '../caisse/AccountActivationModal';
-import { caisseKeys } from '../../../lib/query-keys';
+import { caisseKeys, compteKeys } from '../../../lib/query-keys';
 
 
 interface Compte {
@@ -46,9 +44,12 @@ interface EpargnesProps {
   activeView?: string;
 }
 
+const ITEMS_PER_PAGE = 15;
+
 export default function Epargnes({ activeView }: EpargnesProps) {
-  const [comptes, setComptes] = useState<Compte[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // UI state (modals, forms, selections)
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [selectedCompte, setSelectedCompte] = useState<Compte | null>(null);
   const [transactionType, setTransactionType] = useState<'Dépôt' | 'Retrait' | null>(null);
@@ -60,7 +61,6 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   const [activeTab, setActiveTab] = useState<TypeCompteType>(TypeCompte.CURRENT);
   const [statusFilter, setStatusFilter] = useState<StatutCompteType | 'all'>('all');
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  // État pour le modal d'activation de compte
   const [activationAccount, setActivationAccount] = useState<{
     id: string;
     numeroCompte: string;
@@ -68,6 +68,14 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     montantInitial: number;
     client: { id: string; nom: string; prenom: string; photoUrl?: string };
   } | null>(null);
+
+  // Pagination & Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Permissions
+  const { hasPermission } = usePermissions();
 
   // Query for active caisse session (needed for account activation)
   const { data: sessionActive } = useQuery({
@@ -80,75 +88,55 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     },
   });
 
-  // Pagination & Search state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalComptes, setTotalComptes] = useState(0);
-  const ITEMS_PER_PAGE = 15;
-
-  // Permissions
-  const { hasPermission } = usePermissions();
-
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      setCurrentPage(1); // Reset to page 1 on search
+      setCurrentPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load comptes when tab, page, or search changes
-  useEffect(() => {
-    if (activeTab !== TypeCompte.BLOCKED) {
-      loadComptes();
-    }
-  }, [activeTab, currentPage, debouncedSearch]);
-
   useEffect(() => {
     if (activeView) {
-      if (activeView === 'epargnes-list') {
-        setActiveTab(TypeCompte.CURRENT);
-      } else if (activeView === 'epargnes-transactions') {
+      if (activeView === 'epargnes-list' || activeView === 'epargnes-transactions') {
         setActiveTab(TypeCompte.CURRENT);
       }
     }
   }, [activeView]);
 
-  const loadComptes = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Map tab key to typeCompte value using enums
-      const typeCompte = activeTab === TypeCompte.CURRENT
-        ? TypeCompte.CURRENT
-        : activeTab === TypeCompte.SAVINGS
-          ? TypeCompte.SAVINGS
-          : undefined;
-      
-      const result = await compteEpargneApi.getAll({
-        search: debouncedSearch || undefined,
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-        typeCompte
-      });
+  // --- React Query: Comptes list ---
+  const typeCompte = activeTab === TypeCompte.BLOCKED
+    ? undefined
+    : activeTab;
 
-      const safeData = Array.isArray(result.data) ? result.data : [];
-      setComptes(safeData);
-      setTotalPages(result.totalPages || 1);
-      setTotalComptes(result.total || 0);
-    } catch (error) {
-      console.error('Exception chargement comptes:', error);
-      setComptes([]);
-      setTotalPages(1);
-      setTotalComptes(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, currentPage, debouncedSearch]);
+  const comptesQuery = useQuery({
+    queryKey: compteKeys.list({ typeCompte, search: debouncedSearch, page: currentPage, limit: ITEMS_PER_PAGE }),
+    queryFn: () => compteEpargneApi.getAll({
+      search: debouncedSearch || undefined,
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+      typeCompte,
+    }),
+    enabled: activeTab !== TypeCompte.BLOCKED,
+  });
 
-  const [accountStats, setAccountStats] = useState({
+  const comptes = useMemo(() => {
+    const data = comptesQuery.data;
+    return Array.isArray(data?.data) ? data.data : [];
+  }, [comptesQuery.data]);
+
+  const totalPages = comptesQuery.data?.totalPages || 1;
+  const totalComptes = comptesQuery.data?.total || 0;
+  const loading = comptesQuery.isLoading;
+
+  // --- React Query: Stats ---
+  const statsQuery = useQuery({
+    queryKey: compteKeys.epargne(),
+    queryFn: () => compteEpargneApi.getStats(),
+  });
+
+  const accountStats = useMemo(() => ({
     total: 0,
     epargne: 0,
     courant: 0,
@@ -158,38 +146,14 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     tauxMoyenEpargne: 0,
     tauxMoyenCourant: 0,
     tauxMoyenBloque: 0,
-    // Flux journaliers (si disponibles via API dédiée)
     fluxEntrees: 0,
     fluxSorties: 0,
-  });
-  
-  // Load stats
-  const loadStats = useCallback(async () => {
-    try {
-      const stats = await compteEpargneApi.getStats();
-      // Merge API response with default flux values (API may not provide flux data yet)
-      setAccountStats(prev => ({
-        ...prev,
-        ...stats,
-        // Keep flux values at 0 until backend provides them
-        fluxEntrees: 0,
-        fluxSorties: 0,
-      }));
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
-  useEffect(() => {
-    if (!loading) loadStats();
-  }, [loading, loadStats]);
+    ...statsQuery.data,
+    // Keep flux values at 0 until backend provides them
+    ...(statsQuery.data ? { fluxEntrees: 0, fluxSorties: 0 } : {}),
+  }), [statsQuery.data]);
 
   const stats = useMemo(() => {
-    // Dynamic KPI Logic based on tab selection
     let activeTotal = accountStats.total;
     let activeLabel = 'actifs';
 
@@ -204,18 +168,23 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       activeLabel = 'bloqués';
     }
 
-    // Flux du jour - using real stats from API if available
     const fluxNet = accountStats.fluxEntrees - accountStats.fluxSorties;
 
     return {
       totalComptes: activeTotal,
-      activeLabel: activeLabel,
+      activeLabel,
       soldeTotal: accountStats.totalSolde,
-      fluxNet: fluxNet,
+      fluxNet,
       fluxEntrees: accountStats.fluxEntrees,
       fluxSorties: accountStats.fluxSorties,
     };
   }, [accountStats, activeTab]);
+
+  // --- Invalidation helper (replaces loadComptes) ---
+  const invalidateComptes = () => {
+    queryClient.invalidateQueries({ queryKey: compteKeys.lists() });
+    queryClient.invalidateQueries({ queryKey: compteKeys.epargne() });
+  };
 
   const handleTransaction = (compte: Compte, type: 'Dépôt' | 'Retrait') => {
     if (!compte.clients) {
@@ -229,7 +198,6 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         toast.warning('Pour activer un compte, veuillez d\'abord ouvrir une session de caisse');
         return;
       }
-      // Open the dedicated activation modal
       setActivationAccount({
         id: compte.id,
         numeroCompte: compte.numero_compte,
@@ -251,7 +219,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   const handleTransactionSuccess = () => {
     setSelectedCompte(null);
     setTransactionType(null);
-    loadComptes();
+    invalidateComptes();
   };
 
   const tabs = [
@@ -263,24 +231,26 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   return (
     <div className="space-y-4 pb-20 md:pb-0 font-sans">
 
-      {/* Header & Title */}
-      {/* Header & Title - Ultra Compact */}
-      <div className="flex items-center justify-between gap-4 px-1">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Gestion des Comptes</h1>
-          <p className="text-[10px] text-slate-500 font-medium">Epargnes & Placements</p>
-        </div>
-        
-        <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>
-          <button
-            onClick={() => setShowAccountForm(true)}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-sm shadow-blue-900/20 flex items-center gap-1.5 font-medium text-xs"
-          >
-            <Plus size={14} />
-            Nouveau <span className="hidden sm:inline">Compte</span>
-          </button>
-        </ProtectedFeature>
-      </div>
+      {/* Header with contextual help */}
+      <FeatureHeader
+        featureKey="finance.epargne"
+        title={FEATURE_DESCRIPTIONS['finance.epargne'].title}
+        subtitle={FEATURE_DESCRIPTIONS['finance.epargne'].subtitle}
+        helpText={FEATURE_DESCRIPTIONS['finance.epargne'].helpText}
+        icon={<PiggyBank size={24} />}
+        actions={
+          <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>
+            <button
+              onClick={() => setShowAccountForm(true)}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-sm shadow-blue-900/20 flex items-center gap-1.5 font-medium text-xs"
+            >
+              <Plus size={14} />
+              Nouveau <span className="hidden sm:inline">Compte</span>
+            </button>
+          </ProtectedFeature>
+        }
+        className="px-1"
+      />
 
       {/* 2. KPIs (Simplified & Compact) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -336,12 +306,9 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         </div>
       </div>
 
-      {/* 3. NAVIGATION (Integrated below) */}
-      {/* Removed separate nav block */}
-
       {/* 4. CONTENU DYNAMIQUE AVEC NAVIGATION PERSISTANTE */}
       <div className="mt-6 bg-surface-base rounded-lg border border-edge shadow-sm overflow-hidden flex flex-col">
-          
+
           {/* Toolbar: Tabs + Search + Filter combined */}
           <div className="flex flex-col sm:flex-row items-center justify-between p-2 gap-2 border-b border-edge bg-slate-50 dark:bg-slate-900/50">
               {/* Tabs */}
@@ -442,7 +409,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
           onClose={() => setShowAccountForm(false)}
           onSuccess={() => {
             setShowAccountForm(false);
-            loadComptes();
+            invalidateComptes();
           }}
         />
       )}
@@ -468,7 +435,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
           onClose={() => setActivationAccount(null)}
           onSuccess={() => {
             setActivationAccount(null);
-            loadComptes();
+            invalidateComptes();
           }}
         />
       )}
@@ -479,7 +446,6 @@ export default function Epargnes({ activeView }: EpargnesProps) {
           isOpen={!!detailCompteId}
           onClose={() => setDetailCompteId(null)}
           onRequestActivation={(account) => {
-            // Close the slideover and open the activation modal
             setDetailCompteId(null);
             setActivationAccount(account);
           }}
@@ -496,7 +462,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
           onSuccess={() => {
             setShowInterestCalc(false);
             setInterestCompte(null);
-            loadComptes();
+            invalidateComptes();
           }}
         />
       )}

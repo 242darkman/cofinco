@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, AlertTriangle, Info, XCircle, Check } from 'lucide-react';
-import { notificationApi } from '../../lib/api-client';
+import { Bell, AlertTriangle, Info, XCircle, Check, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { alertsApi, notificationApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import CreateAlertModal from './alerts/CreateAlertModal';
 
 interface Alert {
   id: string;
@@ -18,20 +19,43 @@ export default function AdminAlerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const fetchAlerts = useCallback(async () => {
+    setLoading(true);
     try {
-      const params: { type?: string; unread?: boolean } = {};
-      if (showUnreadOnly) params.unread = true;
-
-      const data = await notificationApi.getAll(params);
-
-      setAlerts(data || []);
-      setUnreadCount(data?.filter((a: Alert) => !a.is_read).length || 0);
+      // Try new alerts API first, fallback to notifications
+      try {
+        const data = await alertsApi.getAll(showUnreadOnly);
+        setAlerts(data || []);
+        setUnreadCount(data?.filter((a: Alert) => !a.is_read).length || 0);
+      } catch {
+        // Fallback to notification API
+        const params: { type?: string; unread?: boolean } = {};
+        if (showUnreadOnly) params.unread = true;
+        const data = await notificationApi.getAll(params);
+        setAlerts(data || []);
+        setUnreadCount(data?.filter((a: Alert) => !a.is_read).length || 0);
+      }
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du chargement des alertes'));
+    } finally {
+      setLoading(false);
     }
   }, [showUnreadOnly]);
+
+  const deleteAlert = useCallback(async (alertId: string) => {
+    if (!confirm('Supprimer cette alerte?')) return;
+
+    try {
+      await alertsApi.delete(alertId);
+      toast.success('Alerte supprimée');
+      fetchAlerts();
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+    }
+  }, [fetchAlerts]);
 
   useEffect(() => {
     fetchAlerts();
@@ -100,6 +124,13 @@ export default function AdminAlerts() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={fetchAlerts}
+            disabled={loading}
+            className="p-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition"
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
             onClick={() => setShowUnreadOnly(!showUnreadOnly)}
             className={`px-4 py-2 rounded-lg font-semibold transition ${
               showUnreadOnly
@@ -118,6 +149,13 @@ export default function AdminAlerts() {
               Tout marquer lu
             </button>
           )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Nouvelle alerte
+          </button>
         </div>
       </div>
 
@@ -160,19 +198,35 @@ export default function AdminAlerts() {
                     </div>
                   </div>
                 </div>
-                {!alert.is_read && (
+                <div className="flex items-center gap-2">
+                  {!alert.is_read && (
+                    <button
+                      onClick={() => markAsRead(alert.id)}
+                      className="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-sm font-semibold transition"
+                    >
+                      Marquer lu
+                    </button>
+                  )}
                   <button
-                    onClick={() => markAsRead(alert.id)}
-                    className="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-sm font-semibold transition"
+                    onClick={() => deleteAlert(alert.id)}
+                    className="p-2 text-red-400 hover:bg-red-500/20 rounded transition"
+                    title="Supprimer"
                   >
-                    Marquer lu
+                    <Trash2 size={16} />
                   </button>
-                )}
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Create Alert Modal */}
+      <CreateAlertModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={fetchAlerts}
+      />
     </div>
   );
 }

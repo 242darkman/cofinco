@@ -1,5 +1,8 @@
 import { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { db } from "../db";
+
+const logger = createLogger('Routes:Agences');
 import { agences, userAgences, users, coffresForts, comptesLiaison, userRoles } from "../../shared/schema";
 import { employes } from "../../shared/schema/employes";
 import { clients } from "../../shared/schema/clients";
@@ -98,7 +101,7 @@ export function registerAgencesRoutes(app: Express) {
       const result = await query;
       res.json(result);
     } catch (error: any) {
-      console.error("Erreur GET /api/agences:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences');
       res.status(500).json({ error: error.message });
     }
   });
@@ -128,7 +131,7 @@ export function registerAgencesRoutes(app: Express) {
         nombreUtilisateurs: Number(countResult?.count || 0)
       });
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/:id:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/:id');
       res.status(500).json({ error: error.message });
     }
   });
@@ -231,7 +234,7 @@ export function registerAgencesRoutes(app: Express) {
         compteLiaison: result.compteLiaison
       });
     } catch (error: any) {
-      console.error("Erreur POST /api/agences:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences');
       res.status(500).json({ error: error.message });
     }
   });
@@ -281,7 +284,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Erreur PATCH /api/agences/:id:", error);
+      logger.error({ err: error }, 'Erreur PATCH /api/agences/:id');
       res.status(500).json({ error: error.message });
     }
   });
@@ -329,7 +332,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json({ message: "Agence supprimée avec succès" });
     } catch (error: any) {
-      console.error("Erreur DELETE /api/agences/:id:", error);
+      logger.error({ err: error }, 'Erreur DELETE /api/agences/:id');
       res.status(500).json({ error: error.message });
     }
   });
@@ -368,7 +371,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Erreur GET /api/users/:userId/agences:", error);
+      logger.error({ err: error }, 'Erreur GET /api/users/:userId/agences');
       res.status(500).json({ error: error.message });
     }
   });
@@ -410,7 +413,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Erreur GET /api/me/agences:", error);
+      logger.error({ err: error }, 'Erreur GET /api/me/agences');
       res.status(500).json({ error: error.message });
     }
   });
@@ -522,7 +525,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.status(201).json(newAffectation);
     } catch (error: any) {
-      console.error("Erreur POST /api/users/:userId/agences:", error);
+      logger.error({ err: error }, 'Erreur POST /api/users/:userId/agences');
       res.status(500).json({ error: error.message });
     }
   });
@@ -601,7 +604,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Erreur PATCH /api/user-agences/:id:", error);
+      logger.error({ err: error }, 'Erreur PATCH /api/user-agences/:id');
       res.status(500).json({ error: error.message });
     }
   });
@@ -633,7 +636,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json({ message: "Affectation supprimée avec succès" });
     } catch (error: any) {
-      console.error("Erreur DELETE /api/user-agences/:id:", error);
+      logger.error({ err: error }, 'Erreur DELETE /api/user-agences/:id');
       res.status(500).json({ error: error.message });
     }
   });
@@ -671,7 +674,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/:agenceId/users:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/:agenceId/users');
       res.status(500).json({ error: error.message });
     }
   });
@@ -720,7 +723,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.status(201).json(migration);
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/:id/migrations:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences/:id/migrations');
       if (error instanceof MigrationError) {
         return res.status(400).json({ error: error.message, code: error.code, details: error.details });
       }
@@ -737,7 +740,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/migrations/:id/dry-run:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences/migrations/:id/dry-run');
       if (error instanceof MigrationError) {
         return res.status(400).json({ error: error.message, code: error.code });
       }
@@ -759,7 +762,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(migration);
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/migrations/:id/submit:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences/migrations/:id/submit');
       if (error instanceof MigrationError) {
         return res.status(400).json({ error: error.message, code: error.code });
       }
@@ -790,14 +793,14 @@ export function registerAgencesRoutes(app: Express) {
 
       // Lancer l'exécution en arrière-plan
       agencyMigrationService.processMigration(id, { userId, ipAddress, userAgent }).catch(err => {
-        console.error("Background Migration Failed:", err);
+        logger.error({ err }, 'Background Migration Failed');
       });
 
       await logAudit(req, "MIGRATE_EXECUTE", "agency_migrations", id, {});
 
       res.json({ message: "Migration démarrée", migrationId: id });
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/migrations/:id/execute:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences/migrations/:id/execute');
       if (error instanceof MigrationError) {
         return res.status(400).json({ error: error.message, code: error.code });
       }
@@ -820,7 +823,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(migration);
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/migrations/:id/cancel:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences/migrations/:id/cancel');
       if (error instanceof MigrationError) {
         return res.status(400).json({ error: error.message, code: error.code });
       }
@@ -841,7 +844,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/migrations/:id/rollback:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences/migrations/:id/rollback');
       if (error instanceof MigrationError) {
         const status = error.code === "NOT_FOUND" ? 404 : error.code === "ROLLBACK_EXPIRED" ? 410 : 400;
         return res.status(status).json({ error: error.message, code: error.code, details: error.details });
@@ -863,7 +866,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(migration);
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/migrations/:id/status:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/migrations/:id/status');
       res.status(500).json({ error: error.message });
     }
   });
@@ -877,7 +880,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(checks);
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/migrations/:id/pre-flight-checks:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/migrations/:id/pre-flight-checks');
       res.status(500).json({ error: error.message });
     }
   });
@@ -891,7 +894,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(logs);
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/migrations/:id/audit-logs:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/migrations/:id/audit-logs');
       res.status(500).json({ error: error.message });
     }
   });
@@ -906,7 +909,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(entities);
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/migrations/:id/entities:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/migrations/:id/entities');
       res.status(500).json({ error: error.message });
     }
   });
@@ -935,7 +938,7 @@ export function registerAgencesRoutes(app: Express) {
         completedAt: migration.completedAt
       });
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/migrations/:id/report:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/migrations/:id/report');
       res.status(500).json({ error: error.message });
     }
   });
@@ -953,7 +956,7 @@ export function registerAgencesRoutes(app: Express) {
 
       res.json(migrations);
     } catch (error: any) {
-      console.error("Erreur GET /api/agences/:id/migrations:", error);
+      logger.error({ err: error }, 'Erreur GET /api/agences/:id/migrations');
       res.status(500).json({ error: error.message });
     }
   });
@@ -983,14 +986,14 @@ export function registerAgencesRoutes(app: Express) {
 
       // Lancer l'exécution
       agencyMigrationService.processMigration(migration.id, { userId }).catch(err => {
-        console.error("Background Migration Failed:", err);
+        logger.error({ err }, 'Background Migration Failed');
       });
 
       await logAudit(req, "MIGRATE", "agences", id, { migrationId: migration.id });
 
       res.status(201).json(migration);
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/:id/migrate:", error);
+      logger.error({ err: error }, 'Erreur POST /api/agences/:id/migrate');
       if (error instanceof MigrationError) {
         return res.status(400).json({ error: error.message, code: error.code, details: error.details });
       }

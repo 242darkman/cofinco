@@ -1,5 +1,8 @@
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
 import { TransfertCoffreService } from "../services/coffre/transfert-service";
+
+const logger = createLogger('Routes:Coffre');
 import { idempotencyMiddleware } from "../middleware/idempotency";
 import { z } from "zod";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
@@ -95,7 +98,7 @@ coffreRouter.post(
     try {
       const validationSchema = z.object({
         agenceId: z.string().uuid(),
-        montant: z.number().positive(),
+        montant: z.coerce.number().positive(),
         motif: z.string().min(3),
         description: z.string().optional(),
         idempotencyKey: z.string().optional(),
@@ -263,6 +266,125 @@ coffreRouter.post(
 
       res.json(result);
     } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  }
+);
+
+// 4b. Annuler un transfert EXECUTÉ (crée un transfert compensatoire en sens inverse)
+coffreRouter.post(
+  "/transferts/:id/reverse",
+  attachAbility,
+  requireAbility(Actions.MANAGE, Subjects.COFFRE),
+  idempotencyMiddleware("reverse-transfert"),
+  async (req, res) => {
+    try {
+      const reverseSchema = z.object({
+        reason: z.string().min(10, "Le motif doit faire au moins 10 caractères"),
+      });
+      const { reason } = reverseSchema.parse(req.body);
+      const userId = (req as any).user?.id;
+
+      // 1. Load original transfer
+      const [original] = await db
+        .select()
+        .from(schema.transfertsCoffreCaisse)
+        .where(eq(schema.transfertsCoffreCaisse.id, req.params.id));
+
+      if (!original) {
+        return res.status(404).json({ error: "Transfert non trouvé" });
+      }
+      if (original.statut !== "EXECUTED") {
+        return res.status(400).json({ error: `Seuls les transferts exécutés peuvent être annulés (statut actuel: ${original.statut})` });
+      }
+      if (original.verrouille) {
+        return res.status(400).json({ error: "Ce transfert est verrouillé et ne peut pas être annulé" });
+      }
+
+      // 2. Check time limit: only within 24 hours of execution
+      const executedAt = original.executedAt ? new Date(original.executedAt) : null;
+      if (executedAt) {
+        const hoursElapsed = (Date.now() - executedAt.getTime()) / (1000 * 60 * 60);
+        if (hoursElapsed > 24) {
+          return res.status(400).json({ error: "L'annulation n'est possible que dans les 24h suivant l'exécution" });
+        }
+      }
+
+      // 3. Determine reverse direction
+      const reverseType = original.typeTransfert === "COFFRE_VERS_CAISSE"
+        ? "CAISSE_VERS_COFFRE"
+        : "COFFRE_VERS_CAISSE";
+
+      // 4. Create compensating transfer (auto-validated + auto-executed)
+      const result = await service.createTransfert({
+        agenceId: original.agenceId,
+        caisseId: original.caisseId,
+        typeTransfert: reverseType,
+        montant: Number(original.montant),
+        motif: `[ANNULATION] ${reason} (réf. originale: ${original.reference})`,
+        commentaire: JSON.stringify({
+          isReversal: true,
+          originalTransfertId: original.id,
+          originalReference: original.reference,
+          reversalReason: reason,
+        }),
+        requestedBy: userId,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      const newTransfert = (result as any).transfert;
+
+      // 5. Auto-validate the compensating transfer
+      await service.validateTransfert({
+        transfertId: newTransfert.id,
+        validatorId: userId,
+        approved: true,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      // 6. Auto-execute the compensating transfer
+      const execResult = await service.executeTransfert({
+        transfertId: newTransfert.id,
+        executorId: userId,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      // 7. Lock the original transfer to prevent further operations
+      await db.update(schema.transfertsCoffreCaisse)
+        .set({ verrouille: true, updatedAt: new Date() })
+        .where(eq(schema.transfertsCoffreCaisse.id, original.id));
+
+      dispatchDomainEvent({
+        type: "TRANSFER_EXECUTED",
+        data: {
+          transfertId: newTransfert.id,
+          reference: newTransfert.reference,
+          typeTransfert: reverseType,
+          montant: Number(original.montant),
+          agenceId: original.agenceId,
+          executedByUserId: userId,
+          isReversal: true,
+          originalTransfertId: original.id,
+        },
+        timestamp: new Date(),
+      });
+
+      res.json({
+        success: true,
+        message: "Transfert annulé avec succès",
+        originalTransfert: original.reference,
+        reversalTransfert: newTransfert,
+        execResult,
+      });
+    } catch (e: any) {
+      logger.error({ err: e }, 'Erreur annulation transfert');
       res.status(400).json({ error: e.message });
     }
   }
@@ -439,7 +561,7 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
     });
 
   } catch (e: any) {
-    console.error("Supervision Error:", e);
+    logger.error({ err: e }, 'Supervision Error');
     res.status(500).json({ error: e.message });
   }
 });
@@ -554,7 +676,7 @@ coffreRouter.get("/mouvements", async (req, res) => {
     });
 
   } catch (e: any) {
-    console.error("Error fetching coffre movements:", e);
+    logger.error({ err: e }, 'Error fetching coffre movements');
     res.status(500).json({ error: e.message });
   }
 });

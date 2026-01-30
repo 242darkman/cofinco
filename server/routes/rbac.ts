@@ -1,11 +1,15 @@
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { modules, permissions, rolePermissions, userPermissions, userRoles } from "@shared/schema";
+
+const logger = createLogger('Routes:RBAC');
 import { SystemRole, getRoleOptions, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
 import { logAudit } from "../audit";
+import { auditTrailService } from "../services/audit-trail-service";
 import { getWsInstance } from "../ws-server";
 import { getPermissionsForUserV2 } from "../services/permissions-service";
 import {
@@ -76,7 +80,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json(allModules);
     } catch (error) {
-      console.error("Get modules error:", error);
+      logger.error({ err: error }, 'Get modules error');
       res.status(500).json({ message: "Erreur lors de la récupération des modules" });
     }
   });
@@ -93,7 +97,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json(module);
     } catch (error) {
-      console.error("Get module error:", error);
+      logger.error({ err: error }, 'Get module error');
       res.status(500).json({ message: "Erreur lors de la récupération du module" });
     }
   });
@@ -141,7 +145,7 @@ export function registerRbacRoutes(app: Express) {
       const allPermissions = await query;
       res.json(allPermissions);
     } catch (error) {
-      console.error("Get permissions error:", error);
+      logger.error({ err: error }, 'Get permissions error');
       res.status(500).json({ message: "Erreur lors de la récupération des permissions" });
     }
   });
@@ -177,7 +181,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json(rolePerms);
     } catch (error) {
-      console.error("Get role permissions error:", error);
+      logger.error({ err: error }, 'Get role permissions error');
       res.status(500).json({ message: "Erreur lors de la récupération des permissions du rôle" });
     }
   });
@@ -225,6 +229,9 @@ export function registerRbacRoutes(app: Express) {
         return res.json(updated);
       }
 
+      // Get permission code for audit
+      const [perm] = await db.select().from(permissions).where(eq(permissions.id, permId));
+
       const [created] = await db.insert(rolePermissions)
         .values({
           role: normalizedRole,
@@ -243,6 +250,17 @@ export function registerRbacRoutes(app: Express) {
         "medium"
       );
 
+      // Log to permission audit trail
+      await auditTrailService.logPermissionChange({
+        entityType: 'role',
+        entityId: normalizedRole,
+        permissionId: permId,
+        permissionCode: perm?.code,
+        action: granted ? 'GRANT' : 'REVOKE',
+        beforeState: null,
+        afterState: { granted },
+      }, req.session.userId!, req);
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -258,7 +276,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.status(201).json(created);
     } catch (error) {
-      console.error("Create role permission error:", error);
+      logger.error({ err: error }, 'Create role permission error');
       res.status(500).json({ message: "Erreur lors de la création de la permission" });
     }
   });
@@ -268,6 +286,17 @@ export function registerRbacRoutes(app: Express) {
     try {
       const { id } = req.params;
       const { granted } = req.body;
+
+      // Get before state for audit
+      const [existing] = await db.select({
+        role: rolePermissions.role,
+        permissionId: rolePermissions.permissionId,
+        granted: rolePermissions.granted,
+        permissionCode: permissions.code,
+      })
+        .from(rolePermissions)
+        .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+        .where(eq(rolePermissions.id, id));
 
       const [updated] = await db.update(rolePermissions)
         .set({ granted, updatedAt: new Date() })
@@ -288,6 +317,19 @@ export function registerRbacRoutes(app: Express) {
         "medium"
       );
 
+      // Log to permission audit trail
+      if (existing) {
+        await auditTrailService.logPermissionChange({
+          entityType: 'role',
+          entityId: existing.role,
+          permissionId: existing.permissionId,
+          permissionCode: existing.permissionCode || undefined,
+          action: granted ? 'GRANT' : 'REVOKE',
+          beforeState: { granted: existing.granted },
+          afterState: { granted },
+        }, req.session.userId!, req);
+      }
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -304,7 +346,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json(updated);
     } catch (error) {
-      console.error("Update role permission error:", error);
+      logger.error({ err: error }, 'Update role permission error');
       res.status(500).json({ message: "Erreur lors de la mise à jour de la permission" });
     }
   });
@@ -313,6 +355,17 @@ export function registerRbacRoutes(app: Express) {
   app.delete("/api/role-permissions/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { id } = req.params;
+
+      // Get before state for audit
+      const [existing] = await db.select({
+        role: rolePermissions.role,
+        permissionId: rolePermissions.permissionId,
+        granted: rolePermissions.granted,
+        permissionCode: permissions.code,
+      })
+        .from(rolePermissions)
+        .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+        .where(eq(rolePermissions.id, id));
 
       const [deleted] = await db.delete(rolePermissions)
         .where(eq(rolePermissions.id, id))
@@ -332,6 +385,19 @@ export function registerRbacRoutes(app: Express) {
         "medium"
       );
 
+      // Log to permission audit trail
+      if (existing) {
+        await auditTrailService.logPermissionChange({
+          entityType: 'role',
+          entityId: existing.role,
+          permissionId: existing.permissionId,
+          permissionCode: existing.permissionCode || undefined,
+          action: 'REVOKE',
+          beforeState: { granted: existing.granted },
+          afterState: null,
+        }, req.session.userId!, req);
+      }
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -347,7 +413,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json({ message: "Permission supprimée", deleted });
     } catch (error) {
-      console.error("Delete role permission error:", error);
+      logger.error({ err: error }, 'Delete role permission error');
       res.status(500).json({ message: "Erreur lors de la suppression de la permission" });
     }
   });
@@ -364,6 +430,24 @@ export function registerRbacRoutes(app: Express) {
       }
 
       const results = [];
+      const auditEntries: Array<{
+        entityType: 'role';
+        entityId: string;
+        permissionId: string;
+        permissionCode?: string;
+        action: 'GRANT' | 'REVOKE' | 'BULK_GRANT' | 'BULK_REVOKE';
+        beforeState: any;
+        afterState: any;
+      }> = [];
+
+      // Get permission codes for audit
+      const permIds = permUpdates.map(u => u.permissionId);
+      const allPerms = permIds.length > 0
+        ? await db.select({ id: permissions.id, code: permissions.code })
+            .from(permissions)
+            .where(eq(permissions.id, permIds[0])) // Will be improved with inArray
+        : [];
+      const permCodeMap = new Map(allPerms.map(p => [p.id, p.code]));
 
       for (const update of permUpdates) {
         const { permissionId, granted } = update;
@@ -375,6 +459,8 @@ export function registerRbacRoutes(app: Express) {
             eq(rolePermissions.role, normalizedRole),
             eq(rolePermissions.permissionId, permissionId)
           ));
+
+        const beforeGranted = existing?.granted ?? null;
 
         if (existing) {
           if (granted) {
@@ -397,6 +483,17 @@ export function registerRbacRoutes(app: Express) {
             .returning();
           results.push(created);
         }
+
+        // Track for audit
+        auditEntries.push({
+          entityType: 'role',
+          entityId: normalizedRole,
+          permissionId,
+          permissionCode: permCodeMap.get(permissionId),
+          action: granted ? 'BULK_GRANT' : 'BULK_REVOKE',
+          beforeState: beforeGranted !== null ? { granted: beforeGranted } : null,
+          afterState: granted ? { granted: true } : null,
+        });
       }
 
       await logAudit(
@@ -408,6 +505,11 @@ export function registerRbacRoutes(app: Express) {
         "success",
         "high"
       );
+
+      // Log bulk audit entries
+      if (auditEntries.length > 0) {
+        await auditTrailService.logBulkPermissionChange(auditEntries, req.session.userId!, req);
+      }
 
       // Notify
       const wsInstance = getWsInstance();
@@ -424,7 +526,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json({ message: "Permissions mises à jour", count: results.length, results });
     } catch (error) {
-      console.error("Bulk update role permissions error:", error);
+      logger.error({ err: error }, 'Bulk update role permissions error');
       res.status(500).json({ message: "Erreur lors de la mise à jour des permissions" });
     }
   });
@@ -434,7 +536,7 @@ export function registerRbacRoutes(app: Express) {
     try {
       res.json(getRoleOptions());
     } catch (error) {
-      console.error("Get roles error:", error);
+      logger.error({ err: error }, 'Get roles error');
       res.status(500).json({ message: "Erreur lors de la récupération des rôles" });
     }
   });
@@ -462,7 +564,7 @@ export function registerRbacRoutes(app: Express) {
       // Return extended response with CASL rules
       res.json(permissionsData);
     } catch (error) {
-      console.error("Get my permissions error:", error);
+      logger.error({ err: error }, 'Get my permissions error');
       res.status(500).json({ message: "Erreur lors de la récupération des permissions" });
     }
   });
@@ -552,7 +654,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json(result);
     } catch (error) {
-      console.error("Get user permissions error:", error);
+      logger.error({ err: error }, 'Get user permissions error');
       res.status(500).json({ message: "Erreur lors de la récupération des permissions utilisateur" });
     }
   });
@@ -607,6 +709,17 @@ export function registerRbacRoutes(app: Express) {
         "high"
       );
 
+      // Log to permission audit trail
+      await auditTrailService.logPermissionChange({
+        entityType: 'user',
+        entityId: userId,
+        permissionId: permission_id,
+        permissionCode: perm.code,
+        action: granted ? 'GRANT' : 'REVOKE',
+        beforeState: existing ? { granted: !granted } : null,
+        afterState: { granted },
+      }, req.session.userId!, req);
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -622,7 +735,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json({ message: "Permission mise à jour", permissionId: permission_id, granted });
     } catch (error) {
-      console.error("Toggle user permission error:", error);
+      logger.error({ err: error }, 'Toggle user permission error');
       res.status(500).json({ message: "Erreur lors de la modification de la permission" });
     }
   });
@@ -632,6 +745,16 @@ export function registerRbacRoutes(app: Express) {
     try {
       const { userId } = req.params;
 
+      // Get existing overrides for audit
+      const existingOverrides = await db.select({
+        permissionId: userPermissions.permissionId,
+        granted: userPermissions.granted,
+        permissionCode: permissions.code,
+      })
+        .from(userPermissions)
+        .leftJoin(permissions, eq(userPermissions.permissionId, permissions.id))
+        .where(eq(userPermissions.userId, userId));
+
       await db.delete(userPermissions)
         .where(eq(userPermissions.userId, userId));
 
@@ -640,10 +763,25 @@ export function registerRbacRoutes(app: Express) {
         "RESET_USER_PERMISSIONS",
         "user_permissions",
         userId,
-        {},
+        { count: existingOverrides.length },
         "success",
         "high"
       );
+
+      // Log bulk audit entries for all removed overrides
+      if (existingOverrides.length > 0) {
+        const auditEntries = existingOverrides.map(override => ({
+          entityType: 'user' as const,
+          entityId: userId,
+          permissionId: override.permissionId,
+          permissionCode: override.permissionCode || undefined,
+          action: 'BULK_REVOKE' as const,
+          beforeState: { granted: override.granted },
+          afterState: null,
+          reason: 'Reset all user permission overrides',
+        }));
+        await auditTrailService.logBulkPermissionChange(auditEntries, req.session.userId!, req);
+      }
 
       // Notify
       const wsInstance = getWsInstance();
@@ -660,7 +798,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json({ message: "Permissions réinitialisées" });
     } catch (error) {
-      console.error("Reset user permissions error:", error);
+      logger.error({ err: error }, 'Reset user permissions error');
       res.status(500).json({ message: "Erreur lors de la réinitialisation" });
     }
   });
@@ -706,7 +844,7 @@ export function registerRbacRoutes(app: Express) {
 
       res.json({ hasPermission: !!rolePerm });
     } catch (error) {
-      console.error("Check RBAC permission error:", error);
+      logger.error({ err: error }, 'Check RBAC permission error');
       res.status(500).json({ hasPermission: false });
     }
   });
@@ -717,7 +855,7 @@ export function registerRbacRoutes(app: Express) {
       // Import dynamically to avoid circular dependencies
       const { seedRBAC } = await import('../seed-rbac-logic');
 
-      console.log('🔄 Admin triggered RBAC reseed...');
+      logger.info('Admin triggered RBAC reseed');
       await seedRBAC();
 
       await logAudit(
@@ -742,7 +880,7 @@ export function registerRbacRoutes(app: Express) {
         message: "RBAC reseeded successfully. All clients should refresh their permissions."
       });
     } catch (error) {
-      console.error("Reseed RBAC error:", error);
+      logger.error({ err: error }, 'Reseed RBAC error');
       res.status(500).json({ message: "Erreur lors du reseed RBAC" });
     }
   });
@@ -772,7 +910,7 @@ export function registerRbacRoutes(app: Express) {
         version,
       });
     } catch (error) {
-      console.error("Get RBAC catalog error:", error);
+      logger.error({ err: error }, 'Get RBAC catalog error');
       res.status(500).json({ message: "Erreur lors de la récupération du catalogue" });
     }
   });
@@ -786,7 +924,7 @@ export function registerRbacRoutes(app: Express) {
       const version = await getRbacVersion();
       res.json({ version });
     } catch (error) {
-      console.error("Get RBAC version error:", error);
+      logger.error({ err: error }, 'Get RBAC version error');
       res.status(500).json({ message: "Erreur" });
     }
   });
@@ -818,7 +956,7 @@ export function registerRbacRoutes(app: Express) {
         version,
       });
     } catch (error) {
-      console.error("Get role permissions error:", error);
+      logger.error({ err: error }, 'Get role permissions error');
       res.status(500).json({ message: "Erreur lors de la récupération des permissions du rôle" });
     }
   });
@@ -873,6 +1011,17 @@ export function registerRbacRoutes(app: Express) {
         "high"
       );
 
+      // Log to permission audit trail
+      await auditTrailService.logPermissionChange({
+        entityType: 'role',
+        entityId: normalizedRole,
+        permissionId: resolvedPermissionId,
+        permissionCode: perm?.code,
+        action: granted ? 'GRANT' : 'REVOKE',
+        beforeState: { granted: !granted },
+        afterState: { granted },
+      }, req.session.userId!, req);
+
       // Broadcast with proper scoping
       await broadcastRbacUpdate(buildRbacUpdatePayload('role', result.newVersion, {
         role: normalizedRole,
@@ -888,7 +1037,7 @@ export function registerRbacRoutes(app: Express) {
         granted,
       });
     } catch (error) {
-      console.error("Toggle role permission error:", error);
+      logger.error({ err: error }, 'Toggle role permission error');
       res.status(500).json({ message: "Erreur lors de la modification de la permission" });
     }
   });
@@ -926,6 +1075,17 @@ export function registerRbacRoutes(app: Express) {
         "high"
       );
 
+      // Log bulk audit entries
+      const auditEntries = updates.map((update: { permissionId: string; granted: boolean }) => ({
+        entityType: 'role' as const,
+        entityId: normalizedRole,
+        permissionId: update.permissionId,
+        action: (update.granted ? 'BULK_GRANT' : 'BULK_REVOKE') as const,
+        beforeState: null,
+        afterState: { granted: update.granted },
+      }));
+      await auditTrailService.logBulkPermissionChange(auditEntries, req.session.userId!, req);
+
       // Broadcast
       await broadcastRbacUpdate(buildRbacUpdatePayload('role', result.newVersion, {
         role: normalizedRole,
@@ -937,7 +1097,7 @@ export function registerRbacRoutes(app: Express) {
         updated: result.updated,
       });
     } catch (error) {
-      console.error("Bulk update role permissions error:", error);
+      logger.error({ err: error }, 'Bulk update role permissions error');
       res.status(500).json({ message: "Erreur lors de la mise à jour des permissions" });
     }
   });
@@ -963,7 +1123,7 @@ export function registerRbacRoutes(app: Express) {
         version,
       });
     } catch (error: any) {
-      console.error("Get user overrides error:", error);
+      logger.error({ err: error }, 'Get user overrides error');
       if (error.message?.includes('not found')) {
         return res.status(404).json({ message: error.message });
       }
@@ -1017,6 +1177,17 @@ export function registerRbacRoutes(app: Express) {
         "high"
       );
 
+      // Log to permission audit trail
+      await auditTrailService.logPermissionChange({
+        entityType: 'user',
+        entityId: userId,
+        permissionId: resolvedPermissionId,
+        permissionCode: perm?.code,
+        action: granted === null ? 'REVOKE' : (granted ? 'GRANT' : 'REVOKE'),
+        beforeState: null, // Could be improved by fetching before state
+        afterState: granted !== null ? { granted } : null,
+      }, req.session.userId!, req);
+
       // Broadcast to the specific user only
       await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
         userId,
@@ -1032,7 +1203,7 @@ export function registerRbacRoutes(app: Express) {
         granted,
       });
     } catch (error: any) {
-      console.error("Toggle user override error:", error);
+      logger.error({ err: error }, 'Toggle user override error');
       if (error.message?.includes('not found')) {
         return res.status(404).json({ message: error.message });
       }
@@ -1066,6 +1237,16 @@ export function registerRbacRoutes(app: Express) {
         "high"
       );
 
+      // Log to permission audit trail (single entry for reset)
+      await auditTrailService.logPermissionChange({
+        entityType: 'user',
+        entityId: userId,
+        action: 'BULK_REVOKE',
+        beforeState: { overridesCount: result.deleted },
+        afterState: null,
+        reason: 'Reset all user permission overrides',
+      }, req.session.userId!, req);
+
       // Broadcast to the specific user only
       await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
         userId,
@@ -1077,8 +1258,455 @@ export function registerRbacRoutes(app: Express) {
         deleted: result.deleted,
       });
     } catch (error) {
-      console.error("Reset user overrides error:", error);
+      logger.error({ err: error }, 'Reset user overrides error');
       res.status(500).json({ message: "Erreur lors de la réinitialisation des exceptions" });
+    }
+  });
+
+  // ============================================
+  // BULK OPERATIONS ENDPOINTS
+  // ============================================
+
+  /**
+   * PUT /api/rbac/users/:userId/overrides/bulk
+   * Bulk update permission overrides for a user
+   * Protected: requires rbac.manage or admin
+   * Body: { updates: [{ permissionId: string, granted: boolean | null }] }
+   * granted=null removes the override (inherit from role)
+   */
+  app.put("/api/rbac/users/:userId/overrides/bulk", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { userId } = req.params;
+      const { updates } = req.body;
+
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ message: "updates array requis" });
+      }
+
+      // Verify user exists
+      const userExists = await db.select({ id: userRoles.userId })
+        .from(userRoles)
+        .where(eq(userRoles.userId, userId))
+        .limit(1);
+
+      if (userExists.length === 0) {
+        return res.status(404).json({ message: "Utilisateur non trouvé" });
+      }
+
+      const results: Array<{ permissionId: string; success: boolean; error?: string }> = [];
+      const auditEntries: Array<{
+        entityType: 'user';
+        entityId: string;
+        permissionId: string;
+        permissionCode?: string;
+        action: 'GRANT' | 'REVOKE' | 'BULK_GRANT' | 'BULK_REVOKE';
+        beforeState: any;
+        afterState: any;
+      }> = [];
+
+      // Get permission codes for audit
+      const permIds = updates.map((u: any) => u.permissionId).filter(Boolean);
+      const allPerms = permIds.length > 0
+        ? await db.select({ id: permissions.id, code: permissions.code })
+            .from(permissions)
+        : [];
+      const permCodeMap = new Map(allPerms.map(p => [p.id, p.code]));
+
+      // Process updates in transaction
+      await db.transaction(async (tx) => {
+        for (const update of updates) {
+          const { permissionId, granted } = update;
+
+          if (!permissionId) {
+            results.push({ permissionId: 'unknown', success: false, error: 'permissionId requis' });
+            continue;
+          }
+
+          try {
+            // Get existing override
+            const [existing] = await tx.select()
+              .from(userPermissions)
+              .where(and(
+                eq(userPermissions.userId, userId),
+                eq(userPermissions.permissionId, permissionId)
+              ));
+
+            const beforeGranted = existing?.granted ?? null;
+
+            if (granted === null) {
+              // Remove override (inherit from role)
+              if (existing) {
+                await tx.delete(userPermissions)
+                  .where(eq(userPermissions.id, existing.id));
+              }
+            } else if (existing) {
+              // Update existing
+              await tx.update(userPermissions)
+                .set({ granted, updatedAt: new Date() })
+                .where(eq(userPermissions.id, existing.id));
+            } else {
+              // Create new
+              await tx.insert(userPermissions)
+                .values({ userId, permissionId, granted });
+            }
+
+            results.push({ permissionId, success: true });
+
+            // Track for audit
+            auditEntries.push({
+              entityType: 'user',
+              entityId: userId,
+              permissionId,
+              permissionCode: permCodeMap.get(permissionId),
+              action: granted === null ? 'BULK_REVOKE' : (granted ? 'BULK_GRANT' : 'BULK_REVOKE'),
+              beforeState: beforeGranted !== null ? { granted: beforeGranted } : null,
+              afterState: granted !== null ? { granted } : null,
+            });
+          } catch (err: any) {
+            results.push({ permissionId, success: false, error: err.message });
+          }
+        }
+      });
+
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.filter(r => !r.success).length;
+
+      await logAudit(
+        req,
+        "BULK_UPDATE_USER_OVERRIDES",
+        "user_permissions",
+        userId,
+        { count: updates.length, successCount, failureCount },
+        "success",
+        "high"
+      );
+
+      // Log bulk audit entries
+      if (auditEntries.length > 0) {
+        await auditTrailService.logBulkPermissionChange(auditEntries, req.session.userId!, req);
+      }
+
+      // Broadcast to the specific user
+      const version = await getRbacVersion();
+      await broadcastRbacUpdate(buildRbacUpdatePayload('user', version, { userId }));
+
+      res.json({
+        success: true,
+        version,
+        results,
+        successCount,
+        failureCount,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Bulk update user overrides error');
+      res.status(500).json({ message: "Erreur lors de la mise à jour des exceptions" });
+    }
+  });
+
+  /**
+   * POST /api/rbac/permissions/bulk-assign
+   * Assign multiple permissions to multiple roles atomically
+   * Protected: requires rbac.manage or admin
+   * Body: { assignments: [{ role: string, permissionId: string, granted: boolean }] }
+   */
+  app.post("/api/rbac/permissions/bulk-assign", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { assignments } = req.body;
+
+      if (!Array.isArray(assignments) || assignments.length === 0) {
+        return res.status(400).json({ message: "assignments array requis" });
+      }
+
+      const results: Array<{ role: string; permissionId: string; success: boolean; error?: string }> = [];
+      const auditEntries: Array<{
+        entityType: 'role';
+        entityId: string;
+        permissionId: string;
+        permissionCode?: string;
+        action: 'BULK_GRANT' | 'BULK_REVOKE';
+        beforeState: any;
+        afterState: any;
+      }> = [];
+
+      // Get permission codes for audit
+      const permIds = [...new Set(assignments.map((a: any) => a.permissionId).filter(Boolean))];
+      const allPerms = permIds.length > 0
+        ? await db.select({ id: permissions.id, code: permissions.code })
+            .from(permissions)
+        : [];
+      const permCodeMap = new Map(allPerms.map(p => [p.id, p.code]));
+
+      // Group assignments by role for efficient processing
+      const byRole = new Map<string, Array<{ permissionId: string; granted: boolean }>>();
+      for (const assignment of assignments) {
+        const normalizedRole = normalizeRole(assignment.role);
+        if (!normalizedRole) {
+          results.push({ role: assignment.role, permissionId: assignment.permissionId, success: false, error: 'Rôle invalide' });
+          continue;
+        }
+        if (!byRole.has(normalizedRole)) {
+          byRole.set(normalizedRole, []);
+        }
+        byRole.get(normalizedRole)!.push({ permissionId: assignment.permissionId, granted: assignment.granted });
+      }
+
+      // Process each role's assignments in transaction
+      await db.transaction(async (tx) => {
+        for (const [role, roleAssignments] of byRole) {
+          for (const { permissionId, granted } of roleAssignments) {
+            try {
+              // Check if exists
+              const [existing] = await tx.select()
+                .from(rolePermissions)
+                .where(and(
+                  eq(rolePermissions.role, role as SystemRole),
+                  eq(rolePermissions.permissionId, permissionId)
+                ));
+
+              const beforeGranted = existing?.granted ?? null;
+
+              if (existing) {
+                if (granted) {
+                  await tx.update(rolePermissions)
+                    .set({ granted: true, updatedAt: new Date() })
+                    .where(eq(rolePermissions.id, existing.id));
+                } else {
+                  await tx.delete(rolePermissions)
+                    .where(eq(rolePermissions.id, existing.id));
+                }
+              } else if (granted) {
+                await tx.insert(rolePermissions)
+                  .values({ role: role as SystemRole, permissionId, granted: true });
+              }
+
+              results.push({ role, permissionId, success: true });
+
+              // Track for audit
+              auditEntries.push({
+                entityType: 'role',
+                entityId: role,
+                permissionId,
+                permissionCode: permCodeMap.get(permissionId),
+                action: granted ? 'BULK_GRANT' : 'BULK_REVOKE',
+                beforeState: beforeGranted !== null ? { granted: beforeGranted } : null,
+                afterState: granted ? { granted: true } : null,
+              });
+            } catch (err: any) {
+              results.push({ role, permissionId, success: false, error: err.message });
+            }
+          }
+        }
+      });
+
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.filter(r => !r.success).length;
+      const affectedRoles = [...byRole.keys()];
+
+      await logAudit(
+        req,
+        "BULK_ASSIGN_PERMISSIONS",
+        "rbac",
+        undefined,
+        { count: assignments.length, successCount, failureCount, affectedRoles },
+        "success",
+        "high"
+      );
+
+      // Log bulk audit entries
+      if (auditEntries.length > 0) {
+        await auditTrailService.logBulkPermissionChange(auditEntries, req.session.userId!, req);
+      }
+
+      // Broadcast global update (multiple roles affected)
+      const version = await getRbacVersion();
+      await broadcastRbacUpdate(buildRbacUpdatePayload('global', version));
+
+      res.json({
+        success: true,
+        version,
+        results,
+        successCount,
+        failureCount,
+        affectedRoles,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Bulk assign permissions error');
+      res.status(500).json({ message: "Erreur lors de l'assignation des permissions" });
+    }
+  });
+
+  // ============================================
+  // TEMPORARY PERMISSIONS ENDPOINTS
+  // ============================================
+
+  /**
+   * GET /api/rbac/temp-permissions
+   * Get all temporary permissions (admin view)
+   * Protected: requires rbac.manage or admin
+   */
+  app.get("/api/rbac/temp-permissions", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { activeOnly = 'true', limit = '100' } = req.query;
+
+      const { getAllTemporaryPermissions } = await import('../services/temporary-permissions-service');
+      const tempPerms = await getAllTemporaryPermissions({
+        activeOnly: activeOnly === 'true',
+        limit: parseInt(limit as string, 10),
+      });
+
+      res.json({ temporaryPermissions: tempPerms });
+    } catch (error) {
+      logger.error({ err: error }, 'Get temp permissions error');
+      res.status(500).json({ message: "Erreur lors de la récupération des permissions temporaires" });
+    }
+  });
+
+  /**
+   * GET /api/rbac/users/:userId/temp-permissions
+   * Get temporary permissions for a specific user
+   * Protected: own user or rbac.view/admin
+   */
+  app.get("/api/rbac/users/:userId/temp-permissions", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const ability = (req as any).ability;
+      const currentUserId = req.session.userId;
+
+      // Allow if checking own permissions or has RBAC view access
+      if (userId !== currentUserId &&
+          !ability?.can(Actions.VIEW, Subjects.RBAC) &&
+          !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { getUserTemporaryPermissions } = await import('../services/temporary-permissions-service');
+      const tempPerms = await getUserTemporaryPermissions(userId);
+
+      res.json({ temporaryPermissions: tempPerms });
+    } catch (error) {
+      logger.error({ err: error }, 'Get user temp permissions error');
+      res.status(500).json({ message: "Erreur lors de la récupération des permissions temporaires" });
+    }
+  });
+
+  /**
+   * POST /api/rbac/temp-permissions
+   * Grant a temporary permission
+   * Protected: requires rbac.manage or admin
+   * Body: { userId, permissionId?, permissionCode?, expiresAt, reason }
+   */
+  app.post("/api/rbac/temp-permissions", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { userId, permissionId, permissionCode, expiresAt, reason } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ message: "userId requis" });
+      }
+      if (!permissionId && !permissionCode) {
+        return res.status(400).json({ message: "permissionId ou permissionCode requis" });
+      }
+      if (!expiresAt) {
+        return res.status(400).json({ message: "expiresAt requis" });
+      }
+      if (!reason) {
+        return res.status(400).json({ message: "reason requis" });
+      }
+
+      // Resolve permissionId from code if needed
+      let resolvedPermissionId = permissionId;
+      if (!resolvedPermissionId && permissionCode) {
+        const [perm] = await db.select().from(permissions).where(eq(permissions.code, permissionCode));
+        if (!perm) {
+          return res.status(404).json({ message: "Permission non trouvée" });
+        }
+        resolvedPermissionId = perm.id;
+      }
+
+      const { grantTemporaryPermission } = await import('../services/temporary-permissions-service');
+      const result = await grantTemporaryPermission({
+        userId,
+        permissionId: resolvedPermissionId,
+        grantedBy: req.session.userId!,
+        expiresAt: new Date(expiresAt),
+        reason,
+      });
+
+      await logAudit(
+        req,
+        "GRANT_TEMP_PERMISSION",
+        "temporary_permissions",
+        result.id,
+        { userId, permissionCode: result.permissionCode, expiresAt, reason },
+        "success",
+        "high"
+      );
+
+      res.status(201).json(result);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Grant temp permission error');
+      if (error.message?.includes('existe déjà')) {
+        return res.status(409).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message || "Erreur lors de l'attribution de la permission temporaire" });
+    }
+  });
+
+  /**
+   * DELETE /api/rbac/temp-permissions/:id
+   * Revoke a temporary permission
+   * Protected: requires rbac.manage or admin
+   * Body: { revokeReason? }
+   */
+  app.delete("/api/rbac/temp-permissions/:id", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { id } = req.params;
+      const { revokeReason } = req.body || {};
+
+      const { revokeTemporaryPermission } = await import('../services/temporary-permissions-service');
+      await revokeTemporaryPermission(id, req.session.userId!, revokeReason);
+
+      await logAudit(
+        req,
+        "REVOKE_TEMP_PERMISSION",
+        "temporary_permissions",
+        id,
+        { revokeReason },
+        "success",
+        "high"
+      );
+
+      res.json({ success: true, message: "Permission temporaire révoquée" });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Revoke temp permission error');
+      if (error.message?.includes('non trouvée')) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message || "Erreur lors de la révocation de la permission temporaire" });
     }
   });
 }

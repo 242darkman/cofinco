@@ -6,7 +6,7 @@ import StatCard from '../ui/StatCard';
 import TabGroup from '../ui/TabGroup';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import AdminUserForm from './AdminUserForm';
-import AdminActivityLog from './AdminActivityLog';
+import AdminActivityLogs from './AdminActivityLogs';
 import AdminAlerts from './AdminAlerts';
 import AdminPasswordReset from './AdminPasswordReset';
 import AdminImportCSV from './AdminImportCSV';
@@ -137,7 +137,7 @@ export default function AdminGestionAcces() {
 
   const fetchSessions = useCallback(async () => {
     try {
-      const data = await auditApi.getAll({ limit: 100 });
+      const data = await auditApi.getAll({ limit: '100' });
       const activeSessions = data?.filter((log: any) =>
         log.action_type === 'LOGIN' &&
         new Date(log.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -672,7 +672,7 @@ export default function AdminGestionAcces() {
               </div>
             )}
 
-            {activeTab === 'activity' && <AdminActivityLog />}
+            {activeTab === 'activity' && <AdminActivityLogs variant="compact" />}
             {activeTab === 'alerts' && <AdminAlerts />}
             {activeTab === 'analytics' && (
               <div className="text-center py-20 text-slate-500">

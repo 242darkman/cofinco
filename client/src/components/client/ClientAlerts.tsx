@@ -1,12 +1,12 @@
 import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, AlertCircle, Info, CheckCircle, X, ShieldAlert, BadgeCheck } from 'lucide-react';
+import { AlertCircle, Info, X, ShieldAlert, BadgeCheck } from 'lucide-react';
 import { Card, Badge } from '../ui';
 
 interface ClientAlert {
   id: string;
   client_id: string;
-  alert_type: 'payment_overdue' | 'document_missing' | 'kyc_pending';
+  alert_type: 'payment_overdue' | 'document_missing' | 'kyc_pending' | 'credit_late' | 'low_balance';
   alert_level: 'info' | 'warning' | 'critical';
   message: string;
   is_resolved: boolean;
@@ -25,19 +25,18 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
 
   useEffect(() => {
     fetchAlerts();
-    checkAndCreateAlerts();
   }, [client.id]);
 
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/clients/${client.id}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur chargement client');
-      const clientData = await res.json();
-      const clientAlerts = (clientData.alerts || []).filter((a: ClientAlert) => !a.is_resolved);
-      setAlerts(clientAlerts.sort((a: ClientAlert, b: ClientAlert) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      ));
+      const res = await fetch(`/api/clients/${client.id}/alerts`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Erreur chargement alertes');
+      const data: ClientAlert[] = await res.json();
+      setAlerts(data.sort((a, b) => {
+        const levelOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+        return (levelOrder[a.alert_level] ?? 3) - (levelOrder[b.alert_level] ?? 3);
+      }));
     } catch (error) {
       console.error('Erreur chargement alertes:', error);
     } finally {
@@ -45,93 +44,18 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
     }
   };
 
-  const checkAndCreateAlerts = async () => {
+  const handleResolveAlert = async (alertType: string) => {
     try {
-      const res = await fetch(`/api/clients/${client.id}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur chargement client');
-      const clientData = await res.json();
-      
-      const existingAlerts = clientData.alerts || [];
-      const existingTypes = new Set(existingAlerts.filter((a: ClientAlert) => !a.is_resolved).map((a: ClientAlert) => a.alert_type));
-      const newAlerts: ClientAlert[] = [];
-
-      const tauxRemboursement = Number(client.tauxRemboursement || 0);
-      if (tauxRemboursement < 70 && !existingTypes.has('payment_overdue')) {
-        newAlerts.push({
-          id: crypto.randomUUID(),
-          client_id: client.id,
-          alert_type: 'payment_overdue',
-          alert_level: 'critical',
-          message: `Taux de remboursement critique (${client.tauxRemboursement}%). Action requise.`,
-          is_resolved: false,
-          created_at: new Date().toISOString()
-        });
-      }
-
-      const documents = clientData.documents || [];
-      if (documents.length === 0 && !existingTypes.has('document_missing')) {
-        newAlerts.push({
-          id: crypto.randomUUID(),
-          client_id: client.id,
-          alert_type: 'document_missing',
-          alert_level: 'warning',
-          message: 'Aucun document KYC uploadé. Vérification d\'identité requise.',
-          is_resolved: false,
-          created_at: new Date().toISOString()
-        });
-      } else {
-        const pendingDocs = documents.filter((d: any) => d.status === 'Pending');
-        if (pendingDocs.length > 0 && !existingTypes.has('kyc_pending')) {
-          newAlerts.push({
-            id: crypto.randomUUID(),
-            client_id: client.id,
-            alert_type: 'kyc_pending',
-            alert_level: 'info',
-            message: `${pendingDocs.length} document(s) en attente de vérification.`,
-            is_resolved: false,
-            created_at: new Date().toISOString()
-          });
-        }
-      }
-
-      if (newAlerts.length > 0) {
-        const updatedAlerts = [...existingAlerts, ...newAlerts];
-        await fetch(`/api/clients/${client.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ alerts: updatedAlerts })
-        });
-        fetchAlerts();
-      }
-    } catch (error) {
-      console.error('Erreur vérification alertes:', error);
-    }
-  };
-
-  const handleResolveAlert = async (alertId: string) => {
-    try {
-      const res = await fetch(`/api/clients/${client.id}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur chargement client');
-      const clientData = await res.json();
-      
-      const updatedAlerts = (clientData.alerts || []).map((a: ClientAlert) => 
-        a.id === alertId ? { ...a, is_resolved: true, resolved_at: new Date().toISOString() } : a
-      );
-
-      const updateRes = await fetch(`/api/clients/${client.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(`/api/clients/${client.id}/alerts/${alertType}/resolve`, {
+        method: 'POST',
         credentials: 'include',
-        body: JSON.stringify({ alerts: updatedAlerts })
       });
+      if (!res.ok) throw new Error('Erreur resolution alerte');
 
-      if (!updateRes.ok) throw new Error('Erreur résolution alerte');
-
-      setAlerts(prev => prev.filter(a => a.id !== alertId));
+      setAlerts(prev => prev.filter(a => a.alert_type !== alertType));
       onUpdate?.();
     } catch (error) {
-      console.error('Erreur résolution alerte:', error);
+      console.error('Erreur resolution alerte:', error);
     }
   };
 
@@ -206,7 +130,7 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
                  <BadgeCheck size={32} className="text-emerald-500" />
             </div>
             <p className="text-emerald-400 font-bold text-lg">Aucune alerte active</p>
-            <p className="text-slate-400 text-sm">Le client est en parfaite règle.</p>
+            <p className="text-slate-400 text-sm">Le client est en parfaite regle.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -219,23 +143,23 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
                      }`}>
                          {getAlertIcon(alert.alert_level)}
                      </div>
-                     
+
                      <div className="flex-1 min-w-0">
                          <div className="flex items-center justify-between mb-1">
                              <div className="flex items-center gap-2">
-                                 <Badge 
-                                    value={getAlertLabel(alert.alert_level)} 
-                                    variant={getAlertVariant(alert.alert_level)} 
-                                    size="sm" 
+                                 <Badge
+                                    value={getAlertLabel(alert.alert_level)}
+                                    variant={getAlertVariant(alert.alert_level)}
+                                    size="sm"
                                  />
                                  <span className="text-[10px] text-slate-500 uppercase font-semibold hidden sm:inline-block">
                                      {new Date(alert.created_at).toLocaleDateString()}
                                  </span>
                              </div>
                              <button
-                                onClick={() => handleResolveAlert(alert.id)}
+                                onClick={() => handleResolveAlert(alert.alert_type)}
                                 className="text-slate-400 hover:text-white p-1 hover:bg-slate-700/50 rounded transition"
-                                title="Marquer comme résolu"
+                                title="Marquer comme resolu"
                              >
                                 <X size={16} />
                              </button>
@@ -258,19 +182,19 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
       {(criticalAlerts.length > 0 || warningAlerts.length > 0) && (
           <Card variant="elevated" className="border-cyan-500/30">
             <h3 className="text-sm font-bold text-cyan-400 mb-3 uppercase tracking-wider flex items-center gap-2">
-                <ShieldAlert size={16} /> Actions Recommandées
+                <ShieldAlert size={16} /> Actions Recommandees
             </h3>
             <ul className="space-y-2">
                 {criticalAlerts.length > 0 && (
                     <li className="flex items-start gap-2 text-sm text-slate-300 bg-red-500/5 p-2 rounded border border-red-500/10">
                         <span className="h-1.5 w-1.5 rounded-full bg-red-500 mt-1.5"></span>
-                        <span>Contacter immédiatement le client pour régularisation des paiements en retard.</span>
+                        <span>Contacter immediatement le client pour regularisation des paiements en retard.</span>
                     </li>
                 )}
                  {warningAlerts.length > 0 && (
                     <li className="flex items-start gap-2 text-sm text-slate-300 bg-amber-500/5 p-2 rounded border border-amber-500/10">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500 mt-1.5"></span>
-                        <span>Profiter du prochain contact pour mettre à jour les documents manquants ou le score.</span>
+                        <span>Profiter du prochain contact pour mettre a jour les documents manquants ou le score.</span>
                     </li>
                 )}
             </ul>

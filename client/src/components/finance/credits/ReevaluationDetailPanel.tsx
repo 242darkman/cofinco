@@ -154,7 +154,7 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
   const steps = [
     { id: 'request', label: STATUT_REEVALUATION_LABELS[StatutReevaluation.REQUESTED], status: [StatutReevaluation.REQUESTED, StatutReevaluation.ELIGIBILITY_CHECK] },
     { id: 'authorized', label: STATUT_REEVALUATION_LABELS[StatutReevaluation.AUTHORIZED], status: [StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION] },
-    { id: 'committee', label: 'En comité', status: [StatutReevaluation.IN_COMMITTEE] },
+    { id: 'committee', label: STATUT_REEVALUATION_LABELS[StatutReevaluation.IN_COMMITTEE], status: [StatutReevaluation.IN_COMMITTEE] },
     { id: 'decision', label: 'Décision', status: [StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.REFUSED, StatutReevaluation.CANCELLED] }
   ];
 

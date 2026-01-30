@@ -13,14 +13,16 @@
  */
 
 import type { Express, Request, Response, NextFunction } from "express";
+import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Conversations');
 import { db } from "../db";
 import {
   conversations,
   conversationParticipants,
   messagesV2,
   messageReactions,
-  messageReceipts,
   users,
   userAgences,
   agences,
@@ -163,7 +165,7 @@ function requireParticipant(
       next();
     })
     .catch((error) => {
-      console.error("Error checking participant:", error);
+      logger.error({ err: error }, 'Error checking participant');
       res.status(500).json({ message: "Internal server error" });
     });
 }
@@ -388,7 +390,7 @@ export function registerConversationsRoutes(app: Express): void {
         hasMore,
       });
     } catch (error) {
-      console.error("Error fetching conversations:", error);
+      logger.error({ err: error }, 'Error fetching conversations');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid parameters", errors: error.errors });
       }
@@ -466,7 +468,7 @@ export function registerConversationsRoutes(app: Express): void {
               : conversation[0].title || "Groupe sans nom",
         });
       } catch (error) {
-        console.error("Error fetching conversation:", error);
+        logger.error({ err: error }, 'Error fetching conversation');
         res.status(500).json({ message: "Error fetching conversation" });
       }
     }
@@ -571,7 +573,7 @@ export function registerConversationsRoutes(app: Express): void {
 
       res.status(201).json({ conversation: newConversation, created: true });
     } catch (error) {
-      console.error("Error creating DM:", error);
+      logger.error({ err: error }, 'Error creating DM');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
@@ -663,7 +665,7 @@ export function registerConversationsRoutes(app: Express): void {
 
       res.status(201).json({ conversation: newConversation, created: true });
     } catch (error) {
-      console.error("Error creating group:", error);
+      logger.error({ err: error }, 'Error creating group');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
@@ -761,7 +763,7 @@ export function registerConversationsRoutes(app: Express): void {
 
         res.json(updated);
       } catch (error) {
-        console.error("Error updating conversation:", error);
+        logger.error({ err: error }, 'Error updating conversation');
         if (error instanceof z.ZodError) {
           return res.status(400).json({ message: "Invalid input", errors: error.errors });
         }
@@ -892,7 +894,7 @@ export function registerConversationsRoutes(app: Express): void {
 
         res.status(201).json({ success: true });
       } catch (error) {
-        console.error("Error adding participant:", error);
+        logger.error({ err: error }, 'Error adding participant');
         if (error instanceof z.ZodError) {
           return res.status(400).json({ message: "Invalid input", errors: error.errors });
         }
@@ -996,7 +998,7 @@ export function registerConversationsRoutes(app: Express): void {
 
         res.json({ success: true });
       } catch (error) {
-        console.error("Error removing participant:", error);
+        logger.error({ err: error }, 'Error removing participant');
         res.status(500).json({ message: "Error removing participant" });
       }
     }
@@ -1120,7 +1122,7 @@ export function registerConversationsRoutes(app: Express): void {
           hasMore,
         });
       } catch (error) {
-        console.error("Error fetching messages:", error);
+        logger.error({ err: error }, 'Error fetching messages');
         if (error instanceof z.ZodError) {
           return res.status(400).json({ message: "Invalid parameters", errors: error.errors });
         }
@@ -1222,7 +1224,7 @@ export function registerConversationsRoutes(app: Express): void {
 
         res.status(201).json(messageWithSender);
       } catch (error) {
-        console.error("Error sending message:", error);
+        logger.error({ err: error }, 'Error sending message');
         if (error instanceof z.ZodError) {
           return res.status(400).json({ message: "Invalid input", errors: error.errors });
         }
@@ -1303,7 +1305,7 @@ export function registerConversationsRoutes(app: Express): void {
           lastReadMessageId,
         });
       } catch (error) {
-        console.error("Error marking as read:", error);
+        logger.error({ err: error }, 'Error marking as read');
         if (error instanceof z.ZodError) {
           return res.status(400).json({ message: "Invalid input", errors: error.errors });
         }
@@ -1385,7 +1387,7 @@ export function registerConversationsRoutes(app: Express): void {
 
       res.status(201).json({ success: true });
     } catch (error) {
-      console.error("Error adding reaction:", error);
+      logger.error({ err: error }, 'Error adding reaction');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
@@ -1454,7 +1456,7 @@ export function registerConversationsRoutes(app: Express): void {
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Error removing reaction:", error);
+      logger.error({ err: error }, 'Error removing reaction');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
@@ -1529,7 +1531,7 @@ export function registerConversationsRoutes(app: Express): void {
 
       res.json(updated);
     } catch (error) {
-      console.error("Error editing message:", error);
+      logger.error({ err: error }, 'Error editing message');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
@@ -1583,7 +1585,7 @@ export function registerConversationsRoutes(app: Express): void {
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Error deleting message:", error);
+      logger.error({ err: error }, 'Error deleting message');
       res.status(500).json({ message: "Error deleting message" });
     }
   });
@@ -1660,7 +1662,7 @@ export function registerConversationsRoutes(app: Express): void {
         .limit(15);
       res.json(foundUsers);
     } catch (error) {
-      console.error("Error searching users:", error);
+      logger.error({ err: error }, 'Error searching users');
       res.status(500).json({ message: "Error searching users" });
     }
   });

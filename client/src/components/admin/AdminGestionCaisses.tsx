@@ -10,12 +10,12 @@ import { ForceCloseModal } from './ForceCloseModal';
 import AssignCashierModal from './AssignCashierModal';
 import CaisseOperatingHoursModal from './CaisseOperatingHoursModal';
 import { isAdminRole, normalizeRole } from '@shared/types/roles';
-import { StatutClient, StatutCaisseAgent, StatutCaisse, StatutCaisseType } from '@shared/enum/status-constants';
+import { StatutClient, StatutCaisseAgent, StatutCaisse, StatutCaisseType, TYPE_CAISSE_LABELS, TypeCaisseType } from '@shared/enum/status-constants';
 
 interface Caisse {
   id: string;
   nom: string;
-  type: 'Physique' | 'Coffre-Fort' | 'Virtuelle';
+  type: TypeCaisseType | string;
   statut: StatutCaisseType;
   solde: string;
   isOccupied?: boolean;
@@ -268,7 +268,7 @@ export default function AdminGestionCaisses() {
                       </div>
                       <div className="min-w-0">
                         <div className="font-medium text-white truncate">{caisse.nom}</div>
-                        <div className="text-xs text-slate-500">{caisse.type}</div>
+                        <div className="text-xs text-slate-500">{TYPE_CAISSE_LABELS[caisse.type as TypeCaisseType] || caisse.type}</div>
                       </div>
                     </div>
                   </td>

@@ -7,6 +7,9 @@ import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { StorageService } from "../services/storage-service";
 import { normalizeNom, normalizePrenom } from "./name-utils";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Clients');
 
 // ============================================
 // TYPES ET SCHEMAS API
@@ -150,7 +153,7 @@ export async function getClient(id: string): Promise<ClientFull | undefined> {
  * Récupérer tous les clients avec données utilisateur fusionnées
  */
 export async function getAllClients(filter: { agence?: string; agenceId?: string } = {}): Promise<ClientFull[]> {
-  const conditions = [];
+  const conditions = [isNull(clients.deletedAt)];
 
   // Filtrer par agenceId (prioritaire)
   if (filter.agenceId && filter.agenceId !== "all") {
@@ -214,7 +217,7 @@ export async function getClientsPaginated(
   page: number = 1,
   perPage: number = 25
 ): Promise<{ data: ClientFull[]; total: number }> {
-  const conditions = [];
+  const conditions = [isNull(clients.deletedAt)];
 
   if (filter.agenceId && filter.agenceId !== "all") {
     conditions.push(eq(clients.agenceId, filter.agenceId));
@@ -516,26 +519,30 @@ export async function deleteClient(id: string): Promise<boolean> {
     try {
       const { publicDeleted, privateDeleted } = await StorageService.deleteEntityFiles('client', id);
       if (publicDeleted > 0 || privateDeleted > 0) {
-        console.log(`🗑️  Client ${id}: suppression cascade MinIO (${publicDeleted} publics, ${privateDeleted} privés)`);
+        logger.info({ clientId: id, publicDeleted, privateDeleted }, 'Client cascade MinIO deletion completed');
       }
     } catch (storageError) {
       // Log l'erreur mais continue la suppression du client
-      console.error(`⚠️  Erreur suppression fichiers MinIO pour client ${id}:`, storageError);
+      logger.error({ err: storageError, clientId: id }, 'Error deleting MinIO files for client');
     }
 
-    const result = await db.delete(clients).where(eq(clients.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
-  } catch (error: any) {
-    // Si on ne peut pas supprimer (FK violation), on marque le user comme supprimé
-    const [currentClient] = await db.select().from(clients).where(eq(clients.id, id));
-    if (currentClient && currentClient.userId) {
-      const [updated] = await db
+    // Soft delete: set deletedAt instead of hard delete
+    const [softDeleted] = await db
+      .update(clients)
+      .set({ deletedAt: new Date() } as any)
+      .where(eq(clients.id, id))
+      .returning();
+
+    // Also deactivate the linked user
+    if (softDeleted?.userId) {
+      await db
         .update(users)
         .set({ statut: StatutUser.INACTIVE, updatedAt: new Date() })
-        .where(eq(users.id, currentClient.userId))
-        .returning();
-      return !!updated;
+        .where(eq(users.id, softDeleted.userId));
     }
+
+    return !!softDeleted;
+  } catch (error: any) {
     throw error;
   }
 }

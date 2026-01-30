@@ -1,10 +1,12 @@
 /**
  * Unified Offline Database using Dexie (IndexedDB)
  *
- * This module provides:
+ * This module provides comprehensive offline-first functionality:
  * 1. Offline operation queue for sync (transfers, payments, etc.)
  * 2. Persistent caching for slow connections (3G/offline scenarios)
- * 3. User preferences storage
+ * 3. Full entity storage for offline access
+ * 4. Conflict resolution tracking
+ * 5. User preferences and session storage
  *
  * @module offline-db
  */
@@ -15,7 +17,17 @@ import Dexie, { type Table } from 'dexie';
 
 export type OperationPriority = 'critical' | 'high' | 'medium' | 'low';
 export type OperationStatus = 'pending' | 'syncing' | 'completed' | 'failed' | 'conflict';
-export type OperationType = 'transfer' | 'caisse' | 'client' | 'payment' | 'epargne' | 'credit' | 'tontine' | 'other';
+export type OperationType =
+  | 'transfer'
+  | 'caisse'
+  | 'client'
+  | 'payment'
+  | 'epargne'
+  | 'credit'
+  | 'tontine'
+  | 'remise'
+  | 'enquete'
+  | 'other';
 
 export interface OfflineOperation {
   id?: number;
@@ -35,18 +47,26 @@ export interface OfflineOperation {
   errorMessage?: string;
   idempotencyKey: string;
   userId?: number;
+  agenceId?: string;
   serverResponse?: string;
+  // Background sync metadata
+  backgroundSyncTag?: string;
+  estimatedSyncTime?: number;
 }
+
+// ========== ENTITY TYPES (full offline storage) ==========
 
 export interface OfflineClient {
   id?: number;
   serverId?: number;
   uuid: string;
-  data: string;
+  data: string; // JSON stringified client data
   localVersion: number;
   serverVersion?: number;
   lastSyncedAt?: number;
   isDirty: boolean;
+  isDeleted?: boolean;
+  agenceId?: string;
 }
 
 export interface OfflineTransfer {
@@ -58,6 +78,7 @@ export interface OfflineTransfer {
   serverVersion?: number;
   lastSyncedAt?: number;
   status: 'draft' | 'pending' | 'synced' | 'failed';
+  agenceId?: string;
 }
 
 export interface OfflineCaisseTransaction {
@@ -69,7 +90,74 @@ export interface OfflineCaisseTransaction {
   serverVersion?: number;
   lastSyncedAt?: number;
   isDirty: boolean;
+  caisseId?: string;
+  sessionId?: string;
 }
+
+export interface OfflineEpargneAccount {
+  id?: number;
+  serverId?: number;
+  uuid: string;
+  clientId: string;
+  data: string;
+  localVersion: number;
+  serverVersion?: number;
+  lastSyncedAt?: number;
+  isDirty: boolean;
+}
+
+export interface OfflineCredit {
+  id?: number;
+  serverId?: number;
+  uuid: string;
+  clientId: string;
+  data: string;
+  localVersion: number;
+  serverVersion?: number;
+  lastSyncedAt?: number;
+  isDirty: boolean;
+  status: string;
+}
+
+export interface OfflineTontine {
+  id?: number;
+  serverId?: number;
+  uuid: string;
+  data: string;
+  localVersion: number;
+  serverVersion?: number;
+  lastSyncedAt?: number;
+  isDirty: boolean;
+}
+
+export interface OfflineRemise {
+  id?: number;
+  serverId?: string;
+  uuid: string;
+  agentId: string;
+  data: string;
+  status: 'draft' | 'pending' | 'synced' | 'failed';
+  photos: string[]; // Base64 encoded photos
+  gpsCoordinates?: { lat: number; lng: number };
+  createdAt: number;
+  syncedAt?: number;
+}
+
+export interface OfflineEnquete {
+  id?: number;
+  serverId?: number;
+  uuid: string;
+  clientId: string;
+  demandeId?: string;
+  data: any;
+  photos: string[]; // Base64 encoded
+  gpsCoordinates?: { lat: number; lng: number };
+  timestamp: Date;
+  synced: number; // 0 = false, 1 = true
+  agentId?: string;
+}
+
+// ========== SYNC & CONFLICT TYPES ==========
 
 export interface SyncMetadata {
   id?: number;
@@ -88,20 +176,12 @@ export interface ConflictRecord {
   createdAt: number;
   resolvedAt?: number;
   resolution?: 'local' | 'server' | 'merged';
+  resolvedBy?: string;
+  mergedData?: string;
 }
 
-// ========== CACHE TYPES (for slow connection optimization) ==========
+// ========== CACHE TYPES ==========
 
-/** Offline enquete form data */
-export interface OfflineEnquete {
-  id?: number;
-  clientId: string;
-  data: any;
-  timestamp: Date;
-  synced: number; // 0 = false, 1 = true
-}
-
-/** Cached API response with TTL */
 export interface CachedQuery {
   id?: number;
   key: string;
@@ -111,10 +191,10 @@ export interface CachedQuery {
   meta?: {
     endpoint?: string;
     version?: string;
+    etag?: string;
   };
 }
 
-/** Static configuration data */
 export interface CachedConfig {
   id?: number;
   key: string;
@@ -123,12 +203,51 @@ export interface CachedConfig {
   version: string;
 }
 
-/** User preferences */
 export interface UserPreference {
   id?: number;
   key: string;
   value: unknown;
   userId?: string;
+}
+
+// ========== OFFLINE SESSION ==========
+
+export interface OfflineSession {
+  id?: number;
+  userId: number;
+  userName: string;
+  userRole: string;
+  agenceId?: string;
+  agenceName?: string;
+  permissions: string[];
+  expiresAt: number;
+  createdAt: number;
+}
+
+// ========== MAP TILES CACHE ==========
+
+export interface CachedMapTile {
+  id?: number;
+  tileUrl: string;
+  blob: Blob;
+  zoom: number;
+  x: number;
+  y: number;
+  timestamp: number;
+}
+
+// ========== GPS TRACKING ==========
+
+export interface GpsTrackPoint {
+  id?: number;
+  agentId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  timestamp: number;
+  synced: boolean;
+  activityType?: 'collection' | 'visit' | 'delivery' | 'other';
+  metadata?: string;
 }
 
 // ========== DATABASE CLASS ==========
@@ -139,35 +258,84 @@ export interface UserPreference {
 class OfflineDatabase extends Dexie {
   // Sync queue tables
   operations!: Table<OfflineOperation>;
+  conflicts!: Table<ConflictRecord>;
+  metadata!: Table<SyncMetadata>;
+
+  // Entity tables
   clients!: Table<OfflineClient>;
   transfers!: Table<OfflineTransfer>;
   caisseTransactions!: Table<OfflineCaisseTransaction>;
-  metadata!: Table<SyncMetadata>;
-  conflicts!: Table<ConflictRecord>;
+  epargneAccounts!: Table<OfflineEpargneAccount>;
+  credits!: Table<OfflineCredit>;
+  tontines!: Table<OfflineTontine>;
+  remises!: Table<OfflineRemise>;
+  enquetes!: Table<OfflineEnquete>;
 
   // Cache tables
-  enquetes_offline!: Table<OfflineEnquete>;
   cachedQueries!: Table<CachedQuery>;
   cachedConfigs!: Table<CachedConfig>;
   preferences!: Table<UserPreference>;
 
+  // Session & Maps
+  offlineSessions!: Table<OfflineSession>;
+  mapTiles!: Table<CachedMapTile>;
+  gpsTrackPoints!: Table<GpsTrackPoint>;
+
   constructor() {
     super('COFINOfflineDB');
 
-    // Version 1: All tables unified
-    this.version(1).stores({
+    // Version 2: Enhanced schema with full offline support
+    this.version(2).stores({
       // Sync queue tables
+      operations: '++id, uuid, type, priority, status, createdAt, idempotencyKey, userId, agenceId, backgroundSyncTag',
+      conflicts: '++id, operationId, entityType, entityId, createdAt, resolvedAt',
+      metadata: '++id, key',
+
+      // Entity tables
+      clients: '++id, uuid, serverId, isDirty, lastSyncedAt, agenceId, isDeleted',
+      transfers: '++id, uuid, serverId, status, lastSyncedAt, agenceId',
+      caisseTransactions: '++id, uuid, serverId, isDirty, lastSyncedAt, caisseId, sessionId',
+      epargneAccounts: '++id, uuid, serverId, clientId, isDirty, lastSyncedAt',
+      credits: '++id, uuid, serverId, clientId, isDirty, lastSyncedAt, status',
+      tontines: '++id, uuid, serverId, isDirty, lastSyncedAt',
+      remises: '++id, uuid, serverId, agentId, status, createdAt',
+      enquetes: '++id, uuid, serverId, clientId, demandeId, synced, timestamp, agentId',
+
+      // Cache tables
+      cachedQueries: '++id, key, timestamp',
+      cachedConfigs: '++id, key, version',
+      preferences: '++id, key, userId',
+
+      // Session & Maps
+      offlineSessions: '++id, userId, expiresAt',
+      mapTiles: '++id, tileUrl, zoom, [zoom+x+y], timestamp',
+      gpsTrackPoints: '++id, agentId, timestamp, synced'
+    }).upgrade(tx => {
+      // Migration from v1 to v2: rename enquetes_offline to enquetes
+      return tx.table('enquetes_offline').toArray().then(enquetes => {
+        return tx.table('enquetes').bulkAdd(enquetes.map(e => ({
+          ...e,
+          uuid: e.uuid || generateUUID(),
+          photos: e.photos || [],
+          synced: e.synced || 0
+        })));
+      }).catch(() => {
+        // Table might not exist, that's fine
+      });
+    });
+
+    // Keep v1 schema for backward compatibility during migration
+    this.version(1).stores({
       operations: '++id, uuid, type, priority, status, createdAt, idempotencyKey',
       clients: '++id, uuid, serverId, isDirty, lastSyncedAt',
       transfers: '++id, uuid, serverId, status, lastSyncedAt',
       caisseTransactions: '++id, uuid, serverId, isDirty, lastSyncedAt',
       metadata: '++id, key',
       conflicts: '++id, operationId, entityType, entityId, createdAt',
-      // Cache tables
       enquetes_offline: '++id, clientId, timestamp, synced',
       cachedQueries: '++id, key, timestamp',
       cachedConfigs: '++id, key, version',
-      preferences: '++id, key, userId',
+      preferences: '++id, key, userId'
     });
   }
 }
@@ -180,16 +348,21 @@ export const offlineDb = db;
 // ========== CACHE TTL CONFIGURATION ==========
 
 export const CACHE_TTL = {
-  CONFIG: 24 * 60 * 60 * 1000,  // 24 hours
-  LOOKUP: 12 * 60 * 60 * 1000,  // 12 hours
-  STATS: 5 * 60 * 1000,         // 5 minutes
-  LIST: 10 * 60 * 1000,         // 10 minutes
-  RECORD: 15 * 60 * 1000,       // 15 minutes
+  CONFIG: 24 * 60 * 60 * 1000, // 24 hours
+  LOOKUP: 12 * 60 * 60 * 1000, // 12 hours
+  STATS: 5 * 60 * 1000, // 5 minutes
+  LIST: 10 * 60 * 1000, // 10 minutes
+  RECORD: 15 * 60 * 1000, // 15 minutes
+  CLIENT: 60 * 60 * 1000, // 1 hour
+  MAP_TILE: 30 * 24 * 60 * 60 * 1000 // 30 days
 } as const;
 
 // ========== UUID & HASH UTILITIES ==========
 
 export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -212,7 +385,7 @@ export function getPriorityOrder(priority: OperationPriority): number {
     critical: 0,
     high: 1,
     medium: 2,
-    low: 3,
+    low: 3
   };
   return order[priority];
 }
@@ -221,12 +394,14 @@ export function getOperationPriority(type: OperationType): OperationPriority {
   const priorities: Record<OperationType, OperationPriority> = {
     transfer: 'critical',
     caisse: 'critical',
+    remise: 'critical',
     payment: 'high',
     credit: 'high',
-    client: 'medium',
     epargne: 'medium',
+    client: 'medium',
     tontine: 'medium',
-    other: 'low',
+    enquete: 'medium',
+    other: 'low'
   };
   return priorities[type];
 }
@@ -238,7 +413,11 @@ export async function addOfflineOperation(
   endpoint: string,
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   payload: any,
-  userId?: number
+  options?: {
+    userId?: number;
+    agenceId?: string;
+    backgroundSyncTag?: string;
+  }
 ): Promise<string> {
   const uuid = generateUUID();
   const payloadStr = JSON.stringify(payload);
@@ -258,23 +437,43 @@ export async function addOfflineOperation(
     maxRetries: 5,
     createdAt: Date.now(),
     idempotencyKey,
-    userId,
+    userId: options?.userId,
+    agenceId: options?.agenceId,
+    backgroundSyncTag: options?.backgroundSyncTag
   });
 
   return uuid;
 }
 
-export async function getPendingOperations(): Promise<OfflineOperation[]> {
-  const operations = await db.operations
-    .where('status')
-    .anyOf(['pending', 'failed'])
-    .toArray();
+export async function getPendingOperations(
+  options?: { type?: OperationType; agenceId?: string; limit?: number }
+): Promise<OfflineOperation[]> {
+  let query = db.operations.where('status').anyOf(['pending', 'failed']);
 
-  return operations.sort((a, b) => {
+  const operations = await query.toArray();
+
+  let filtered = operations;
+
+  if (options?.type) {
+    filtered = filtered.filter((op) => op.type === options.type);
+  }
+
+  if (options?.agenceId) {
+    filtered = filtered.filter((op) => op.agenceId === options.agenceId);
+  }
+
+  // Sort by priority then by creation time
+  filtered.sort((a, b) => {
     const priorityDiff = getPriorityOrder(a.priority) - getPriorityOrder(b.priority);
     if (priorityDiff !== 0) return priorityDiff;
     return a.createdAt - b.createdAt;
   });
+
+  if (options?.limit) {
+    filtered = filtered.slice(0, options.limit);
+  }
+
+  return filtered;
 }
 
 export async function updateOperationStatus(
@@ -291,7 +490,7 @@ export async function updateOperationStatus(
       retryCount: status === 'failed' ? operation.retryCount + 1 : operation.retryCount,
       syncedAt: status === 'completed' ? Date.now() : undefined,
       errorMessage,
-      serverResponse,
+      serverResponse
     });
   }
 }
@@ -302,25 +501,47 @@ export async function getOperationStats(): Promise<{
   completed: number;
   failed: number;
   conflict: number;
+  byType: Record<OperationType, number>;
 }> {
   const [pending, syncing, completed, failed, conflict] = await Promise.all([
     db.operations.where('status').equals('pending').count(),
     db.operations.where('status').equals('syncing').count(),
     db.operations.where('status').equals('completed').count(),
     db.operations.where('status').equals('failed').count(),
-    db.operations.where('status').equals('conflict').count(),
+    db.operations.where('status').equals('conflict').count()
   ]);
 
-  return { pending, syncing, completed, failed, conflict };
+  const pendingOps = await db.operations.where('status').equals('pending').toArray();
+  const byType: Record<OperationType, number> = {
+    transfer: 0,
+    caisse: 0,
+    client: 0,
+    payment: 0,
+    epargne: 0,
+    credit: 0,
+    tontine: 0,
+    remise: 0,
+    enquete: 0,
+    other: 0
+  };
+
+  pendingOps.forEach((op) => {
+    byType[op.type]++;
+  });
+
+  return { pending, syncing, completed, failed, conflict, byType };
 }
 
-export async function clearCompletedOperations(olderThanMs: number = 24 * 60 * 60 * 1000): Promise<void> {
+export async function clearCompletedOperations(olderThanMs: number = 24 * 60 * 60 * 1000): Promise<number> {
   const cutoff = Date.now() - olderThanMs;
-  await db.operations
+  const toDelete = await db.operations
     .where('status')
     .equals('completed')
-    .and((op) => (op.syncedAt || 0) < cutoff)
-    .delete();
+    .filter((op) => (op.syncedAt || 0) < cutoff)
+    .toArray();
+
+  await db.operations.bulkDelete(toDelete.map((op) => op.id!));
+  return toDelete.length;
 }
 
 // ========== CONFLICT FUNCTIONS ==========
@@ -331,32 +552,37 @@ export async function addConflict(
   entityId: string,
   localData: any,
   serverData: any
-): Promise<void> {
-  await db.conflicts.add({
+): Promise<number> {
+  return await db.conflicts.add({
     operationId,
     entityType,
     entityId,
     localData: JSON.stringify(localData),
     serverData: JSON.stringify(serverData),
-    createdAt: Date.now(),
+    createdAt: Date.now()
   });
 }
 
 export async function getUnresolvedConflicts(): Promise<ConflictRecord[]> {
-  return db.conflicts
-    .where('resolvedAt')
-    .equals(undefined as any)
-    .toArray();
+  return db.conflicts.filter((c) => !c.resolvedAt).toArray();
 }
 
 export async function resolveConflict(
   conflictId: number,
-  resolution: 'local' | 'server' | 'merged'
+  resolution: 'local' | 'server' | 'merged',
+  resolvedBy?: string,
+  mergedData?: any
 ): Promise<void> {
   await db.conflicts.update(conflictId, {
     resolvedAt: Date.now(),
     resolution,
+    resolvedBy,
+    mergedData: mergedData ? JSON.stringify(mergedData) : undefined
   });
+}
+
+export async function getConflictsByType(type: OperationType): Promise<ConflictRecord[]> {
+  return db.conflicts.where('entityType').equals(type).filter((c) => !c.resolvedAt).toArray();
 }
 
 // ========== METADATA FUNCTIONS ==========
@@ -366,13 +592,13 @@ export async function setMetadata(key: string, value: any): Promise<void> {
   if (existing) {
     await db.metadata.update(existing.id!, {
       value: JSON.stringify(value),
-      updatedAt: Date.now(),
+      updatedAt: Date.now()
     });
   } else {
     await db.metadata.add({
       key,
       value: JSON.stringify(value),
-      updatedAt: Date.now(),
+      updatedAt: Date.now()
     });
   }
 }
@@ -383,6 +609,183 @@ export async function getMetadata<T>(key: string): Promise<T | null> {
     return JSON.parse(record.value) as T;
   }
   return null;
+}
+
+// ========== CLIENT OFFLINE STORAGE ==========
+
+export async function saveClientOffline(client: any, agenceId?: string): Promise<string> {
+  const uuid = client.uuid || generateUUID();
+  const existing = await db.clients.where('uuid').equals(uuid).first();
+
+  if (existing) {
+    await db.clients.update(existing.id!, {
+      data: JSON.stringify(client),
+      localVersion: existing.localVersion + 1,
+      isDirty: true,
+      agenceId
+    });
+  } else {
+    await db.clients.add({
+      uuid,
+      serverId: client.id,
+      data: JSON.stringify(client),
+      localVersion: 1,
+      serverVersion: client.version,
+      isDirty: !client.id, // Dirty if new (no server ID)
+      agenceId
+    });
+  }
+
+  return uuid;
+}
+
+export async function getClientOffline(uuid: string): Promise<any | null> {
+  const record = await db.clients.where('uuid').equals(uuid).first();
+  if (record) {
+    return JSON.parse(record.data);
+  }
+  return null;
+}
+
+export async function getClientsOffline(options?: {
+  agenceId?: string;
+  isDirty?: boolean;
+  limit?: number;
+}): Promise<any[]> {
+  let collection = db.clients.filter((c) => !c.isDeleted);
+
+  if (options?.agenceId) {
+    collection = collection.and((c) => c.agenceId === options.agenceId);
+  }
+
+  if (options?.isDirty !== undefined) {
+    collection = collection.and((c) => c.isDirty === options.isDirty);
+  }
+
+  let results = await collection.toArray();
+
+  if (options?.limit) {
+    results = results.slice(0, options.limit);
+  }
+
+  return results.map((r) => ({ ...JSON.parse(r.data), _offline: { uuid: r.uuid, isDirty: r.isDirty } }));
+}
+
+export async function markClientSynced(uuid: string, serverId: number, serverVersion?: number): Promise<void> {
+  const existing = await db.clients.where('uuid').equals(uuid).first();
+  if (existing) {
+    await db.clients.update(existing.id!, {
+      serverId,
+      serverVersion,
+      lastSyncedAt: Date.now(),
+      isDirty: false
+    });
+  }
+}
+
+// ========== REMISE (TERRAIN) OFFLINE STORAGE ==========
+
+export async function saveRemiseOffline(
+  agentId: string,
+  data: any,
+  photos: string[] = [],
+  gpsCoordinates?: { lat: number; lng: number }
+): Promise<string> {
+  const uuid = generateUUID();
+
+  await db.remises.add({
+    uuid,
+    agentId,
+    data: JSON.stringify(data),
+    status: 'draft',
+    photos,
+    gpsCoordinates,
+    createdAt: Date.now()
+  });
+
+  return uuid;
+}
+
+export async function getRemisesOffline(agentId: string): Promise<OfflineRemise[]> {
+  return db.remises.where('agentId').equals(agentId).toArray();
+}
+
+export async function updateRemiseStatus(
+  uuid: string,
+  status: 'draft' | 'pending' | 'synced' | 'failed',
+  serverId?: string
+): Promise<void> {
+  const existing = await db.remises.where('uuid').equals(uuid).first();
+  if (existing) {
+    await db.remises.update(existing.id!, {
+      status,
+      serverId,
+      syncedAt: status === 'synced' ? Date.now() : undefined
+    });
+  }
+}
+
+// ========== ENQUETE OFFLINE STORAGE ==========
+
+export async function saveEnqueteOffline(
+  clientId: string,
+  data: any,
+  options?: {
+    demandeId?: string;
+    photos?: string[];
+    gpsCoordinates?: { lat: number; lng: number };
+    agentId?: string;
+  }
+): Promise<string> {
+  const uuid = generateUUID();
+
+  await db.enquetes.add({
+    uuid,
+    clientId,
+    demandeId: options?.demandeId,
+    data,
+    photos: options?.photos || [],
+    gpsCoordinates: options?.gpsCoordinates,
+    timestamp: new Date(),
+    synced: 0,
+    agentId: options?.agentId
+  });
+
+  return uuid;
+}
+
+export async function getEnquetesOffline(options?: {
+  clientId?: string;
+  agentId?: string;
+  synced?: boolean;
+}): Promise<OfflineEnquete[]> {
+  let collection = db.enquetes.toCollection();
+
+  if (options?.clientId) {
+    collection = db.enquetes.where('clientId').equals(options.clientId);
+  }
+
+  let results = await collection.toArray();
+
+  if (options?.agentId) {
+    results = results.filter((e) => e.agentId === options.agentId);
+  }
+
+  if (options?.synced !== undefined) {
+    results = results.filter((e) => (e.synced === 1) === options.synced);
+  }
+
+  return results;
+}
+
+export async function markEnqueteSynced(uuid: string, serverId: number): Promise<void> {
+  const existing = await db.enquetes.where('uuid').equals(uuid).first();
+  if (existing) {
+    await db.enquetes.update(existing.id!, {
+      serverId,
+      synced: 1
+    });
+  }
 }
 
 // ========== CACHE QUERY FUNCTIONS ==========
@@ -419,7 +822,7 @@ export async function setCachedQuery<T>(
       data,
       timestamp: Date.now(),
       ttl,
-      meta,
+      meta
     });
   } catch (error) {
     console.warn('[OfflineDB] Error writing cache:', error);
@@ -434,12 +837,22 @@ export async function clearCachedQuery(key: string): Promise<void> {
   }
 }
 
+export async function clearCacheByPattern(pattern: string): Promise<number> {
+  try {
+    const regex = new RegExp(pattern);
+    const toDelete = await db.cachedQueries.filter((c) => regex.test(c.key)).toArray();
+    await db.cachedQueries.bulkDelete(toDelete.map((c) => c.id!));
+    return toDelete.length;
+  } catch (error) {
+    console.warn('[OfflineDB] Error clearing cache by pattern:', error);
+    return 0;
+  }
+}
+
 export async function purgeExpiredCache(): Promise<number> {
   try {
     const now = Date.now();
-    const expired = await db.cachedQueries
-      .filter((entry) => now - entry.timestamp > entry.ttl)
-      .toArray();
+    const expired = await db.cachedQueries.filter((entry) => now - entry.timestamp > entry.ttl).toArray();
 
     const ids = expired.map((e) => e.id!).filter(Boolean);
     await db.cachedQueries.bulkDelete(ids);
@@ -478,7 +891,7 @@ export async function setCachedConfig<T>(key: string, data: T, version: string):
       key,
       data,
       updatedAt: Date.now(),
-      version,
+      version
     });
   } catch (error) {
     console.warn('[OfflineDB] Error writing config:', error);
@@ -533,15 +946,169 @@ export async function setPreference<T>(key: string, value: T, userId?: string): 
   }
 }
 
+// ========== OFFLINE SESSION FUNCTIONS ==========
+
+export async function saveOfflineSession(session: Omit<OfflineSession, 'id' | 'createdAt'>): Promise<void> {
+  // Clear existing sessions for this user
+  await db.offlineSessions.where('userId').equals(session.userId).delete();
+
+  await db.offlineSessions.add({
+    ...session,
+    createdAt: Date.now()
+  });
+}
+
+export async function getOfflineSession(): Promise<OfflineSession | null> {
+  const sessions = await db.offlineSessions.toArray();
+  const validSession = sessions.find((s) => s.expiresAt > Date.now());
+  return validSession || null;
+}
+
+export async function clearOfflineSession(): Promise<void> {
+  await db.offlineSessions.clear();
+}
+
+// ========== MAP TILES CACHE ==========
+
+export async function cacheMapTile(
+  tileUrl: string,
+  blob: Blob,
+  zoom: number,
+  x: number,
+  y: number
+): Promise<void> {
+  try {
+    // Remove existing tile if present
+    await db.mapTiles.where('tileUrl').equals(tileUrl).delete();
+
+    await db.mapTiles.add({
+      tileUrl,
+      blob,
+      zoom,
+      x,
+      y,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.warn('[OfflineDB] Error caching map tile:', error);
+  }
+}
+
+export async function getCachedMapTile(tileUrl: string): Promise<Blob | null> {
+  try {
+    const tile = await db.mapTiles.where('tileUrl').equals(tileUrl).first();
+    return tile?.blob || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function clearOldMapTiles(maxAgeMs: number = CACHE_TTL.MAP_TILE): Promise<number> {
+  const cutoff = Date.now() - maxAgeMs;
+  const toDelete = await db.mapTiles.filter((t) => t.timestamp < cutoff).toArray();
+  await db.mapTiles.bulkDelete(toDelete.map((t) => t.id!));
+  return toDelete.length;
+}
+
+export async function getMapTilesCount(): Promise<{ count: number; sizeEstimate: number }> {
+  const tiles = await db.mapTiles.toArray();
+  const totalSize = tiles.reduce((sum, t) => sum + (t.blob?.size || 0), 0);
+  return { count: tiles.length, sizeEstimate: totalSize };
+}
+
+// ========== GPS TRACKING ==========
+
+export async function addGpsTrackPoint(point: Omit<GpsTrackPoint, 'id' | 'synced'>): Promise<void> {
+  await db.gpsTrackPoints.add({
+    ...point,
+    synced: false
+  });
+}
+
+export async function getUnsyncedTrackPoints(agentId: string): Promise<GpsTrackPoint[]> {
+  return db.gpsTrackPoints
+    .where('agentId')
+    .equals(agentId)
+    .filter((p) => !p.synced)
+    .toArray();
+}
+
+export async function markTrackPointsSynced(ids: number[]): Promise<void> {
+  await db.gpsTrackPoints.bulkUpdate(ids.map((id) => ({ key: id, changes: { synced: true } })));
+}
+
+export async function clearOldTrackPoints(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): Promise<number> {
+  const cutoff = Date.now() - maxAgeMs;
+  const toDelete = await db.gpsTrackPoints.filter((p) => p.timestamp < cutoff && p.synced).toArray();
+  await db.gpsTrackPoints.bulkDelete(toDelete.map((p) => p.id!));
+  return toDelete.length;
+}
+
+// ========== STORAGE STATISTICS ==========
+
+export async function getStorageStats(): Promise<{
+  operations: number;
+  clients: number;
+  remises: number;
+  enquetes: number;
+  cachedQueries: number;
+  mapTiles: { count: number; sizeEstimate: number };
+  conflicts: number;
+  estimatedTotalSize: number;
+}> {
+  const [operations, clients, remises, enquetes, cachedQueries, conflicts] = await Promise.all([
+    db.operations.count(),
+    db.clients.count(),
+    db.remises.count(),
+    db.enquetes.count(),
+    db.cachedQueries.count(),
+    db.conflicts.filter((c) => !c.resolvedAt).count()
+  ]);
+
+  const mapTiles = await getMapTilesCount();
+
+  // Rough estimate of storage size
+  const estimatedTotalSize =
+    operations * 2000 + // ~2KB per operation
+    clients * 5000 + // ~5KB per client
+    remises * 10000 + // ~10KB per remise (with photos)
+    enquetes * 15000 + // ~15KB per enquete
+    cachedQueries * 3000 + // ~3KB per cached query
+    mapTiles.sizeEstimate;
+
+  return {
+    operations,
+    clients,
+    remises,
+    enquetes,
+    cachedQueries,
+    mapTiles,
+    conflicts,
+    estimatedTotalSize
+  };
+}
+
 // ========== INITIALIZATION ==========
 
 export async function initOfflineDb(): Promise<void> {
   try {
     await db.open();
 
-    const purged = await purgeExpiredCache();
-    if (purged > 0) {
-      console.log(`[OfflineDB] Purged ${purged} expired cache entries`);
+    // Purge expired data
+    const [purgedCache, purgedOps, purgedTiles, purgedTracks] = await Promise.all([
+      purgeExpiredCache(),
+      clearCompletedOperations(7 * 24 * 60 * 60 * 1000), // 7 days
+      clearOldMapTiles(),
+      clearOldTrackPoints()
+    ]);
+
+    if (purgedCache > 0 || purgedOps > 0 || purgedTiles > 0 || purgedTracks > 0) {
+      console.log('[OfflineDB] Purged:', {
+        cache: purgedCache,
+        operations: purgedOps,
+        tiles: purgedTiles,
+        tracks: purgedTracks
+      });
     }
 
     console.log('[OfflineDB] Initialized successfully');

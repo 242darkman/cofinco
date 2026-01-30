@@ -100,8 +100,8 @@ export function CreditTimeline({ demandeId, compact = false }: CreditTimelinePro
       // Let's keep manual overrides for the dot icons to ensure visibility
     }
     
-    // Check properly for DELETED/Supprimée
-    if (statut === 'DELETED' || statut === 'Supprimée') return 'bg-red-500 text-white border-red-500';
+    // Check for DELETED status (label "Supprimée" is already caught by s.includes('supp') above)
+    if (statut === 'DELETED') return 'bg-red-500 text-white border-red-500';
 
     return 'bg-slate-700 text-slate-300 border-slate-600';
   };

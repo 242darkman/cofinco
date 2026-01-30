@@ -1,19 +1,24 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Drawer } from 'vaul';
-import { 
-    X, 
-    Printer, 
-    Copy, 
-    CheckCircle, 
-    FileText, 
-    CreditCard, 
-    ArrowUpRight, 
-    ArrowDownLeft, 
-    User, 
+import {
+    X,
+    Printer,
+    Copy,
+    CheckCircle,
+    FileText,
+    CreditCard,
+    ArrowUpRight,
+    ArrowDownLeft,
+    User,
     Calendar,
     Share2,
     Banknote,
-    Download
+    Download,
+    RotateCcw,
+    AlertTriangle,
+    Mail,
+    MessageSquare,
+    Link2
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
@@ -23,6 +28,9 @@ import { useReactToPrint } from 'react-to-print';
 import { useReceiptPDF } from '../../../hooks/finance/useReceiptPDF';
 import { ReceiptTemplate, ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
+import { caisseOperationApi } from '../../../lib/api-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { treasuryKeys } from '../../../lib/query-keys';
 
 // --- Types ---
 
@@ -153,6 +161,99 @@ export default function TransactionDetailsSheet({
             handlePrintTicket();
         }
     };
+
+    // --- Cancel/Reverse Operation ---
+    const queryClient = useQueryClient();
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [isCancelling, setIsCancelling] = useState(false);
+
+    const isReversed = transaction?.status === 'Annulé' || transaction?.metadata?.statut === 'REVERSED';
+
+    const handleCancel = useCallback(async () => {
+        if (!transaction?.id || cancelReason.trim().length < 3) {
+            toast.error('Veuillez saisir un motif (minimum 3 caracteres)');
+            return;
+        }
+        setIsCancelling(true);
+        try {
+            const result = await caisseOperationApi.cancel(transaction.id, {
+                reason: cancelReason.trim(),
+            });
+            toast.success(result.message || 'Operation annulee avec succes');
+            setShowCancelConfirm(false);
+            setCancelReason('');
+            // Invalidate relevant queries
+            queryClient.invalidateQueries({ queryKey: ['operations-caisse'] });
+            queryClient.invalidateQueries({ queryKey: ['caisse'] });
+            queryClient.invalidateQueries({ queryKey: ['balances'] });
+            queryClient.invalidateQueries({ queryKey: ['compte-balance'] });
+            queryClient.invalidateQueries({ queryKey: treasuryKeys.all });
+            onClose();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Erreur lors de l\'annulation';
+            toast.error(message);
+        } finally {
+            setIsCancelling(false);
+        }
+    }, [transaction?.id, cancelReason, queryClient, onClose]);
+
+    // --- Linked Operations Chain ---
+    const [operationChain, setOperationChain] = useState<any[]>([]);
+    const [loadingChain, setLoadingChain] = useState(false);
+
+    useEffect(() => {
+        if (!transaction?.id || !isOpen) {
+            setOperationChain([]);
+            return;
+        }
+        let cancelled = false;
+        const loadChain = async () => {
+            setLoadingChain(true);
+            try {
+                const chain = await caisseOperationApi.getChain(transaction.id);
+                if (!cancelled && chain.length > 1) {
+                    setOperationChain(chain);
+                }
+            } catch {
+                // Silently fail — chain is optional
+            } finally {
+                if (!cancelled) setLoadingChain(false);
+            }
+        };
+        loadChain();
+        return () => { cancelled = true; };
+    }, [transaction?.id, isOpen]);
+
+    // --- Send Receipt ---
+    const [isSendingReceipt, setIsSendingReceipt] = useState(false);
+
+    const handleSendReceipt = useCallback(async (channel: "SMS" | "EMAIL") => {
+        if (!transaction?.id) return;
+        const recipient = channel === "SMS"
+            ? transaction.client?.phone
+            : transaction.metadata?.email;
+        if (!recipient) {
+            toast.error(channel === "SMS"
+                ? "Aucun numero de telephone disponible pour ce client"
+                : "Aucune adresse email disponible pour ce client"
+            );
+            return;
+        }
+        setIsSendingReceipt(true);
+        try {
+            const result = await caisseOperationApi.sendReceipt(transaction.id, {
+                channel,
+                recipient: String(recipient),
+            });
+            toast.success(result.message || `Recu envoye par ${channel}`);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Erreur lors de l'envoi";
+            toast.error(message);
+        } finally {
+            setIsSendingReceipt(false);
+        }
+    }, [transaction?.id, transaction?.client?.phone, transaction?.metadata]);
 
     // Prevent rendering if closed and animation finished (handled by Dialog/Drawer roots usually)
     // But for null safety:
@@ -285,28 +386,160 @@ export default function TransactionDetailsSheet({
                             </div>
                         </section>
 
+                        {/* Linked Operations Chain */}
+                        {operationChain.length > 1 && (
+                            <section>
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Link2 size={14} /> Opérations liées
+                                </h3>
+                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">
+                                    <div className="relative">
+                                        {/* Vertical timeline line */}
+                                        <div className="absolute left-3 top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-700" />
+                                        <div className="space-y-4">
+                                            {operationChain.map((op, idx) => {
+                                                const isReversal = !!op.reversal_of_id || !!op.reversalOfId;
+                                                const isCurrent = op.id === transaction.id;
+                                                return (
+                                                    <div key={op.id} className="relative flex items-start gap-3 pl-1">
+                                                        {/* Timeline dot */}
+                                                        <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                                            isReversal
+                                                                ? 'bg-red-100 dark:bg-red-500/20'
+                                                                : 'bg-emerald-100 dark:bg-emerald-500/20'
+                                                        } ${isCurrent ? 'ring-2 ring-cyan-400' : ''}`}>
+                                                            {isReversal ? (
+                                                                <RotateCcw size={12} className="text-red-500 dark:text-red-400" />
+                                                            ) : (
+                                                                <CheckCircle size={12} className="text-emerald-500 dark:text-emerald-400" />
+                                                            )}
+                                                        </div>
+                                                        {/* Details */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-xs font-bold ${isReversal ? 'text-red-500 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                                    {isReversal ? 'Annulation' : (op.type_operation || op.typeOperation || 'Opération')}
+                                                                </span>
+                                                                {isCurrent && (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 rounded font-medium">
+                                                                        actuelle
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                                {formatMoney(Number(op.montant), { showCurrency: true })} · {formatDate(op.created_at || op.createdAt, { format: 'datetime' })}
+                                                            </div>
+                                                            {(op.reversal_reason || op.reversalReason) && (
+                                                                <div className="text-[10px] text-red-400 mt-0.5 italic">
+                                                                    Motif: {op.reversal_reason || op.reversalReason}
+                                                                </div>
+                                                            )}
+                                                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                                                {op.reference}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
                     </div>
                 </div>
 
+                {/* Cancel Confirmation Dialog */}
+                {showCancelConfirm && (
+                    <div className="p-4 border-t border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+                        <div className="flex items-center gap-2 mb-3 text-amber-700 dark:text-amber-400">
+                            <AlertTriangle size={18} />
+                            <span className="font-semibold text-sm">Confirmer l'annulation</span>
+                        </div>
+                        <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            placeholder="Motif d'annulation (obligatoire)..."
+                            className="w-full p-3 text-sm border border-amber-300 dark:border-amber-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                            rows={2}
+                            autoFocus
+                        />
+                        <div className="flex gap-2 mt-3">
+                            <Button
+                                variant="outline"
+                                className="flex-1 h-10 rounded-lg text-sm"
+                                onClick={() => { setShowCancelConfirm(false); setCancelReason(''); }}
+                                disabled={isCancelling}
+                            >
+                                Retour
+                            </Button>
+                            <Button
+                                variant="primary"
+                                className="flex-1 h-10 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white"
+                                onClick={handleCancel}
+                                disabled={isCancelling || cancelReason.trim().length < 3}
+                            >
+                                {isCancelling ? 'Annulation...' : 'Confirmer l\'annulation'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Footer Actions */}
+                {!showCancelConfirm && (
                 <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 safe-area-bottom">
                     <div className="flex gap-3">
+                         {/* Cancel Button (only for POSTED operations) */}
+                         {!isReversed && (
+                            <Button
+                                variant="outline"
+                                className="h-12 rounded-xl border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400"
+                                onClick={() => setShowCancelConfirm(true)}
+                                title="Annuler cette opération"
+                            >
+                                <RotateCcw size={18} />
+                            </Button>
+                         )}
+
+                         {/* Send Receipt SMS */}
+                         <Button
+                             variant="outline"
+                             className="h-12 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                             onClick={() => handleSendReceipt("SMS")}
+                             disabled={isSendingReceipt}
+                             title="Envoyer le reçu par SMS"
+                         >
+                             <MessageSquare size={18} />
+                         </Button>
+
+                         {/* Send Receipt Email */}
+                         <Button
+                             variant="outline"
+                             className="h-12 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                             onClick={() => handleSendReceipt("EMAIL")}
+                             disabled={isSendingReceipt}
+                             title="Envoyer le reçu par Email"
+                         >
+                             <Mail size={18} />
+                         </Button>
+
                          {/* PDF Download Button */}
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             className="flex-1 h-12 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
                             onClick={() => downloadPDF(ticketRef)}
                         >
                             <Download size={18} className="mr-2" /> PDF
                         </Button>
-                        
+
                         {/* Print Button */}
-                        <Button 
-                            variant="primary" 
+                        <Button
+                            variant="primary"
                             className={`flex-1 h-12 rounded-xl text-white shadow-lg shadow-${themeColor}-500/20
-                                ${isCredit 
-                                    ? 'bg-emerald-600 hover:bg-emerald-500' 
-                                    : isDebit 
+                                ${isCredit
+                                    ? 'bg-emerald-600 hover:bg-emerald-500'
+                                    : isDebit
                                         ? 'bg-red-600 hover:bg-red-500'
                                         : 'bg-blue-600 hover:bg-blue-500'
                                 }
@@ -317,6 +550,7 @@ export default function TransactionDetailsSheet({
                         </Button>
                     </div>
                 </div>
+                )}
             </div>
         );
     };

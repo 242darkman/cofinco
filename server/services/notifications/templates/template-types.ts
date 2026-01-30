@@ -123,6 +123,25 @@ export interface PayslipAvailableVars {
   year: string;
 }
 
+export interface HrSanctionCreatedVars {
+  employeeName: string;
+  sanctionType: string;
+  gravite: string;
+  motif: string;
+}
+
+export interface HrSanctionNotifiedVars {
+  employeeName: string;
+  sanctionType: string;
+  gravite: string;
+}
+
+export interface HrSanctionFinalizedVars {
+  employeeName: string;
+  sanctionType: string;
+  gravite: string;
+}
+
 // ============================================================================
 // GENERAL
 // ============================================================================
@@ -357,6 +376,30 @@ export interface PaiementTerrainValidatedVars {
 }
 
 // ============================================================================
+// RECEIPTS (Email/SMS)
+// ============================================================================
+
+export interface ReceiptDepositVars {
+  clientName: string;
+  accountNumber: string;
+  amount: string;
+  balance: string;
+  reference: string;
+  date: string;
+  agentName?: string;
+}
+
+export interface ReceiptWithdrawalVars {
+  clientName: string;
+  accountNumber: string;
+  amount: string;
+  balance: string;
+  reference: string;
+  date: string;
+  agentName?: string;
+}
+
+// ============================================================================
 // UNION TYPE for all template variables
 // ============================================================================
 
@@ -407,4 +450,9 @@ export type TemplateVariables =
   | UserPasswordChangedVars
   | EmployeeWelcomeVars
   | ProspectionCreatedVars
-  | PaiementTerrainValidatedVars;
+  | PaiementTerrainValidatedVars
+  | ReceiptDepositVars
+  | ReceiptWithdrawalVars
+  | HrSanctionCreatedVars
+  | HrSanctionNotifiedVars
+  | HrSanctionFinalizedVars;

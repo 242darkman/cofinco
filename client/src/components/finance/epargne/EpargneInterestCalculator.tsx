@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { X, Percent, Calendar, DollarSign, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
-import { transactionEpargneApi, compteEpargneApi, clientApi } from '../../../lib/api-client';
+import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { escapeHtml } from '../../../lib/sanitize';
@@ -66,33 +66,13 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
     setLoading(true);
 
     try {
-      // Create interest transaction
-      await transactionEpargneApi.create({
-        compteId: compte.id,
-        typeTransaction: 'Intérêts',
+      // Single atomic call: creates mouvement + GL posting + transaction record
+      await compteEpargneApi.crediterInterets(compte.id, {
         montant: interets,
-        soldeAvant: compte.solde,
-        soldeApres: nouveauSolde,
-        description: `Intérêts créditeurs - ${PERIODE_CONFIG[periode].label} (${tauxInteret}%)`,
+        periode: PERIODE_CONFIG[periode].label,
+        tauxInteret,
+        observations: `Intérêts créditeurs - ${PERIODE_CONFIG[periode].label} (${tauxInteret}%)`,
       });
-
-      // Update account balance
-      await compteEpargneApi.update(compte.id, { solde: nouveauSolde });
-
-      // Update client total savings (if client data available)
-      if (compte.clients) {
-        try {
-          const clientData = await clientApi.getById(compte.clients.id);
-          if (clientData) {
-            await clientApi.update(compte.clients.id, {
-              epargneTotal: (parseFloat(clientData.epargneTotal) || 0) + interets,
-            });
-          }
-        } catch (clientError) {
-          // Non-blocking error for client update
-          console.warn('Mise à jour client non effectuée:', clientError);
-        }
-      }
 
       toast.success(`Intérêts de ${formatMoney(interets)} crédités avec succès`);
       onSuccess();
@@ -103,7 +83,7 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
       setLoading(false);
       setShowConfirm(false);
     }
-  }, [compte, interets, nouveauSolde, periode, onSuccess]);
+  }, [compte, interets, periode, tauxInteret, onSuccess]);
 
   const handlePeriodeChange = useCallback((newPeriode: Periode) => {
     setPeriode(newPeriode);

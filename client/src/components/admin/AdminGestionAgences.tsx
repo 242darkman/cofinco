@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Building2, MapPin, Phone, User, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { Card, Button, Badge, SearchInput, SelectField, FormField, Modal, EmptyState, LoadingSpinner, IconButton } from '../ui';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { Plus, Edit2, Trash2, Building2, MapPin, Phone, User, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Map, List, AlertTriangle } from 'lucide-react';
+import { Card, Button, Badge, SearchInput, SelectField, FormField, Modal, EmptyState, LoadingSpinner, IconButton, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { agenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { AgencyMigrationWizard } from '../agences/AgencyMigrationWizard';
+import MapViewToggle, { ViewMode } from './shared/MapViewToggle';
 import { TypeAgence, TypeAgenceType, StatutAgence, StatutAgenceType } from '@shared/enum/status-constants';
+
+// Lazy load map component
+const AdminAgenciesMap = lazy(() => import('./AdminAgenciesMap'));
 
 interface Agence {
   id: string;
@@ -53,6 +57,7 @@ export default function AdminGestionAgences() {
   const [filterType, setFilterType] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const [formData, setFormData] = useState({
     codeAgence: '',
@@ -218,31 +223,33 @@ export default function AdminGestionAgences() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header - Compact mobile */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <FeatureHeader
+        featureKey="admin.agencies"
+        title={FEATURE_DESCRIPTIONS['admin.agencies'].title}
+        subtitle={`${FEATURE_DESCRIPTIONS['admin.agencies'].subtitle} (${agences.length} agences)`}
+        helpText={FEATURE_DESCRIPTIONS['admin.agencies'].helpText}
+        icon={
           <div className="p-2 sm:p-3 bg-cyan-500/20 rounded-xl">
             <Building2 className="text-cyan-400" size={22} />
           </div>
-          <div>
-            <h2 className="text-lg sm:text-2xl font-bold text-white">Gestion des Agences</h2>
-            <p className="text-xs sm:text-sm text-slate-400">Créer et gérer les agences de l'institution</p>
-          </div>
-        </div>
-        {canCreateAgences && (
-          <Button
-            variant="primary"
-            icon={Plus}
-            onClick={() => {
-              setEditingAgence(null);
-              resetForm();
-              setShowForm(true);
-            }}
-            className="w-full sm:w-auto justify-center"
-          >
-            Nouvelle Agence
-          </Button>
-        )}
-      </div>
+        }
+        actions={
+          canCreateAgences ? (
+            <Button
+              variant="primary"
+              icon={Plus}
+              onClick={() => {
+                setEditingAgence(null);
+                resetForm();
+                setShowForm(true);
+              }}
+              className="w-full sm:w-auto justify-center"
+            >
+              Nouvelle Agence
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Filters - Mobile-first: Stack all on mobile, inline on desktop */}
       <Card className="bg-slate-900 border-slate-800 p-3 sm:p-4">
@@ -285,10 +292,25 @@ export default function AdminGestionAgences() {
               className="w-full sm:w-44"
             />
           </div>
+          {/* View Toggle */}
+          <MapViewToggle
+            viewMode={viewMode}
+            onChange={setViewMode}
+          />
         </div>
+
+        {/* GPS Warning */}
+        {viewMode === 'map' && filteredAgences.some(a => !a.latitude || !a.longitude) && (
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <AlertTriangle size={16} className="text-amber-400 flex-shrink-0" />
+            <span className="text-sm text-amber-300">
+              {filteredAgences.filter(a => !a.latitude || !a.longitude).length} agence(s) sans coordonnées GPS ne s'afficheront pas sur la carte.
+            </span>
+          </div>
+        )}
       </Card>
 
-      {/* Agences Grid */}
+      {/* Agences Grid / Map */}
       {loading ? (
         <div className="flex justify-center py-12">
           <LoadingSpinner size="lg" />
@@ -299,6 +321,37 @@ export default function AdminGestionAgences() {
           title="Aucune agence trouvée"
           description="Créez votre première agence ou modifiez vos filtres de recherche."
         />
+      ) : viewMode === 'map' ? (
+        /* Map View */
+        <Suspense fallback={
+          <div className="flex justify-center py-12">
+            <LoadingSpinner size="lg" />
+          </div>
+        }>
+          <AdminAgenciesMap
+            agencies={filteredAgences.map(a => ({
+              id: a.id,
+              codeAgence: a.codeAgence,
+              nom: a.nom,
+              typeAgence: a.typeAgence,
+              adresse: a.adresse,
+              ville: a.ville,
+              region: a.region,
+              telephone: a.telephone,
+              statut: a.statut,
+              latitude: a.latitude,
+              longitude: a.longitude,
+              nombreEmployes: a.nombreEmployes,
+              nombreClients: a.nombreClients,
+            }))}
+            onAgencyClick={(agency) => {
+              const agence = agences.find(a => a.id === agency.id);
+              if (agence && canEditAgences) {
+                handleEdit(agence);
+              }
+            }}
+          />
+        </Suspense>
       ) : (
         <>
         {/* Scrollable Grid Container */}

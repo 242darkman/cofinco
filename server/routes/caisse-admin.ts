@@ -4,6 +4,9 @@
  */
 
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:CaisseAdmin');
 import { z } from "zod";
 import { caisseAdminService } from "../services/caisse-admin-service";
 import { caisseLiquidationService } from "../services/caisse-liquidation-service";
@@ -11,6 +14,10 @@ import { getCaisseHistorique, getCaisseHistoriqueSummary } from "../services/cai
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
+import { db } from "../db";
+import { sessionsCaisseAuditLogs, denominationTemplates, caisses } from "@shared/schema/finance";
+import { users } from "@shared/schema";
+import { eq, desc, and, gte, lte, sql, count } from "drizzle-orm";
 
 export const caisseAdminRouter = Router();
 
@@ -80,7 +87,7 @@ caisseAdminRouter.post(
         session: result.session,
       });
     } catch (error: any) {
-      console.error("Erreur force close session:", error);
+      logger.error({ err: error }, 'Erreur force close session');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -120,7 +127,7 @@ caisseAdminRouter.get(
         availableDestinations: result.availableDestinations,
       });
     } catch (error: any) {
-      console.error("Erreur check liquidation:", error);
+      logger.error({ err: error }, 'Erreur check liquidation');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -174,7 +181,7 @@ caisseAdminRouter.post(
         montantTransfere: result.montantTransfere,
       });
     } catch (error: any) {
-      console.error("Erreur execute liquidation:", error);
+      logger.error({ err: error }, 'Erreur execute liquidation');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -236,7 +243,7 @@ caisseAdminRouter.get(
 
       res.json(result);
     } catch (error: any) {
-      console.error("Erreur récupération historique caisse:", error);
+      logger.error({ err: error }, 'Erreur récupération historique caisse');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -268,7 +275,7 @@ caisseAdminRouter.get(
 
       res.json(summary);
     } catch (error: any) {
-      console.error("Erreur récupération summary historique caisse:", error);
+      logger.error({ err: error }, 'Erreur récupération summary historique caisse');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
@@ -305,10 +312,1324 @@ caisseAdminRouter.get(
 
       res.json(summary);
     } catch (error: any) {
-      console.error("Erreur récupération digital caisses summary:", error);
+      logger.error({ err: error }, 'Erreur récupération digital caisses summary');
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - AUDIT LOGS
+// ============================================================================
+
+/**
+ * GET /api/caisses/audit-logs
+ * Returns paginated audit logs for caisse sessions with filters.
+ */
+caisseAdminRouter.get(
+  "/audit-logs",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const perPage = Math.min(parseInt(req.query.perPage as string) || 20, 100);
+      const action = req.query.action as string | undefined;
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
+      const sessionId = req.query.sessionId as string | undefined;
+
+      const conditions = [];
+      if (action) conditions.push(eq(sessionsCaisseAuditLogs.action, action));
+      if (sessionId) conditions.push(eq(sessionsCaisseAuditLogs.sessionId, sessionId));
+      if (dateFrom) conditions.push(gte(sessionsCaisseAuditLogs.createdAt, new Date(dateFrom)));
+      if (dateTo) conditions.push(lte(sessionsCaisseAuditLogs.createdAt, new Date(dateTo)));
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [totalResult] = await db
+        .select({ total: count() })
+        .from(sessionsCaisseAuditLogs)
+        .where(whereClause);
+
+      const total = totalResult?.total || 0;
+
+      const logs = await db
+        .select({
+          id: sessionsCaisseAuditLogs.id,
+          sessionId: sessionsCaisseAuditLogs.sessionId,
+          action: sessionsCaisseAuditLogs.action,
+          statutAvant: sessionsCaisseAuditLogs.statutAvant,
+          statutApres: sessionsCaisseAuditLogs.statutApres,
+          details: sessionsCaisseAuditLogs.details,
+          userId: sessionsCaisseAuditLogs.userId,
+          ipAddress: sessionsCaisseAuditLogs.ipAddress,
+          createdAt: sessionsCaisseAuditLogs.createdAt,
+          userName: users.nom,
+          userPrenom: users.prenom,
+        })
+        .from(sessionsCaisseAuditLogs)
+        .leftJoin(users, eq(sessionsCaisseAuditLogs.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(sessionsCaisseAuditLogs.createdAt))
+        .limit(perPage)
+        .offset((page - 1) * perPage);
+
+      res.json({
+        data: logs,
+        pagination: {
+          page,
+          perPage,
+          total,
+          totalPages: Math.ceil(total / perPage),
+        },
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération audit logs');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+// ============================================================================
+// DENOMINATION TEMPLATES (Modèles de billetage)
+// ============================================================================
+
+/**
+ * GET /api/caisses/denomination-templates
+ * Returns denomination templates, optionally filtered by agence or caisse.
+ */
+caisseAdminRouter.get(
+  "/denomination-templates",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { agenceId, caisseId, typeTemplate } = req.query;
+      const conditions = [];
+
+      if (agenceId) conditions.push(eq(denominationTemplates.agenceId, agenceId as string));
+      if (caisseId) conditions.push(eq(denominationTemplates.caisseId, caisseId as string));
+      if (typeTemplate) conditions.push(eq(denominationTemplates.typeTemplate, typeTemplate as string));
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const templates = await db
+        .select({
+          id: denominationTemplates.id,
+          nom: denominationTemplates.nom,
+          description: denominationTemplates.description,
+          agenceId: denominationTemplates.agenceId,
+          caisseId: denominationTemplates.caisseId,
+          billetage: denominationTemplates.billetage,
+          totalCalcule: denominationTemplates.totalCalcule,
+          typeTemplate: denominationTemplates.typeTemplate,
+          usageCount: denominationTemplates.usageCount,
+          lastUsedAt: denominationTemplates.lastUsedAt,
+          createdAt: denominationTemplates.createdAt,
+        })
+        .from(denominationTemplates)
+        .where(whereClause)
+        .orderBy(desc(denominationTemplates.usageCount), desc(denominationTemplates.createdAt));
+
+      res.json(templates);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération denomination templates');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/denomination-templates
+ * Create a new denomination template.
+ */
+caisseAdminRouter.post(
+  "/denomination-templates",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { nom, description, agenceId, caisseId, billetage, typeTemplate } = req.body;
+
+      if (!nom || !billetage) {
+        return res.status(400).json({ error: "Nom et billetage requis" });
+      }
+
+      // Calculate total from billetage
+      const totalCalcule = Object.entries(billetage).reduce((sum, [denom, count]) => {
+        return sum + (parseInt(denom) * (count as number));
+      }, 0);
+
+      const userId = (req.user as any)?.id;
+
+      const [created] = await db.insert(denominationTemplates).values({
+        nom,
+        description: description || null,
+        agenceId: agenceId || null,
+        caisseId: caisseId || null,
+        billetage,
+        totalCalcule: totalCalcule.toString(),
+        typeTemplate: typeTemplate || 'GENERAL',
+        createdBy: userId,
+      }).returning();
+
+      res.status(201).json(created);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur création denomination template');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/denomination-templates/:id/use
+ * Mark a template as used (increment usage count).
+ */
+caisseAdminRouter.post(
+  "/denomination-templates/:id/use",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [updated] = await db.update(denominationTemplates)
+        .set({
+          usageCount: sql`${denominationTemplates.usageCount} + 1`,
+          lastUsedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(denominationTemplates.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Modèle non trouvé" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur marquage utilisation template');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * DELETE /api/caisses/denomination-templates/:id
+ * Delete a denomination template.
+ */
+caisseAdminRouter.delete(
+  "/denomination-templates/:id",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      await db.delete(denominationTemplates).where(eq(denominationTemplates.id, id));
+
+      res.json({ message: "Modèle supprimé" });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur suppression denomination template');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - RÉCONCILIATION MOBILE MONEY
+// ============================================================================
+
+/**
+ * GET /api/caisses/sessions/:id/mm-reconciliation
+ * Récupère le statut de réconciliation Mobile Money pour une session
+ */
+caisseAdminRouter.get(
+  "/sessions/:id/mm-reconciliation",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id: sessionId } = req.params;
+      const { mmBalanceReconciliations, sessionsCaisse } = await import("@shared/schema");
+
+      // Récupérer la session pour l'agence
+      const [session] = await db.select({
+        id: sessionsCaisse.id,
+        agenceId: sessionsCaisse.agenceId,
+      })
+      .from(sessionsCaisse)
+      .where(eq(sessionsCaisse.id, sessionId));
+
+      if (!session) {
+        return res.status(404).json({ error: "Session non trouvée" });
+      }
+
+      // Récupérer les réconciliations MM de cette session
+      const reconciliations = await db.select()
+        .from(mmBalanceReconciliations)
+        .where(eq(mmBalanceReconciliations.sessionId, sessionId));
+
+      const providers = reconciliations.map(r => ({
+        provider: r.provider as 'MTN' | 'AIRTEL',
+        expectedBalance: Number(r.expectedBalance),
+        providerBalance: r.providerBalance ? Number(r.providerBalance) : null,
+        ecart: Number(r.ecart),
+        status: r.statut as 'MATCHED' | 'DISCREPANCY' | 'API_FAILED',
+      }));
+
+      const hasDiscrepancy = providers.some(p => p.status === 'DISCREPANCY');
+
+      res.json({
+        providers,
+        hasDiscrepancy,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération MM reconciliation');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/sessions/:id/mm-override
+ * Valide un écart Mobile Money avec justification
+ */
+caisseAdminRouter.post(
+  "/sessions/:id/mm-override",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id: sessionId } = req.params;
+      const { provider, reason } = req.body;
+      const userId = req.session.user!.id;
+
+      if (!provider || !reason) {
+        return res.status(400).json({ error: "Provider et raison requis" });
+      }
+
+      const { mmBalanceReconciliations } = await import("@shared/schema");
+
+      // Mettre à jour le statut de réconciliation
+      await db.update(mmBalanceReconciliations)
+        .set({
+          statut: 'OVERRIDDEN',
+          overrideReason: reason,
+          overriddenBy: userId,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(mmBalanceReconciliations.sessionId, sessionId),
+          eq(mmBalanceReconciliations.provider, provider)
+        ));
+
+      // Log audit
+      const { sessionsCaisseAuditLogs, sessionsCaisse } = await import("@shared/schema");
+
+      const [session] = await db.select()
+        .from(sessionsCaisse)
+        .where(eq(sessionsCaisse.id, sessionId));
+
+      if (session) {
+        await db.insert(sessionsCaisseAuditLogs).values({
+          sessionId,
+          caisseId: session.caisseId,
+          action: 'MM_DISCREPANCY_OVERRIDE',
+          actorId: userId,
+          metadata: { provider, reason },
+          ipAddress: req.ip,
+        });
+      }
+
+      res.json({ message: 'Écart Mobile Money validé' });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur MM override');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - APPROBATION ÉCARTS
+// ============================================================================
+
+const ecartApprovalDecisionSchema = z.object({
+  decision: z.enum(['APPROVED', 'REJECTED']),
+  comment: z.string().optional(),
+});
+
+/**
+ * GET /api/caisses/ecart-approvals
+ * Liste les demandes d'approbation d'écarts pour l'agence de l'utilisateur
+ */
+caisseAdminRouter.get(
+  "/ecart-approvals",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+      const statut = req.query.statut as string || 'PENDING_APPROVAL';
+
+      if (!agenceId) {
+        return res.status(400).json({ error: "Agence non spécifiée" });
+      }
+
+      const { ecartApprovalService } = await import("../services/caisse/ecart-approval-service");
+      const { ecartsApprovalRequests, sessionsCaisse, users } = await import("@shared/schema");
+
+      const requests = await db.select({
+        id: ecartsApprovalRequests.id,
+        sessionId: ecartsApprovalRequests.sessionId,
+        caissierId: ecartsApprovalRequests.caissierId,
+        soldeTheorique: ecartsApprovalRequests.soldeTheorique,
+        montantPhysique: ecartsApprovalRequests.montantPhysique,
+        ecart: ecartsApprovalRequests.ecart,
+        typeEcart: ecartsApprovalRequests.typeEcart,
+        justification: ecartsApprovalRequests.justification,
+        niveauRequis: ecartsApprovalRequests.niveauRequis,
+        statut: ecartsApprovalRequests.statut,
+        createdAt: ecartsApprovalRequests.createdAt,
+        caissierNom: users.nom,
+        caissierPrenom: users.prenom,
+      })
+      .from(ecartsApprovalRequests)
+      .leftJoin(users, eq(ecartsApprovalRequests.caissierId, users.id))
+      .where(and(
+        eq(ecartsApprovalRequests.agenceId, agenceId),
+        eq(ecartsApprovalRequests.statut, statut as any)
+      ))
+      .orderBy(desc(ecartsApprovalRequests.createdAt));
+
+      res.json(requests);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération écart approvals');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/ecart-approvals/:id
+ * Détails d'une demande d'approbation d'écart
+ */
+caisseAdminRouter.get(
+  "/ecart-approvals/:id",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { ecartsApprovalRequests, users, sessionsCaisse, caisses } = await import("@shared/schema");
+
+      const [request] = await db.select({
+        id: ecartsApprovalRequests.id,
+        sessionId: ecartsApprovalRequests.sessionId,
+        caissierId: ecartsApprovalRequests.caissierId,
+        agenceId: ecartsApprovalRequests.agenceId,
+        soldeTheorique: ecartsApprovalRequests.soldeTheorique,
+        montantPhysique: ecartsApprovalRequests.montantPhysique,
+        ecart: ecartsApprovalRequests.ecart,
+        typeEcart: ecartsApprovalRequests.typeEcart,
+        justification: ecartsApprovalRequests.justification,
+        niveauRequis: ecartsApprovalRequests.niveauRequis,
+        statut: ecartsApprovalRequests.statut,
+        approverId: ecartsApprovalRequests.approverId,
+        approvedAt: ecartsApprovalRequests.approvedAt,
+        approvalComment: ecartsApprovalRequests.approvalComment,
+        thresholdApplied: ecartsApprovalRequests.thresholdApplied,
+        createdAt: ecartsApprovalRequests.createdAt,
+        caissierNom: users.nom,
+        caissierPrenom: users.prenom,
+      })
+      .from(ecartsApprovalRequests)
+      .leftJoin(users, eq(ecartsApprovalRequests.caissierId, users.id))
+      .where(eq(ecartsApprovalRequests.id, id));
+
+      if (!request) {
+        return res.status(404).json({ error: "Demande non trouvée" });
+      }
+
+      res.json(request);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération écart approval');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/ecart-approvals/:id/decision
+ * Approuver ou rejeter une demande d'écart
+ */
+caisseAdminRouter.post(
+  "/ecart-approvals/:id/decision",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validation = ecartApprovalDecisionSchema.safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const { decision, comment } = validation.data;
+      const approverId = req.session.user!.id;
+
+      const { ecartApprovalService } = await import("../services/caisse/ecart-approval-service");
+
+      const result = await ecartApprovalService.approveEcart({
+        requestId: id,
+        approverId,
+        decision,
+        comment,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      // TODO: Envoyer notification WebSocket au caissier
+
+      res.json({
+        message: decision === 'APPROVED' ? 'Écart approuvé' : 'Écart rejeté',
+        request: result.request,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur décision écart');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - CLÔTURE AGENCE
+// ============================================================================
+
+/**
+ * GET /api/caisses/agency/:agenceId/closure-status
+ * Vérifie si l'agence est prête pour la clôture journalière
+ */
+caisseAdminRouter.get(
+  "/agency/:agenceId/closure-status",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { agenceId } = req.params;
+      const date = req.query.date ? new Date(req.query.date as string) : undefined;
+
+      const { agencyClosureService } = await import("../services/caisse/agency-closure-service");
+
+      const status = await agencyClosureService.checkClosureReadiness(agenceId, date);
+
+      res.json(status);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur vérification clôture agence');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/agency/:agenceId/finalize-closure
+ * Finalise la clôture journalière de l'agence
+ */
+caisseAdminRouter.post(
+  "/agency/:agenceId/finalize-closure",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { agenceId } = req.params;
+      const { observations } = req.body;
+      const closedBy = req.session.user!.id;
+
+      const { agencyClosureService } = await import("../services/caisse/agency-closure-service");
+
+      const result = await agencyClosureService.finalizeClosure({
+        agenceId,
+        closedBy,
+        observations,
+        ipAddress: req.ip,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json({
+        message: 'Clôture agence finalisée',
+        closure: result.closure,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur finalisation clôture agence');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/agency/:agenceId/closures/history
+ * Historique des clôtures d'une agence
+ */
+caisseAdminRouter.get(
+  "/agency/:agenceId/closures/history",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { agenceId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 30;
+
+      const { agencyClosureService } = await import("../services/caisse/agency-closure-service");
+
+      const history = await agencyClosureService.getClosureHistory(agenceId, limit);
+
+      res.json(history);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération historique clôtures');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - SUGGESTION BILLETAGE PRÉDICTIF
+// ============================================================================
+
+const billetageSuggestionSchema = z.object({
+  caisseId: z.string().uuid(),
+  targetAmount: z.number().positive(),
+  prioritizeSmallDenominations: z.boolean().optional(),
+  dayOfWeek: z.number().int().min(0).max(6).optional(),
+  isEndOfMonth: z.boolean().optional(),
+});
+
+const saveTemplateSchema = z.object({
+  nom: z.string().min(1).max(100),
+  description: z.string().optional(),
+  billetage: z.record(z.string(), z.number().int().min(0)),
+  agenceId: z.string().uuid().optional(),
+  caisseId: z.string().uuid().optional(),
+});
+
+/**
+ * POST /api/caisses/billetage/suggestion
+ * Génère une suggestion de billetage prédictive basée sur l'historique
+ */
+caisseAdminRouter.post(
+  "/billetage/suggestion",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const validation = billetageSuggestionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const { caisseId, targetAmount, ...options } = validation.data;
+      const { predictiveBilletageService } = await import("../services/caisse/predictive-billetage-service");
+
+      const suggestion = await predictiveBilletageService.getSuggestion({
+        caisseId,
+        targetAmount,
+        options,
+      });
+
+      res.json(suggestion);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur suggestion billetage');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/billetage/patterns/:caisseId
+ * Récupère les patterns historiques d'une caisse
+ */
+caisseAdminRouter.get(
+  "/billetage/patterns/:caisseId",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { caisseId } = req.params;
+      const { predictiveBilletageService } = await import("../services/caisse/predictive-billetage-service");
+
+      const pattern = await predictiveBilletageService.analyzeHistoricalPattern(caisseId);
+
+      res.json(pattern);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur analyse patterns billetage');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/billetage/templates
+ * Récupère les templates de billetage fréquemment utilisés
+ */
+caisseAdminRouter.get(
+  "/billetage/templates",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+      const caisseId = req.query.caisseId as string | undefined;
+
+      const { predictiveBilletageService } = await import("../services/caisse/predictive-billetage-service");
+
+      const templates = await predictiveBilletageService.getFrequentTemplates(agenceId, caisseId);
+
+      res.json(templates);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération templates billetage');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/billetage/templates
+ * Sauvegarde un template de billetage personnalisé
+ */
+caisseAdminRouter.post(
+  "/billetage/templates",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const validation = saveTemplateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const userId = req.session.user!.id;
+      const { predictiveBilletageService } = await import("../services/caisse/predictive-billetage-service");
+
+      const template = await predictiveBilletageService.saveTemplate({
+        ...validation.data,
+        createdBy: userId,
+      });
+
+      res.status(201).json({
+        ...template,
+        message: 'Template sauvegardé avec succès',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur sauvegarde template billetage');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - TRANSFERT DE GARDE (HANDOVER)
+// ============================================================================
+
+const initiateHandoverSchema = z.object({
+  sessionId: z.string().uuid(),
+  toCaissierId: z.string().uuid(),
+  montantCompte: z.number().positive(),
+  billetage: z.record(z.string(), z.number().int().min(0)).optional(),
+  motif: z.string().optional(),
+  observations: z.string().optional(),
+});
+
+const confirmHandoverSchema = z.object({
+  montantVerifie: z.number().nonnegative(),
+  billetage: z.record(z.string(), z.number().int().min(0)).optional(),
+  observations: z.string().optional(),
+  ecartJustification: z.string().optional(),
+});
+
+const cancelHandoverSchema = z.object({
+  reason: z.string().min(5, "La raison doit contenir au moins 5 caractères"),
+});
+
+const approveHandoverSchema = z.object({
+  comment: z.string().optional(),
+});
+
+/**
+ * POST /api/caisses/handovers
+ * Initie un transfert de garde
+ */
+caisseAdminRouter.post(
+  "/handovers",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const validation = initiateHandoverSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const fromCaissierId = req.session.user!.id;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const result = await handoverService.initiateHandover({
+        ...validation.data,
+        fromCaissierId,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: result.error,
+          errorCode: result.errorCode,
+        });
+      }
+
+      res.status(201).json({
+        handover: result.handover,
+        message: 'Transfert de garde initié. En attente de confirmation par le caissier entrant.',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur initiation handover');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/handovers/pending
+ * Liste les transferts en attente pour l'utilisateur courant
+ */
+caisseAdminRouter.get(
+  "/handovers/pending",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const handovers = await handoverService.getPendingHandovers(userId);
+
+      res.json(handovers);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération handovers pending');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/handovers/:id
+ * Récupère les détails d'un transfert
+ */
+caisseAdminRouter.get(
+  "/handovers/:id",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const handover = await handoverService.getHandoverById(id);
+
+      if (!handover) {
+        return res.status(404).json({ error: 'Transfert non trouvé' });
+      }
+
+      res.json(handover);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération handover');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/handovers/:id/start-counting
+ * Démarre le comptage (caissier entrant)
+ */
+caisseAdminRouter.post(
+  "/handovers/:id/start-counting",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const toCaissierId = req.session.user!.id;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const result = await handoverService.startCounting(id, toCaissierId, req.ip);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json({ message: 'Comptage démarré' });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur démarrage comptage');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/handovers/:id/confirm
+ * Confirme le transfert (caissier entrant)
+ */
+caisseAdminRouter.post(
+  "/handovers/:id/confirm",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validation = confirmHandoverSchema.safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const toCaissierId = req.session.user!.id;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const result = await handoverService.confirmHandover({
+        handoverId: id,
+        toCaissierId,
+        ...validation.data,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: result.error,
+          errorCode: result.errorCode,
+        });
+      }
+
+      res.json({
+        handover: result.handover,
+        requiresApproval: result.requiresApproval,
+        message: result.requiresApproval
+          ? 'Écart détecté. En attente d\'approbation par un superviseur.'
+          : 'Transfert confirmé. Vous êtes maintenant responsable de cette caisse.',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur confirmation handover');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/handovers/:id/approve
+ * Approuve un transfert contesté (superviseur)
+ */
+caisseAdminRouter.post(
+  "/handovers/:id/approve",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validation = approveHandoverSchema.safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const approvedBy = req.session.user!.id;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const result = await handoverService.approveDisputed(
+        id,
+        approvedBy,
+        validation.data.comment,
+        req.ip
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json({
+        handover: result.handover,
+        message: 'Transfert approuvé et finalisé.',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur approbation handover');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/handovers/:id/cancel
+ * Annule un transfert en cours
+ */
+caisseAdminRouter.post(
+  "/handovers/:id/cancel",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validation = cancelHandoverSchema.safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const cancelledBy = req.session.user!.id;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const result = await handoverService.cancelHandover({
+        handoverId: id,
+        cancelledBy,
+        reason: validation.data.reason,
+        ipAddress: req.ip,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json({
+        handover: result.handover,
+        message: 'Transfert annulé.',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur annulation handover');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/sessions/:sessionId/handovers
+ * Historique des transferts pour une session
+ */
+caisseAdminRouter.get(
+  "/sessions/:sessionId/handovers",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { handoverService } = await import("../services/caisse/handover-service");
+
+      const history = await handoverService.getHandoverHistory(sessionId);
+
+      res.json(history);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération historique handovers');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - CODES DE SÉCURITÉ
+// ============================================================================
+
+const generateCodeSchema = z.object({
+  agenceId: z.string().uuid().optional(),
+  caisseId: z.string().uuid().optional(),
+  codeType: z.enum(['EMERGENCY', 'DAILY', 'PERMANENT']),
+  description: z.string().optional(),
+  maxUsages: z.number().int().min(1).optional(),
+  expiresInHours: z.number().int().min(1).optional(),
+  authorizationDurationHours: z.number().int().min(1).max(24).optional(),
+});
+
+const validateCodeSchema = z.object({
+  code: z.string().min(4).max(12),
+  agenceId: z.string().uuid().optional(),
+  caisseId: z.string().uuid().optional(),
+  action: z.string().optional(),
+});
+
+const rotationPolicySchema = z.object({
+  agenceId: z.string().uuid().optional(),
+  rotationFrequencyDays: z.number().int().min(1).max(365).optional(),
+  maxUsageBeforeRotation: z.number().int().min(1).optional(),
+  notifyDaysBeforeExpiry: z.number().int().min(1).max(30).optional(),
+  autoGenerateOnExpiry: z.boolean().optional(),
+});
+
+/**
+ * GET /api/caisses/security-codes
+ * Liste les codes de sécurité actifs pour une agence/caisse
+ */
+caisseAdminRouter.get(
+  "/security-codes",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+      const caisseId = req.query.caisseId as string | undefined;
+
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const codes = await securityCodeRotationService.getActiveCodes(agenceId, caisseId);
+
+      // Ne pas exposer le hash du code
+      const safeCodes = codes.map(c => ({
+        id: c.id,
+        codeType: c.codeType,
+        agenceId: c.agenceId,
+        caisseId: c.caisseId,
+        active: c.active,
+        expiresAt: c.expiresAt,
+        maxUsages: c.maxUsages,
+        usageCount: c.usageCount,
+        authorizationDurationHours: c.authorizationDurationHours,
+        description: c.description,
+        createdBy: c.createdBy,
+        createdAt: c.createdAt,
+      }));
+
+      res.json(safeCodes);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération codes sécurité');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/security-codes
+ * Génère un nouveau code de sécurité
+ */
+caisseAdminRouter.post(
+  "/security-codes",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const validation = generateCodeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const userId = req.session.user!.id;
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const result = await securityCodeRotationService.generateCode({
+        ...validation.data,
+        createdBy: userId,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.status(201).json({
+        code: result.code, // Le code en clair (à afficher une seule fois)
+        codeId: result.codeId,
+        expiresAt: result.expiresAt,
+        message: 'Code généré avec succès. Ce code ne sera affiché qu\'une seule fois.',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur génération code sécurité');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/security-codes/validate
+ * Valide un code de sécurité et crée une autorisation
+ */
+caisseAdminRouter.post(
+  "/security-codes/validate",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const validation = validateCodeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const userId = req.session.user!.id;
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const result = await securityCodeRotationService.validateCode({
+        ...validation.data,
+        userId,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      if (!result.success) {
+        return res.status(401).json({
+          error: result.error,
+          errorCode: result.errorCode,
+        });
+      }
+
+      res.json({
+        success: true,
+        authorization: result.authorization,
+        message: 'Code validé avec succès',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur validation code sécurité');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * DELETE /api/caisses/security-codes/:id
+ * Révoque un code de sécurité
+ */
+caisseAdminRouter.delete(
+  "/security-codes/:id",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const userId = req.session.user!.id;
+
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const success = await securityCodeRotationService.revokeCode(id, userId, reason);
+
+      if (!success) {
+        return res.status(400).json({ error: 'Impossible de révoquer le code' });
+      }
+
+      res.json({ message: 'Code révoqué avec succès' });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur révocation code sécurité');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/security-codes/statistics
+ * Statistiques des codes de sécurité
+ */
+caisseAdminRouter.get(
+  "/security-codes/statistics",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const statistics = await securityCodeRotationService.getStatistics(agenceId);
+
+      res.json(statistics);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur statistiques codes sécurité');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/security-codes/rotation-policy
+ * Récupère la politique de rotation
+ */
+caisseAdminRouter.get(
+  "/security-codes/rotation-policy",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const policy = await securityCodeRotationService.getRotationPolicy(agenceId);
+
+      res.json(policy || {
+        rotationFrequencyDays: 30,
+        maxUsageBeforeRotation: null,
+        notifyDaysBeforeExpiry: 7,
+        autoGenerateOnExpiry: false,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération politique rotation');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * PUT /api/caisses/security-codes/rotation-policy
+ * Met à jour la politique de rotation
+ */
+caisseAdminRouter.put(
+  "/security-codes/rotation-policy",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const validation = rotationPolicySchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const userId = req.session.user!.id;
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const policy = await securityCodeRotationService.upsertRotationPolicy({
+        ...validation.data,
+        updatedBy: userId,
+      });
+
+      res.json({
+        policy,
+        message: 'Politique de rotation mise à jour',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur mise à jour politique rotation');
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/security-codes/check-rotation
+ * Vérifie et applique les rotations (peut être appelé par un cron)
+ */
+caisseAdminRouter.post(
+  "/security-codes/check-rotation",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      const result = await securityCodeRotationService.checkAndApplyRotation();
+
+      res.json({
+        ...result,
+        message: 'Vérification de rotation effectuée',
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur vérification rotation');
+      res.status(500).json({ error: error.message || "Erreur interne" });
     }
   }
 );

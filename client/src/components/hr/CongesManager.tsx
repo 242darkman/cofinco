@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock, RefreshCw, AlertCircle, Wifi, WifiOff, List, CalendarDays } from 'lucide-react';
 import { DemandeConge } from '../../hooks/hr/useConges';
 import { Card, Button, Modal, FormField, SelectField, Badge, StatCard, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -9,6 +9,15 @@ import { StatutConge, STATUT_CONGE_LABELS } from '@shared/enum/status-constants'
 import { useHrRealtime, useHrSyncStatus } from '../../hooks/hr/useHrRealtime';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api-client';
+import LeaveCalendar from './LeaveCalendar';
+
+interface LeaveBalanceByType {
+  type: string;
+  approved: number;
+  pending: number;
+  joursApproved: number;
+  joursPending: number;
+}
 
 interface LeaveBalance {
   employeId: string;
@@ -20,6 +29,7 @@ interface LeaveBalance {
     pending: number;
     carryOver: number;
   };
+  byType?: LeaveBalanceByType[];
 }
 
 interface CongesManagerProps {
@@ -75,6 +85,7 @@ export default function CongesManager({
     staleTime: 30000,
   });
 
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showForm, setShowForm] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState<number | null>(null);
   const [rejectComment, setRejectComment] = useState('');
@@ -269,6 +280,25 @@ export default function CongesManager({
               </div>
             )}
           </div>
+          {/* Per-type breakdown */}
+          {leaveBalance.data.byType && leaveBalance.data.byType.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-cyan-800/30">
+              <h5 className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">Répartition par type</h5>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {leaveBalance.data.byType.map((bt) => (
+                  <div key={bt.type} className="bg-slate-800/60 rounded-md px-2.5 py-1.5">
+                    <div className="text-[10px] text-slate-400 truncate" title={bt.type}>{bt.type}</div>
+                    <div className="flex items-baseline gap-1.5 mt-0.5">
+                      <span className="text-sm font-bold text-white">{bt.joursApproved}j</span>
+                      {bt.joursPending > 0 && (
+                        <span className="text-[10px] text-yellow-400">+{bt.joursPending}j en att.</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -312,31 +342,54 @@ export default function CongesManager({
               <Calendar size={14} className="text-cyan-400" />
               Demandes de Congés
            </h3>
-           {canCreateConges && (
-             <Button variant="primary" size="sm" onClick={() => setShowForm(true)} className="h-7 text-xs px-2">
-               <Plus size={14} />
-               <span className="hidden sm:inline">Nouvelle Demande</span>
-             </Button>
-           )}
+           <div className="flex items-center gap-2">
+             {/* View Mode Toggle */}
+             <div className="flex items-center bg-slate-800 rounded-lg p-0.5">
+               <button
+                 onClick={() => setViewMode('list')}
+                 className={`p-1 rounded transition ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                 title="Vue liste"
+               >
+                 <List size={14} />
+               </button>
+               <button
+                 onClick={() => setViewMode('calendar')}
+                 className={`p-1 rounded transition ${viewMode === 'calendar' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                 title="Vue calendrier"
+               >
+                 <CalendarDays size={14} />
+               </button>
+             </div>
+             {canCreateConges && (
+               <Button variant="primary" size="sm" onClick={() => setShowForm(true)} className="h-7 text-xs px-2">
+                 <Plus size={14} />
+                 <span className="hidden sm:inline">Nouvelle Demande</span>
+               </Button>
+             )}
+           </div>
         </div>
 
-        {/* Table Container */}
+        {/* Content: List or Calendar */}
         <div className="flex-1 overflow-hidden">
-          <ResponsiveTable
-            data={paginatedDemandes}
-            columns={columns}
-            mobileBreakpoint="md"
-            emptyMessage="Aucune demande de congé."
-            maxHeight="100%"
-            pagination={{
-              page: currentPage,
-              totalPages,
-              onPageChange: setCurrentPage
-            }}
-            density="compact"
-            className="border-0 rounded-none h-full"
-            headerClassName="bg-slate-900 sticky top-0"
-          />
+          {viewMode === 'list' ? (
+            <ResponsiveTable
+              data={paginatedDemandes}
+              columns={columns}
+              mobileBreakpoint="md"
+              emptyMessage="Aucune demande de congé."
+              maxHeight="100%"
+              pagination={{
+                page: currentPage,
+                totalPages,
+                onPageChange: setCurrentPage
+              }}
+              density="compact"
+              className="border-0 rounded-none h-full"
+              headerClassName="bg-slate-900 sticky top-0"
+            />
+          ) : (
+            <LeaveCalendar demandes={demandes} />
+          )}
         </div>
       </div>
 

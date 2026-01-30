@@ -9,6 +9,9 @@
  */
 
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:Balances');
 import { requireAuth } from "../auth";
 import { balanceService } from "../services/balance-service";
 import { z } from "zod";
@@ -38,7 +41,7 @@ router.get("/compte/:id", requireAbility(Actions.VIEW, Subjects.COMPTE), async (
     const balance = await balanceService.getCompteBalance(req.params.id);
     res.json(balance);
   } catch (error: any) {
-    console.error("Error fetching compte balance:", error);
+    logger.error({ err: error }, 'Error fetching compte balance');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Compte non trouvé" });
     }
@@ -56,7 +59,7 @@ router.get("/caisse/:id", requireAbility(Actions.VIEW, Subjects.CAISSE), async (
     const balance = await balanceService.getCaisseBalance(req.params.id);
     res.json(balance);
   } catch (error: any) {
-    console.error("Error fetching caisse balance:", error);
+    logger.error({ err: error }, 'Error fetching caisse balance');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Caisse non trouvée" });
     }
@@ -74,7 +77,7 @@ router.get("/session/:id", requireAbility(Actions.VIEW, Subjects.CAISSE_SESSION)
     const balance = await balanceService.getSessionCaisseBalance(req.params.id);
     res.json(balance);
   } catch (error: any) {
-    console.error("Error fetching session balance:", error);
+    logger.error({ err: error }, 'Error fetching session balance');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Session non trouvée" });
     }
@@ -92,7 +95,7 @@ router.get("/coffre/:id", requireAbility(Actions.VIEW, Subjects.COFFRE), async (
     const balance = await balanceService.getCoffreBalance(req.params.id);
     res.json(balance);
   } catch (error: any) {
-    console.error("Error fetching coffre balance:", error);
+    logger.error({ err: error }, 'Error fetching coffre balance');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Coffre non trouvé" });
     }
@@ -110,7 +113,7 @@ router.get("/credit/:id", requireAbility(Actions.VIEW, Subjects.CREDIT), async (
     const balance = await balanceService.getCreditBalance(req.params.id);
     res.json(balance);
   } catch (error: any) {
-    console.error("Error fetching credit balance:", error);
+    logger.error({ err: error }, 'Error fetching credit balance');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Crédit non trouvé" });
     }
@@ -128,7 +131,7 @@ router.get("/tontine/:id", requireAbility(Actions.VIEW, Subjects.TONTINE), async
     const balance = await balanceService.getTontineBalance(req.params.id);
     res.json(balance);
   } catch (error: any) {
-    console.error("Error fetching tontine balance:", error);
+    logger.error({ err: error }, 'Error fetching tontine balance');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Tontine non trouvée" });
     }
@@ -146,7 +149,7 @@ router.get("/caisse-agent/:id", requireAbility(Actions.VIEW, Subjects.CAISSE_AGE
     const balance = await balanceService.getCaisseAgentBalance(req.params.id);
     res.json(balance);
   } catch (error: any) {
-    console.error("Error fetching caisse agent balance:", error);
+    logger.error({ err: error }, 'Error fetching caisse agent balance');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Caisse agent non trouvée" });
     }
@@ -156,27 +159,8 @@ router.get("/caisse-agent/:id", requireAbility(Actions.VIEW, Subjects.CAISSE_AGE
 
 // ============================================
 // POSITION DE TRÉSORERIE GLOBALE
+// SUPPRIMÉ: Utiliser /api/treasury/v2/encaisse (Single Source of Truth depuis GL)
 // ============================================
-
-/**
- * GET /api/balances/cash-position
- * Récupère la position de trésorerie globale
- * Requiert: VIEW sur Caisse OU Coffre OU Dashboard (pour le tableau de bord)
- */
-router.get("/cash-position", requireAnyAbility([
-  { action: Actions.VIEW, subject: Subjects.CAISSE },
-  { action: Actions.VIEW, subject: Subjects.COFFRE },
-  { action: Actions.VIEW, subject: Subjects.DASHBOARD },
-]), async (req, res) => {
-  try {
-    const agenceId = req.query.agenceId as string | undefined;
-    const cashPosition = await balanceService.getGlobalCashPosition(agenceId);
-    res.json(cashPosition);
-  } catch (error: any) {
-    console.error("Error fetching cash position:", error);
-    res.status(500).json({ error: "Erreur lors de la récupération de la position de trésorerie" });
-  }
-});
 
 // ============================================
 // RÉCONCILIATION
@@ -197,7 +181,7 @@ router.get("/reconcile/compte/:id", requireAnyAbility([
     const result = await balanceService.reconcileCompte(req.params.id);
     res.json(result);
   } catch (error: any) {
-    console.error("Error reconciling compte:", error);
+    logger.error({ err: error }, 'Error reconciling compte');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Compte non trouvé" });
     }
@@ -218,7 +202,7 @@ router.get("/reconcile/session/:id", requireAnyAbility([
     const result = await balanceService.reconcileSessionCaisse(req.params.id);
     res.json(result);
   } catch (error: any) {
-    console.error("Error reconciling session:", error);
+    logger.error({ err: error }, 'Error reconciling session');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Session non trouvée" });
     }
@@ -239,7 +223,7 @@ router.get("/reconcile/tontine/:id", requireAnyAbility([
     const result = await balanceService.reconcileTontine(req.params.id);
     res.json(result);
   } catch (error: any) {
-    console.error("Error reconciling tontine:", error);
+    logger.error({ err: error }, 'Error reconciling tontine');
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: "Tontine non trouvée" });
     }
@@ -248,27 +232,79 @@ router.get("/reconcile/tontine/:id", requireAnyAbility([
 });
 
 /**
- * POST /api/balances/reconcile/full
- * Lance une réconciliation complète
- * Requiert: MANAGE sur Comptabilité (opération sensible)
+ * POST /api/balances/reconcile/session/:id/fix
+ * Recalcule et corrige le solde d'une session caisse
+ * Requiert: MANAGE sur Comptabilité (action corrective)
  */
-router.post("/reconcile/full", requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req, res) => {
+router.post("/reconcile/session/:id/fix", requireAnyAbility([
+  { action: Actions.MANAGE, subject: Subjects.COMPTABILITE },
+]), async (req, res) => {
   try {
-    const agenceId = req.body.agenceId as string | undefined;
-    const report = await balanceService.runFullReconciliation(agenceId);
+    const sessionId = req.params.id;
+    const userId = (req as any).user?.id;
 
-    // Log l'événement
-    console.log(`[RECONCILIATION] Full run completed: ${report.runId}`, {
-      totalEntities: report.totalEntities,
-      discrepancies: report.discrepancies.length,
-      summary: report.summary
+    // 1. Récupérer la session et vérifier qu'elle existe
+    const result = await balanceService.reconcileSessionCaisse(sessionId);
+
+    if (!result.hasDiscrepancy) {
+      return res.json({
+        success: true,
+        message: "Le solde est déjà correct, aucune correction nécessaire.",
+        result,
+      });
+    }
+
+    // 2. Corriger le solde
+    const { db } = await import("../db");
+    const { sessionsCaisse, sessionsCaisseAuditLogs } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    await db.update(sessionsCaisse)
+      .set({
+        montantFermetureTheorique: result.calculatedBalance.toString(),
+        updatedAt: new Date(),
+      })
+      .where(eq(sessionsCaisse.id, sessionId));
+
+    // 3. Log d'audit
+    await db.insert(sessionsCaisseAuditLogs).values({
+      sessionId,
+      action: "BALANCE_CORRECTED",
+      details: {
+        oldBalance: result.persistedBalance,
+        newBalance: result.calculatedBalance,
+        discrepancy: result.discrepancy,
+        severity: result.severity,
+        correctedBy: userId,
+        reason: "Réconciliation automatique via API",
+      },
+      userId,
     });
 
-    res.json(report);
+    logger.info({
+      sessionId,
+      oldBalance: result.persistedBalance,
+      newBalance: result.calculatedBalance,
+      userId,
+    }, 'Session balance corrected');
+
+    res.json({
+      success: true,
+      message: "Solde corrigé avec succès.",
+      oldBalance: result.persistedBalance,
+      newBalance: result.calculatedBalance,
+      discrepancy: result.discrepancy,
+    });
   } catch (error: any) {
-    console.error("Error running full reconciliation:", error);
-    res.status(500).json({ error: "Erreur lors de la réconciliation complète" });
+    logger.error({ err: error }, 'Error fixing session balance');
+    if (error.message?.includes("not found")) {
+      return res.status(404).json({ error: "Session non trouvée" });
+    }
+    res.status(500).json({ error: "Erreur lors de la correction du solde" });
   }
 });
+
+// SUPPRIMÉ: POST /api/balances/reconcile/full
+// Utiliser POST /api/treasury/v2/reconciliation/run pour la réconciliation GL vs Opérationnel
 
 export default router;

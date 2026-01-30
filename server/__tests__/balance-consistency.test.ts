@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { db } from '../db';
+import { createLogger } from '../lib/logger';
 import {
   comptes,
   transactionsCompte,
@@ -21,6 +22,8 @@ import {
 import { eq, sql, and, sum, isNull } from 'drizzle-orm';
 import { balanceService } from '../services/balance-service';
 import { RECONCILIATION_THRESHOLDS } from '@shared/types/balances';
+
+const logger = createLogger('BalanceTest');
 
 describe('Balance Consistency Tests', () => {
 
@@ -56,8 +59,10 @@ describe('Balance Consistency Tests', () => {
           total: sql<number>`COALESCE(SUM(
             CASE
               WHEN ${transactionsCompte.typePaiement} IN (
-                'DEPOSIT_CASH', 'DEPOSIT_MM', 'DEPOSIT_TRANSFER', 'TRANSFER_IN',
-                'INTEREST', 'BONUS', 'SYSTEM_CREDIT', 'INITIAL_DEPOSIT'
+                'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED',
+                'TRANSFER_IN', 'INTEREST_PAYMENT', 'INITIAL_DEPOSIT',
+                'CREDIT_DISBURSEMENT', 'TONTINE_WITHDRAWAL', 'COFFRE_TO_CAISSE',
+                'COFFRE_TRANSIT_IN', 'SESSION_SURPLUS', 'ADJUSTMENT'
               )
               THEN CAST(${transactionsCompte.montant} AS DECIMAL)
               ELSE -CAST(${transactionsCompte.montant} AS DECIMAL)
@@ -84,7 +89,7 @@ describe('Balance Consistency Tests', () => {
 
       // Log les divergences pour debugging
       if (discrepancies.length > 0) {
-        console.warn('[BALANCE TEST] Compte discrepancies found:', discrepancies);
+        logger.warn({ discrepancies }, 'Compte discrepancies found');
       }
 
       expect(discrepancies.length).toBe(0);
@@ -98,7 +103,7 @@ describe('Balance Consistency Tests', () => {
         .limit(1);
 
       if (!randomCompte) {
-        console.log('[BALANCE TEST] No comptes found, skipping test');
+        logger.info('No comptes found, skipping test');
         return;
       }
 
@@ -141,7 +146,11 @@ describe('Balance Consistency Tests', () => {
         const [result] = await db.select({
           total: sql<number>`COALESCE(SUM(
             CASE
-              WHEN ${operationsCaisse.typeOperation} IN ('DEPOT', 'ENCAISSEMENT', 'APPROVISIONNEMENT')
+              WHEN ${operationsCaisse.typeOperation} IN (
+                'SAVINGS_DEPOSIT', 'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED',
+                'SAFE_SUPPLY', 'CREDIT_REPAYMENT', 'LOAN_REPAYMENT', 'TONTINE_CONTRIBUTION',
+                'MISC_COLLECTION', 'INITIAL_DEPOSIT'
+              )
               THEN CAST(${operationsCaisse.montant} AS DECIMAL)
               ELSE -CAST(${operationsCaisse.montant} AS DECIMAL)
             END
@@ -167,7 +176,7 @@ describe('Balance Consistency Tests', () => {
       }
 
       if (discrepancies.length > 0) {
-        console.warn('[BALANCE TEST] Session discrepancies found:', discrepancies);
+        logger.warn({ discrepancies }, 'Session discrepancies found');
       }
 
       expect(discrepancies.length).toBe(0);
@@ -180,7 +189,7 @@ describe('Balance Consistency Tests', () => {
         .limit(1);
 
       if (!randomSession) {
-        console.log('[BALANCE TEST] No active sessions found, skipping test');
+        logger.info('No active sessions found, skipping test');
         return;
       }
 
@@ -262,7 +271,7 @@ describe('Balance Consistency Tests', () => {
       }
 
       if (discrepancies.length > 0) {
-        console.warn('[BALANCE TEST] Tontine discrepancies found:', discrepancies);
+        logger.warn({ discrepancies }, 'Tontine discrepancies found');
       }
 
       expect(discrepancies.length).toBe(0);
@@ -275,7 +284,7 @@ describe('Balance Consistency Tests', () => {
         .limit(1);
 
       if (!randomTontine) {
-        console.log('[BALANCE TEST] No active tontines found, skipping test');
+        logger.info('No active tontines found, skipping test');
         return;
       }
 
@@ -324,7 +333,7 @@ describe('Balance Consistency Tests', () => {
         .limit(1);
 
       if (!randomCredit) {
-        console.log('[BALANCE TEST] No active credits found, skipping test');
+        logger.info('No active credits found, skipping test');
         return;
       }
 
@@ -390,11 +399,11 @@ describe('Balance Consistency Tests', () => {
       expect(report.totalEntities).toBeGreaterThanOrEqual(0);
 
       // Log le rapport pour debugging
-      console.log('[BALANCE TEST] Reconciliation report:', {
+      logger.info({
         runId: report.runId,
         totalEntities: report.totalEntities,
         summary: report.summary
-      });
+      }, 'Reconciliation report');
 
       // Pas de divergences critiques
       expect(report.summary.critical).toBe(0);

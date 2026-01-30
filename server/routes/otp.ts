@@ -1,5 +1,8 @@
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { storage } from "../storage";
+
+const logger = createLogger('Routes:Otp');
 import { insertOtpValidationSchema } from "@shared/schema";
 import { requireAuth } from "../auth";
 import { z } from "zod";
@@ -84,7 +87,7 @@ export function registerOtpRoutes(app: Express) {
           details: error.errors,
         });
       }
-      console.error("OTP Request Error:", error);
+      logger.error({ err: error }, 'OTP Request Error');
       res.status(500).json({ success: false, error: "Erreur interne" });
     }
   });
@@ -121,7 +124,7 @@ export function registerOtpRoutes(app: Express) {
           details: error.errors,
         });
       }
-      console.error("OTP Verify Error:", error);
+      logger.error({ err: error }, 'OTP Verify Error');
       res.status(500).json({ success: false, error: "Erreur interne" });
     }
   });
@@ -165,7 +168,7 @@ export function registerOtpRoutes(app: Express) {
       const otpRecord = await storage.createOtpValidation(parsed2);
 
       // Simulate SMS sending (log to console)
-      console.log(`[SMS MOCK] Sending OTP ${otpCode} to ${clientPhone} for transaction ${transactionReference}`);
+      logger.info({ otpCode, clientPhone, transactionReference }, 'SMS MOCK - Sending OTP');
 
       res.json({
         success: true,
@@ -175,7 +178,7 @@ export function registerOtpRoutes(app: Express) {
       });
 
     } catch (error: any) {
-      console.error("OTP Generation Error:", error);
+      logger.error({ err: error }, 'OTP Generation Error');
       res.status(500).json({ error: "impossibleGenererOtp", details: error.message });
     }
   });
@@ -195,7 +198,7 @@ export function registerOtpRoutes(app: Express) {
       const otpRecord = await storage.getOtpByReference(transactionReference);
 
       if (!otpRecord) {
-        return res.status(404).json({ error: "codeInvalide" }); // Generic error for security
+        return res.status(400).json({ error: "codeInvalide" }); // Generic error for security
       }
 
       if (otpRecord.statut === 'validated') {
@@ -240,7 +243,7 @@ export function registerOtpRoutes(app: Express) {
       res.json({ success: true });
 
     } catch (error: any) {
-      console.error("OTP Validation Error:", error);
+      logger.error({ err: error }, 'OTP Validation Error');
       res.status(500).json({ error: "erreurValidation", details: error.message });
     }
   });

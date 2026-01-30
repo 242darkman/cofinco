@@ -58,11 +58,13 @@ export default function AdminDashboard() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [users, allLogs, healthData] = await Promise.all([
+      const [users, auditResponse, healthData] = await Promise.all([
         userApi.getAll().catch(() => []),
-        auditApi.getAll().catch(() => []),
+        auditApi.getAll().catch(() => ({ data: [] })),
         healthApi.check().catch(() => null)
       ]);
+      // L'API audit retourne { data: [...], total, page, totalPages }
+      const allLogs = Array.isArray(auditResponse) ? auditResponse : (auditResponse?.data || []);
 
       // Deduplicate Users for Count
       const uniqueUsers = Array.from(new Set(users.map((u: any) => u.id)))

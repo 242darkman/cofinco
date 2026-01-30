@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight } from 'lucide-react';
-import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog } from '../../ui';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, MapPin, Play, Pencil } from 'lucide-react';
+import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
 import { useCredits } from '../../../hooks/credits/useCredits';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
@@ -15,6 +15,7 @@ import CreditDisbursementModal from './CreditDisbursementModal';
 import CreditCommissionRejectionModal from './CreditCommissionRejectionModal';
 import CreditFeesPaymentModal from './CreditFeesPaymentModal';
 import ReferenceTable from './CreditRemboursement';
+import CreditEcheancier from './CreditEcheancier';
 import { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';
 import { formatClientName, resolveClientPhotoUrl } from '../../../lib/format';
 import { TableColumn } from '../../ui/ResponsiveTable';
@@ -23,9 +24,10 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 import { PipelineFunnel } from './PipelineFunnel';
+import EnqueteZoneAnalytics from './EnqueteZoneAnalytics';
 import { differenceInDays } from 'date-fns';
 
-type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements' | 'archives';
+type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'carte' | 'reevaluations' | 'remboursements' | 'echeancier' | 'archives';
 
 // Helper to get static configuration
 const getTabConfig = () => [
@@ -33,10 +35,12 @@ const getTabConfig = () => [
   { key: 'credits', label: 'Crédits', icon: CreditCard },
   { key: 'demandes', label: 'À traiter', icon: FileText, badgeColors: 'bg-blue-100 text-blue-800' }, // New demands, rejected, cancelled
   { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck, badgeColors: 'bg-yellow-100 text-yellow-800' }, // Only "A enquêter" (ready for investigation)
+  { key: 'carte', label: 'Carte', icon: MapPin }, // Geographic analysis map
   { key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeColors: 'bg-red-100 text-red-800' }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
   { key: 'commission', label: "Comité", icon: Users, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
   { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw, badgeColors: 'bg-gray-100 text-gray-800' }, // Credit reevaluation workflow
   { key: 'remboursements', label: 'Remboursements', icon: TrendingUp },
+  { key: 'echeancier', label: 'Échéancier', icon: Calendar },
   { key: 'archives', label: 'Archives', icon: XCircle, badgeColors: 'bg-slate-100 text-slate-800' } // Cancelled / Rejected
 ];
 
@@ -60,7 +64,27 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const [demandesPage, setDemandesPage] = useState(1);
   const [demandeToDelete, setDemandeToDelete] = useState<string | null>(null);
   const [demandeToCancel, setDemandeToCancel] = useState<string | null>(null);
+  const [enqueteData, setEnqueteData] = useState<any>(null); // Store fetched enquête data
+  const [loadingEnquete, setLoadingEnquete] = useState(false);
   const ITEMS_PER_PAGE = 15;
+
+  // Function to fetch enquête data by demande ID
+  const fetchEnqueteByDemandeId = async (demandeId: string) => {
+    try {
+      setLoadingEnquete(true);
+      const response = await fetch(`/api/demandes-credit/${demandeId}/enquete`);
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching enquête:', error);
+      return null;
+    } finally {
+      setLoadingEnquete(false);
+    }
+  };
 
   useEffect(() => {
     if (activeView) {
@@ -107,7 +131,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   });
 
   // Offline Sync Logic
-  const offlineItems = useLiveQuery(() => db.enquetes_offline.where('synced').equals(0).toArray());
+  const offlineItems = useLiveQuery(() => db.enquetes.where('synced').equals(0).toArray());
   const pendingCount = offlineItems?.length || 0;
 
   useEffect(() => {
@@ -119,8 +143,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
            for (const item of offlineItems) {
                try {
                    await enquetes.createEnquete(item.data);
-                   await db.enquetes_offline.update(item.id!, { synced: 1 });
-                   await db.enquetes_offline.delete(item.id!); // Clean up after sync
+                   await db.enquetes.update(item.id!, { synced: 1 });
+                   await db.enquetes.delete(item.id!); // Clean up after sync
                    successCount++;
                } catch (e) {
                    console.error("Sync failed for item", item.id, e);
@@ -297,7 +321,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     const client = item.clients || item.client;
     const name = formatClientName(client?.nom, client?.prenom) || 'Client Inconnu';
     const photoUrl = resolveClientPhotoUrl(client?.photo_url || client?.photoProfile);
-    const initials = (client?.nom?.[0] || 'C').toUpperCase();
+    const initials = ((client?.prenom?.[0] || '') + (client?.nom?.[0] || 'C')).toUpperCase();
 
     return (
       <div className="flex items-center gap-3">
@@ -391,32 +415,53 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => renderClientName(item) },
     { key: 'type_activite', label: 'Activité' },
     { key: 'montant_demande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', badge: true, align: 'center', badgeClassName: 'min-w-[100px]' }
+    { key: 'statut', label: 'Statut', align: 'center', format: (val) => {
+      const translations: Record<string, string> = {
+        'READY_FOR_INVESTIGATION': 'Prêt à enquêter',
+        'UNDER_INVESTIGATION': 'En cours d\'enquête',
+        'INVESTIGATION_COMPLETE': 'Enquête terminée',
+      };
+      const colors: Record<string, string> = {
+        'READY_FOR_INVESTIGATION': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+        'UNDER_INVESTIGATION': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+        'INVESTIGATION_COMPLETE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      };
+      const label = translations[val] || val;
+      const colorClass = colors[val] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+      return (
+        <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${colorClass}`}>
+          {label}
+        </span>
+      );
+    } }
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Gestion des Crédits" 
-        description="Crédits, demandes et enquêtes"
-        icon={CreditCard}
+      {/* Header with contextual help */}
+      <FeatureHeader
+        featureKey="finance.credits"
+        title={FEATURE_DESCRIPTIONS['finance.credits'].title}
+        subtitle={FEATURE_DESCRIPTIONS['finance.credits'].subtitle}
+        helpText={FEATURE_DESCRIPTIONS['finance.credits'].helpText}
+        icon={<CreditCard size={24} className="text-indigo-400" />}
         actions={
-          <div className="flex gap-2 items-center">
+          <div className="flex items-center gap-3">
             {pendingCount > 0 && (
-              <Badge 
-                variant="warning" 
-                size="lg" 
-                className="animate-pulse flex items-center gap-2"
+              <Badge
+                variant="warning"
+                size="sm"
+                className="animate-pulse flex items-center gap-1.5"
                 value={
-                  <span className="flex items-center gap-2">
-                    <WifiOff size={16} />
-                    {pendingCount} En attente de synchro
+                  <span className="flex items-center gap-1.5">
+                    <WifiOff size={14} />
+                    <span className="hidden sm:inline">{pendingCount} Sync</span>
                   </span>
                 }
               />
             )}
             <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
-              <Button variant="primary" onClick={() => setShowRequestForm(true)} icon={FileText}>
+              <Button size="sm" variant="primary" onClick={() => setShowRequestForm(true)} icon={FileText}>
                 Nouvelle Demande
               </Button>
             </ProtectedFeature>
@@ -424,15 +469,18 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         }
       />
 
-      <Card variant="default" padding="sm" className="sticky top-0 z-10 backdrop-blur-md bg-slate-900/80 mb-6">
-        <TabGroup 
-          activeTab={activeTab} 
-          onTabChange={(key) => setActiveTab(key as TabId)}
-          tabs={tabs} 
-          variant="pills"
-          size="sm"
-        />
-      </Card>
+      {/* Sticky Tabs Row */}
+      <div className="bg-[#020617]/90 backdrop-blur-xl -mx-6 px-6 py-2 mb-6 border-b border-[#1e293b]/50 sticky top-0 z-20">
+         <TabGroup 
+            activeTab={activeTab} 
+            onTabChange={(key) => setActiveTab(key as TabId)}
+            tabs={tabs} 
+            variant="pills"
+            size="sm"
+            scrollable
+            className="pb-1"
+         />
+      </div>
 
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && (
@@ -877,7 +925,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <div className="space-y-4">
           <div className="flex justify-end">
             <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
-              <Button variant="primary" onClick={() => setShowEnqueteForm(true)} icon={TrendingUp}>
+              <Button size="xs" variant="primary" onClick={() => setShowEnqueteForm(true)} icon={TrendingUp}>
                 Nouvelle Enquête
               </Button>
             </ProtectedFeature>
@@ -897,34 +945,112 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               loading={isLoading}
               emptyMessage="Aucune enquête en attente"
               onRowClick={(item: any) => {
-                  setSelectedDemande(item);
-                  setShowEnqueteForm(true);
+                  // Seulement ouvrir le formulaire si l'enquête est en cours ou terminée
+                  if (item.statut === StatutDemande.UNDER_INVESTIGATION || item.statut === StatutDemande.INVESTIGATION_COMPLETE) {
+                    setSelectedDemande(item);
+                    setShowEnqueteForm(true);
+                  }
               }}
               density="compact"
               actions={(item) => (
                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
-                   <Button 
-                      size="sm" 
+                  {/* Bouton Démarrer - pour les demandes prêtes à enquêter */}
+                  {item.statut === StatutDemande.READY_FOR_INVESTIGATION && (
+                    <Button
+                      size="xs"
                       variant="primary"
-                      onClick={(e) => { 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await demandes.startInvestigation(item.id);
+                        // Le statut change, la liste se rafraîchit automatiquement
+                        // L'utilisateur peut ensuite cliquer sur "Continuer" pour remplir le formulaire
+                      }}
+                      icon={Play}
+                    >
+                      Démarrer
+                    </Button>
+                  )}
+                  {/* Bouton Continuer - pour les enquêtes en cours */}
+                  {item.statut === StatutDemande.UNDER_INVESTIGATION && (
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={(e) => {
                         e.stopPropagation();
                         setSelectedDemande(item);
                         setShowEnqueteForm(true);
                       }}
-                      icon={ClipboardCheck}
-                   >
-                     Enquêter
-                   </Button>
+                      icon={Pencil}
+                    >
+                      Continuer
+                    </Button>
+                  )}
+                  {/* Bouton Voir - pour les enquêtes terminées */}
+                  {item.statut === StatutDemande.INVESTIGATION_COMPLETE && (
+                    <>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        isLoading={loadingEnquete}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          // Fetch the actual enquête data before opening
+                          const fetchedEnquete = await fetchEnqueteByDemandeId(item.id);
+                          if (fetchedEnquete) {
+                            setEnqueteData(fetchedEnquete);
+                          }
+                          setSelectedDemande(item);
+                          setShowEnqueteForm(true);
+                        }}
+                        icon={Eye}
+                      >
+                        Voir
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="primary"
+                        isLoading={demandes.validatingInvestigation}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await demandes.validateInvestigation(item.id);
+                        }}
+                        icon={CheckCircle}
+                      >
+                        Valider
+                      </Button>
+                    </>
+                  )}
                 </ProtectedFeature>
-              )} 
+              )}
             />
           </Card>
         </div>
       )}
 
+      {/* Carte Tab - Analyse Géographique */}
+      {activeTab === 'carte' && (
+        <EnqueteZoneAnalytics
+          enquetes={enquetes.enquetes.map(e => ({
+            ...e,
+            // Map fields for compatibility
+            geo_latitude: (e as any).geo_latitude || (e as any).geoLatitude,
+            geo_longitude: (e as any).geo_longitude || (e as any).geoLongitude,
+            geo_accuracy: (e as any).geo_accuracy || (e as any).geoAccuracy,
+            geo_timestamp: (e as any).geo_timestamp || (e as any).geoTimestamp,
+          }))}
+          loading={enquetes.loading}
+          onRefresh={() => enquetes.fetchEnquetes?.()}
+        />
+      )}
+
       {/* Remboursements Tab */}
       {activeTab === 'remboursements' && (
         <ReferenceTable />
+      )}
+
+      {/* Échéancier Tab */}
+      {activeTab === 'echeancier' && (
+        <CreditEcheancier />
       )}
 
       {/* Réévaluations Tab */}
@@ -963,31 +1089,56 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           onClose={() => {
             setShowEnqueteForm(false);
             setSelectedDemande(null);
+            setEnqueteData(null); // Reset enquête data on close
           }}
-          clientId={selectedDemande?.clients?.id}
+          clientId={selectedDemande?.clients?.id || selectedDemande?.client_id}
           clientNom={selectedDemande ? formatClientName(selectedDemande.clients?.nom, selectedDemande.clients?.prenom) : undefined}
-          initialData={selectedDemande ? {
+          readOnly={selectedDemande?.statut === StatutDemande.INVESTIGATION_COMPLETE}
+          initialData={enqueteData ? {
+            // Use fetched enquête data if available
+            id: enqueteData.id,
+            demandeId: enqueteData.demande_id || enqueteData.demandeId,
+            client_id: enqueteData.client_id || enqueteData.clientId,
+            montant_demande: enqueteData.montant_demande || enqueteData.montantDemande,
+            categorie_activite: enqueteData.categorie_activite || enqueteData.categorieActivite,
+            type_activite: enqueteData.type_activite || enqueteData.typeActivite,
+            anciennete_activite: enqueteData.anciennete_activite || enqueteData.ancienneteActivite,
+            description_activite: enqueteData.objet_credit || enqueteData.objetCredit,
+            objet_credit: enqueteData.objet_credit || enqueteData.objetCredit,
+            revenu_mensuel: enqueteData.revenu_mensuel || enqueteData.revenuMensuel,
+            revenus_mensuels: enqueteData.revenu_mensuel || enqueteData.revenuMensuel,
+            revenu_journalier: enqueteData.revenu_journalier || enqueteData.revenuJournalier,
+            type_revenu: enqueteData.type_revenu || enqueteData.typeRevenu,
+            charges_mensuelles: enqueteData.charges_mensuelles || enqueteData.chargesMensuelles,
+            photos_activite: enqueteData.photos_activite || enqueteData.photosActivite || [],
+            photos_geotagged: enqueteData.photos_geotagged || enqueteData.photosGeotagged || [],
+            garanties_proposees: enqueteData.garanties_proposees || enqueteData.garantiesProposees || [],
+            autres_credits: enqueteData.autres_credits || enqueteData.autresCredits || [],
+          } : selectedDemande ? {
+            // Fallback to demande data for new enquêtes
             id: selectedDemande.id,
+            demandeId: selectedDemande.id,
             client_id: selectedDemande.client_id || selectedDemande.clients?.id,
             montant_demande: selectedDemande.montant_demande?.toString(),
             type_activite: selectedDemande.type_activite,
             categorie_activite: selectedDemande.categorie_activite,
             anciennete_activite: selectedDemande.anciennete_activite,
             objet_credit: selectedDemande.objet_credit,
-            // Revenus pré-remplis depuis la demande, fallback vers données client
             revenus_mensuels: selectedDemande.revenus_mensuels || selectedDemande.revenu_mensuel || selectedDemande.clients?.revenuMensuel,
             revenu_mensuel: selectedDemande.revenu_mensuel || selectedDemande.revenus_mensuels || selectedDemande.clients?.revenuMensuel,
             revenu_journalier: selectedDemande.revenu_journalier || selectedDemande.clients?.revenuJournalier,
             type_revenu: selectedDemande.type_revenu || selectedDemande.clients?.typeRevenu,
-            // Charges pré-remplies depuis la demande
             charges_mensuelles: selectedDemande.charges_mensuelles
           } : undefined}
           onSave={async (data) => {
-            await enquetes.createEnquete({ ...data, demande_id: selectedDemande?.id });
-            setShowEnqueteForm(false);
-            setSelectedDemande(null);
-            enquetes.fetchEnquetes();
-            demandes.fetchDemandes();
+            const success = await enquetes.createEnquete(data);
+            if (success) {
+              setShowEnqueteForm(false);
+              setSelectedDemande(null);
+              setEnqueteData(null);
+              enquetes.fetchEnquetes();
+              demandes.fetchDemandes();
+            }
           }}
         />
       )}

@@ -1,14 +1,15 @@
 
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../ui/sheet';
 import { Input, Button, Badge } from '../../ui';
-import { Search, UserCheck, Clock, CheckCircle2 } from 'lucide-react';
+import { Search, UserCheck, Clock, CheckCircle2, CheckSquare, Square, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { api } from '../../../lib/api-client';
+import { api, compteEpargneApi } from '../../../lib/api-client';
 import { resolveClientPhotoUrl } from '@/lib/format';
 import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '@/lib/status-labels';
+import { toast } from '../../../lib/toast';
 
 export interface PendingAccount {
   id: string;
@@ -33,9 +34,14 @@ interface PendingActivationDrawerProps {
 
 export function PendingActivationDrawer({ open, onClose, onActivate }: PendingActivationDrawerProps) {
   const [search, setSearch] = useState('');
+  const queryClient = useQueryClient();
+
+  // Batch selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchActivating, setBatchActivating] = useState(false);
 
   // Sync cache key with CaisseDashboard
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['comptes', 'pending-activation'],
     queryFn: async () => {
       const res = await api.get<PendingAccount[]>('/comptes/pending-activation');
@@ -64,6 +70,58 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
     setImageErrors(prev => ({ ...prev, [id]: true }));
   };
 
+  // Toggle single selection
+  const toggleSelect = useCallback((accountId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(accountId)) {
+        next.delete(accountId);
+      } else {
+        next.add(accountId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Toggle all selection
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filteredAccounts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredAccounts.map(a => a.id)));
+    }
+  }, [filteredAccounts, selectedIds.size]);
+
+  // Batch activate handler
+  const handleBatchActivate = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+
+    setBatchActivating(true);
+    try {
+      const result = await compteEpargneApi.batchActivate(Array.from(selectedIds));
+
+      if (result.activated > 0) {
+        toast.success(`${result.activated} compte(s) activé(s) avec succès`);
+      }
+      if (result.failed > 0) {
+        toast.warning(`${result.failed} activation(s) échouée(s)`);
+      }
+
+      // Clear selection and refresh
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['comptes', 'pending-activation'] });
+      refetch();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de l\'activation batch');
+    } finally {
+      setBatchActivating(false);
+    }
+  }, [selectedIds, queryClient, refetch]);
+
+  const allSelected = filteredAccounts.length > 0 && selectedIds.size === filteredAccounts.length;
+  const someSelected = selectedIds.size > 0;
+
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-slate-950 border-slate-800">
@@ -73,8 +131,8 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
               <UserCheck className="text-orange-500" />
               Activations Requises
               {accounts.length > 0 && (
-                <Badge 
-                  variant="warning" 
+                <Badge
+                  variant="warning"
                   className="ml-2 bg-orange-500 text-white border-none"
                   value={accounts.length}
                 />
@@ -84,16 +142,50 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
               Encaissez les dépôts initiaux pour activer les comptes.
             </SheetDescription>
           </SheetHeader>
-          
+
           <div className="mt-4 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-            <Input 
-              placeholder="Rechercher nom ou numéro..." 
+            <Input
+              placeholder="Rechercher nom ou numéro..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 bg-slate-950 border-slate-800 text-white placeholder:text-slate-600"
             />
           </div>
+
+          {/* Batch actions bar */}
+          {filteredAccounts.length > 0 && (
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition"
+              >
+                {allSelected ? (
+                  <CheckSquare size={16} className="text-orange-500" />
+                ) : (
+                  <Square size={16} />
+                )}
+                {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </button>
+
+              {someSelected && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={handleBatchActivate}
+                  disabled={batchActivating}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-xs"
+                >
+                  {batchActivating ? (
+                    <Loader2 size={14} className="animate-spin mr-1" />
+                  ) : (
+                    <CheckCircle2 size={14} className="mr-1" />
+                  )}
+                  Activer {selectedIds.size} compte{selectedIds.size > 1 ? 's' : ''}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -105,55 +197,77 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                 <p>Aucune activation en attente</p>
              </div>
           ) : (
-             filteredAccounts.map((account) => (
-                <div key={account.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 group hover:border-orange-500/30 transition-all">
-                   <div className="flex justify-between items-start">
-                      <div className="flex gap-3">
-                         <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
-                            {resolveClientPhotoUrl(account.client.photoUrl) ? (
-                               <img 
-                                 src={resolveClientPhotoUrl(account.client.photoUrl)} 
-                                 alt="Client" 
-                                 className="w-full h-full object-cover"
-                                 onError={() => handleImageError(account.id)}
-                               />
-                            ) : (
-                               <UserCheck size={20} className="text-slate-400" />
-                            )}
-                         </div>
-                         <div>
-                            <h4 className="font-medium text-slate-200">
-                               {account.client.nom} {account.client.prenom}
-                            </h4>
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                               <Badge
-                                  variant="outline"
-                                  className="text-[10px] px-1 py-0 h-4 border-slate-700 text-slate-400"
-                                  value={getStatusLabel(account.typeCompte, ACCOUNT_TYPE_LABELS)}
-                               />
-                               <span className="flex items-center gap-1">
-                                  <Clock size={10} />
-                                  {formatDistanceToNow(new Date(account.createdAt), { addSuffix: true, locale: fr })}
-                               </span>
-                            </div>
-                         </div>
-                      </div>
-                      <div className="text-right">
-                         <p className="text-lg font-bold text-white">
-                            {formattedMoney(account.montantInitial)}
-                         </p>
-                         <p className="text-xs text-slate-500 font-mono">{account.numeroCompte}</p>
-                      </div>
-                   </div>
-                   
-                   <Button
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-11 font-medium shadow-lg shadow-emerald-500/10 active:scale-[0.98] transition-all"
-                      onClick={() => onActivate(account)}
-                   >
-                      Encaisser maintenant
-                   </Button>
-                </div>
-             ))
+             filteredAccounts.map((account) => {
+                const isSelected = selectedIds.has(account.id);
+                return (
+                  <div
+                    key={account.id}
+                    className={`bg-slate-900 border rounded-xl p-4 flex flex-col gap-3 group transition-all ${
+                      isSelected
+                        ? 'border-orange-500/50 bg-orange-500/5'
+                        : 'border-slate-800 hover:border-orange-500/30'
+                    }`}
+                  >
+                     <div className="flex justify-between items-start">
+                        <div className="flex gap-3">
+                           {/* Selection checkbox */}
+                           <button
+                             onClick={(e) => toggleSelect(account.id, e)}
+                             className="flex-shrink-0 self-center"
+                           >
+                             {isSelected ? (
+                               <CheckSquare size={20} className="text-orange-500" />
+                             ) : (
+                               <Square size={20} className="text-slate-600 hover:text-slate-400" />
+                             )}
+                           </button>
+
+                           <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
+                              {resolveClientPhotoUrl(account.client.photoUrl) && !imageErrors[account.id] ? (
+                                 <img
+                                   src={resolveClientPhotoUrl(account.client.photoUrl)}
+                                   alt="Client"
+                                   className="w-full h-full object-cover"
+                                   onError={() => handleImageError(account.id)}
+                                 />
+                              ) : (
+                                 <UserCheck size={20} className="text-slate-400" />
+                              )}
+                           </div>
+                           <div>
+                              <h4 className="font-medium text-slate-200">
+                                 {account.client.nom} {account.client.prenom}
+                              </h4>
+                              <div className="flex items-center gap-2 text-xs text-slate-500">
+                                 <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1 py-0 h-4 border-slate-700 text-slate-400"
+                                    value={getStatusLabel(account.typeCompte, ACCOUNT_TYPE_LABELS)}
+                                 />
+                                 <span className="flex items-center gap-1">
+                                    <Clock size={10} />
+                                    {formatDistanceToNow(new Date(account.createdAt), { addSuffix: true, locale: fr })}
+                                 </span>
+                              </div>
+                           </div>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-lg font-bold text-white">
+                              {formattedMoney(account.montantInitial)}
+                           </p>
+                           <p className="text-xs text-slate-500 font-mono">{account.numeroCompte}</p>
+                        </div>
+                     </div>
+
+                     <Button
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-11 font-medium shadow-lg shadow-emerald-500/10 active:scale-[0.98] transition-all"
+                        onClick={() => onActivate(account)}
+                     >
+                        Encaisser maintenant
+                     </Button>
+                  </div>
+                );
+             })
           )}
         </div>
       </SheetContent>

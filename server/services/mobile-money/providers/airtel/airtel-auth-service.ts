@@ -9,6 +9,9 @@
  */
 
 import type { AirtelProviderConfig } from "./airtel-config";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger('AirtelAuth');
 
 export interface AirtelTokenResponse {
   access_token: string;
@@ -71,7 +74,7 @@ export class AirtelAuthService {
    * Rafraîchit le token auprès d'Airtel
    */
   private async refreshToken(): Promise<string> {
-    console.log(`[Airtel Auth] Requesting new access token...`);
+    logger.info('Requesting new access token');
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.requestTimeout);
@@ -93,10 +96,10 @@ export class AirtelAuthService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Airtel Auth] Token request failed: ${response.status}`, {
+        logger.error({
           status: response.status,
           hasError: !!errorText,
-        });
+        }, 'Token request failed');
         throw new Error(`AIRTEL_AUTH_FAILED: HTTP ${response.status}`);
       }
 
@@ -114,7 +117,7 @@ export class AirtelAuthService {
         obtainedAt: now,
       };
 
-      console.log(`[Airtel Auth] Token obtained, expires in ${expiresInSeconds}s`);
+      logger.info({ expiresIn: expiresInSeconds }, 'Token obtained');
 
       return data.access_token;
     } catch (error) {
@@ -133,7 +136,7 @@ export class AirtelAuthService {
    */
   invalidateToken(): void {
     tokenCache = null;
-    console.log("[Airtel Auth] Token invalidated");
+    logger.info('Token invalidated');
   }
 
   /**
@@ -198,7 +201,7 @@ export class AirtelAuthService {
 
       // Si 401 et retry activé, invalider le token et réessayer une fois
       if (response.status === 401 && retryOnAuthError) {
-        console.log("[Airtel Auth] Got 401, refreshing token and retrying...");
+        logger.info('Got 401, refreshing token and retrying');
         this.invalidateToken();
         return this.authenticatedRequest<T>(method, endpoint, {
           body,

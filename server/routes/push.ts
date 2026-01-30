@@ -4,7 +4,10 @@
  */
 
 import type { Express } from "express";
+import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Push');
 import {
   savePushSubscription,
   removePushSubscription,
@@ -95,7 +98,7 @@ export function registerPushRoutes(app: Express) {
           details: error.errors,
         });
       }
-      console.error("[Push] Error saving subscription:", error);
+      logger.error({ err: error }, 'Error saving subscription');
       res.status(500).json({ error: "Failed to save subscription" });
     }
   });
@@ -116,7 +119,7 @@ export function registerPushRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error) {
-      console.error("[Push] Error removing subscription:", error);
+      logger.error({ err: error }, 'Error removing subscription');
       res.status(500).json({ error: "Failed to remove subscription" });
     }
   });
@@ -142,7 +145,7 @@ export function registerPushRoutes(app: Express) {
         }))
       );
     } catch (error) {
-      console.error("[Push] Error fetching subscriptions:", error);
+      logger.error({ err: error }, 'Error fetching subscriptions');
       res.status(500).json({ error: "Failed to fetch subscriptions" });
     }
   });
@@ -181,7 +184,7 @@ export function registerPushRoutes(app: Express) {
         failed: result.failed,
       });
     } catch (error) {
-      console.error("[Push] Error sending test:", error);
+      logger.error({ err: error }, 'Error sending test');
       res.status(500).json({ error: "Failed to send test notification" });
     }
   });
@@ -208,7 +211,7 @@ export function registerPushRoutes(app: Express) {
         envFormat: `VAPID_PUBLIC_KEY=${keys.publicKey}\nVAPID_PRIVATE_KEY=${keys.privateKey}`,
       });
     } catch (error) {
-      console.error("[Push] Error generating VAPID keys:", error);
+      logger.error({ err: error }, 'Error generating VAPID keys');
       res.status(500).json({ error: "Failed to generate VAPID keys" });
     }
   });

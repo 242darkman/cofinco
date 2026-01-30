@@ -18,6 +18,9 @@ import accountingPostingService from "./accounting-posting-service";
 import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-posting-service";
 import { balanceService } from "./balance-service";
 import type { BalanceEntityType } from "@shared/types/balances";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Ledger');
 
 // Infer MouvementFinancier type from table
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
@@ -116,7 +119,7 @@ export async function validateUserId(
     .limit(1);
   
   if (!userExists) {
-    console.warn(`Warning: User ID ${userId} does not exist. Will use null for created_by`);
+    logger.warn({ userId }, 'User ID does not exist, using null for created_by');
     return undefined;
   }
   
@@ -347,7 +350,7 @@ async function recalculateClientSavings(tx: PgTransaction<any, any, any>, client
             })
             .where(eq(clients.id, clientId));
     } catch (error) {
-        console.error(`Error calculating savings for client ${clientId}:`, error);
+        logger.error({ err: error, clientId }, 'Error calculating savings for client');
         // Do not block the transaction for this
     }
 }
@@ -647,7 +650,7 @@ export async function executeWithLedger<T>(
 
         if (glResult) {
           glPostingStatus = "POSTED";
-          console.log(`[Ledger] GL posted sync: ${mouvement.id} -> ${glResult.numeroPiece}`);
+          logger.info({ mouvementId: mouvement.id, numeroPiece: glResult.numeroPiece }, 'GL posted sync');
         } else {
           // null = already posted (idempotent)
           glPostingStatus = "POSTED";
@@ -663,7 +666,7 @@ export async function executeWithLedger<T>(
           // Non-critical: mark as SKIPPED
           glPostingStatus = "SKIPPED";
           glPostingError = message;
-          console.warn(`[Ledger] GL skipped (no rule, not required): ${mouvement.id} - ${message}`);
+          logger.warn({ mouvementId: mouvement.id, error: message }, 'GL skipped (no rule, not required)');
         } else {
           if (requiresGl) {
             // Critical: GL is required → rollback
@@ -672,7 +675,7 @@ export async function executeWithLedger<T>(
           // Non-critical: mark as FAILED
           glPostingStatus = "FAILED";
           glPostingError = message;
-          console.error(`[Ledger] GL failed (not required, continuing): ${mouvement.id} - ${message}`);
+          logger.error({ mouvementId: mouvement.id, error: message }, 'GL failed (not required, continuing)');
         }
       }
     } else {
@@ -717,7 +720,7 @@ export async function retryGlPosting(
     await db.update(mouvementsFinanciers)
       .set({ glPostingStatus: "POSTED", glPostingError: null })
       .where(eq(mouvementsFinanciers.id, mouvement.id));
-    console.log(`[Ledger] GL retry posted: ${mouvement.id} -> ${result.numeroPiece}`);
+    logger.info({ mouvementId: mouvement.id, numeroPiece: result.numeroPiece }, 'GL retry posted');
   }
   // null means already posted — also mark as POSTED
   else {
@@ -734,7 +737,7 @@ export async function retryGlPosting(
  * Calcule automatiquement previousBalance à partir du montant et sens du mouvement
  * si ancienSolde* n'est pas fourni dans additionalEventData.
  */
-function emitBalanceUpdates(
+export function emitBalanceUpdates(
   mouvement: MouvementFinancier,
   agenceId?: string,
   additionalEventData?: {
@@ -842,7 +845,7 @@ function emitBalanceUpdates(
 
   } catch (error) {
     // Log but don't throw - WS emission shouldn't break business flow
-    console.error(`[Ledger] BALANCE_UPDATED emission failed for ${mouvement.id}:`, error);
+    logger.error({ err: error, mouvementId: mouvement.id }, 'BALANCE_UPDATED emission failed');
   }
 }
 

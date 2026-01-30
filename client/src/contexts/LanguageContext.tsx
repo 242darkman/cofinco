@@ -185,7 +185,8 @@ const translations: Translations = {
   tousDroitsReserves: { fr: 'Tous droits réservés', en: 'All rights reserved' },
   identifiantsInvalides: { fr: 'Identifiant ou mot de passe incorrect', en: 'Invalid username or password' },
   remplirTousChamps: { fr: 'Veuillez remplir tous les champs', en: 'Please fill in all fields' },
-  
+  seSouvenirDeMoi: { fr: 'Se souvenir de moi', en: 'Remember me' },
+
   // Dashboard Charts
   repartitionProduits: { fr: 'Répartition des Produits', en: 'Product Distribution' },
   statutCredits: { fr: 'Statut des Crédits', en: 'Credit Status' },
@@ -338,6 +339,7 @@ const translations: Translations = {
   menuEpargnes: { fr: 'Épargnes', en: 'Savings' },
   menuCompte: { fr: 'Comptes', en: 'Accounts' },
   menuAgentTerrain: { fr: 'Agent de Terrain', en: 'Field Agent' },
+  menuAgentModules: { fr: 'Gestion Agent', en: 'Agent Management' },
   menuTerrain: { fr: 'Agent de Terrain', en: 'Field' },
   menuCaisse: { fr: 'Caisse', en: 'Cash Register' },
   menuCoffre: { fr: 'Coffre-Fort', en: 'Safe' },
@@ -526,6 +528,35 @@ const translations: Translations = {
 
 
   agentsAuTotal: { fr: 'agents au total', en: 'total agents' },
+
+  // Dashboard - ComparativeAnalytics i18n
+  comparerLabel: { fr: 'Comparer :', en: 'Compare:' },
+  moisPeriode: { fr: 'Mois', en: 'Month' },
+  trimestrePeriode: { fr: 'Trimestre', en: 'Quarter' },
+  anneePeriode: { fr: 'Année', en: 'Year' },
+  previsionsNMois: { fr: 'Prévisions (6 mois)', en: 'Forecast (6 months)' },
+  clientsMetrique: { fr: 'Clients', en: 'Clients' },
+  creditsMetrique: { fr: 'Crédits', en: 'Credits' },
+  depotsMetrique: { fr: 'Dépôts', en: 'Deposits' },
+  retraitsMetrique: { fr: 'Retraits', en: 'Withdrawals' },
+  montantCreditsLabel: { fr: 'Montant crédits', en: 'Credit amount' },
+  reelLabel: { fr: 'Réel', en: 'Actual' },
+  previsionLabel: { fr: 'Prévision', en: 'Forecast' },
+  donneesInsuffisantesPrevision: { fr: 'Données insuffisantes pour les prévisions', en: 'Insufficient data for forecasts' },
+  chargementAnalytique: { fr: 'Chargement analytique...', en: 'Loading analytics...' },
+  vsPrecedent: { fr: 'vs', en: 'vs' },
+
+  // Dashboard - AgencySelector i18n
+  rechercherAgence: { fr: 'Rechercher une agence...', en: 'Search agency...' },
+  chargementAgences: { fr: 'Chargement des agences...', en: 'Loading agencies...' },
+  aucuneAgenceTrouvee: { fr: 'Aucune agence trouvée', en: 'No agency found' },
+
+  // Dashboard - AnalyticsGrid i18n
+  erreurChargementGraphiques: { fr: 'Erreur lors du chargement des graphiques', en: 'Error loading charts' },
+  recharger: { fr: 'Recharger', en: 'Reload' },
+
+  // Dashboard - Permissions
+  actionNonAutorisee: { fr: 'Action non autorisée', en: 'Action not authorized' },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

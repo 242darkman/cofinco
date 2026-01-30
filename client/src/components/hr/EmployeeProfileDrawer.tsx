@@ -10,6 +10,7 @@ import { Employe } from '../../hooks/hr/useEmployes';
 import { resolveStorageUrl } from '@/lib/format';
 import { StatutUser } from '@shared/enum/status-constants';
 import { toast } from 'sonner';
+import DocumentPreviewModal from '../ui/DocumentPreviewModal';
 
 type DrawerView = 'profile' | 'documents' | 'activity';
 
@@ -34,14 +35,44 @@ interface AuditLog {
   createdAt: string;
 }
 
-interface EntityFile {
-  key: string;
-  name: string;
-  url: string | null;
-  bucket: 'public' | 'private';
-  size?: number;
-  lastModified?: string;
+interface EmployeeDoc {
+  id: string;
+  employeId: string;
+  nom: string;
+  typeDocument: string;
+  categorie: string | null;
+  description: string | null;
+  storageKey: string;
+  bucket: string;
+  fileName: string;
+  fileSize: number | null;
+  mimeType: string | null;
+  dateEmission: string | null;
+  dateExpiration: string | null;
+  statut: string;
+  verifiePar: string | null;
+  verifieAt: string | null;
+  motifRejet: string | null;
+  ajoutePar: string | null;
+  createdAt: string | null;
+  url?: string | null;
 }
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  CONTRACT: 'Contrat',
+  ID_CARD: 'Pièce d\'identité',
+  DIPLOMA: 'Diplôme',
+  CERTIFICATE: 'Certificat',
+  MEDICAL: 'Médical',
+  OTHER: 'Autre',
+};
+
+const DOC_STATUS_STYLES: Record<string, { label: string; cls: string }> = {
+  PENDING: { label: 'En attente', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+  VERIFIED: { label: 'Vérifié', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+  REJECTED: { label: 'Rejeté', cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  EXPIRED: { label: 'Expiré', cls: 'bg-slate-500/10 text-slate-400 border-slate-500/30' },
+};
 
 interface EmployeeProfileDrawerProps {
   employee: Employe;
@@ -62,10 +93,13 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
   const [logsLoading, setLogsLoading] = useState(false);
 
   // Documents state
-  const [documents, setDocuments] = useState<EntityFile[]>([]);
+  const [documents, setDocuments] = useState<EmployeeDoc[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploadMeta, setUploadMeta] = useState({ nom: '', typeDocument: 'OTHER', dateExpiration: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewDoc, setPreviewDoc] = useState<EmployeeDoc | null>(null);
 
   // Helper to get initials
   const getInitials = (nom: string, prenom: string) => {
@@ -143,10 +177,10 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
   const fetchDocuments = useCallback(async () => {
     setDocsLoading(true);
     try {
-      const res = await fetch(`/api/storage/entity/employe/${employee.id}/files`, { credentials: 'include' });
+      const res = await fetch(`/api/hr/employees/${employee.id}/documents`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setDocuments(data.files || []);
+        setDocuments(data || []);
       }
     } catch (error) {
       console.error('Erreur chargement documents:', error);
@@ -279,22 +313,30 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!uploadMeta.nom) {
+      toast.error('Nom du document requis');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('fileType', 'employe');
-      formData.append('entityType', 'employe');
-      formData.append('entityId', employee.id);
+      formData.append('nom', uploadMeta.nom);
+      formData.append('typeDocument', uploadMeta.typeDocument);
+      if (uploadMeta.dateExpiration) formData.append('dateExpiration', uploadMeta.dateExpiration);
 
-      const res = await fetch('/api/storage/entity/upload', {
+      const res = await fetch(`/api/hr/employees/${employee.id}/documents`, {
         method: 'POST',
         credentials: 'include',
         body: formData,
       });
 
       if (!res.ok) throw new Error('Erreur upload');
-      toast.success('Document ajouté', { description: file.name });
+      toast.success('Document ajouté', { description: uploadMeta.nom });
+      setUploadMeta({ nom: '', typeDocument: 'OTHER', dateExpiration: '' });
+      setShowUploadForm(false);
       fetchDocuments();
     } catch (error: any) {
       toast.error('Erreur upload', { description: error.message });
@@ -304,22 +346,38 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
     }
   };
 
-  const handleDeleteAllDocs = () => {
+  const handleDeleteDoc = (doc: EmployeeDoc) => {
     setConfirmAction({
-      title: 'Supprimer tous les documents',
-      message: `Tous les documents de ${employee.nom} ${employee.prenom} seront supprimés définitivement.`,
-      confirmLabel: 'Supprimer tout',
+      title: 'Supprimer le document',
+      message: `Le document "${doc.nom}" sera supprimé définitivement.`,
+      confirmLabel: 'Supprimer',
       variant: 'danger',
       onConfirm: async () => {
-        const res = await fetch(`/api/storage/entity/employe/${employee.id}`, {
+        const res = await fetch(`/api/hr/documents/${doc.id}`, {
           method: 'DELETE',
           credentials: 'include',
         });
         if (!res.ok) throw new Error('Erreur suppression');
-        toast.success('Documents supprimés');
+        toast.success('Document supprimé');
         fetchDocuments();
       },
     });
+  };
+
+  const handleVerifyDoc = async (docId: string, statut: 'VERIFIED' | 'REJECTED', motifRejet?: string) => {
+    try {
+      const res = await fetch(`/api/hr/documents/${docId}/verify`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ statut, motifRejet }),
+      });
+      if (!res.ok) throw new Error('Erreur vérification');
+      toast.success(statut === 'VERIFIED' ? 'Document vérifié' : 'Document rejeté');
+      fetchDocuments();
+    } catch (error: any) {
+      toast.error('Erreur', { description: error.message });
+    }
   };
 
   // ===== AUDIT LOG HELPERS =====
@@ -627,33 +685,77 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                     {documents.length}
                   </span>
                 </div>
-                <div className="flex gap-2">
-                  {documents.length > 0 && (
+                <button
+                  onClick={() => setShowUploadForm(!showUploadForm)}
+                  disabled={uploading}
+                  className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors"
+                >
+                  {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  Ajouter
+                </button>
+              </div>
+
+              {/* Upload form */}
+              {showUploadForm && (
+                <div className="p-4 bg-slate-900 border border-indigo-500/30 rounded-xl space-y-3 animate-in slide-in-from-top-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Nom du document *</label>
+                      <input
+                        type="text"
+                        value={uploadMeta.nom}
+                        onChange={(e) => setUploadMeta(p => ({ ...p, nom: e.target.value }))}
+                        placeholder="ex: Contrat CDI"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
+                      <select
+                        value={uploadMeta.typeDocument}
+                        onChange={(e) => setUploadMeta(p => ({ ...p, typeDocument: e.target.value }))}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white appearance-none focus:border-indigo-500 outline-none"
+                      >
+                        {Object.entries(DOC_TYPE_LABELS).map(([k, v]) => (
+                          <option key={k} value={k}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Date d'expiration (optionnel)</label>
+                    <input
+                      type="date"
+                      value={uploadMeta.dateExpiration}
+                      onChange={(e) => setUploadMeta(p => ({ ...p, dateExpiration: e.target.value }))}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-2">
                     <button
-                      onClick={handleDeleteAllDocs}
-                      className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                      title="Supprimer tout"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || !uploadMeta.nom}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-lg transition-colors"
                     >
-                      <Trash2 size={16} />
+                      {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                      Choisir le fichier
                     </button>
-                  )}
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors"
-                  >
-                    {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                    Ajouter
-                  </button>
+                    <button
+                      onClick={() => setShowUploadForm(false)}
+                      className="px-3 py-2 text-slate-400 hover:text-white text-xs transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  </div>
                   <input
                     ref={fileInputRef}
                     type="file"
                     className="hidden"
                     onChange={handleUploadDocument}
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                   />
                 </div>
-              </div>
+              )}
 
               {docsLoading ? (
                 <div className="flex items-center justify-center py-12">
@@ -667,36 +769,72 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {documents.map((doc) => (
-                    <div key={doc.key} className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition-colors group">
-                      <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
-                        <FileText size={16} className="text-indigo-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-200 font-medium truncate">{doc.name}</p>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                          {doc.size && <span>{formatFileSize(doc.size)}</span>}
-                          {doc.lastModified && <span>{formatDateTime(doc.lastModified)}</span>}
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            doc.bucket === 'public' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
-                          }`}>
-                            {doc.bucket === 'public' ? 'Public' : 'Privé'}
-                          </span>
+                  {documents.map((doc) => {
+                    const statusStyle = DOC_STATUS_STYLES[doc.statut] || DOC_STATUS_STYLES.PENDING;
+                    const isExpired = doc.dateExpiration && new Date(doc.dateExpiration) < new Date();
+                    return (
+                      <div key={doc.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition-colors group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
+                            <FileText size={16} className="text-indigo-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-slate-200 font-medium truncate">{doc.nom}</p>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                              <span className="text-slate-400">{DOC_TYPE_LABELS[doc.typeDocument] || doc.typeDocument}</span>
+                              {doc.fileSize && <span>{formatFileSize(doc.fileSize)}</span>}
+                              <span className={`px-1.5 py-0.5 rounded border text-[10px] font-medium ${statusStyle.cls}`}>
+                                {isExpired && doc.statut !== 'EXPIRED' ? 'Expiré' : statusStyle.label}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {doc.statut === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={() => handleVerifyDoc(doc.id, 'VERIFIED')}
+                                  className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                  title="Vérifier"
+                                >
+                                  <CheckCircle size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleVerifyDoc(doc.id, 'REJECTED')}
+                                  className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                  title="Rejeter"
+                                >
+                                  <Ban size={14} />
+                                </button>
+                              </>
+                            )}
+                            {doc.url && (
+                              <button
+                                onClick={() => setPreviewDoc(doc)}
+                                className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors"
+                                title="Aperçu"
+                              >
+                                <Eye size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteDoc(doc)}
+                              className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
+                        {doc.dateExpiration && (
+                          <div className={`mt-2 flex items-center gap-1.5 text-[10px] ${isExpired ? 'text-red-400' : 'text-slate-500'}`}>
+                            <Calendar size={10} />
+                            <span>Expire le {new Date(doc.dateExpiration).toLocaleDateString('fr-FR')}</span>
+                            {isExpired && <AlertTriangle size={10} className="text-red-400" />}
+                          </div>
+                        )}
                       </div>
-                      {doc.url && (
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-slate-500 hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Voir"
-                        >
-                          <Eye size={16} />
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -764,6 +902,18 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
           )}
         </div>
       </div>
+
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          isOpen={!!previewDoc}
+          onClose={() => setPreviewDoc(null)}
+          documentId={previewDoc.id}
+          documentName={previewDoc.nom || previewDoc.fileName}
+          preloadedUrl={previewDoc.url || undefined}
+          preloadedMimeType={previewDoc.mimeType || undefined}
+        />
+      )}
     </div>
   );
 }

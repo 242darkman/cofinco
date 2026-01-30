@@ -11,6 +11,26 @@ import { authApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { resolveStorageUrl } from '../../lib/format';
 
+// ==================== VALIDATION HELPERS ====================
+const validateEmail = (email: string): string | null => {
+  if (!email) return null; // Empty is allowed
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return 'Format email invalide';
+  }
+  return null;
+};
+
+const validatePhone = (phone: string): string | null => {
+  if (!phone) return null;
+  // Allow formats: +242 06 123 4567, 06 123 4567, 0612345678, +242612345678
+  const phoneRegex = /^[+]?[\d\s-]{6,20}$/;
+  if (!phoneRegex.test(phone)) {
+    return 'Format téléphone invalide';
+  }
+  return null;
+};
+
 // ==================== EDITABLE FIELD COMPONENT ====================
 interface EditableFieldProps {
   label: string;
@@ -20,25 +40,56 @@ interface EditableFieldProps {
   editable?: boolean;
   type?: string;
   placeholder?: string;
+  validation?: 'email' | 'phone' | 'none';
 }
 
-function EditableField({ label, value, icon: Icon, onSave, editable = true, type = 'text', placeholder }: EditableFieldProps) {
+function EditableField({ label, value, icon: Icon, onSave, editable = true, type = 'text', placeholder, validation = 'none' }: EditableFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value || '');
   const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Validate on change
+  const handleChange = (newValue: string) => {
+    setTempValue(newValue);
+
+    // Real-time validation
+    let error: string | null = null;
+    if (validation === 'email') {
+      error = validateEmail(newValue);
+    } else if (validation === 'phone') {
+      error = validatePhone(newValue);
+    }
+    setValidationError(error);
+  };
 
   const handleSave = async () => {
+    // Final validation before save
+    let error: string | null = null;
+    if (validation === 'email') {
+      error = validateEmail(tempValue);
+    } else if (validation === 'phone') {
+      error = validatePhone(tempValue);
+    }
+
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+
     setSaving(true);
     const success = await onSave(tempValue);
     setSaving(false);
     if (success) {
       setIsEditing(false);
+      setValidationError(null);
     }
   };
 
   const handleCancel = () => {
     setTempValue(value || '');
     setIsEditing(false);
+    setValidationError(null);
   };
 
   // --- MODE ÉDITION (Compact) ---
@@ -48,29 +99,33 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
         <label className="block text-[10px] font-medium text-indigo-400 mb-1 ml-1">
           {label}
         </label>
-        
+
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1">
-            <input 
+            <input
               type={type}
-              className="w-full h-8 bg-slate-950 border border-indigo-500 rounded-md pl-2 pr-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/20 transition-all"
+              className={`w-full h-8 bg-slate-950 border rounded-md pl-2 pr-2 text-xs text-white focus:outline-none focus:ring-1 transition-all ${
+                validationError
+                  ? 'border-red-500 focus:ring-red-500/20'
+                  : 'border-indigo-500 focus:ring-indigo-500/20'
+              }`}
               value={tempValue}
-              onChange={e => setTempValue(e.target.value)}
+              onChange={e => handleChange(e.target.value)}
               autoFocus
               placeholder={placeholder || `...`}
             />
           </div>
-          
-          <button 
+
+          <button
             onClick={handleSave}
-            disabled={saving}
-            className="h-8 w-8 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-md transition-colors shadow-sm disabled:opacity-50"
+            disabled={saving || !!validationError}
+            className="h-8 w-8 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             title="Valider"
           >
             {saving ? <LoadingSpinner size="sm" /> : <Check size={14} strokeWidth={3} />}
           </button>
-          
-          <button 
+
+          <button
             onClick={handleCancel}
             className="h-8 w-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-md border border-slate-700 transition-colors"
             title="Annuler"
@@ -78,6 +133,14 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
             <X size={14} />
           </button>
         </div>
+
+        {/* Validation error message */}
+        {validationError && (
+          <div className="mt-1 flex items-center gap-1 text-[9px] text-red-400">
+            <AlertCircle size={10} />
+            <span>{validationError}</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -245,7 +308,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
             value={formData.currentPassword}
             onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
             className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-xs focus:border-indigo-500 outline-none pr-7 h-7"
-            placeholder="Mise de passe actuel"
+            placeholder="Mot de passe actuel"
             required
           />
           <button
@@ -319,6 +382,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<{ url: string; file: File } | null>(null);
 
   const handlePhotoClick = () => {
     fileInputRef.current?.click();
@@ -337,13 +401,21 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
       return;
     }
 
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreview({ url: previewUrl, file });
+  }, []);
+
+  const handleConfirmPhoto = useCallback(async () => {
+    if (!photoPreview || !user) return;
+
     setUploadingPhoto(true);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', photoPreview.file);
       formData.append('fileType', 'profile');
       formData.append('entityType', 'user');
-      formData.append('entityId', user!.id);
+      formData.append('entityId', user.id);
 
       const response = await fetch('/api/storage/entity/upload', {
         method: 'POST',
@@ -358,15 +430,23 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
       if (success) {
         toast.success('Photo mise à jour');
         reloadProfile();
-        onUserUpdate?.(); 
+        onUserUpdate?.();
       }
     } catch (err: any) {
       toast.error(handleApiError(err, 'Erreur upload'));
     } finally {
       setUploadingPhoto(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      handleCancelPreview();
     }
-  }, [updateField, reloadProfile, onUserUpdate]);
+  }, [photoPreview, user, updateField, reloadProfile, onUserUpdate]);
+
+  const handleCancelPreview = useCallback(() => {
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview.url);
+    }
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [photoPreview]);
 
   const handleDeletePhoto = useCallback(async () => {
     if (!confirm('Supprimer votre photo ?')) return;
@@ -429,27 +509,69 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
       {/* HEADER COMPACT */}
       <div className="flex items-center gap-3 mb-4 bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
         <div className="relative group shrink-0">
-          {user.photoProfile ? (
-            <img
-              src={resolveStorageUrl(user.photoProfile)}
-              alt={getFullName()}
-              className="w-10 h-10 rounded-full border border-indigo-500 object-cover"
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold border border-indigo-400">
-              {getInitials()}
+          {/* Photo Preview Mode */}
+          {photoPreview ? (
+            <div className="relative">
+              <img
+                src={photoPreview.url}
+                alt="Aperçu"
+                className="w-10 h-10 rounded-full border-2 border-indigo-500 object-cover ring-2 ring-indigo-500/30"
+              />
+              <div className="absolute -bottom-2 -right-2 flex gap-0.5">
+                <button
+                  onClick={handleConfirmPhoto}
+                  disabled={uploadingPhoto}
+                  className="bg-emerald-500 hover:bg-emerald-400 p-1 rounded-full transition-colors disabled:opacity-50"
+                  title="Confirmer"
+                >
+                  {uploadingPhoto ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <Check size={10} className="text-white" strokeWidth={3} />
+                  )}
+                </button>
+                <button
+                  onClick={handleCancelPreview}
+                  disabled={uploadingPhoto}
+                  className="bg-slate-700 hover:bg-slate-600 p-1 rounded-full border border-slate-600 transition-colors disabled:opacity-50"
+                  title="Annuler"
+                >
+                  <X size={10} className="text-slate-300" />
+                </button>
+              </div>
             </div>
+          ) : (
+            <>
+              {user.photoProfile ? (
+                <img
+                  src={resolveStorageUrl(user.photoProfile)}
+                  alt={getFullName()}
+                  className="w-10 h-10 rounded-full border border-indigo-500 object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold border border-indigo-400">
+                  {getInitials()}
+                </div>
+              )}
+              <button
+                onClick={handlePhotoClick}
+                disabled={uploadingPhoto}
+                className="absolute -bottom-1 -right-1 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50"
+              >
+                <Camera size={8} className="text-slate-300" />
+              </button>
+            </>
           )}
-          <button
-            onClick={handlePhotoClick}
-            disabled={uploadingPhoto}
-            className="absolute -bottom-1 -right-1 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50"
-          >
-             <Camera size={8} className="text-slate-300" />
-          </button>
         </div>
-        <div className="min-w-0">
-          <h1 className="text-base font-bold truncate leading-tight">{getFullName()}</h1>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-bold truncate leading-tight">{getFullName()}</h1>
+            {photoPreview && (
+              <span className="text-[9px] px-1.5 py-0.5 bg-indigo-500/20 text-indigo-400 rounded border border-indigo-500/30">
+                Aperçu photo
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
              <span className="text-indigo-400 font-medium text-[10px] uppercase">
                {getRoleLabel(user.role)}
@@ -476,6 +598,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
               onSave={(val) => updateField('telephone', val)}
               type="tel"
               placeholder="+242..."
+              validation="phone"
             />
             <EditableField
               label="Email"
@@ -484,6 +607,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
               onSave={(val) => updateField('email', val)}
               type="email"
               placeholder="@..."
+              validation="email"
             />
             <EditableField
               label="Adresse"

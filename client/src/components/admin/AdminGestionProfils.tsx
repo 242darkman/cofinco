@@ -179,7 +179,14 @@ export default function AdminGestionProfils() {
     setLoading(true);
     try {
       const data = await employeApi.getAll();
-      setUsers(data || []);
+      // Dédupliquer par ID d'employé (un employé peut avoir plusieurs rôles mais ne doit apparaître qu'une fois)
+      const employeMap = new Map<string, any>();
+      for (const emp of (data || [])) {
+        if (!employeMap.has(emp.id)) {
+          employeMap.set(emp.id, emp);
+        }
+      }
+      setUsers(Array.from(employeMap.values()));
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du chargement du personnel'));
     } finally {

@@ -32,6 +32,9 @@ import {
   ParticipantRole,
   MessageContentType,
 } from '@shared/schema';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('MigrateMessagesV2');
 
 // Configuration
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -58,7 +61,7 @@ const stats: MigrationStats = {
  * Récupère toutes les paires uniques de conversations existantes
  */
 async function getUniquePairs(): Promise<Array<{ user1: string; user2: string }>> {
-  console.log('Fetching unique conversation pairs...');
+  logger.info('Fetching unique conversation pairs...');
 
   const result = await db.execute<{ user1: string; user2: string }>(sql`
     SELECT DISTINCT
@@ -68,7 +71,7 @@ async function getUniquePairs(): Promise<Array<{ user1: string; user2: string }>
     ORDER BY user1, user2
   `);
 
-  console.log(`Found ${result.rows.length} unique conversation pairs`);
+  logger.info({ count: result.rows.length }, 'Found unique conversation pairs');
   return result.rows;
 }
 
@@ -94,7 +97,7 @@ async function migratePair(user1: string, user2: string): Promise<void> {
   // Vérifier si déjà migré
   const existing = await getDMConversation(dmKey);
   if (existing) {
-    console.log(`  [SKIP] Conversation already exists for ${dmKey}`);
+    logger.info({ dmKey }, '[SKIP] Conversation already exists');
     return;
   }
 
@@ -111,7 +114,7 @@ async function migratePair(user1: string, user2: string): Promise<void> {
     .orderBy(messages.createdAt);
 
   if (pairMessages.length === 0) {
-    console.log(`  [SKIP] No messages for pair ${dmKey}`);
+    logger.info({ dmKey }, '[SKIP] No messages for pair');
     return;
   }
 
@@ -119,7 +122,7 @@ async function migratePair(user1: string, user2: string): Promise<void> {
   const lastMessage = pairMessages[pairMessages.length - 1];
 
   if (DRY_RUN) {
-    console.log(`  [DRY-RUN] Would create conversation ${dmKey} with ${pairMessages.length} messages`);
+    logger.info({ dmKey, messageCount: pairMessages.length }, '[DRY-RUN] Would create conversation');
     stats.conversationsCreated++;
     stats.participantsCreated += 2;
     stats.messagesMigrated += pairMessages.length;
@@ -228,11 +231,11 @@ async function migratePair(user1: string, user2: string): Promise<void> {
         }
       }
 
-      console.log(`  [OK] Created conversation ${dmKey} with ${pairMessages.length} messages`);
+      logger.info({ dmKey, messageCount: pairMessages.length }, '[OK] Created conversation');
     });
   } catch (error) {
     const errorMsg = `Failed to migrate pair ${dmKey}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    console.error(`  [ERROR] ${errorMsg}`);
+    logger.error({ err: error, dmKey }, '[ERROR] Migration failed');
     stats.errors.push(errorMsg);
   }
 }
@@ -241,13 +244,10 @@ async function migratePair(user1: string, user2: string): Promise<void> {
  * Fonction principale de migration
  */
 async function migrate(): Promise<void> {
-  console.log('='.repeat(60));
-  console.log('MIGRATION: Messages v1 -> Conversations + Messages v2');
-  console.log('='.repeat(60));
-  console.log(`Mode: ${DRY_RUN ? 'DRY RUN (no changes)' : 'LIVE'}`);
-  console.log(`Batch size: ${BATCH_SIZE}`);
-  console.log(`Started at: ${stats.startTime.toISOString()}`);
-  console.log('');
+  logger.info('='.repeat(60));
+  logger.info('MIGRATION: Messages v1 -> Conversations + Messages v2');
+  logger.info('='.repeat(60));
+  logger.info({ mode: DRY_RUN ? 'DRY RUN (no changes)' : 'LIVE', batchSize: BATCH_SIZE, startedAt: stats.startTime.toISOString() }, 'Migration started');
 
   // Vérifier que les tables existent
   try {
@@ -255,7 +255,7 @@ async function migrate(): Promise<void> {
     await db.execute(sql`SELECT 1 FROM conversation_participants LIMIT 1`);
     await db.execute(sql`SELECT 1 FROM messages_v2 LIMIT 1`);
   } catch (error) {
-    console.error('ERROR: New tables do not exist. Please run db:push first.');
+    logger.error({ err: error }, 'ERROR: New tables do not exist. Please run db:push first.');
     process.exit(1);
   }
 
@@ -263,14 +263,14 @@ async function migrate(): Promise<void> {
   const pairs = await getUniquePairs();
 
   if (pairs.length === 0) {
-    console.log('No messages to migrate.');
+    logger.info('No messages to migrate.');
     return;
   }
 
   // Migrer par batches
   for (let i = 0; i < pairs.length; i += BATCH_SIZE) {
     const batch = pairs.slice(i, i + BATCH_SIZE);
-    console.log(`\nProcessing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(pairs.length / BATCH_SIZE)} (${batch.length} pairs)...`);
+    logger.info({ batchNumber: Math.floor(i / BATCH_SIZE) + 1, totalBatches: Math.ceil(pairs.length / BATCH_SIZE), pairsInBatch: batch.length }, 'Processing batch...');
 
     for (const pair of batch) {
       await migratePair(pair.user1, pair.user2);
@@ -281,24 +281,24 @@ async function migrate(): Promise<void> {
   stats.endTime = new Date();
   const duration = (stats.endTime.getTime() - stats.startTime.getTime()) / 1000;
 
-  console.log('');
-  console.log('='.repeat(60));
-  console.log('MIGRATION COMPLETE');
-  console.log('='.repeat(60));
-  console.log(`Duration: ${duration.toFixed(2)}s`);
-  console.log(`Conversations created: ${stats.conversationsCreated}`);
-  console.log(`Participants created: ${stats.participantsCreated}`);
-  console.log(`Messages migrated: ${stats.messagesMigrated}`);
-  console.log(`Errors: ${stats.errors.length}`);
+  logger.info('='.repeat(60));
+  logger.info('MIGRATION COMPLETE');
+  logger.info('='.repeat(60));
+  logger.info({
+    durationSeconds: duration.toFixed(2),
+    conversationsCreated: stats.conversationsCreated,
+    participantsCreated: stats.participantsCreated,
+    messagesMigrated: stats.messagesMigrated,
+    errorCount: stats.errors.length
+  }, 'Migration summary');
 
   if (stats.errors.length > 0) {
-    console.log('\nErrors:');
-    stats.errors.forEach((e, i) => console.log(`  ${i + 1}. ${e}`));
+    logger.error({ errors: stats.errors }, 'Migration errors occurred');
   }
 
   if (DRY_RUN) {
-    console.log('\n[DRY RUN] No changes were made to the database.');
-    console.log('Run without --dry-run to perform the actual migration.');
+    logger.info('[DRY RUN] No changes were made to the database.');
+    logger.info('Run without --dry-run to perform the actual migration.');
   }
 }
 
@@ -307,18 +307,18 @@ async function migrate(): Promise<void> {
  */
 async function rollback(): Promise<void> {
   if (DRY_RUN) {
-    console.log('[DRY RUN] Would delete all conversations, participants, and messages_v2');
+    logger.info('[DRY RUN] Would delete all conversations, participants, and messages_v2');
     return;
   }
 
-  console.log('Rolling back migration...');
+  logger.info('Rolling back migration...');
 
   await db.transaction(async (tx) => {
     // Les cascades s'occupent de tout
     await tx.delete(conversations);
   });
 
-  console.log('Rollback complete.');
+  logger.info('Rollback complete.');
 }
 
 // Point d'entrée
@@ -331,7 +331,7 @@ if (action === 'rollback') {
       process.exit(0);
     })
     .catch((error) => {
-      console.error('Rollback failed:', error);
+      logger.error({ err: error }, 'Rollback failed');
       pool.end();
       process.exit(1);
     });
@@ -342,7 +342,7 @@ if (action === 'rollback') {
       process.exit(stats.errors.length > 0 ? 1 : 0);
     })
     .catch((error) => {
-      console.error('Migration failed:', error);
+      logger.error({ err: error }, 'Migration failed');
       pool.end();
       process.exit(1);
     });

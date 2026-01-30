@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckCircle2, X, Copy,
   ChevronDown, ChevronUp, Clock, User,
@@ -9,12 +9,40 @@ import { toast } from 'sonner';
 import { formatClientName } from '@/lib/format';
 import { ReceiptActions } from '../../shared/ReceiptActions';
 
-interface UniversalPaymentSuccessModalProps {
+// Sparkle position configuration
+interface SparkleConfig {
+  top: string;
+  left?: string;
+  right?: string;
+  size: number;
+  color: string;
+  delay: string;
+}
+
+// Generate random sparkle positions
+const generateSparklePositions = (isDebit: boolean): SparkleConfig[] => {
+  const colors = isDebit
+    ? ['text-amber-400/40', 'text-orange-400/30', 'text-yellow-400/30']
+    : ['text-emerald-400/40', 'text-cyan-400/30', 'text-teal-400/30'];
+
+  return Array.from({ length: 5 }, (_, i) => ({
+    top: `${Math.random() * 70 + 10}%`,
+    ...(Math.random() > 0.5
+      ? { left: `${Math.random() * 30 + 5}%` }
+      : { right: `${Math.random() * 30 + 5}%` }),
+    size: Math.floor(Math.random() * 8) + 10,
+    color: colors[i % colors.length],
+    delay: `${i * 150}ms`,
+  }));
+};
+
+export interface UniversalPaymentSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
-  term?: string;
   data?: ReceiptData;
   factureId?: string;
+  /** Optional term/label for display (unused but kept for compat) */
+  term?: string;
 }
 
 // Copy to clipboard helper
@@ -37,6 +65,24 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   const [copied, setCopied] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
 
+  // Extract values with defaults for type safety
+  const reference = data?.reference || '';
+  const total = data?.total || 0;
+  const devise = data?.devise || 'FCFA';
+  const date = data?.date ? new Date(data.date) : new Date();
+  const type = data?.type || '';
+  const modePaiement = data?.modePaiement || 'Espèces';
+
+  const isDebit = ['Retrait', 'Décaissement', 'Prêt', 'Versement coffre'].some(
+    t => type.toLowerCase().includes(t.toLowerCase())
+  );
+
+  // Generate random sparkle positions (memoized per open state)
+  const sparklePositions = useMemo(
+    () => (isOpen ? generateSparklePositions(isDebit) : []),
+    [isOpen, isDebit]
+  );
+
   // Animation sequence
   useEffect(() => {
     if (isOpen) {
@@ -48,25 +94,19 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
 
   // Copy reference
   const handleCopyReference = async () => {
-    if (!data || !data.reference) return;
-    await copyToClipboard(data.reference, 'Référence');
+    if (!reference) {
+      toast.error('Aucune référence à copier');
+      return;
+    }
+    await copyToClipboard(reference, 'Référence');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Check if reference is available for copy
+  const hasReference = Boolean(reference && reference !== 'N/A');
+
   if (!isOpen || !data) return null;
-
-  // Extract values with defaults for type safety
-  const reference = data.reference || '';
-  const total = data.total || 0;
-  const devise = data.devise || 'FCFA';
-  const date = data.date ? new Date(data.date) : new Date();
-  const type = data.type || '';
-  const modePaiement = data.modePaiement || 'Espèces';
-
-  const isDebit = ['Retrait', 'Décaissement', 'Prêt', 'Versement coffre'].some(
-    t => type.toLowerCase().includes(t.toLowerCase())
-  );
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
@@ -82,16 +122,22 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
         <div className="relative bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent p-6 sm:p-8 overflow-hidden">
           {/* Background Effects */}
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-20 -right-20 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl animate-pulse" />
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl" />
-            {/* Confetti-like particles */}
-            {animationComplete && (
-              <>
-                <Sparkles className="absolute top-4 right-8 text-emerald-400/40 animate-bounce" size={16} />
-                <Sparkles className="absolute top-12 left-12 text-cyan-400/30 animate-bounce delay-100" size={12} />
-                <Sparkles className="absolute bottom-8 right-16 text-amber-400/30 animate-bounce delay-200" size={14} />
-              </>
-            )}
+            <div className={`absolute -top-20 -right-20 w-40 h-40 ${isDebit ? 'bg-amber-500/20' : 'bg-emerald-500/20'} rounded-full blur-3xl animate-pulse`} />
+            <div className={`absolute -bottom-10 -left-10 w-32 h-32 ${isDebit ? 'bg-orange-500/10' : 'bg-cyan-500/10'} rounded-full blur-2xl`} />
+            {/* Confetti-like particles with randomized positions */}
+            {animationComplete && sparklePositions.map((sparkle, index) => (
+              <Sparkles
+                key={index}
+                className={`absolute animate-bounce ${sparkle.color}`}
+                style={{
+                  top: sparkle.top,
+                  left: sparkle.left,
+                  right: sparkle.right,
+                  animationDelay: sparkle.delay,
+                }}
+                size={sparkle.size}
+              />
+            ))}
           </div>
 
           {/* Close button - Desktop */}
@@ -128,13 +174,15 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
             {/* Reference Badge - Tappable to copy */}
             <button
               onClick={handleCopyReference}
+              disabled={!hasReference}
               className={`
                 flex items-center gap-2 px-4 py-1.5 rounded-full
                 ${isDebit ? 'bg-amber-500/20 border-amber-500/30' : 'bg-emerald-500/20 border-emerald-500/30'}
                 border backdrop-blur-sm
-                active:scale-95 transition-all
+                transition-all
                 transform duration-500 delay-300
                 ${animationComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+                ${hasReference ? 'active:scale-95 cursor-pointer' : 'cursor-default opacity-70'}
               `}
             >
               {copied ? (
@@ -142,13 +190,17 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                   <Check size={12} className="text-emerald-400" />
                   <span className="text-emerald-400 text-sm font-medium">Copié !</span>
                 </>
-              ) : (
+              ) : hasReference ? (
                 <>
                   <span className={`text-sm font-mono font-medium ${isDebit ? 'text-amber-400' : 'text-emerald-400'}`}>
                     {reference}
                   </span>
                   <Copy size={12} className={isDebit ? 'text-amber-400/60' : 'text-emerald-400/60'} />
                 </>
+              ) : (
+                <span className="text-sm text-slate-500 italic">
+                  Référence non disponible
+                </span>
               )}
             </button>
           </div>

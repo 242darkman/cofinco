@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { authService, type User as UserType } from '../../lib/auth';
 import LoginBackground from './LoginBackground';
+import ForgotPasswordModal from './ForgotPasswordModal';
 import Button from '../ui/Button';
 import FormField from '../ui/FormField';
 import Card from '../ui/Card';
@@ -45,6 +46,8 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
   const [showSessionExpiredBanner, setShowSessionExpiredBanner] = useState(!!sessionExpiredMessage);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -114,7 +117,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
     const startTime = Date.now();
 
     try {
-      const user = await authService.login(username, password);
+      const user = await authService.login(username, password, rememberMe);
 
       const elapsed = Date.now() - startTime;
       if (elapsed < 600) await new Promise(r => setTimeout(r, 600 - elapsed));
@@ -473,6 +476,37 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                         data-testid="input-password"
                       />
 
+                      {/* Remember Me Checkbox & Forgot Password */}
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2 cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={rememberMe}
+                              onChange={(e) => setRememberMe(e.target.checked)}
+                              className="w-4 h-4 rounded border-slate-600 bg-slate-700/50 text-blue-500
+                                       focus:ring-blue-500/50 focus:ring-offset-0 focus:ring-2
+                                       transition-colors cursor-pointer"
+                            />
+                            <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                              {t('seSouvenirDeMoi') || 'Se souvenir de moi'}
+                            </span>
+                          </label>
+                          <span className="text-xs text-slate-500">
+                            30 jours
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => setShowForgotPassword(true)}
+                            className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                          >
+                            {t('motDePasseOublie') || 'Mot de passe oublié ?'}
+                          </button>
+                        </div>
+                      </div>
+
                       <Button
                         type="submit"
                         variant="primary"
@@ -528,6 +562,12 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
           </motion.div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 }

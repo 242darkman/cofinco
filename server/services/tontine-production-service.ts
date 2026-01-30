@@ -11,6 +11,9 @@
  */
 
 import { db } from "../db";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('TontineProduction');
 import {
   tontines,
   tontineCycles,
@@ -974,7 +977,7 @@ export async function approveDistribution(params: {
           },
         });
       } catch (e) {
-        console.error("Erreur posting comptable tontine distribution:", e);
+        logger.error({ err: e }, 'Error posting tontine distribution');
       }
     } else if (request.payoutMethod === TontinePayoutMethod.WALLET) {
       // Wallet transfer (internal)

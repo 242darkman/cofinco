@@ -4,6 +4,9 @@ import { eq, and, lte, sql, isNotNull, gt, or } from "drizzle-orm";
 import { executeWithLedger } from "./ledger";
 import { updateCompteSolde, updateCreditSolde, generateReference } from "./ledger";
 import { StatutCredit, TypeCompte, TypeOperationCaisse, MethodePaiement, FrequenceRemboursement } from "@shared/enum/status-constants";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('AutoRepay');
 
 export async function processAutomaticCreditRepayments() {
   const now = new Date();
@@ -35,7 +38,7 @@ export async function processAutomaticCreditRepayments() {
       await executeAutomaticRepayment(credit);
       results.success++;
     } catch (error) {
-      console.error(`Error processing auto-repayment for credit ${credit.id}:`, error);
+      logger.error({ creditId: credit.id, err: error }, 'Error processing auto-repayment');
       results.failed++;
       results.errors.push({ creditId: credit.id, error });
     }
@@ -67,7 +70,7 @@ async function executeAutomaticRepayment(credit: any) {
   const amountToPay = Math.min(soldeRestant, montantEcheance);
 
   if (amountToPay <= 0) {
-      console.log(`[AutoRepay] Credit ${credit.id} has 0 remaining balance. Skipping.`);
+      logger.info({ creditId: credit.id }, 'Credit has 0 remaining balance, skipping');
       // Optional: Auto-close credit?
       return; // Skip this credit
   }
@@ -110,6 +113,7 @@ async function executeAutomaticRepayment(credit: any) {
         compteId: sourceAccountId,
         mouvementId: mouvement.id,
         typePaiement: TypeOperationCaisse.CREDIT_REPAYMENT,
+        sens: "DEBIT", // Loan repayment is money going out
         montant: amountToPay.toString(),
         soldeApres: nouveauSoldeCompte,
         methodePaiement: MethodePaiement.TRANSFER,
@@ -125,8 +129,17 @@ async function executeAutomaticRepayment(credit: any) {
       switch(freq) {
         case FrequenceRemboursement.DAILY: nextDate.setDate(nextDate.getDate() + 1); break;
         case FrequenceRemboursement.WEEKLY: nextDate.setDate(nextDate.getDate() + 7); break;
-        case FrequenceRemboursement.BI_MONTHLY: nextDate.setDate(nextDate.getDate() + 14); break;
+        case FrequenceRemboursement.BI_MONTHLY:
+          // Bimensuel = 2x/mois: avance du 1er au 15, ou du 15 au 1er du mois suivant
+          if (nextDate.getDate() <= 15) {
+            nextDate.setDate(15);
+          } else {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            nextDate.setDate(1);
+          }
+          break;
         case FrequenceRemboursement.MONTHLY: nextDate.setMonth(nextDate.getMonth() + 1); break;
+        case FrequenceRemboursement.QUARTERLY: nextDate.setMonth(nextDate.getMonth() + 3); break;
         default: nextDate.setMonth(nextDate.getMonth() + 1);
       }
 

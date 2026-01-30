@@ -9,9 +9,12 @@
  */
 
 import { Router, Request, Response, NextFunction } from "express";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Routes:Payments');
 import { z } from "zod";
 import { paymentService } from "../services/mobile-money/payment-service";
-import { initializeProviders } from "../services/mobile-money/provider-registry";
+import { initializeProviders, providerRegistry } from "../services/mobile-money/provider-registry";
 import {
   getReconciliationReports,
   markReportReviewed,
@@ -108,7 +111,7 @@ function webhookIpValidator(provider: "MTN" | "AIRTEL") {
     const clientIp = getClientIp(req);
 
     if (!isIpAllowed(clientIp, provider)) {
-      console.warn(`[Webhook ${provider}] Rejected request from unauthorized IP: ${clientIp}`);
+      logger.warn({ provider, clientIp }, 'Webhook rejected request from unauthorized IP');
       // Retourner 200 pour ne pas révéler la protection
       return res.status(200).json({ received: true });
     }
@@ -192,7 +195,7 @@ const listFilterSchema = z.object({
  */
 // Handlers webhook réutilisables (montés sur paymentsRouter ET webhooksRouter)
 async function handleMtnWebhook(req: Request, res: Response) {
-  console.log("📩 MTN WEBHOOK POST:", { headers: req.headers, body: req.body });
+  logger.info({ headers: req.headers, body: req.body }, 'MTN WEBHOOK POST');
   const startTime = Date.now();
   const clientIp = (req as any).webhookClientIp || getClientIp(req);
 
@@ -217,7 +220,7 @@ async function handleMtnWebhook(req: Request, res: Response) {
     await paymentService.handleWebhook("MTN", req.body, signature, headers);
 
     logEntry.processingTimeMs = Date.now() - startTime;
-    console.log("[Webhook MTN] Processed successfully", logEntry);
+    logger.info({ logEntry }, 'Webhook MTN processed successfully');
 
     res.status(200).json({ received: true });
   } catch (error) {
@@ -225,7 +228,7 @@ async function handleMtnWebhook(req: Request, res: Response) {
     logEntry.result = "processing_error";
     logEntry.error = error instanceof Error ? error.message : "Unknown error";
 
-    console.error("[Webhook MTN] Processing error", logEntry);
+    logger.error({ logEntry }, 'Webhook MTN processing error');
 
     res.status(200).json({ received: true, error: "Processing failed" });
   }
@@ -257,7 +260,7 @@ async function handleAirtelWebhook(req: Request, res: Response) {
     await paymentService.handleWebhook("AIRTEL", req.body, signature, headers);
 
     logEntry.processingTimeMs = Date.now() - startTime;
-    console.log("[Webhook Airtel] Processed successfully", logEntry);
+    logger.info({ logEntry }, 'Webhook Airtel processed successfully');
 
     res.status(200).json({ received: true });
   } catch (error) {
@@ -265,7 +268,7 @@ async function handleAirtelWebhook(req: Request, res: Response) {
     logEntry.result = "processing_error";
     logEntry.error = error instanceof Error ? error.message : "Unknown error";
 
-    console.error("[Webhook Airtel] Processing error", logEntry);
+    logger.error({ logEntry }, 'Webhook Airtel processing error');
 
     res.status(200).json({ received: true, error: "Processing failed" });
   }
@@ -309,7 +312,7 @@ paymentsRouter.post("/collect", async (req, res) => {
 
     res.status(201).json(intent);
   } catch (error) {
-    console.error("[Payments] Collection error:", error);
+    logger.error({ err: error }, 'Payments collection error');
     res.status(500).json({
       error: "Erreur lors de l'initiation de la collection",
       message: error instanceof Error ? error.message : "Erreur inconnue",
@@ -342,7 +345,7 @@ paymentsRouter.post("/payout", async (req, res) => {
 
     res.status(201).json(intent);
   } catch (error) {
-    console.error("[Payments] Payout error:", error);
+    logger.error({ err: error }, 'Payments payout error');
     res.status(500).json({
       error: "Erreur lors de l'initiation du payout",
       message: error instanceof Error ? error.message : "Erreur inconnue",
@@ -368,7 +371,7 @@ paymentsRouter.get("/:id", async (req, res) => {
 
     res.json(intent);
   } catch (error) {
-    console.error("[Payments] Get error:", error);
+    logger.error({ err: error }, 'Payments get error');
     res.status(500).json({ error: "Erreur lors de la récupération du paiement" });
   }
 });
@@ -403,7 +406,7 @@ paymentsRouter.get("/", async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error("[Payments] List error:", error);
+    logger.error({ err: error }, 'Payments list error');
     res.status(500).json({ error: "Erreur lors de la récupération des paiements" });
   }
 });
@@ -425,7 +428,7 @@ paymentsRouter.post("/:id/cancel", async (req, res) => {
 
     res.json(intent);
   } catch (error) {
-    console.error("[Payments] Cancel error:", error);
+    logger.error({ err: error }, 'Payments cancel error');
     res.status(500).json({
       error: "Erreur lors de l'annulation du paiement",
       message: error instanceof Error ? error.message : "Erreur inconnue",
@@ -491,7 +494,7 @@ paymentsRouter.get("/reconciliation/reports", async (req, res) => {
 
     res.json({ reports });
   } catch (error) {
-    console.error("[Payments] Reconciliation reports list error:", error);
+    logger.error({ err: error }, 'Payments reconciliation reports list error');
     res.status(500).json({ error: "Erreur lors de la récupération des rapports" });
   }
 });
@@ -517,7 +520,7 @@ paymentsRouter.get("/reconciliation/reports/:id", async (req, res) => {
 
     res.json(report);
   } catch (error) {
-    console.error("[Payments] Reconciliation report detail error:", error);
+    logger.error({ err: error }, 'Payments reconciliation report detail error');
     res.status(500).json({ error: "Erreur lors de la récupération du rapport" });
   }
 });
@@ -548,7 +551,7 @@ paymentsRouter.post("/reconciliation/reports/:id/review", async (req, res) => {
 
     res.json({ success: true, message: "Rapport marqué comme reviewé" });
   } catch (error) {
-    console.error("[Payments] Review report error:", error);
+    logger.error({ err: error }, 'Payments review report error');
     res.status(500).json({ error: "Erreur lors du marquage du rapport" });
   }
 });
@@ -567,7 +570,7 @@ paymentsRouter.post("/reconciliation/reports/:id/resolve", async (req, res) => {
 
     res.json({ success: true, message: "Rapport marqué comme résolu" });
   } catch (error) {
-    console.error("[Payments] Resolve report error:", error);
+    logger.error({ err: error }, 'Payments resolve report error');
     res.status(500).json({ error: "Erreur lors de la résolution du rapport" });
   }
 });
@@ -602,7 +605,7 @@ paymentsRouter.post("/reconciliation/generate", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[Payments] Generate report error:", error);
+    logger.error({ err: error }, 'Payments generate report error');
     res.status(500).json({ error: "Erreur lors de la génération du rapport" });
   }
 });
@@ -644,9 +647,89 @@ paymentsRouter.post("/:id/manual-reconcile", async (req, res) => {
       intent,
     });
   } catch (error) {
-    console.error("[Payments] Manual reconcile error:", error);
+    logger.error({ err: error }, 'Payments manual reconcile error');
     res.status(500).json({
       error: "Erreur lors de la réconciliation manuelle",
+      message: error instanceof Error ? error.message : "Erreur inconnue",
+    });
+  }
+});
+
+// ============================================
+// PROVIDER BALANCE CHECK
+// ============================================
+
+/**
+ * GET /api/payments/provider-balances
+ * Fetch real-time balances from all registered mobile money providers
+ */
+paymentsRouter.get("/provider-balances", async (req, res) => {
+  try {
+    if (!req.session?.user?.id) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
+
+    const providers = providerRegistry.getAll();
+    const results: Array<{
+      provider: string;
+      code: string;
+      balance: string | null;
+      currency: string | null;
+      accountStatus: string | null;
+      error: string | null;
+      checkedAt: string;
+    }> = [];
+
+    // Fetch balances in parallel
+    const balancePromises = providers.map(async (provider) => {
+      try {
+        if (typeof provider.getBalance === "function") {
+          const balance = await provider.getBalance();
+          return {
+            provider: provider.name,
+            code: provider.code,
+            balance: balance.balance,
+            currency: balance.currency,
+            accountStatus: balance.accountStatus,
+            error: null,
+            checkedAt: new Date().toISOString(),
+          };
+        }
+        return {
+          provider: provider.name,
+          code: provider.code,
+          balance: null,
+          currency: null,
+          accountStatus: null,
+          error: "Balance check not supported by this provider",
+          checkedAt: new Date().toISOString(),
+        };
+      } catch (err) {
+        const error = err as Error;
+        logger.error({ err: error, providerCode: provider.code }, 'Payments balance check failed');
+        return {
+          provider: provider.name,
+          code: provider.code,
+          balance: null,
+          currency: null,
+          accountStatus: null,
+          error: error.message,
+          checkedAt: new Date().toISOString(),
+        };
+      }
+    });
+
+    const balances = await Promise.all(balancePromises);
+
+    res.json({
+      success: true,
+      providers: balances,
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Payments provider balance check error');
+    res.status(500).json({
+      error: "Erreur lors de la vérification des soldes",
       message: error instanceof Error ? error.message : "Erreur inconnue",
     });
   }
@@ -660,7 +743,7 @@ paymentsRouter.post("/:id/manual-reconcile", async (req, res) => {
  * Initialise les providers au chargement du module
  */
 initializeProviders().catch((error) => {
-  console.error("[Payments] Failed to initialize providers:", error);
+  logger.error({ err: error }, 'Payments failed to initialize providers');
 });
 
 export default paymentsRouter;

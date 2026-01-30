@@ -1,4 +1,4 @@
-import { pgTable, text, uniqueIndex, integer, numeric, boolean, timestamp, uuid, json, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, uniqueIndex, integer, numeric, boolean, timestamp, uuid, json, jsonb, index, date, varchar } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -395,6 +395,10 @@ export const mouvementsFinanciers = pgTable(
     requiresGlPosting: boolean("requires_gl_posting").notNull().default(true),
     glPostingStatus: text("gl_posting_status").notNull().default("PENDING"), // PENDING | POSTED | FAILED | SKIPPED
     glPostingError: text("gl_posting_error"),
+
+    // Reversal tracking
+    reversalOfId: uuid("reversal_of_id"), // Points to original movement being reversed
+    reversalReason: text("reversal_reason"),
   },
   (t) => ({
     uqReference: uniqueIndex("uq_mouvements_reference").on(t.reference),
@@ -408,6 +412,7 @@ export const mouvementsFinanciers = pgTable(
     idxAgenceCreated: index("idx_mouvements_agence_created").on(t.agenceId, t.createdAt),
     idxAgenceModuleRef: index("idx_mouvements_agence_module_ref").on(t.agenceId, t.sourceModule, t.reference),
     idxGlStatus: index("idx_mouvements_gl_status").on(t.glPostingStatus),
+    idxReversalOf: index("idx_mouvements_reversal_of").on(t.reversalOfId),
 
     chkMontantPos: sql`CONSTRAINT chk_mouvements_montant_pos CHECK (${t.montant} > 0)`,
   }),
@@ -802,6 +807,10 @@ export const transactionsCompte = pgTable(
 
     statut: statutTransactionEnum("statut").notNull().default("POSTED"),
 
+    // Direction of transaction (CREDIT = money in, DEBIT = money out)
+    // Stored directly to avoid complex JOINs and ensure correct classification
+    sens: sensMouvementEnum("sens").notNull().default("DEBIT"),
+
     montant: numeric("montant").notNull(),
 
     // Cache UI (facultatif mais pratique)
@@ -820,6 +829,11 @@ export const transactionsCompte = pgTable(
 
     annulledAt: timestamp("annulled_at"),
     reversedAt: timestamp("reversed_at"),
+
+    // Reversal tracking
+    reversalOfId: uuid("reversal_of_id"), // Self-referencing: points to original transaction
+    reversalReason: text("reversal_reason"),
+    reversedByUserId: uuid("reversed_by_user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => ({
     idxCompteDate: index("idx_transactions_compte_compte_date").on(
@@ -832,6 +846,13 @@ export const transactionsCompte = pgTable(
     uqRefExt: uniqueIndex("uq_transactions_compte_reference_externe").on(t.referenceExterne),
 
     chkMontantPos: sql`CONSTRAINT chk_transactions_compte_montant_pos CHECK (${t.montant} > 0)`,
+    idxReversalOf: index("idx_transactions_compte_reversal_of").on(t.reversalOfId),
+    idxSens: index("idx_transactions_compte_sens").on(t.sens),
+    idxCompteSensDate: index("idx_transactions_compte_compte_sens_date").on(
+      t.compteId,
+      t.sens,
+      t.createdAt,
+    ),
   }),
 );
 
@@ -1011,6 +1032,19 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   closingBordereauUrl: text("closing_bordereau_url"),       // URL du PDF généré
   // ========== FIN WORKFLOW FERMETURE ==========
 
+  // ========== ÉCART APPROVAL ==========
+  ecartApprovalId: uuid("ecart_approval_id"),               // Référence vers ecartsApprovalRequests.id
+  ecartApprovalStatus: text("ecart_approval_status"),       // AUTO_APPROVED, PENDING_APPROVAL, APPROVED, REJECTED
+  // ========== FIN ÉCART APPROVAL ==========
+
+  // ========== HANDOVER (TRANSFERT DE GARDE) ==========
+  handoverCount: integer("handover_count").default(0),                    // Nombre de transferts de garde effectués
+  lastHandoverId: uuid("last_handover_id"),                               // Référence vers caisse_handovers.id
+  originalCaissierId: uuid("original_caissier_id").references(() => users.id, { onDelete: "set null" }), // Caissier qui a ouvert la session
+  // Solde actuel (mis à jour après chaque opération pour les handovers)
+  soldeActuel: numeric("solde_actuel"),
+  // ========== FIN HANDOVER ==========
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
@@ -1054,6 +1088,11 @@ export const operationsCaisse = pgTable(
     annulledAt: timestamp("annulled_at"),
     reversedAt: timestamp("reversed_at"),
 
+    // Reversal tracking
+    reversalOfId: uuid("reversal_of_id"), // Self-referencing: points to original operation
+    reversalReason: text("reversal_reason"),
+    reversedByUserId: uuid("reversed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
   },
@@ -1064,6 +1103,7 @@ export const operationsCaisse = pgTable(
     uqReference: uniqueIndex("uq_operations_caisse_reference").on(t.reference),
     uqIdempotency: uniqueIndex("uq_operations_caisse_idempotency").on(t.idempotencyKey),
     chkMontantPos: sql`CONSTRAINT chk_operations_caisse_montant_pos CHECK (${t.montant} > 0)`,
+    idxReversalOf: index("idx_operations_caisse_reversal_of").on(t.reversalOfId),
   }),
 );
 
@@ -1121,6 +1161,31 @@ export const insertCaisseTransfertSchema = createInsertSchema(caisseTransferts).
 export type InsertCaisseTransfert = z.infer<typeof insertCaisseTransfertSchema>;
 export type CaisseTransfert = typeof caisseTransferts.$inferSelect;
 
+// ========== SCHEDULED CAISSE TRANSFERS ==========
+export const scheduledCaisseTransfers = pgTable("scheduled_caisse_transfers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceSourceId: uuid("agence_source_id").notNull().references(() => agences.id),
+  agenceDestId: uuid("agence_dest_id").notNull().references(() => agences.id),
+  montant: numeric("montant").notNull(),
+  datePrevue: date("date_prevue").notNull(),
+  frequence: varchar("frequence", { length: 20 }).default("ONE_TIME"), // ONE_TIME, DAILY, WEEKLY, MONTHLY
+  jourSemaine: integer("jour_semaine"), // 0-6 for weekly
+  jourMois: integer("jour_mois"), // 1-31 for monthly
+  motif: text("motif"),
+  statut: varchar("statut", { length: 20 }).default("SCHEDULED"), // SCHEDULED, EXECUTED, CANCELLED, FAILED
+  transfertId: uuid("transfert_id").references(() => caisseTransferts.id),
+  derniereExecution: timestamp("derniere_execution"),
+  prochaineExecution: timestamp("prochaine_execution"),
+  nombreExecutions: integer("nombre_executions").default(0),
+  maxExecutions: integer("max_executions"), // NULL = unlimited
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ScheduledCaisseTransfer = typeof scheduledCaisseTransfers.$inferSelect;
+export type InsertScheduledCaisseTransfer = typeof scheduledCaisseTransfers.$inferInsert;
+
 // ========== AUDIT SESSIONS CAISSE ==========
 export const sessionsCaisseAuditLogs = pgTable("sessions_caisse_audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -1136,6 +1201,27 @@ export const sessionsCaisseAuditLogs = pgTable("sessions_caisse_audit_logs", {
 });
 
 export type SessionCaisseAuditLog = typeof sessionsCaisseAuditLogs.$inferSelect;
+
+// ========== DENOMINATION TEMPLATES ==========
+export const denominationTemplates = pgTable("denomination_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  caisseId: uuid("caisse_id").references(() => caisses.id, { onDelete: "cascade" }),
+  billetage: jsonb("billetage").$type<Record<string, number>>().notNull(),
+  totalCalcule: numeric("total_calcule").notNull(),
+  typeTemplate: text("type_template").default("GENERAL"), // OPENING, CLOSING, GENERAL
+  usageCount: integer("usage_count").default(0),
+  lastUsedAt: timestamp("last_used_at"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDenominationTemplateSchema = createInsertSchema(denominationTemplates).omit({ id: true, createdAt: true, updatedAt: true, usageCount: true, lastUsedAt: true });
+export type InsertDenominationTemplate = z.infer<typeof insertDenominationTemplateSchema>;
+export type DenominationTemplate = typeof denominationTemplates.$inferSelect;
 
 // ========== REEVALUATION WORKFLOW TABLES ==========
 
@@ -1513,3 +1599,94 @@ export const insertCreditRefundRequestSchema = createInsertSchema(creditRefundRe
 });
 export type InsertCreditRefundRequest = z.infer<typeof insertCreditRefundRequestSchema>;
 export type CreditRefundRequest = typeof creditRefundRequests.$inferSelect;
+
+// ========== CAISSE HANDOVER (TRANSFERT DE GARDE) ==========
+
+/**
+ * Table des transferts de garde - permet le changement de caissier
+ * en cours de journée sans clôturer la session
+ */
+export const caisseHandovers = pgTable("caisse_handovers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  // Session concernée
+  sessionId: uuid("session_id").notNull().references(() => sessionsCaisse.id, { onDelete: "restrict" }),
+  caisseId: uuid("caisse_id").notNull().references(() => caisses.id, { onDelete: "restrict" }),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "set null" }),
+
+  // Caissiers impliqués
+  fromCaissierId: uuid("from_caissier_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  toCaissierId: uuid("to_caissier_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+
+  // Montants au moment du transfert
+  montantTheorique: numeric("montant_theorique").notNull(),
+  montantCompte: numeric("montant_compte").notNull(),
+  ecart: numeric("ecart").default("0"),
+
+  // Billetage au moment du transfert
+  billetageSortant: jsonb("billetage_sortant").$type<Record<string, number>>(),
+  billetageEntrant: jsonb("billetage_entrant").$type<Record<string, number>>(),
+
+  // Statut du workflow
+  statut: text("statut").notNull().default("PENDING"), // PENDING, COUNTING, CONFIRMED, CANCELLED, DISPUTED
+
+  // Justifications et observations
+  motif: text("motif"),
+  observationsSortant: text("observations_sortant"),
+  observationsEntrant: text("observations_entrant"),
+  ecartJustification: text("ecart_justification"),
+
+  // Timestamps workflow
+  initiatedAt: timestamp("initiated_at").notNull().defaultNow(),
+  countingStartedAt: timestamp("counting_started_at"),
+  confirmedAt: timestamp("confirmed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelledBy: uuid("cancelled_by").references(() => users.id, { onDelete: "set null" }),
+  cancelReason: text("cancel_reason"),
+
+  // Approbation (si écart)
+  requiresApproval: boolean("requires_approval").default(false),
+  approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  approvalComment: text("approval_comment"),
+
+  // Métadonnées
+  ipAddressFrom: text("ip_address_from"),
+  ipAddressTo: text("ip_address_to"),
+  userAgentFrom: text("user_agent_from"),
+  userAgentTo: text("user_agent_to"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCaisseHandoverSchema = createInsertSchema(caisseHandovers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  initiatedAt: true,
+});
+export type InsertCaisseHandover = z.infer<typeof insertCaisseHandoverSchema>;
+export type CaisseHandover = typeof caisseHandovers.$inferSelect;
+
+/**
+ * Audit logs pour les transferts de garde
+ */
+export const caisseHandoverAuditLogs = pgTable("caisse_handover_audit_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  handoverId: uuid("handover_id").notNull().references(() => caisseHandovers.id, { onDelete: "cascade" }),
+
+  action: text("action").notNull(), // INITIATED, COUNTING_STARTED, CONFIRMED, CANCELLED, DISPUTED, APPROVED, REJECTED
+  actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+
+  statutAvant: text("statut_avant"),
+  statutApres: text("statut_apres"),
+
+  details: jsonb("details").$type<Record<string, unknown>>(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CaisseHandoverAuditLog = typeof caisseHandoverAuditLogs.$inferSelect;

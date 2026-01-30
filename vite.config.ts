@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { metaImagesPlugin } from "./vite-plugin-meta-images";
+import { VitePWA } from "vite-plugin-pwa";
 
 import fs from "fs";
 
@@ -18,6 +19,140 @@ export default defineConfig({
     runtimeErrorOverlay(),
     tailwindcss(),
     metaImagesPlugin(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'cofin-logo.png', 'icons/*.png'],
+      manifest: false, // Use external manifest.json
+      workbox: {
+        // Precache all static assets
+        globPatterns: [
+          '**/*.{js,css,html,ico,png,svg,woff,woff2}'
+        ],
+        globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
+        // Runtime caching strategies
+        runtimeCaching: [
+          // API calls - Network first with cache fallback
+          {
+            urlPattern: /^\/api\/(?!auth|session).*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              },
+              networkTimeoutSeconds: 10,
+              cacheableResponse: {
+                statuses: [0, 200]
+              },
+              backgroundSync: {
+                name: 'api-queue',
+                options: {
+                  maxRetentionTime: 24 * 60 // 24 hours in minutes
+                }
+              }
+            }
+          },
+          // Static lookup data - Cache first (rarely changes)
+          {
+            urlPattern: /^\/api\/(agences|regions|departements|parametres|roles)/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'lookup-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Dashboard & Stats - Stale while revalidate
+          {
+            urlPattern: /^\/api\/(dashboard|stats|analytics)/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'stats-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 5 // 5 minutes
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Images - Cache first
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'image-cache',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          },
+          // Storage files (documents, attachments)
+          {
+            urlPattern: /^\/api\/storage\//i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'storage-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Google Fonts
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Leaflet tiles for maps
+          {
+            urlPattern: /^https:\/\/[a-z]\.tile\.openstreetmap\.org\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles-cache',
+              expiration: {
+                maxEntries: 1000,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          }
+        ],
+        // Skip waiting and claim clients immediately
+        skipWaiting: true,
+        clientsClaim: true,
+        // Clean up old caches
+        cleanupOutdatedCaches: true,
+        // Offline fallback
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//]
+      },
+      // Development options
+      devOptions: {
+        enabled: process.env.NODE_ENV === 'development',
+        type: 'module'
+      }
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -168,6 +303,18 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         cookieDomainRewrite: "localhost",
+        // Ensure cookies are properly forwarded through the proxy
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            // Rewrite Set-Cookie domain for local development
+            const setCookie = proxyRes.headers['set-cookie'];
+            if (setCookie) {
+              proxyRes.headers['set-cookie'] = setCookie.map((cookie: string) =>
+                cookie.replace(/Domain=[^;]+;?/gi, '').replace(/Secure;?/gi, '')
+              );
+            }
+          });
+        },
       },
       "/ws": {
         target: "ws://localhost:5000",

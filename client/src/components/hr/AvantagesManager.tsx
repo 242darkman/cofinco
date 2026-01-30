@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Gift, CheckCircle2, UserPlus, Users, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Gift, CheckCircle2, UserPlus, Users, Filter, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { Avantage } from '../../hooks/hr/useAvantages';
 import { Employe } from '../../hooks/hr/useEmployes';
-import { Card, Button, SelectField } from '../ui';
+import { Card, Button, SelectField, Modal, FormField } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { toast } from '../../lib/toast';
 
 interface AvantagesManagerProps {
   avantages: Avantage[];
@@ -11,6 +12,9 @@ interface AvantagesManagerProps {
   selectedEmployes: string[];
   onToggleEmploye: (employeId: string) => void;
   onApplyToSelected: (avantageId: number) => void;
+  onCreate?: (data: { nom: string; type: string; montantParDefaut: number; description?: string; eligibleContrats?: string[] }) => Promise<boolean>;
+  onUpdate?: (id: number, data: Partial<Avantage>) => Promise<boolean>;
+  onDelete?: (id: number) => Promise<boolean>;
 }
 
 export default function AvantagesManager({
@@ -19,12 +23,21 @@ export default function AvantagesManager({
   selectedEmployes,
   onToggleEmploye,
   onApplyToSelected,
+  onCreate,
+  onUpdate,
+  onDelete,
 }: AvantagesManagerProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canApplyAvantages = hasPermission('rh', 'edit') || hasPermission('avantages', 'create');
 
   const [contractFilter, setContractFilter] = useState<string>('Tous');
+
+  // CRUD state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingAvantage, setEditingAvantage] = useState<Avantage | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Avantage | null>(null);
+  const [formData, setFormData] = useState({ nom: '', type: 'Prime', montantParDefaut: 0, description: '', eligibleContrats: '' });
   
   // Pagination for employees
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,6 +66,64 @@ export default function AvantagesManager({
     { value: 'Stage', label: 'Stagiaires' },
   ];
 
+  const resetForm = () => setFormData({ nom: '', type: 'Prime', montantParDefaut: 0, description: '', eligibleContrats: '' });
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onCreate) return;
+    const eligibleArr = formData.eligibleContrats ? formData.eligibleContrats.split(',').map(c => c.trim()).filter(Boolean) : undefined;
+    const success = await onCreate({
+      nom: formData.nom,
+      type: formData.type,
+      montantParDefaut: formData.montantParDefaut,
+      description: formData.description || undefined,
+      eligibleContrats: eligibleArr,
+    });
+    if (success) {
+      toast.success('Avantage créé');
+      setShowCreateModal(false);
+      resetForm();
+    }
+  };
+
+  const handleEditOpen = (avantage: Avantage) => {
+    setFormData({
+      nom: avantage.nom,
+      type: avantage.type,
+      montantParDefaut: avantage.montantParDefaut || 0,
+      description: avantage.description || '',
+      eligibleContrats: Array.isArray(avantage.eligibleContrats) ? avantage.eligibleContrats.join(', ') : '',
+    });
+    setEditingAvantage(avantage);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAvantage || !onUpdate) return;
+    const eligibleArr = formData.eligibleContrats ? formData.eligibleContrats.split(',').map(c => c.trim()).filter(Boolean) : undefined;
+    const success = await onUpdate(editingAvantage.id, {
+      nom: formData.nom,
+      type: formData.type,
+      montantParDefaut: formData.montantParDefaut,
+      description: formData.description || undefined,
+      eligibleContrats: eligibleArr,
+    });
+    if (success) {
+      toast.success('Avantage mis à jour');
+      setEditingAvantage(null);
+      resetForm();
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete || !onDelete) return;
+    const success = await onDelete(confirmDelete.id);
+    if (success) {
+      toast.success('Avantage supprimé');
+      setConfirmDelete(null);
+    }
+  };
+
   return (
 
     <div className="flex flex-col h-full overflow-hidden">
@@ -65,6 +136,15 @@ export default function AvantagesManager({
                     <Gift className="text-cyan-400" size={18} />
                     <h3 className="text-base font-bold text-white">Avantages Disponibles</h3>
                 </div>
+                {canApplyAvantages && onCreate && (
+                  <button
+                    onClick={() => { resetForm(); setShowCreateModal(true); }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition"
+                  >
+                    <Plus size={14} />
+                    <span className="hidden sm:inline">Nouvel avantage</span>
+                  </button>
+                )}
              </div>
              
              <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-slate-700">
@@ -95,16 +175,35 @@ export default function AvantagesManager({
                                 ))}
                             </div>
 
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                fullWidth
-                                disabled={selectedEmployes.length === 0 || !canApplyAvantages}
-                                onClick={() => onApplyToSelected(avantage.id)}
-                                className="opacity-90 hover:opacity-100 mt-3 h-8 text-xs"
-                            >
-                                Attribuer à {selectedEmployes.length || 0}
-                            </Button>
+                            <div className="flex gap-1.5 mt-3">
+                              <Button
+                                  variant="primary"
+                                  size="sm"
+                                  disabled={selectedEmployes.length === 0 || !canApplyAvantages}
+                                  onClick={() => onApplyToSelected(avantage.id)}
+                                  className="opacity-90 hover:opacity-100 h-8 text-xs flex-1"
+                              >
+                                  Attribuer à {selectedEmployes.length || 0}
+                              </Button>
+                              {canApplyAvantages && onUpdate && (
+                                <button
+                                  onClick={() => handleEditOpen(avantage)}
+                                  className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-md transition"
+                                  title="Modifier"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              )}
+                              {canApplyAvantages && onDelete && (
+                                <button
+                                  onClick={() => setConfirmDelete(avantage)}
+                                  className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
                         </div>
                         )})
                     ) : (
@@ -215,6 +314,88 @@ export default function AvantagesManager({
              </Card>
         </div>
       </div>
+
+      {/* Create / Edit Modal */}
+      <Modal
+        isOpen={showCreateModal || !!editingAvantage}
+        onClose={() => { setShowCreateModal(false); setEditingAvantage(null); resetForm(); }}
+        title={editingAvantage ? 'Modifier l\'avantage' : 'Nouvel Avantage'}
+        size="md"
+      >
+        <form onSubmit={editingAvantage ? handleEditSubmit : handleCreateSubmit} className="space-y-4">
+          <FormField
+            label="Nom"
+            name="nom"
+            type="text"
+            value={formData.nom}
+            onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <SelectField
+              label="Type"
+              name="type"
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              options={[
+                { value: 'Prime', label: 'Prime' },
+                { value: 'Assurance', label: 'Assurance' },
+                { value: 'Avantage en nature', label: 'Avantage en nature' },
+                { value: 'Autre', label: 'Autre' },
+              ]}
+              required
+            />
+            <FormField
+              label="Montant par défaut (FC)"
+              name="montantParDefaut"
+              type="number"
+              value={formData.montantParDefaut.toString()}
+              onChange={(e) => setFormData({ ...formData, montantParDefaut: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          <FormField
+            label="Description"
+            name="description"
+            type="text"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          />
+          <FormField
+            label="Contrats éligibles (séparés par virgule)"
+            name="eligibleContrats"
+            type="text"
+            value={formData.eligibleContrats}
+            onChange={(e) => setFormData({ ...formData, eligibleContrats: e.target.value })}
+            placeholder="CDI, CDD, Stage"
+          />
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+            <Button type="button" variant="secondary" onClick={() => { setShowCreateModal(false); setEditingAvantage(null); resetForm(); }}>
+              Annuler
+            </Button>
+            <Button type="submit" variant="primary">
+              {editingAvantage ? 'Enregistrer' : 'Créer'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-red-400">Supprimer l'avantage</h3>
+            </div>
+            <div className="p-4 text-sm text-slate-300">
+              Voulez-vous vraiment supprimer l'avantage <span className="font-bold text-white">"{confirmDelete.nom}"</span> ?
+            </div>
+            <div className="p-4 border-t border-slate-800 flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(null)}>Annuler</Button>
+              <Button variant="danger" size="sm" onClick={handleDeleteConfirm}>Supprimer</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,511 +1,501 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Activity, Filter, Download, Search, Calendar, User, Eye, X } from 'lucide-react';
-import { Card, Button, SelectField, Modal, ResponsiveTable } from '../ui';
-import { auditApi, userApi } from '../../lib/api-client';
-import { toast, handleApiError } from '../../lib/toast';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Search, ChevronLeft, ChevronRight, Eye,
+  Download, RefreshCw, Calendar, Terminal, Activity, Clock
+} from 'lucide-react';
+import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
+import { auditApi } from '../../lib/api-client';
+import { toast } from '../../lib/toast';
 
-interface ActivityLog {
+interface LogEntry {
   id: string;
-  user_id: string;
-  user_name: string;
-  user_email: string;
+  date: string;
+  user: string;
+  user_email?: string;
   action: string;
-  action_type: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'VIEW' | 'EXPORT' | 'OTHER';
   module: string;
-  details: string;
-  ip_address?: string;
-  user_agent?: string;
-  created_at: string;
-  metadata?: any;
+  details: any;
+  status: 'success' | 'error' | 'warning';
+  ip?: string;
+  userAgent?: string;
+  error_message?: string;
+  created_at?: string;
 }
 
-const formatLogDate = (log?: Partial<ActivityLog> | null) => {
-  const value = log?.created_at ?? (log as any)?.createdAt ?? (log as any)?.timestamp;
-  if (!value) {
-    return 'N/A';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
-  }
-  return date.toLocaleString('fr-FR');
-};
+interface AdminActivityLogsProps {
+  /**
+   * 'compact' - Simple card-based view for embedded use (e.g., AdminGestionAcces)
+   * 'full' - Full-featured table view with pagination and details drawer (default)
+   */
+  variant?: 'compact' | 'full';
+  /** Max items to show in compact mode (default: 50) */
+  compactLimit?: number;
+}
 
-export default function AdminActivityLogs() {
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterUser, setFilterUser] = useState('all');
-  const [filterAction, setFilterAction] = useState('all');
-  const [filterModule, setFilterModule] = useState('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [users, setUsers] = useState<any[]>([]);
-  const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
+/**
+ * Unified Activity Logs Component
+ * Supports both compact (embedded) and full (standalone) modes
+ */
+export default function AdminActivityLogs({
+  variant = 'full',
+  compactLimit = 50
+}: AdminActivityLogsProps) {
+  // Pagination state (full mode)
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(variant === 'compact' ? compactLimit : 10);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  const actionTypes = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'VIEW', 'EXPORT', 'OTHER'];
-  const modules = ['Caisse', 'Clients', 'Crédits', 'Épargnes', 'Tontines', 'Comptabilité', 'Administration'];
+  // Filter state
+  const [search, setSearch] = useState('');
+  const [filterModule, setFilterModule] = useState('');
+  const [filterSuccess, setFilterSuccess] = useState('all');
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
-  const loadUsers = useCallback(async () => {
-    try {
-      const data = await userApi.getAll();
-      setUsers(data || []);
-    } catch (error) {
-      // Silent fail - users are optional for filtering
-    }
-  }, []);
+  // Unique modules for filter dropdown
+  const modules = Array.from(new Set(logs.map(l => l.module).filter(Boolean)));
 
-  const loadLogs = useCallback(async () => {
+  // Fetch logs
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await auditApi.getAll({ limit: 500 });
-      const mapped = (data || []).map((log: any) => {
-        const actionRaw = String(log.action_type ?? log.action ?? 'OTHER').toUpperCase();
-        const allowed = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'VIEW', 'EXPORT', 'OTHER'];
-        const actionType = allowed.includes(actionRaw) ? (actionRaw as ActivityLog['action_type']) : 'OTHER';
-        const createdAt = log.created_at ?? log.createdAt ?? log.timestamp ?? null;
-        return {
-          id: log.id,
-          user_id: log.user_id ?? log.userId ?? '',
-          user_name: log.user_name ?? log.userName ?? 'Système',
-          user_email: log.user_email ?? log.userEmail ?? '',
-          action: log.action ?? '',
-          action_type: actionType,
-          module: log.module ?? log.resource ?? 'N/A',
-          details: typeof log.details === 'string' ? log.details : JSON.stringify(log.details ?? {}),
-          ip_address: log.ip_address ?? log.ipAddress ?? '',
-          user_agent: log.user_agent ?? log.userAgent ?? '',
-          created_at: createdAt || new Date().toISOString(),
-          metadata: log.metadata ?? null,
-        } as ActivityLog;
-      });
-      setLogs(mapped);
+      if (variant === 'compact') {
+        // Simple fetch for compact mode
+        const params: Record<string, string> = { limit: limit.toString() };
+        if (filterModule) params.module = filterModule;
+        if (filterSuccess !== 'all') params.success = filterSuccess;
+
+        const data = await auditApi.getAll(params);
+        const mappedLogs: LogEntry[] = (data || []).map((item: any) => ({
+          id: item.id,
+          date: new Date(item.created_at || item.createdAt).toLocaleString('fr-FR'),
+          user: item.user_name || item.userName || item.user_email || 'Système',
+          user_email: item.user_email,
+          action: item.action || 'UNKNOWN',
+          module: item.module || item.entity_type || 'SYSTEM',
+          details: item.details || {},
+          status: item.success === false ? 'error' : 'success',
+          error_message: item.error_message,
+          created_at: item.created_at || item.createdAt,
+        }));
+        setLogs(mappedLogs);
+        setTotal(mappedLogs.length);
+      } else {
+        // Paginated fetch for full mode
+        const response = await auditApi.getPaginated({
+          page,
+          limit,
+          search
+        });
+
+        const mappedLogs: LogEntry[] = response.data.map((item: any) => ({
+          id: item.id,
+          date: new Date(item.created_at || item.createdAt).toLocaleString('fr-FR'),
+          user: item.user_name || item.userName || 'Système',
+          action: item.action || 'UNKNOWN',
+          module: item.module || item.entity_type || 'SYSTEM',
+          details: item.details || {},
+          status: item.success === false ? 'error' : 'success',
+          ip: item.ip_address || item.ipAddress || 'N/A',
+          userAgent: item.user_agent || item.userAgent || ''
+        }));
+
+        setLogs(mappedLogs);
+
+        if (response.meta?.pagination) {
+          setTotal(response.meta.pagination.total_items || 0);
+        } else if ((response as any).pagination) {
+          setTotal((response as any).pagination.total || 0);
+        } else {
+          setTotal(mappedLogs.length);
+        }
+      }
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement des logs'));
+      console.error("Erreur chargement logs:", error);
+      toast.error("Impossible de charger l'historique");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [variant, page, limit, search, filterModule, filterSuccess]);
 
   useEffect(() => {
-    loadUsers();
-    loadLogs();
-  }, [loadUsers, loadLogs]);
+    const timer = setTimeout(() => {
+      fetchLogs();
+    }, variant === 'full' ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [fetchLogs, variant]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [logs, searchQuery, filterUser, filterAction, filterModule, dateFrom, dateTo]);
+  const totalPages = Math.ceil(total / limit) || 1;
 
-  const applyFilters = () => {
-    let filtered = [...logs];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(log =>
-        (log.user_name || '').toLowerCase().includes(query) ||
-        (log.action || '').toLowerCase().includes(query) ||
-        (log.details || '').toLowerCase().includes(query) ||
-        (log.ip_address || '').includes(query)
-      );
-    }
-
-    if (filterUser !== 'all') {
-      filtered = filtered.filter(log => log.user_id === filterUser);
-    }
-
-    if (filterAction !== 'all') {
-      filtered = filtered.filter(log => log.action_type === filterAction);
-    }
-
-    if (filterModule !== 'all') {
-      filtered = filtered.filter(log => log.module === filterModule);
-    }
-
-    if (dateFrom) {
-      const fromDate = new Date(dateFrom);
-      filtered = filtered.filter((log) => {
-        const date = new Date(log.created_at);
-        return !Number.isNaN(date.getTime()) && date >= fromDate;
-      });
-    }
-
-    if (dateTo) {
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59);
-      filtered = filtered.filter((log) => {
-        const date = new Date(log.created_at);
-        return !Number.isNaN(date.getTime()) && date <= toDate;
-      });
-    }
-
-    setFilteredLogs(filtered);
+  const formatTimeAgo = (date: string) => {
+    const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+    if (seconds < 60) return 'À l\'instant';
+    if (seconds < 3600) return `Il y a ${Math.floor(seconds / 60)}min`;
+    if (seconds < 86400) return `Il y a ${Math.floor(seconds / 3600)}h`;
+    return new Date(date).toLocaleDateString('fr-FR');
   };
 
-  const exportLogs = () => {
-    const csv = [
-      ['Date', 'Utilisateur', 'Email', 'Action', 'Type', 'Module', 'Détails', 'IP'].join(','),
-      ...filteredLogs.map(log => [
-        formatLogDate(log),
-        log.user_name,
-        log.user_email,
-        log.action,
-        log.action_type,
-        log.module,
-        `"${(log.details || '').replace(/"/g, '""')}"`,
-        log.ip_address || ''
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `logs_activite_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
-
-  const getActionColor = (actionType: string) => {
-    switch (actionType) {
-      case 'CREATE': return 'text-green-400 bg-green-500/20';
-      case 'UPDATE': return 'text-blue-400 bg-blue-500/20';
-      case 'DELETE': return 'text-blue-400 bg-blue-500/20';
-      case 'LOGIN': return 'text-cyan-400 bg-cyan-500/20';
-      case 'LOGOUT': return 'text-slate-400 bg-slate-500/20';
-      case 'VIEW': return 'text-emerald-400 bg-emerald-500/20';
-      case 'EXPORT': return 'text-cyan-400 bg-cyan-500/20';
-      default: return 'text-slate-400 bg-slate-500/20';
-    }
-  };
-
-  const tableColumns = [
-    { 
-      key: 'created_at', 
-      label: 'Date/Heure', 
-      format: (val: any, item: ActivityLog) => formatLogDate(item),
-    },
-    { 
-      key: 'user_name', 
-      label: 'Utilisateur',
-      primary: true,
-      format: (_: any, item: ActivityLog) => (
-        <div>
-          <p className="font-semibold text-white">{item.user_name}</p>
-          <p className="text-xs text-slate-500">{item.user_email}</p>
-        </div>
-      )
-    },
-    { 
-      key: 'action_type', 
-      label: 'Type',
-      format: (val: string) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getActionColor(val)}`}>
-          {val}
-        </span>
-      )
-    },
-    { key: 'action', label: 'Action' },
-    { key: 'module', label: 'Module' },
-    { 
-      key: 'details', 
-      label: 'Détails',
-      hideOnMobile: true,
-      format: (val: string) => <span className="max-w-xs truncate block">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
-    }
-  ];
-
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterUser, filterAction, filterModule, dateFrom, dateTo]);
-
-  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
-  const paginatedLogs = filteredLogs.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  return (
-    <div className="h-full flex flex-col space-y-2">
-      <Card variant="default" padding="none" className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Header & Controls */}
-        <div className="p-4 border-b border-edge bg-surface-muted/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" />
-              </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-content-primary">Logs d'Activité</h2>
-                <p className="text-xs sm:text-sm text-content-muted">Historique des actions ({filteredLogs.length})</p>
-              </div>
+  // ============================================
+  // COMPACT MODE RENDER
+  // ============================================
+  if (variant === 'compact') {
+    return (
+      <div className="space-y-6">
+        <FeatureHeader
+          featureKey="admin.activity"
+          title={`${FEATURE_DESCRIPTIONS['admin.activity'].title} (${logs.length})`}
+          subtitle={FEATURE_DESCRIPTIONS['admin.activity'].subtitle}
+          helpText={FEATURE_DESCRIPTIONS['admin.activity'].helpText}
+          icon={<Activity size={28} className="text-indigo-400" />}
+          actions={
+            <div className="flex gap-2 flex-wrap">
+            <select
+              value={filterModule}
+              onChange={(e) => setFilterModule(e.target.value)}
+              className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+            >
+              <option value="">Tous les modules</option>
+              {modules.map(module => (
+                <option key={module} value={module}>{module}</option>
+              ))}
+            </select>
+            <select
+              value={filterSuccess}
+              onChange={(e) => setFilterSuccess(e.target.value)}
+              className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+            >
+              <option value="all">Tous</option>
+              <option value="true">Succès</option>
+              <option value="false">Échecs</option>
+            </select>
+            <select
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value))}
+              className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+            >
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+            </select>
             </div>
-            <div className="flex gap-2">
-               <Button
-                variant="secondary"
-                size="sm"
-                icon={Filter}
-                onClick={() => setShowFilters(!showFilters)}
-                className={`shadow-sm ${showFilters ? 'bg-primary/10 text-primary border-primary/20' : ''}`}
-              >
-                Filtres
-              </Button>
-              <Button
-                variant="success"
-                size="sm"
-                icon={Download}
-                onClick={exportLogs}
-                className="shadow-lg shadow-success/20"
-              >
-                Exporter
-              </Button>
-            </div>
-          </div>
+          }
+        />
 
-          <div className="space-y-3">
-             {/* Search Bar - Always Visible */}
-             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={18} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher dans les logs..."
-                className="w-full pl-10 pr-4 py-2 bg-surface-base border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
-              />
-            </div>
-
-            {/* Collapsible Advanced Filters */}
-            {showFilters && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-edge animate-in slide-in-from-top-2 duration-200">
-                <SelectField
-                  label="Utilisateur"
-                  name="filterUser"
-                  value={filterUser}
-                  onChange={(e) => setFilterUser(e.target.value)}
-                  options={[
-                    { value: 'all', label: 'Tous les utilisateurs' },
-                    ...users.map(u => ({ value: u.id, label: `${u.nom} ${u.prenom}` }))
-                  ]}
-                  containerClassName="mt-0"
-                />
-
-                <SelectField
-                  label="Type d'action"
-                  name="filterAction"
-                  value={filterAction}
-                  onChange={(e) => setFilterAction(e.target.value)}
-                  options={[
-                    { value: 'all', label: 'Tous les types' },
-                    ...actionTypes.map(t => ({ value: t, label: t }))
-                  ]}
-                  containerClassName="mt-0"
-                />
-
-                <SelectField
-                  label="Module"
-                  name="filterModule"
-                  value={filterModule}
-                  onChange={(e) => setFilterModule(e.target.value)}
-                  options={[
-                    { value: 'all', label: 'Tous les modules' },
-                    ...modules.map(m => ({ value: m, label: m }))
-                  ]}
-                  containerClassName="mt-0"
-                />
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="w-full">
-                     <label className="block text-xs font-semibold text-content-secondary mb-1.5">Début</label>
-                     <div className="relative">
-                       <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="w-full px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                      />
-                     </div>
-                  </div>
-                  <div className="w-full">
-                     <label className="block text-xs font-semibold text-content-secondary mb-1.5">Fin</label>
-                     <div className="relative">
-                       <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="w-full px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                      />
-                     </div>
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
-                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setFilterUser('all');
-                      setFilterAction('all');
-                      setFilterModule('all');
-                      setDateFrom('');
-                      setDateTo('');
-                      setCurrentPage(1);
-                    }}
-                    className="text-content-muted hover:text-content-primary"
-                  >
-                    Réinitialiser tout
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="text-content-muted text-sm mt-3">Chargement de l'historique...</p>
-          </div>
-        ) : filteredLogs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-content-muted">
-            <Activity size={48} className="opacity-20 mb-4" />
-            <p className="text-sm">Aucun log trouvé pour ces critères</p>
-          </div>
+          <div className="text-center py-12 text-slate-400">Chargement...</div>
+        ) : logs.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">Aucune activité</div>
         ) : (
-           <div className="bg-surface-base flex-1 flex flex-col overflow-hidden min-h-0">
-             <div className="flex-1 overflow-y-auto custom-scrollbar">
-               <ResponsiveTable
-                data={paginatedLogs}
-                columns={tableColumns}
-                loading={loading}
-                emptyMessage="Aucun log trouvé"
-                mobileBreakpoint="md"
-                actions={(item) => (
-                  <div className="flex items-center justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={Eye}
-                      onClick={() => setSelectedLog(item)}
-                      className="text-cyan-400 hover:bg-cyan-500/10 w-8 h-8 p-0"
-                      aria-label="Voir détails"
-                    />
+          <div className="space-y-2">
+            {logs.map(log => (
+              <div
+                key={log.id}
+                className={`bg-slate-700 rounded-lg p-4 border-l-4 ${
+                  log.status === 'success' ? 'border-green-500' : 'border-red-500'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <span className="text-white font-bold">{log.user_email || log.user || 'Utilisateur inconnu'}</span>
+                      {log.module && (
+                        <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">
+                          {log.module}
+                        </span>
+                      )}
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        log.status === 'success'
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {log.status === 'success' ? 'SUCCÈS' : 'ÉCHEC'}
+                      </span>
+                    </div>
+
+                    <div className="text-slate-300 mb-2">{log.action}</div>
+
+                    {log.error_message && (
+                      <div className="text-sm text-red-400 bg-red-500/10 rounded px-3 py-2">
+                        {log.error_message}
+                      </div>
+                    )}
+
+                    {log.details && Object.keys(log.details).length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-300">
+                          Voir détails
+                        </summary>
+                        <pre className="mt-2 text-xs text-slate-400 bg-slate-800 rounded p-3 overflow-x-auto">
+                          {JSON.stringify(log.details, null, 2)}
+                        </pre>
+                      </details>
+                    )}
                   </div>
-                )}
-              />
-            </div>
-            
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-edge flex items-center justify-between bg-surface-muted/10">
-                <p className="text-xs text-content-muted hidden sm:block">
-                  Affichage de <span className="font-medium text-content-primary">{(currentPage - 1) * itemsPerPage + 1}</span> à <span className="font-medium text-content-primary">{Math.min(currentPage * itemsPerPage, filteredLogs.length)}</span> sur {filteredLogs.length}
-                </p>
-                <div className="flex items-center gap-2 mx-auto sm:mx-0">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className="h-8 px-3"
-                  >
-                    Précédent
-                  </Button>
-                  <span className="text-sm font-medium text-content-primary px-2">
-                    Page {currentPage} / {totalPages}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    className="h-8 px-3"
-                  >
-                    Suivant
-                  </Button>
+
+                  <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
+                    <Clock size={14} />
+                    <span>{log.created_at ? formatTimeAgo(log.created_at) : log.date}</span>
+                  </div>
                 </div>
               </div>
-            )}
+            ))}
           </div>
         )}
-      </Card>
+      </div>
+    );
+  }
 
-      {/* Log Details Modal */}
-      {selectedLog && (
-        <Modal
-          isOpen={!!selectedLog}
-          onClose={() => setSelectedLog(null)}
-          title="Détails de l'activité"
-          size="lg"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-surface-muted rounded-lg border border-edge">
-              <div className="w-10 h-10 rounded-full bg-surface-base flex items-center justify-center border border-edge">
-                <User className="text-content-secondary" size={20} />
-              </div>
-              <div>
-                <p className="font-semibold text-content-primary">{selectedLog.user_name}</p>
-                <p className="text-xs text-content-muted">{selectedLog.user_email}</p>
-              </div>
-              <div className="ml-auto text-right">
-                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getActionColor(selectedLog.action_type)}`}>
-                  {selectedLog.action_type}
-                </span>
-                <p className="text-xs text-content-muted mt-1">{formatLogDate(selectedLog)}</p>
-              </div>
-            </div>
+  // ============================================
+  // FULL MODE RENDER
+  // ============================================
+  return (
+    <div className="flex flex-col h-full bg-slate-950 text-white overflow-hidden relative font-sans">
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-surface-muted/50 rounded-lg border border-edge">
-                <p className="text-xs font-semibold text-content-muted uppercase mb-1">Module</p>
-                <p className="text-sm font-medium text-content-primary flex items-center gap-2">
-                   {selectedLog.module || 'N/A'}
-                </p>
-              </div>
-              <div className="p-3 bg-surface-muted/50 rounded-lg border border-edge">
-                <p className="text-xs font-semibold text-content-muted uppercase mb-1">IP</p>
-                <p className="text-sm font-medium text-content-primary font-mono">{selectedLog.ip_address || 'N/A'}</p>
-              </div>
-            </div>
+      {/* 1. TOOLBAR */}
+      <div className="h-16 px-4 border-b border-slate-800 flex items-center gap-3 bg-slate-900/50 flex-none">
 
-            <div className="p-3 bg-surface-muted/50 rounded-lg border border-edge">
-               <p className="text-xs font-semibold text-content-muted uppercase mb-1">Action</p>
-               <p className="text-sm text-content-primary">{selectedLog.action}</p>
-            </div>
+         <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <input
+              className="w-full h-10 bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 text-sm focus:border-indigo-500 outline-none transition-all placeholder-slate-600 text-slate-200"
+              placeholder="Rechercher par ID, User ou Action..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+         </div>
 
-            <div>
-              <p className="text-xs font-semibold text-content-muted uppercase mb-2">Détails techniques</p>
-              <div className="bg-surface-base p-3 rounded-lg border border-edge overflow-x-auto">
-                <pre className="text-xs text-content-secondary font-mono whitespace-pre-wrap break-all">
-                  {typeof selectedLog.details === 'object' ? JSON.stringify(selectedLog.details, null, 2) : selectedLog.details}
-                </pre>
-              </div>
-            </div>
-            
-            {selectedLog.metadata && (
-              <div>
-                <p className="text-xs font-semibold text-content-muted uppercase mb-2">Métadonnées</p>
-                <div className="bg-surface-base p-3 rounded-lg border border-edge overflow-x-auto">
-                  <pre className="text-xs text-content-secondary font-mono">
-                    {JSON.stringify(selectedLog.metadata, null, 2)}
-                  </pre>
+         <div className="flex items-center gap-2">
+            <button className="h-10 px-4 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white flex items-center gap-2 transition-colors">
+               <Calendar size={16} /> <span className="hidden md:inline">Date</span>
+            </button>
+            <select
+               className="h-10 bg-slate-900 border border-slate-700 rounded-lg px-3 text-sm text-slate-300 outline-none focus:border-indigo-500 cursor-pointer"
+               value={limit}
+               onChange={(e) => setLimit(Number(e.target.value))}
+            >
+               <option value={10}>10 lignes</option>
+               <option value={15}>15 lignes</option>
+               <option value={20}>20 lignes</option>
+               <option value={50}>50 lignes</option>
+            </select>
+            <button
+                className="h-10 px-4 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-emerald-400 hover:border-emerald-500/50 flex items-center gap-2 transition-colors ml-auto"
+                title="Exporter CSV"
+            >
+                <Download size={16} /> <span className="hidden md:inline">Export</span>
+            </button>
+            <button
+                onClick={fetchLogs}
+                className="h-10 w-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white shadow-lg shadow-indigo-900/20 transition-all"
+            >
+               <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            </button>
+         </div>
+      </div>
+
+      {/* 2. TABLE AREA */}
+      <div className="flex-1 overflow-hidden relative flex flex-col">
+         <div className="flex items-center px-4 py-3 bg-slate-900 border-b border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">
+            <div className="w-40">Date & Heure</div>
+            <div className="w-48">Utilisateur</div>
+            <div className="w-32 hidden md:block">Module</div>
+            <div className="flex-1">Action</div>
+            <div className="w-20 text-right">Détails</div>
+         </div>
+
+         <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {logs.map((log) => (
+               <div
+                 key={log.id}
+                 onClick={() => setSelectedLog(log)}
+                 className={`flex items-center px-4 py-2.5 border-b border-slate-800/50 hover:bg-slate-800/50 cursor-pointer transition-colors group text-sm ${selectedLog?.id === log.id ? 'bg-indigo-500/10' : ''}`}
+               >
+                  <div className="w-40 font-mono text-slate-400 text-xs">{log.date}</div>
+
+                  <div className="w-48 flex items-center gap-2">
+                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${log.user === 'Système' ? 'bg-slate-700 text-slate-300' : 'bg-indigo-600 text-white'}`}>
+                        {log.user.charAt(0)}
+                     </div>
+                     <span className="truncate text-slate-200">{log.user}</span>
+                  </div>
+
+                  <div className="w-32 hidden md:block">
+                     <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-700 text-slate-400 font-mono">
+                        {(log.module || '').toUpperCase()}
+                     </span>
+                  </div>
+
+                  <div className="flex-1">
+                     <ActionBadge action={log.action} />
+                  </div>
+
+                  <div className="w-20 text-right">
+                     <button className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded transition-colors">
+                        <Eye size={16} />
+                     </button>
+                  </div>
+               </div>
+            ))}
+
+            {!loading && logs.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                    <Terminal size={32} className="opacity-20 mb-2" />
+                    <p className="text-sm">Aucun log trouvé</p>
                 </div>
-              </div>
             )}
 
-            <div className="flex justify-end pt-2">
-              <Button variant="secondary" onClick={() => setSelectedLog(null)}>
-                Fermer
-              </Button>
+            {loading && (
+                <div className="absolute inset-0 bg-slate-950/50 flex items-center justify-center backdrop-blur-sm z-10">
+                    <div className="animate-spin text-indigo-500">
+                        <RefreshCw size={32} />
+                    </div>
+                </div>
+            )}
+         </div>
+      </div>
+
+      {/* 3. FOOTER PAGINATION */}
+      <div className="h-14 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-4 flex-none z-10">
+         <div className="text-xs text-slate-500">
+            Affichage <span className="text-white font-medium">{logs.length > 0 ? 1 + (page-1)*limit : 0}</span> à <span className="text-white font-medium">{Math.min(page*limit, total)}</span> sur <span className="text-white font-medium">{total}</span>
+         </div>
+
+         <div className="flex items-center gap-1">
+            <button
+               disabled={page === 1}
+               onClick={() => setPage(p => Math.max(1, p - 1))}
+               className="p-2 rounded-lg border border-slate-700 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-slate-300"
+            >
+               <ChevronLeft size={16} />
+            </button>
+            <div className="px-4 text-sm font-mono text-slate-300">
+               Page {page} / {totalPages}
             </div>
-          </div>
-        </Modal>
+            <button
+               disabled={page >= totalPages}
+               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+               className="p-2 rounded-lg border border-slate-700 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-slate-300"
+            >
+               <ChevronRight size={16} />
+            </button>
+         </div>
+      </div>
+
+      {/* 4. DETAIL DRAWER */}
+      {selectedLog && (
+         <>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-40 animate-in fade-in" onClick={() => setSelectedLog(null)} />
+            <div className="absolute top-0 right-0 h-full w-full md:w-[450px] bg-slate-900 border-l border-slate-800 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+               <div className="h-16 px-6 border-b border-slate-800 flex items-center justify-between shrink-0">
+                  <h3 className="font-bold text-white flex items-center gap-2">
+                     <Terminal size={18} className="text-indigo-400"/> Détails Techniques
+                  </h3>
+                  <button onClick={() => setSelectedLog(null)} className="text-slate-400 hover:text-white transition-colors">
+                    <div className="p-1 hover:bg-slate-800 rounded">
+                        <ChevronRight size={20} />
+                    </div>
+                  </button>
+               </div>
+               <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Metadata */}
+                  <div className="grid grid-cols-2 gap-4">
+                     <DetailItem label="ID Event" value={selectedLog.id} />
+                     <DetailItem label="Timestamp" value={selectedLog.date} />
+                     <DetailItem label="Module" value={selectedLog.module} />
+                     <DetailItem label="Action" value={selectedLog.action} />
+                  </div>
+
+                  {/* User Info */}
+                   <div>
+                     <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Acteur</label>
+                     <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedLog.user === 'Système' ? 'bg-slate-700 text-slate-300' : 'bg-indigo-600 text-white'}`}>
+                            {selectedLog.user.charAt(0)}
+                        </div>
+                        <div>
+                            <div className="text-sm font-medium text-white">{selectedLog.user}</div>
+                            <div className="text-xs text-slate-400">User Agent Details below</div>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* JSON Payload */}
+                  <div>
+                     <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Payload JSON</label>
+                     <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-x-auto relative group-code">
+                        <pre className="text-xs font-mono text-emerald-400">
+                            {JSON.stringify(selectedLog.details, null, 2)}
+                        </pre>
+                     </div>
+                  </div>
+
+                  {/* Additional Technical Info */}
+                   <div>
+                     <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Headers & Context</label>
+                     <div className="grid grid-cols-1 gap-2">
+                        {selectedLog.userAgent && (
+                            <div className="p-2 bg-slate-800/30 rounded border border-slate-700/50 flex flex-col gap-1">
+                                <span className="text-xs text-slate-500">User Agent</span>
+                                <span className="text-xs text-slate-300 font-mono break-all">{selectedLog.userAgent}</span>
+                            </div>
+                        )}
+                        {selectedLog.ip && (
+                            <div className="p-2 bg-slate-800/30 rounded border border-slate-700/50 flex justify-between">
+                                <span className="text-xs text-slate-500">IP Address</span>
+                                <span className="text-xs text-slate-300 font-mono">{selectedLog.ip}</span>
+                            </div>
+                         )}
+                     </div>
+                  </div>
+               </div>
+
+               {/* Drawer Footer */}
+               <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end gap-2 shrink-0">
+                    <button onClick={() => setSelectedLog(null)} className="px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors">Fermer</button>
+               </div>
+            </div>
+         </>
       )}
+
     </div>
   );
 }
 
+// --- Sub-Components ---
+
+function ActionBadge({ action }: { action: string }) {
+   const colors: Record<string, string> = {
+      LOGIN: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      LOGOUT: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+      CREATE_COMPTE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      RETRAIT_COMPTE: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+      UPDATE: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      DELETE: 'bg-red-500/10 text-red-400 border-red-500/20',
+      DEFAULT: 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+   };
+
+   let color = colors.DEFAULT;
+   if (colors[action]) color = colors[action];
+   else if (action.includes('CREATE') || action.includes('ADD')) color = colors.CREATE_COMPTE;
+   else if (action.includes('DELETE') || action.includes('REMOVE')) color = colors.DELETE;
+   else if (action.includes('UPDATE') || action.includes('EDIT')) color = colors.UPDATE;
+
+   return (
+      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${color} inline-block`}>
+         {action}
+      </span>
+   )
+}
+
+function DetailItem({ label, value }: { label: string, value: string }) {
+   return (
+      <div>
+         <div className="text-[10px] text-slate-500 uppercase font-bold mb-1">{label}</div>
+         <div className="text-sm text-slate-200 font-mono truncate p-2 bg-slate-800/30 rounded border border-slate-700/30 select-all">
+            {value}
+        </div>
+      </div>
+   )
+}

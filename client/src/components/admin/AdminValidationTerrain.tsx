@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { CheckCircle, XCircle, Search, Clock, DollarSign, User, AlertCircle, RefreshCw, MapPin, Smartphone, CreditCard, Hash, Calendar, Building2 } from 'lucide-react';
-import { Button, Modal, FormField, ResponsiveTable, Badge, Card } from '../ui';
+import React, { useState, useCallback, useMemo } from 'react';
+import { CheckCircle, XCircle, Search, Clock, DollarSign, User, AlertCircle, RefreshCw, MapPin, Smartphone, CreditCard, Hash, Calendar, Building2, CheckSquare, Square, MinusSquare, Loader2, FileImage, Eye } from 'lucide-react';
+import { Button, Modal, FormField, ResponsiveTable, Badge, Card, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -8,6 +8,10 @@ import { toast } from 'sonner';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole } from '@shared/types/roles';
 import { requestAllPages } from '../../lib/api-client';
+import DocumentPreviewModal from '../ui/DocumentPreviewModal';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { useBulkSelection, useBulkAction } from '../../hooks/admin/useBulkSelection';
 
 interface PaiementTerrain {
   id: string;
@@ -42,7 +46,7 @@ export default function AdminValidationTerrain() {
   const [page, setPage] = useState(1);
   const [selectedAgenceId, setSelectedAgenceId] = useState<string | null>(null);
   const itemsPerPage = 10;
-  
+
   // Reject Modal
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaiementTerrain | null>(null);
@@ -51,6 +55,17 @@ export default function AdminValidationTerrain() {
   // Detail Modal
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailPayment, setDetailPayment] = useState<PaiementTerrain | null>(null);
+
+  // Document Preview Modal
+  const [showDocPreview, setShowDocPreview] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string; url?: string } | null>(null);
+
+  // Confirm dialog
+  const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
+
+  // Bulk action state
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
 
   const handleRowClick = (payment: PaiementTerrain) => {
     setDetailPayment(payment);
@@ -104,6 +119,18 @@ export default function AdminValidationTerrain() {
     },
     staleTime: 60000, // 1 minute (invalidated by WS anyway)
   });
+
+  // Bulk selection - needs to be after query so we have items
+  const payments: PaiementTerrain[] = paymentsResponse?.data || [];
+  const {
+    selectedIds,
+    isAllSelected,
+    isPartiallySelected,
+    toggle: toggleSelect,
+    toggleAll: toggleSelectAll,
+    clearSelection,
+    selectedCount,
+  } = useBulkSelection<PaiementTerrain>({ items: payments });
 
   const handleValidate = async (id: string) => {
     setProcessingId(id);
@@ -161,6 +188,113 @@ export default function AdminValidationTerrain() {
     }
   };
 
+  // Bulk validate all selected payments
+  const handleBulkValidate = useCallback(() => {
+    const selected = Array.from(selectedIds);
+    if (selected.length === 0) return;
+
+    openConfirm({
+      title: `Valider ${selected.length} paiement(s) ?`,
+      message: `Voulez-vous vraiment valider ${selected.length} paiement(s) sélectionné(s) ?`,
+      variant: 'success',
+      confirmText: 'Valider tout',
+      onConfirm: async () => {
+        setBulkProcessing(true);
+        setBulkProgress({ current: 0, total: selected.length });
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < selected.length; i++) {
+          try {
+            const response = await fetch(`/api/paiements-terrain/${selected[i]}/validate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            if (response.ok) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          } catch {
+            failCount++;
+          }
+          setBulkProgress({ current: i + 1, total: selected.length });
+        }
+
+        setBulkProcessing(false);
+        setBulkProgress(null);
+        clearSelection();
+        queryClient.invalidateQueries({ queryKey: ['/api/paiements-terrain'] });
+
+        if (failCount === 0) {
+          toast.success(`${successCount} paiement(s) validé(s) avec succès`);
+        } else {
+          toast.warning(`${successCount} validé(s), ${failCount} échoué(s)`);
+        }
+      },
+    });
+  }, [selectedIds, openConfirm, clearSelection, queryClient]);
+
+  // Bulk reject all selected payments
+  const handleBulkReject = useCallback(() => {
+    const selected = Array.from(selectedIds);
+    if (selected.length === 0) return;
+
+    openConfirm({
+      title: `Rejeter ${selected.length} paiement(s) ?`,
+      message: `Voulez-vous vraiment rejeter ${selected.length} paiement(s) sélectionné(s) ?`,
+      variant: 'danger',
+      confirmText: 'Rejeter tout',
+      onConfirm: async () => {
+        setBulkProcessing(true);
+        setBulkProgress({ current: 0, total: selected.length });
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < selected.length; i++) {
+          try {
+            const response = await fetch(`/api/paiements-terrain/${selected[i]}/reject`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reason: 'Rejet en masse' })
+            });
+            if (response.ok) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          } catch {
+            failCount++;
+          }
+          setBulkProgress({ current: i + 1, total: selected.length });
+        }
+
+        setBulkProcessing(false);
+        setBulkProgress(null);
+        clearSelection();
+        queryClient.invalidateQueries({ queryKey: ['/api/paiements-terrain'] });
+
+        if (failCount === 0) {
+          toast.success(`${successCount} paiement(s) rejeté(s)`);
+        } else {
+          toast.warning(`${successCount} rejeté(s), ${failCount} échoué(s)`);
+        }
+      },
+    });
+  }, [selectedIds, openConfirm, clearSelection, queryClient]);
+
+  // Open document preview
+  const handlePreviewDocument = useCallback((payment: PaiementTerrain) => {
+    if (payment.clients?.photoProfile) {
+      setPreviewDoc({
+        id: payment.clientId,
+        name: `Photo client - ${payment.clients.nom} ${payment.clients.prenom}`,
+        url: payment.clients.photoProfile,
+      });
+      setShowDocPreview(true);
+    }
+  }, []);
+
   const allPayments = paymentsResponse?.data || [];
   const isSearching = searchTerm.trim().length > 0;
   const filteredData = isSearching
@@ -185,45 +319,86 @@ export default function AdminValidationTerrain() {
     ? filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage)
     : filteredData;
 
-  const columns = [
-    { 
-      key: 'montant', 
-      label: 'Montant', 
+  const columns = useMemo(() => [
+    {
+      key: 'select',
+      label: '',
+      format: (_: any, item: PaiementTerrain) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSelect(item.id, paginatedData);
+          }}
+          className="p-1 text-slate-400 hover:text-primary transition"
+        >
+          {selectedIds.has(item.id) ? (
+            <CheckSquare size={18} className="text-primary" />
+          ) : (
+            <Square size={18} />
+          )}
+        </button>
+      ),
+      width: '40px',
+    },
+    {
+      key: 'montant',
+      label: 'Montant',
       primary: true,
       format: (val: string) => (
         <span className="font-bold text-emerald-600 dark:text-emerald-400">
           {parseFloat(val).toLocaleString()} FCFA
         </span>
       ),
-      icon: DollarSign 
+      icon: DollarSign
     },
-    { 
-      key: 'typePaiement', 
+    {
+      key: 'typePaiement',
       label: 'Type',
       badge: true
     },
-    { 
-      key: 'client', 
+    {
+      key: 'client',
       label: 'Client',
       format: (_: any, item: PaiementTerrain) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'}</span>
-          <span className="text-xs text-slate-500">{item.clients?.telephone || ''}</span>
+        <div className="flex items-center gap-2">
+          {item.clients?.photoProfile && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePreviewDocument(item);
+              }}
+              className="relative group"
+              title="Voir la photo"
+            >
+              <img
+                src={item.clients.photoProfile}
+                alt=""
+                className="w-8 h-8 rounded-full object-cover border border-slate-300 dark:border-slate-600"
+              />
+              <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                <Eye size={12} className="text-white" />
+              </div>
+            </button>
+          )}
+          <div className="flex flex-col">
+            <span className="font-medium">{item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'}</span>
+            <span className="text-xs text-slate-500">{item.clients?.telephone || ''}</span>
+          </div>
         </div>
       ),
       icon: User
     },
-    { 
-      key: 'agent', 
+    {
+      key: 'agent',
       label: 'Agent',
       format: (_: any, item: PaiementTerrain) => (
         <span className="text-sm">{item.agents_terrain ? `${item.agents_terrain.nom} ${item.agents_terrain.prenom}` : 'Inconnu'}</span>
       ),
       hideOnMobile: true
     },
-    { 
-      key: 'createdAt', 
-      label: 'Date', 
+    {
+      key: 'createdAt',
+      label: 'Date',
       format: (date: string) => (
         <div className="flex flex-col text-xs">
           <span className="font-medium">{format(new Date(date), 'dd MMM yyyy', { locale: fr })}</span>
@@ -247,21 +422,17 @@ export default function AdminValidationTerrain() {
        },
        hideOnMobile: true
     }
-  ];
+  ], [selectedIds, paginatedData, toggleSelect, handlePreviewDocument]);
 
   return (
     <div className="space-y-6">
-       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-         <div>
-           <div className="flex items-center gap-2">
-             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Validations Terrain</h2>
-             <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-xs font-medium border border-amber-500/20">
-               {totalItems} en attente
-             </span>
-           </div>
-           <p className="text-slate-500 text-sm">Valider les transactions collectées par les agents en temps réel</p>
-         </div>
-         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+       <FeatureHeader
+         featureKey="admin.validation-terrain"
+         title={`${FEATURE_DESCRIPTIONS['admin.validation-terrain'].title}`}
+         subtitle={`${FEATURE_DESCRIPTIONS['admin.validation-terrain'].subtitle} (${totalItems} en attente)`}
+         helpText={FEATURE_DESCRIPTIONS['admin.validation-terrain'].helpText}
+         actions={
+           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
              {/* Agency Selector (Admin only) */}
              {isAdmin && (
                <div className="relative">
@@ -296,16 +467,87 @@ export default function AdminValidationTerrain() {
                   className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/50 outline-none transition-all"
                 />
              </div>
-             <Button 
-                variant="ghost" 
+             <Button
+                variant="ghost"
                 size="sm"
-                icon={RefreshCw} 
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/paiements-terrain'] })} 
+                icon={RefreshCw}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/paiements-terrain'] })}
                 className={isRefetching ? "animate-spin" : ""}
                 title="Actualiser"
              />
+           </div>
+         }
+       />
+
+       {/* Bulk Operations Toolbar */}
+       {selectedCount > 0 && (
+         <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-xl p-3 flex flex-wrap items-center gap-4">
+           <button
+             onClick={() => toggleSelectAll(paginatedData)}
+             className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-700/50 transition"
+           >
+             {isAllSelected ? (
+               <CheckSquare size={18} className="text-primary" />
+             ) : isPartiallySelected ? (
+               <MinusSquare size={18} className="text-primary" />
+             ) : (
+               <Square size={18} className="text-slate-400" />
+             )}
+             <span className="text-sm text-slate-300">
+               {isAllSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+             </span>
+           </button>
+
+           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 rounded-lg">
+             <span className="text-sm font-medium text-white">{selectedCount}</span>
+             <span className="text-sm text-slate-400">sélectionné(s)</span>
+           </div>
+
+           {bulkProcessing && bulkProgress && (
+             <div className="flex items-center gap-3 px-4 py-2 bg-indigo-600/20 rounded-lg border border-indigo-500/30">
+               <Loader2 className="animate-spin text-indigo-400" size={16} />
+               <div className="text-sm">
+                 <span className="text-white font-medium">{bulkProgress.current}</span>
+                 <span className="text-slate-400"> / {bulkProgress.total}</span>
+               </div>
+               <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+                 <div
+                   className="h-full bg-indigo-500 transition-all duration-300"
+                   style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                 />
+               </div>
+             </div>
+           )}
+
+           {!bulkProcessing && (
+             <>
+               <div className="flex-1" />
+               <Button
+                 variant="danger"
+                 size="sm"
+                 onClick={handleBulkReject}
+                 icon={XCircle}
+               >
+                 Rejeter ({selectedCount})
+               </Button>
+               <Button
+                 variant="success"
+                 size="sm"
+                 onClick={handleBulkValidate}
+                 icon={CheckCircle}
+               >
+                 Valider ({selectedCount})
+               </Button>
+               <button
+                 onClick={clearSelection}
+                 className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition"
+               >
+                 Effacer
+               </button>
+             </>
+           )}
          </div>
-       </div>
+       )}
 
        <Card padding="none" className="overflow-hidden">
          <ResponsiveTable
@@ -531,9 +773,9 @@ export default function AdminValidationTerrain() {
                        </p>
                    </div>
                </div>
-               <FormField 
-                   label="Motif du rejet" 
-                   name="reason" 
+               <FormField
+                   label="Motif du rejet"
+                   name="reason"
                    value={rejectReason}
                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRejectReason(e.target.value)}
                    placeholder="Raison du rejet (ex: Montant incorrect)..."
@@ -541,6 +783,32 @@ export default function AdminValidationTerrain() {
                />
            </div>
        </Modal>
+
+       {/* Document Preview Modal */}
+       {previewDoc && (
+         <DocumentPreviewModal
+           isOpen={showDocPreview}
+           onClose={() => {
+             setShowDocPreview(false);
+             setPreviewDoc(null);
+           }}
+           documentId={previewDoc.id}
+           documentName={previewDoc.name}
+           preloadedUrl={previewDoc.url}
+           preloadedMimeType="image/jpeg"
+         />
+       )}
+
+       {/* Confirm Dialog for Bulk Operations */}
+       <ConfirmDialog
+         isOpen={confirmState.isOpen}
+         onClose={closeConfirm}
+         onConfirm={handleConfirm}
+         title={confirmState.title || ''}
+         message={confirmState.message || ''}
+         variant={confirmState.variant}
+         confirmText={confirmState.confirmText}
+       />
     </div>
   );
 }

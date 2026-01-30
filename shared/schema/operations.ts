@@ -528,13 +528,6 @@ export type CaisseUserAuthorization = typeof caisseUserAuthorizations.$inferSele
 export const insertCaisseUserAuthorizationSchema = createInsertSchema(caisseUserAuthorizations).omit({ id: true, createdAt: true, grantedAt: true });
 export type InsertCaisseUserAuthorization = z.infer<typeof insertCaisseUserAuthorizationSchema>;
 
-// Code Generation Permissions
-export const codeGenerationPermissions = pgTable("code_generation_permissions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  managerId: uuid("manager_id").references(() => users.id),
-  canGenerate: boolean("can_generate").default(false),
-});
-
 // POS Devices
 export const posDevices = pgTable("pos_devices", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -637,7 +630,7 @@ export type LigneFacture = typeof lignesFactures.$inferSelect;
 export const comptageBillets = pgTable("comptage_billets", {
   id: uuid("id").primaryKey().defaultRandom(),
   sessionId: uuid("session_id").notNull().references(() => sessionsCaisse.id),
-  typeComptage: text("type_comptage").notNull(), 
+  typeComptage: text("type_comptage").notNull(),
   billets10000: integer("billets_10000").default(0),
   billets5000: integer("billets_5000").default(0),
   billets2000: integer("billets_2000").default(0),
@@ -653,11 +646,35 @@ export const comptageBillets = pgTable("comptage_billets", {
   validePar: uuid("valide_par").references(() => users.id),
   dateValidation: timestamp("date_validation"),
   observations: text("observations"),
+  // Dual count verification columns
+  compteurId: uuid("compteur_id").references(() => users.id),
+  verificateurId: uuid("verificateur_id").references(() => users.id),
+  verificationBilletage: jsonb("verification_billetage").$type<Record<string, number>>(),
+  verificationTotal: numeric("verification_total"),
+  ecartVerification: numeric("ecart_verification"),
+  dualCountRequired: boolean("dual_count_required").default(false),
+  dualCountCompleted: boolean("dual_count_completed").default(false),
+  verificationSubmittedAt: timestamp("verification_submitted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertComptageBilletsSchema = createInsertSchema(comptageBillets).omit({ id: true, createdAt: true });
 export type InsertComptageBillets = z.infer<typeof insertComptageBilletsSchema>;
 export type ComptageBillets = typeof comptageBillets.$inferSelect;
+
+// Configuration du comptage à deux par agence
+export const dualCountConfig = pgTable("dual_count_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  thresholdMontant: numeric("threshold_montant").default("1000000"),
+  alwaysRequiredForClosing: boolean("always_required_for_closing").default(true),
+  requireDifferentUser: boolean("require_different_user").default(true),
+  maxEcartTolerance: numeric("max_ecart_tolerance").default("100"),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type DualCountConfig = typeof dualCountConfig.$inferSelect;
+export type InsertDualCountConfig = typeof dualCountConfig.$inferInsert;
 
 // Zones
 export const zones = pgTable("zones", {

@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, LogOut, ChevronDown, Activity, Building2 } from 'lucide-react';
+import { User, LogOut, ChevronDown, Activity, Building2, Shield } from 'lucide-react';
 import { getRoleLabel } from '@shared/types/roles';
 import { resolveStorageUrl } from '../../lib/format';
 
@@ -15,38 +15,143 @@ interface UserProfileDropdownProps {
   };
   onProfileClick: () => void;
   onActivityClick?: () => void;
+  onSessionsClick?: () => void;
   onLogout: () => void;
   className?: string;
 }
 
-// Composant MenuItem réutilisable
+// Composant MenuItem réutilisable avec forward ref
 interface MenuItemProps {
   icon: React.ElementType;
   label: string;
   onClick: () => void;
+  isActive?: boolean;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ icon: Icon, label, onClick }) => (
-  <button
-    onClick={onClick}
-    className="w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer group"
-  >
-    <Icon size={18} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
-    <span className="group-hover:text-white transition-colors">{label}</span>
-  </button>
+const MenuItem = React.forwardRef<HTMLButtonElement, MenuItemProps>(
+  ({ icon: Icon, label, onClick, isActive }, ref) => (
+    <button
+      ref={ref}
+      onClick={onClick}
+      role="menuitem"
+      tabIndex={isActive ? 0 : -1}
+      className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer group outline-none focus:ring-2 focus:ring-indigo-500/50 ${isActive ? 'bg-slate-800/50 ring-1 ring-indigo-500/50' : ''}`}
+    >
+      <Icon size={18} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
+      <span className="group-hover:text-white transition-colors">{label}</span>
+    </button>
+  )
 );
+MenuItem.displayName = 'MenuItem';
+
+// Skeleton loading pour la photo
+const PhotoSkeleton: React.FC<{ size: 'sm' | 'lg' }> = ({ size }) => (
+  <div
+    className={`${size === 'sm' ? 'w-8 h-8' : 'w-12 h-12'} rounded-full bg-slate-700 animate-pulse`}
+  />
+);
+
+// Composant Avatar avec gestion d'erreur et skeleton
+interface AvatarProps {
+  photoUrl?: string;
+  fullName: string;
+  initials: string;
+  size: 'sm' | 'lg';
+  className?: string;
+}
+
+const Avatar: React.FC<AvatarProps> = ({ photoUrl, fullName, initials, size, className = '' }) => {
+  const [imageState, setImageState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const resolvedUrl = photoUrl ? resolveStorageUrl(photoUrl) : null;
+
+  // Précharger et vérifier l'état de l'image
+  useEffect(() => {
+    if (!resolvedUrl) {
+      setImageState('idle');
+      return;
+    }
+
+    // Vérifier si l'image est déjà en cache
+    const img = new Image();
+    img.src = resolvedUrl;
+
+    if (img.complete && img.naturalWidth > 0) {
+      // Image déjà en cache - afficher immédiatement
+      setImageState('loaded');
+    } else {
+      // Image pas en cache - afficher skeleton
+      setImageState('loading');
+
+      img.onload = () => setImageState('loaded');
+      img.onerror = () => setImageState('error');
+    }
+
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [resolvedUrl]);
+
+  const sizeClasses = size === 'sm'
+    ? 'w-8 h-8 text-sm'
+    : 'w-12 h-12 text-lg';
+
+  const borderClasses = size === 'sm'
+    ? 'border-2 border-slate-700'
+    : 'border-2 border-slate-600';
+
+  // Fallback vers initiales si pas d'URL ou erreur
+  if (!resolvedUrl || imageState === 'error') {
+    return (
+      <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
+        {initials}
+      </div>
+    );
+  }
+
+  // Skeleton pendant le chargement
+  if (imageState === 'loading' || imageState === 'idle') {
+    return <PhotoSkeleton size={size} />;
+  }
+
+  // Image chargée
+  return (
+    <img
+      ref={imgRef}
+      src={resolvedUrl}
+      alt={fullName}
+      className={`${sizeClasses} rounded-full object-cover ${borderClasses} ${className}`}
+      onError={() => setImageState('error')}
+    />
+  );
+};
 
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   user,
   onProfileClick,
   onActivityClick,
+  onSessionsClick,
   onLogout,
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const [activeIndex, setActiveIndex] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Refs for menu items for focus management
+  const menuItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Build menu items array
+  const menuItems = [
+    { id: 'profile', label: 'Mon Profil', icon: User, onClick: onProfileClick },
+    ...(onSessionsClick ? [{ id: 'sessions', label: 'Sessions actives', icon: Shield, onClick: onSessionsClick }] : []),
+    ...(onActivityClick ? [{ id: 'activity', label: "Journal d'activité", icon: Activity, onClick: onActivityClick }] : []),
+  ];
+  const totalItems = menuItems.length + 1; // +1 for logout button
 
   // Calculer la position du menu
   const updateMenuPosition = () => {
@@ -92,16 +197,71 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  // Gestion de la touche Escape
+  // Gestion clavier: Escape, flèches haut/bas, Tab (focus trap)
   useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        setIsOpen(false);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      switch (event.key) {
+        case 'Escape':
+          event.preventDefault();
+          setIsOpen(false);
+          triggerRef.current?.focus();
+          break;
+
+        case 'ArrowDown':
+          event.preventDefault();
+          setActiveIndex(prev => (prev + 1) % totalItems);
+          break;
+
+        case 'ArrowUp':
+          event.preventDefault();
+          setActiveIndex(prev => (prev - 1 + totalItems) % totalItems);
+          break;
+
+        case 'Tab':
+          // Focus trap: prevent tab from leaving the menu
+          event.preventDefault();
+          if (event.shiftKey) {
+            setActiveIndex(prev => (prev - 1 + totalItems) % totalItems);
+          } else {
+            setActiveIndex(prev => (prev + 1) % totalItems);
+          }
+          break;
+
+        case 'Enter':
+        case ' ':
+          // Let the active button handle this
+          break;
+
+        case 'Home':
+          event.preventDefault();
+          setActiveIndex(0);
+          break;
+
+        case 'End':
+          event.preventDefault();
+          setActiveIndex(totalItems - 1);
+          break;
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, totalItems]);
+
+  // Focus management: focus active item when activeIndex changes
+  useEffect(() => {
+    if (isOpen && menuItemRefs.current[activeIndex]) {
+      menuItemRefs.current[activeIndex]?.focus();
+    }
+  }, [activeIndex, isOpen]);
+
+  // Reset active index when opening menu
+  useEffect(() => {
+    if (isOpen) {
+      setActiveIndex(0);
+    }
   }, [isOpen]);
 
   // Génération des initiales
@@ -131,18 +291,13 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
       {/* ZONE 1: HEADER IDENTITÉ */}
       <div className="p-4 bg-slate-800/50 border-b border-slate-700">
         <div className="flex items-center gap-4">
-          {/* Avatar plus grand */}
-          {user?.photoProfile ? (
-            <img
-              src={resolveStorageUrl(user.photoProfile)}
-              alt={fullName}
-              className="w-12 h-12 rounded-full object-cover border-2 border-slate-600"
-            />
-          ) : (
-            <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-lg border border-indigo-500/30">
-              {getInitials()}
-            </div>
-          )}
+          {/* Avatar plus grand avec skeleton et gestion d'erreur */}
+          <Avatar
+            photoUrl={user?.photoProfile}
+            fullName={fullName}
+            initials={getInitials()}
+            size="lg"
+          />
 
           <div className="flex-1 min-w-0">
             {/* Nom complet */}
@@ -171,35 +326,32 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
 
       {/* ZONE 2: NAVIGATION */}
       <div className="p-2 space-y-1">
-        <MenuItem
-          icon={User}
-          label="Mon Profil"
-          onClick={() => {
-            setIsOpen(false);
-            onProfileClick();
-          }}
-        />
-        {onActivityClick && (
+        {menuItems.map((item, index) => (
           <MenuItem
-            icon={Activity}
-            label="Journal d'activité"
+            key={item.id}
+            ref={el => { menuItemRefs.current[index] = el; }}
+            icon={item.icon}
+            label={item.label}
+            isActive={activeIndex === index}
             onClick={() => {
               setIsOpen(false);
-              onActivityClick();
+              item.onClick();
             }}
           />
-        )}
+        ))}
       </div>
 
       {/* ZONE 3: FOOTER */}
       <div className="p-2 border-t border-slate-800">
         <button
+          ref={el => { menuItemRefs.current[menuItems.length] = el; }}
           onClick={() => {
             setIsOpen(false);
             onLogout();
           }}
-          className="w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors group"
+          className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors group ${activeIndex === menuItems.length ? 'bg-rose-500/10 ring-1 ring-rose-500/50 text-rose-400' : ''}`}
           role="menuitem"
+          tabIndex={activeIndex === menuItems.length ? 0 : -1}
         >
           <LogOut size={16} className="group-hover:text-rose-400 transition-colors" />
           <span>Déconnexion</span>
@@ -220,18 +372,13 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
         aria-haspopup="true"
       >
         <div className="relative">
-          {/* Avatar */}
-          {user?.photoProfile ? (
-            <img
-              src={resolveStorageUrl(user.photoProfile)}
-              alt={fullName}
-              className="w-8 h-8 rounded-full object-cover border-2 border-slate-700"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold border-2 border-slate-700">
-              {getInitials()}
-            </div>
-          )}
+          {/* Avatar avec skeleton et gestion d'erreur */}
+          <Avatar
+            photoUrl={user?.photoProfile}
+            fullName={fullName}
+            initials={getInitials()}
+            size="sm"
+          />
           {/* Indicateur de statut en ligne */}
           <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
         </div>

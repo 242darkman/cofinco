@@ -91,10 +91,11 @@ class AuthService {
 
   /**
    * Authentification utilisateur
+   * @param rememberMe - Si true, crée un refresh token pour session persistante (30 jours)
    */
-  async login(username: string, password: string): Promise<User | null> {
+  async login(username: string, password: string, rememberMe: boolean = false): Promise<User | null> {
     try {
-      const loginResult = await authApi.login(username, password);
+      const loginResult = await authApi.login(username, password, rememberMe);
 
       const user = this.mapAuthUser(loginResult.user);
       this.currentUser = user;
@@ -365,16 +366,63 @@ class AuthService {
   }
 
   /**
+   * Tente de rafraîchir la session via le refresh token (Remember Me)
+   * Utilisé quand la session normale est invalide
+   */
+  async tryRefreshSession(): Promise<boolean> {
+    try {
+      console.log('🔄 Attempting session refresh via remember-me token...');
+
+      const result = await authApi.refreshSession();
+
+      if (result.success && result.user) {
+        const user = this.mapAuthUser(result.user);
+        this.currentUser = user;
+
+        // Appliquer les permissions si incluses
+        if (result.permissions) {
+          this.applyPermissionsData(result.permissions);
+        } else {
+          await this.loadPermissionsFromApi();
+        }
+
+        console.log('✅ Session refreshed successfully via remember-me');
+        return true;
+      }
+
+      console.log('❌ Session refresh failed - no valid refresh token');
+      return false;
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+      return false;
+    }
+  }
+
+  /**
    * Initialiser l'auth au démarrage de l'app
-   * Vérifie si une session valide existe
+   * Vérifie si une session valide existe, sinon tente le refresh token
    */
   async initialize(): Promise<User | null> {
-    const isValid = await this.verifySession();
-    if (isValid) {
+    // D'abord essayer la session normale
+    try {
+      const authUser = await authApi.getMe();
+      const user = this.mapAuthUser(authUser);
+      this.currentUser = user;
+      await this.loadPermissionsFromApi();
       this.startSessionCheck();
       return this.currentUser;
+    } catch (error) {
+      // Session invalide - essayer le refresh token (Remember Me)
+      const refreshed = await this.tryRefreshSession();
+      if (refreshed) {
+        this.startSessionCheck();
+        return this.currentUser;
+      }
+
+      // Pas de session ni refresh token valide
+      this.clearSession();
+      return null;
     }
-    return null;
   }
 
   /**

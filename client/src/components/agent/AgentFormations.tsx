@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, Plus, Award, TrendingUp, CheckCircle, Clock } from 'lucide-react';
+import { GraduationCap, Plus, Award, TrendingUp, CheckCircle, Clock, ExternalLink, Download, Star } from 'lucide-react';
 import { StatutSuiviFormation, STATUT_SUIVI_FORMATION_LABELS } from '@shared/enum/status-constants';
 
 interface Formation {
@@ -31,6 +31,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
   const [suivis, setSuivis] = useState<FormationSuivi[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewFormation, setShowNewFormation] = useState(false);
+  const [completionScore, setCompletionScore] = useState<Record<string, number>>({});
 
   const [newFormation, setNewFormation] = useState({
     titre: '',
@@ -48,7 +49,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
 
   const loadFormations = async () => {
     try {
-      const response = await fetch('/api/agent-formations');
+      const response = await fetch('/api/agent-formations', { credentials: 'include' });
       if (!response.ok) throw new Error('Erreur lors du chargement');
       const data = await response.json();
       setFormations(data || []);
@@ -61,7 +62,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
 
   const loadSuivis = async () => {
     try {
-      const response = await fetch(`/api/agent-formations-suivi?agent_id=${agentId}`);
+      const response = await fetch(`/api/agent-formations-suivi?agent_id=${agentId}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Erreur lors du chargement');
       const data = await response.json();
       setSuivis(data || []);
@@ -78,6 +79,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
       const response = await fetch('/api/agent-formations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(newFormation)
       });
 
@@ -96,7 +98,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
         obligatoire: false
       });
     } catch (error: any) {
-      alert('Erreur: ' + error.error);
+      alert('Erreur: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -112,6 +114,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
       const response = await fetch('/api/agent-formations-suivi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           agent_id: agentId,
           formation_id: formationId,
@@ -127,28 +130,34 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
       }
       loadSuivis();
     } catch (error: any) {
-      alert('Erreur: ' + error.error);
+      alert('Erreur: ' + error.message);
     }
   };
 
-  const updateProgression = async (suiviId: string, progression: number) => {
+  const updateProgression = async (suiviId: string, progression: number, score?: number) => {
     try {
       const statut = progression >= 100 ? 'COMPLETED' : 'IN_PROGRESS';
+
+      const body: Record<string, unknown> = {
+        progression,
+        statut,
+        ...(progression >= 100 && { date_fin: new Date().toISOString().slice(0, 10) }),
+      };
+      if (score !== undefined) {
+        body.score = score;
+      }
 
       const response = await fetch(`/api/agent-formations-suivi/${suiviId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          progression,
-          statut,
-          ...(progression >= 100 && { date_fin: new Date().toISOString().slice(0, 10) })
-        })
+        credentials: 'include',
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) throw new Error('Erreur lors de la mise à jour');
       loadSuivis();
     } catch (error: any) {
-      alert('Erreur: ' + error.error);
+      alert('Erreur: ' + error.message);
     }
   };
 
@@ -253,6 +262,17 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
               </div>
 
               <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">URL du contenu (PDF, vidéo, etc.)</label>
+                <input
+                  type="url"
+                  value={newFormation.contenu_url}
+                  onChange={(e) => setNewFormation({ ...newFormation, contenu_url: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                  placeholder="https://example.com/formation.pdf"
+                />
+              </div>
+
+              <div className="md:col-span-2">
                 <label className="flex items-center gap-2 text-slate-300">
                   <input
                     type="checkbox"
@@ -287,14 +307,38 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
                   <div>
                     <h4 className="text-white font-bold">{suivi.formation?.titre}</h4>
                     <p className="text-slate-400 text-sm">{suivi.formation?.description}</p>
+                    {suivi.formation?.contenu_url && (
+                      <a
+                        href={suivi.formation.contenu_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm mt-1"
+                      >
+                        <ExternalLink size={14} />
+                        Accéder au contenu
+                      </a>
+                    )}
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    suivi.statut === StatutSuiviFormation.COMPLETED ? 'bg-green-500/20 text-green-400' :
-                    suivi.statut === StatutSuiviFormation.IN_PROGRESS ? 'bg-blue-500/20 text-blue-400' :
-                    'bg-slate-500/20 text-slate-400'
-                  }`}>
-                    {STATUT_SUIVI_FORMATION_LABELS[suivi.statut as keyof typeof STATUT_SUIVI_FORMATION_LABELS] || suivi.statut}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {suivi.statut === StatutSuiviFormation.COMPLETED && suivi.certificat_url && (
+                      <a
+                        href={suivi.certificat_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
+                        title="Télécharger le certificat"
+                      >
+                        <Download size={16} />
+                      </a>
+                    )}
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      suivi.statut === StatutSuiviFormation.COMPLETED ? 'bg-green-500/20 text-green-400' :
+                      suivi.statut === StatutSuiviFormation.IN_PROGRESS ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-slate-500/20 text-slate-400'
+                    }`}>
+                      {STATUT_SUIVI_FORMATION_LABELS[suivi.statut as keyof typeof STATUT_SUIVI_FORMATION_LABELS] || suivi.statut}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mb-3">
@@ -310,18 +354,69 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
                   </div>
                 </div>
 
+                {/* Score display for completed formations */}
+                {suivi.statut === StatutSuiviFormation.COMPLETED && suivi.score != null && (
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-slate-600/30 rounded-lg">
+                    <Star size={16} className="text-yellow-400" />
+                    <span className="text-sm text-slate-300">
+                      Score: <span className={`font-bold ${suivi.score >= 70 ? 'text-green-400' : suivi.score >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>{suivi.score}/100</span>
+                    </span>
+                    {suivi.certificat_url && (
+                      <span className="ml-auto flex items-center gap-1 text-green-400 text-xs">
+                        <Award size={14} />
+                        Certifié
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {suivi.statut === StatutSuiviFormation.IN_PROGRESS && (
-                  <div className="flex gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={suivi.progression}
-                      onChange={(e) => updateProgression(suivi.id, Number(e.target.value))}
-                      className="flex-1"
-                    />
-                    {suivi.progression === 100 && (
-                      <Award size={20} className="text-green-400" />
+                  <div className="space-y-3">
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={suivi.progression}
+                        onChange={(e) => {
+                          const prog = Number(e.target.value);
+                          if (prog < 100) {
+                            updateProgression(suivi.id, prog);
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                    </div>
+
+                    {/* Score input + completion button when progression reaches 100 */}
+                    {suivi.progression >= 95 && (
+                      <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-sm text-blue-400 font-semibold mb-2">Terminer la formation</p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <label className="block text-xs text-slate-400 mb-1">Score obtenu (0-100)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={completionScore[suivi.id] ?? ''}
+                              onChange={(e) => setCompletionScore(prev => ({ ...prev, [suivi.id]: Number(e.target.value) }))}
+                              className="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                              placeholder="Score..."
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              const score = completionScore[suivi.id];
+                              updateProgression(suivi.id, 100, score !== undefined ? score : undefined);
+                            }}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2 mt-4"
+                          >
+                            <Award size={16} />
+                            Terminer
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -346,6 +441,19 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
               </div>
               <h4 className="text-lg font-bold text-white mb-2">{formation.titre}</h4>
               <p className="text-slate-300 text-sm mb-4">{formation.description}</p>
+
+              {formation.contenu_url && (
+                <a
+                  href={formation.contenu_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-sm mb-4"
+                >
+                  <ExternalLink size={14} />
+                  Voir le contenu
+                </a>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="text-sm text-slate-400">
                   <span className="text-blue-400">{formation.type_formation}</span> • {formation.duree_heures}h

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Users, DollarSign, Calendar, TrendingUp, Edit2, Trash2, ArrowLeft, Eye, MoreHorizontal, Coins, Target, Clock, Activity, AlertTriangle } from 'lucide-react';
+import { Plus, Users, DollarSign, Calendar, TrendingUp, Edit2, Trash2, ArrowLeft, Eye, MoreHorizontal, Coins, Target, Clock, Activity, AlertTriangle, Download } from 'lucide-react';
 import PageHeader from '../../ui/PageHeader';
+import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import Badge from '../../ui/Badge';
 import Card from '../../ui/Card';
 import StatCard from '../../ui/StatCard';
@@ -12,6 +13,7 @@ import ConfirmDialog from '../../ui/ConfirmDialog';
 import { tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml } from '../../../lib/sanitize';
+import { exportToPDF } from '../../../lib/exportUtils';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
 import TontineForm from './TontineForm';
@@ -130,6 +132,25 @@ export default function Tontines() {
     };
   }, [tontines]);
 
+  // Export tontine summary as PDF
+  const handleExportSummary = useCallback(() => {
+    if (!selectedTontine) return;
+    const t = selectedTontine;
+    const data = [{
+      'Nom': t.nom,
+      'Statut': t.statut,
+      'Fréquence': t.frequence,
+      'Cotisation (FCFA)': (t.montantCotisation || 0).toLocaleString('fr-FR'),
+      'Membres': `${t.nombreMembresActuel || 0} / ${t.nombreMembresMax || t.nombreMembres || 0}`,
+      'Tour actuel': t.tourActuel || 1,
+      'Total collecté (FCFA)': (t.totalCollecte || 0).toLocaleString('fr-FR'),
+      'Date début': new Date(t.dateDebut).toLocaleDateString('fr-FR'),
+      'Créé le': new Date(t.createdAt).toLocaleDateString('fr-FR'),
+    }];
+    const date = new Date().toISOString().slice(0, 10);
+    exportToPDF(data, `tontine-resume-${date}`, `Résumé - ${t.nom}`);
+  }, [selectedTontine]);
+
   const columns = [
     {
       label: 'Tontine',
@@ -230,7 +251,15 @@ export default function Tontines() {
             title={selectedTontine.nom}
             description={selectedTontine.description}
             actions={
-               <Button
+              <div className="flex items-center gap-2">
+                <IconButton
+                  icon={Download}
+                  size="sm"
+                  onClick={handleExportSummary}
+                  aria-label="Exporter le résumé en PDF"
+                  title="Exporter résumé PDF"
+                />
+                <Button
                   variant="ghost"
                   onClick={() => setSelectedTontine(null)}
                   icon={ArrowLeft}
@@ -239,6 +268,7 @@ export default function Tontines() {
                 >
                   Retour
                 </Button>
+              </div>
             }
             className="p-0 m-0"
           />
@@ -343,9 +373,12 @@ export default function Tontines() {
   return (
     <div className="flex flex-col h-full space-y-2">
       <div className="shrink-0">
-          <PageHeader
-            title="Gestion des Tontines"
-            description="Groupes d'épargne collective"
+          <FeatureHeader
+            featureKey="finance.tontines"
+            title={FEATURE_DESCRIPTIONS['finance.tontines'].title}
+            subtitle={FEATURE_DESCRIPTIONS['finance.tontines'].subtitle}
+            helpText={FEATURE_DESCRIPTIONS['finance.tontines'].helpText}
+            icon={<Users size={24} />}
             actions={
               canCreateTontines ? (
                 <Button
@@ -366,7 +399,6 @@ export default function Tontines() {
                 </div>
               )
             }
-            className="mb-2 p-0"
           />
 
           {/* Compact Overview Stats */}

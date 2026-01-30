@@ -1,6 +1,9 @@
 import { db } from "../../../db";
 import { notificationJobs } from "@shared/schema";
 import { sql, eq, gte, and } from "drizzle-orm";
+import { createLogger } from "../../../lib/logger";
+
+const logger = createLogger('NotifAudit');
 
 // ============================================================================
 // TYPES
@@ -88,23 +91,19 @@ export function logNotificationEvent(
       : undefined,
   };
 
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    service: "notification",
-    level,
-    message,
+  const logContext = {
     ...safeContext,
   };
 
   switch (level) {
     case "error":
-      console.error(JSON.stringify(logEntry));
+      logger.error(logContext, message);
       break;
     case "warn":
-      console.warn(JSON.stringify(logEntry));
+      logger.warn(logContext, message);
       break;
     default:
-      console.log(JSON.stringify(logEntry));
+      logger.info(logContext, message);
   }
 }
 

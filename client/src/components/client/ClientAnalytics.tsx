@@ -1,14 +1,12 @@
 import type { ClientWithIdentity } from '@shared/schema';
 import { StatutCompte, StatutCredit } from '@shared/enum/status-constants';
 import React, { useState } from 'react';
-import { DollarSign, Target, Award, CreditCard, Wallet, Users, Activity, TrendingUp, TrendingDown, X, Calendar, ArrowRight } from 'lucide-react';
+import { DollarSign, Target, Award, CreditCard, Wallet, Users, TrendingUp, ArrowRight, BarChart3, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import ClientTags from './ClientTags';
 import { Card, Badge, Skeleton } from '../ui';
 import Modal from '../ui/Modal';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from 'wouter';
-// Removed missing formatMoney import, using toLocaleString instead
 
 interface ClientAnalyticsProps {
   client: ClientWithIdentity;
@@ -61,25 +59,22 @@ const MetricDetailsModal = ({
             // Implementation: I'll use the logic I know exists or generic fetch.
             
             if (type === 'credits') {
-              const res = await fetch(`/api/credits?clientId=${clientId}`);
+              const res = await fetch(`/api/credits?clientId=${clientId}`, { credentials: 'include' });
               if (!res.ok) return [];
-              const all = await res.json();
+              const result = await res.json();
+              const all = Array.isArray(result) ? result : result.data ?? [];
               return all.filter((c: any) => [StatutCredit.ACTIVE, StatutCredit.LATE].includes(c.statut));
             }
             if (type === 'savings') {
-               const res = await fetch(`/api/comptes?clientId=${clientId}`);
+               const res = await fetch(`/api/comptes?clientId=${clientId}`, { credentials: 'include' });
                if (!res.ok) return [];
                const all = await res.json();
                return all.filter((a: any) => ['Épargne', 'Compte Bloqué', 'Terme'].includes(a.typeCompte) && a.statut === StatutCompte.ACTIVE);
             }
             if (type === 'tontines') {
-                // This might be tricky if no direct endpoint.
-                // Assuming /api/tontines/participations/:clientId or similar.
-                // Or /api/clients/:id/tontines. 
-                // Let's try /api/tontines/member/${clientId} based on common patterns, or fallback to empty.
-                const res = await fetch(`/api/clients/${clientId}/tontines`); // Hypothetical
+                const res = await fetch(`/api/clients/${clientId}/tontines`, { credentials: 'include' });
                 if (res.ok) return res.json();
-                return []; 
+                return [];
             }
             return [];
         },
@@ -192,21 +187,39 @@ const MetricDetailsModal = ({
 // Helper for dummy tours if data missing (fallback)
 const sourceDummyTours = (item: any) => item.nombreParticipants || 12;
 
+type ComparePreset = 'month' | 'quarter' | 'year';
+
+interface ComparisonData {
+  periodA: { start: string; end: string; metrics: Record<string, number> };
+  periodB: { start: string; end: string; metrics: Record<string, number> };
+  variations: Record<string, { periodA: number; periodB: number; change: number; changePercent: number }>;
+}
+
 export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
-  const [, setLocation] = useLocation();
   const [activeMetric, setActiveMetric] = useState<'credits' | 'savings' | 'tontines' | null>(null);
+  const [comparePreset, setComparePreset] = useState<ComparePreset>('month');
 
   // Fetch Real-Time Analytics
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ['client-analytics', client.id],
     queryFn: async () => {
-      const res = await fetch(`/api/clients/${client.id}/analytics`);
+      const res = await fetch(`/api/clients/${client.id}/analytics`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch analytics');
       return res.json();
     },
     refetchInterval: 5000,
   });
-  
+
+  // Fetch Period Comparison
+  const { data: comparison, isLoading: comparisonLoading } = useQuery<ComparisonData>({
+    queryKey: ['client-analytics-compare', client.id, comparePreset],
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${client.id}/analytics/compare?preset=${comparePreset}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch comparison');
+      return res.json();
+    },
+  });
+
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const onPieEnter = (_: any, index: number) => {
@@ -215,229 +228,205 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
 
   if (isLoading || !analytics) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-48 w-full rounded-xl" />
-        <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-24 rounded-lg" />
-            <Skeleton className="h-24 rounded-lg" />
-        </div>
-        <Skeleton className="h-64 w-full rounded-xl" />
+      <div className="grid grid-cols-4 gap-2">
+        <Skeleton className="h-16 rounded-lg col-span-2" />
+        <Skeleton className="h-16 rounded-lg" />
+        <Skeleton className="h-16 rounded-lg" />
+        <Skeleton className="h-32 rounded-lg col-span-2" />
+        <Skeleton className="h-32 rounded-lg col-span-2" />
       </div>
     );
   }
 
   const { summary, distribution, monthly_trend } = analytics;
   const totalValue = distribution.reduce((sum, item) => sum + item.value, 0);
+  const memberDays = client.dateInscription ? Math.floor((new Date().getTime() - new Date(client.dateInscription).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-500">
-      {/* 1. Segment & Fidélité Card */}
-      <Card variant="elevated" className="relative overflow-hidden border-blue-500/20">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
-
-        <div className="relative z-10 flex flex-col sm:flex-row gap-6">
-            {/* Points Fidélité */}
-            <div className="flex-1 flex items-center justify-center sm:justify-start gap-4">
-                <div className="relative w-20 h-20 flex items-center justify-center bg-cyan-500/10 rounded-full border border-cyan-500/30">
-                    <Award size={32} className="text-cyan-400" />
-                </div>
-                <div>
-                     <p className="text-xs text-slate-500 uppercase font-semibold">Points Fidélité</p>
-                     <p className="text-2xl font-bold text-cyan-400">{summary.fidelity_points.toLocaleString()}</p>
-                     <p className="text-xs text-slate-400 mt-1">
-                        Membre depuis {client.dateInscription ? Math.floor((new Date().getTime() - new Date(client.dateInscription).getTime()) / (1000 * 60 * 60 * 24)) : 0}j
-                     </p>
-                </div>
-            </div>
-
-            {/* Segment & Tags */}
-            <div className="flex-1 border-t sm:border-t-0 sm:border-l border-slate-700/50 pt-4 sm:pt-0 sm:pl-6 flex flex-col justify-center">
-                 <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-slate-500 uppercase font-semibold">Segment Client</p>
-                    <Badge value={client.segment} variant={client.segment === 'VIP' ? 'warning' : 'neutral'} />
-                 </div>
-                 <div className="mt-auto">
-                    <ClientTags clientId={client.id} compact={true} />
-                 </div>
-            </div>
-        </div>
-      </Card>
-
-
-      {/* 2. & 3. Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          
-          {/* Répartition Financière */}
-          <Card variant="default" padding="md" className="lg:col-span-2 flex flex-col h-[300px] sm:h-auto">
-            <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                <DollarSign size={16} className="text-cyan-400" />
-                Répartition Financière
-            </h4>
-
-            {summary.total_savings === 0 ? (
-               <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-                 <div className="w-20 h-20 rounded-full border-2 border-slate-700 border-dashed flex items-center justify-center mb-2">
-                    <DollarSign size={24} className="text-slate-600" />
-                 </div>
-                 <p className="text-sm">Aucune donnée financière</p>
-               </div>
-            ) : (
-              <div className="flex flex-col sm:flex-row items-center h-full">
-                <div className="w-full sm:w-1/2 h-[200px] relative">
-                   <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                        <Pie
-                          data={distribution}
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                          onMouseEnter={onPieEnter}
-                          onClick={(_, index) => setActiveIndex(index)}
-                        >
-                          {distribution.map((entry, index) => (
-                            <Cell 
-                               key={`cell-${index}`} 
-                               fill={entry.color} 
-                               stroke="rgba(0,0,0,0)"
-                               className="cursor-pointer hover:opacity-80 transition-opacity"
-                            />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip 
-                            formatter={(value: number) => `${value.toLocaleString()} FCFA`}
-                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
-                            itemStyle={{ color: '#f8fafc' }}
-                        />
-                     </PieChart>
-                   </ResponsiveContainer>
-                   
-                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <p className="text-xs text-slate-500 uppercase font-semibold">Total</p>
-                      <p className="text-lg font-bold text-white">{summary.total_savings.toLocaleString()}</p>
-                   </div>
-                </div>
-
-                <div className="w-full sm:w-1/2 mt-4 sm:mt-0 sm:pl-6 space-y-3">
-                    {distribution.map((item, index) => (
-                        <div 
-                            key={index} 
-                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${activeIndex === index ? 'bg-slate-800 ring-1 ring-slate-700' : 'hover:bg-slate-800/50'}`}
-                            onClick={() => setActiveIndex(index)}
-                        >
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                                <span className="text-sm text-slate-300">{item.label}</span>
-                            </div>
-                            <div className="text-right">
-                                 <p className="text-sm font-bold text-white">{item.value.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">FCFA</span></p>
-                                 <p className="text-[10px] text-slate-500">
-                                    {((item.value / totalValue) * 100).toFixed(1)}%
-                                 </p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </Card>
-
-          {/* Key Metrics Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 content-start">
-              <Card variant="default" padding="sm" className="bg-slate-800/30">
-                 <div className="flex items-start justify-between mb-2">
-                    <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
-                        <Target size={18} />
-                    </div>
-                    <span className={`text-xl font-bold ${summary.repayment_rate >= 90 ? 'text-emerald-400' : summary.repayment_rate >= 80 ? 'text-cyan-400' : 'text-amber-400'}`}>
-                        {summary.repayment_rate}%
-                    </span>
-                 </div>
-                 <p className="text-xs text-slate-500 font-medium uppercase truncate">Taux Remboursement</p>
-              </Card>
-
-              <Card variant="default" padding="sm" className="bg-slate-800/30">
-                 <div className="flex items-start justify-between mb-2">
-                    <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
-                        <TrendingUp size={18} />
-                    </div>
-                    <span className="text-xl font-bold text-emerald-400">
-                        {monthly_trend.savings_growth}
-                    </span>
-                 </div>
-                 <p className="text-xs text-slate-500 font-medium uppercase truncate">Croissance (Mois)</p>
-              </Card>
+    <div className="space-y-2 animate-in fade-in duration-300">
+      {/* Row 1: Fidélité + Segment + Taux + Croissance - All in one row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {/* Points Fidélité */}
+        <div className="bg-slate-800/40 rounded-lg p-2.5 border border-slate-700/50 flex items-center gap-2.5">
+          <div className="w-10 h-10 flex items-center justify-center bg-cyan-500/10 rounded-full border border-cyan-500/30 shrink-0">
+            <Award size={18} className="text-cyan-400" />
           </div>
+          <div className="min-w-0">
+            <p className="text-[10px] text-slate-500 uppercase font-semibold">Points Fidélité</p>
+            <p className="text-lg font-bold text-cyan-400 leading-tight">{summary.fidelity_points.toLocaleString()}</p>
+            <p className="text-[10px] text-slate-500 truncate">Membre depuis {memberDays}j</p>
+          </div>
+        </div>
+
+        {/* Segment & Tags */}
+        <div className="bg-slate-800/40 rounded-lg p-2.5 border border-slate-700/50">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[10px] text-slate-500 uppercase font-semibold">Segment</p>
+            <Badge value={client.segment} variant={client.segment === 'VIP' ? 'warning' : 'neutral'} />
+          </div>
+          <ClientTags clientId={client.id} compact={true} />
+        </div>
+
+        {/* Taux Remboursement */}
+        <div className="bg-slate-800/40 rounded-lg p-2.5 border border-slate-700/50 flex items-center justify-between">
+          <div className="p-1.5 bg-slate-700/50 rounded-lg text-slate-400">
+            <Target size={16} />
+          </div>
+          <div className="text-right">
+            <span className={`text-xl font-bold ${summary.repayment_rate >= 90 ? 'text-emerald-400' : summary.repayment_rate >= 80 ? 'text-cyan-400' : 'text-amber-400'}`}>
+              {summary.repayment_rate}%
+            </span>
+            <p className="text-[10px] text-slate-500 uppercase font-medium">Taux Remboursement</p>
+          </div>
+        </div>
+
+        {/* Croissance */}
+        <div className="bg-slate-800/40 rounded-lg p-2.5 border border-slate-700/50 flex items-center justify-between">
+          <div className="p-1.5 bg-slate-700/50 rounded-lg text-slate-400">
+            <TrendingUp size={16} />
+          </div>
+          <div className="text-right">
+            <span className="text-xl font-bold text-emerald-400">{monthly_trend.savings_growth}</span>
+            <p className="text-[10px] text-slate-500 uppercase font-medium">Croissance (Mois)</p>
+          </div>
+        </div>
       </div>
 
-      
-      {/* 4. Navigation Cards (Interactive Drill-Down) */}
-      <div className="grid grid-cols-3 gap-3">
-         {/* Credits */}
-         <Card 
-            variant="default" 
-            padding="sm" 
-            className={`text-center py-4 cursor-pointer transition-all active:scale-95 border border-transparent hover:border-blue-500/50 ${summary.active_loans_count > 0 ? 'bg-blue-500/10 hover:bg-blue-500/20' : 'bg-slate-800/20 hover:bg-slate-800/50'}`}
-            onClick={() => setActiveMetric('credits')}
-         >
-            <div className="flex items-center justify-center mb-2 gap-2">
-                <CreditCard size={18} className="text-blue-400" />
-                <span className="text-2xl font-bold text-white">{summary.active_loans_count}</span>
+      {/* Row 2: Répartition Financière + Comparaison de périodes */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-2">
+        {/* Répartition Financière - Compact */}
+        <div className="lg:col-span-2 bg-slate-800/40 rounded-lg p-2.5 border border-slate-700/50">
+          <h4 className="text-[11px] font-bold text-white mb-2 flex items-center gap-1.5">
+            <DollarSign size={12} className="text-cyan-400" />
+            Répartition Financière
+          </h4>
+          {summary.total_savings === 0 ? (
+            <div className="flex flex-col items-center justify-center py-4 text-slate-500">
+              <div className="w-12 h-12 rounded-full border border-slate-700 border-dashed flex items-center justify-center mb-1">
+                <DollarSign size={16} className="text-slate-600" />
+              </div>
+              <p className="text-[10px]">Aucune donnée financière</p>
             </div>
-            <p className="text-xs text-slate-400 uppercase font-semibold">Crédits en cours</p>
-            {summary.active_loans_count > 0 && (
-                <p className="text-[10px] text-blue-400 mt-1 flex items-center justify-center gap-1">
-                    Voir détails <ArrowRight size={10} />
-                </p>
-            )}
-         </Card>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-24 relative shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={distribution} innerRadius={28} outerRadius={40} paddingAngle={3} dataKey="value" onMouseEnter={onPieEnter}>
+                      {distribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(0,0,0,0)" className="cursor-pointer hover:opacity-80" />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip formatter={(value: number) => `${value.toLocaleString()} F`} contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', fontSize: '10px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <p className="text-[8px] text-slate-500 uppercase">Total</p>
+                  <p className="text-[10px] font-bold text-white">{(summary.total_savings / 1000).toFixed(0)}k</p>
+                </div>
+              </div>
+              <div className="flex-1 space-y-1 min-w-0">
+                {distribution.map((item, index) => (
+                  <div key={index} className={`flex items-center justify-between py-0.5 px-1.5 rounded text-[10px] cursor-pointer ${activeIndex === index ? 'bg-slate-700/50' : 'hover:bg-slate-700/30'}`} onClick={() => setActiveIndex(index)}>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-slate-400 truncate">{item.label}</span>
+                    </div>
+                    <span className="font-semibold text-white shrink-0">{item.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-         {/* Epargnes */}
-         <Card 
-            variant="default" 
-            padding="sm" 
-            className={`text-center py-4 cursor-pointer transition-all active:scale-95 border border-transparent hover:border-emerald-500/50 ${summary.savings_accounts_count > 0 ? 'bg-emerald-500/10 hover:bg-emerald-500/20' : 'bg-slate-800/20 hover:bg-slate-800/50'}`}
-            onClick={() => setActiveMetric('savings')}
-         >
-            <div className="flex items-center justify-center mb-2 gap-2">
-                <Wallet size={18} className="text-emerald-400" />
-                <span className="text-2xl font-bold text-white">{summary.savings_accounts_count}</span>
+        {/* Comparaison de périodes - Compact */}
+        <div className="lg:col-span-3 bg-slate-800/40 rounded-lg p-2.5 border border-slate-700/50">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-[11px] font-bold text-white flex items-center gap-1.5">
+              <BarChart3 size={12} className="text-cyan-400" />
+              Comparaison
+            </h4>
+            <div className="flex gap-0.5 bg-slate-700/50 rounded p-0.5">
+              {([['month', 'Mois'], ['quarter', 'Trim.'], ['year', 'An']] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setComparePreset(key)}
+                  className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${comparePreset === key ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500 hover:text-slate-300'}`}>
+                  {label}
+                </button>
+              ))}
             </div>
-            <p className="text-xs text-slate-400 uppercase font-semibold">Comptes Épargne</p>
-            {summary.savings_accounts_count > 0 && (
-                <p className="text-[10px] text-emerald-400 mt-1 flex items-center justify-center gap-1">
-                    Voir les comptes <ArrowRight size={10} />
-                </p>
-            )}
-         </Card>
+          </div>
 
-         {/* Tontines */}
-         <Card 
-            variant="default" 
-            padding="sm" 
-            className={`text-center py-4 cursor-pointer transition-all active:scale-95 border border-transparent hover:border-amber-500/50 ${summary.active_tontines_count > 0 ? 'bg-amber-500/10 hover:bg-amber-500/20' : 'bg-slate-800/20 hover:bg-slate-800/50'}`}
-            onClick={() => setActiveMetric('tontines')}
-         >
-            <div className="flex items-center justify-center mb-2 gap-2">
-                <Users size={18} className="text-amber-400" />
-                <span className="text-2xl font-bold text-white">{summary.active_tontines_count}</span>
+          {comparisonLoading ? (
+            <div className="grid grid-cols-3 gap-1.5">{[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-12 rounded" />)}</div>
+          ) : comparison ? (() => {
+            const presetLabels: Record<ComparePreset, [string, string]> = { month: ['Préc.', 'Actuel'], quarter: ['Préc.', 'Actuel'], year: ['Préc.', 'Actuel'] };
+            const metrics: { key: string; label: string; isCurrency: boolean }[] = [
+              { key: 'depots', label: 'Dépôts', isCurrency: true },
+              { key: 'retraits', label: 'Retraits', isCurrency: true },
+              { key: 'fluxNet', label: 'Flux net', isCurrency: true },
+              { key: 'nombreTransactions', label: 'Transactions', isCurrency: false },
+              { key: 'nombreCredits', label: 'Nvx crédits', isCurrency: false },
+              { key: 'montantCredits', label: 'Mnt crédits', isCurrency: true },
+            ];
+            return (
+              <>
+                <div className="flex items-center gap-3 mb-1.5 text-[9px] text-slate-500 uppercase font-semibold">
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-500" /> {presetLabels[comparePreset][0]}</span>
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> {presetLabels[comparePreset][1]}</span>
+                </div>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-1.5">
+                  {metrics.map(({ key, label, isCurrency }) => {
+                    const v = comparison.variations[key];
+                    if (!v) return null;
+                    const isPositive = v.changePercent > 0;
+                    const isNeutral = v.changePercent === 0;
+                    const formatVal = (n: number) => isCurrency ? `${(n/1000).toFixed(n >= 1000 ? 0 : 1)}k` : n.toLocaleString();
+                    return (
+                      <div key={key} className="bg-slate-700/30 rounded p-1.5 border border-slate-700/30">
+                        <p className="text-[9px] text-slate-500 uppercase font-semibold truncate">{label}</p>
+                        <div className="flex items-end justify-between mt-0.5">
+                          <p className="text-sm font-bold text-white leading-none">{isCurrency ? formatVal(v.periodB) : v.periodB}</p>
+                          <div className={`flex items-center text-[9px] font-bold px-1 rounded ${isNeutral ? 'text-slate-400' : (key === 'retraits' ? !isPositive : isPositive) ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {isNeutral ? <Minus size={8} /> : isPositive ? <ArrowUpRight size={8} /> : <ArrowDownRight size={8} />}
+                            {Math.abs(v.changePercent).toFixed(0)}%
+                          </div>
+                        </div>
+                        <p className="text-[8px] text-slate-500">vs {isCurrency ? formatVal(v.periodA) : v.periodA}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })() : <div className="text-center py-3 text-slate-500 text-[10px]">Aucune donnée comparative</div>}
+        </div>
+      </div>
+
+      {/* Row 3: Navigation Cards - Inline compact */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { key: 'credits' as const, icon: CreditCard, count: summary.active_loans_count, label: 'Crédits en cours', color: 'blue' },
+          { key: 'savings' as const, icon: Wallet, count: summary.savings_accounts_count, label: 'Comptes Épargne', color: 'emerald' },
+          { key: 'tontines' as const, icon: Users, count: summary.active_tontines_count, label: 'Tontines Actives', color: 'amber' },
+        ].map(({ key, icon: Icon, count, label, color }) => (
+          <div key={key}
+            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all active:scale-[0.98] border border-transparent hover:border-${color}-500/50 ${count > 0 ? `bg-${color}-500/10 hover:bg-${color}-500/15` : 'bg-slate-800/30 hover:bg-slate-800/50'}`}
+            onClick={() => setActiveMetric(key)}>
+            <div className="flex items-center gap-2">
+              <Icon size={16} className={`text-${color}-400`} />
+              <span className="text-lg font-bold text-white">{count}</span>
             </div>
-            <p className="text-xs text-slate-400 uppercase font-semibold">Tontines Actives</p>
-            {summary.active_tontines_count > 0 && (
-                <p className="text-[10px] text-amber-400 mt-1 flex items-center justify-center gap-1">
-                    Voir participations <ArrowRight size={10} />
-                </p>
-            )}
-         </Card>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400 uppercase font-semibold">{label}</p>
+              {count > 0 && <p className={`text-[9px] text-${color}-400 flex items-center justify-end gap-0.5`}>Détails <ArrowRight size={8} /></p>}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Details Modal */}
-      <MetricDetailsModal 
-          isOpen={activeMetric !== null} 
-          onClose={() => setActiveMetric(null)} 
-          type={activeMetric} 
-          clientId={client.id}
-      />
+      <MetricDetailsModal isOpen={activeMetric !== null} onClose={() => setActiveMetric(null)} type={activeMetric} clientId={client.id} />
     </div>
   );
 }

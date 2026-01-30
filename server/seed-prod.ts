@@ -17,6 +17,9 @@
 import { db, pool } from './db';
 import { eq, count, and, isNull, sql } from 'drizzle-orm';
 import { seedRBAC } from './seed-rbac-logic';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('SeedProd');
 import {
   users,
   userRoles,
@@ -203,6 +206,9 @@ const PLAN_COMPTABLE_DATA = [
   // Classe 4: Tiers
   { num: '401', label: 'Fournisseurs', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '411', label: 'Clients', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '4111', label: 'Dépôts clients - Comptes courants', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4112', label: 'Dépôts clients - Comptes épargne', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4113', label: 'Dépôts clients - Comptes bloqués', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '411100', label: 'Clients - Crédits en cours', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '411200', label: 'Clients - Crédits en souffrance', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '411300', label: 'Clients - Épargne', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
@@ -263,6 +269,7 @@ const PLAN_COMPTABLE_DATA = [
 
 const JOURNAUX_DATA = [
   { code: 'CAISSE', intitule: 'Journal de Caisse', typeJournal: 'Caisse' },
+  { code: 'CAI', intitule: 'Journal Caisse (espèces)', typeJournal: 'Caisse' },
   { code: 'BANK', intitule: 'Journal de Banque', typeJournal: 'Banque' },
   { code: 'ACHAT', intitule: 'Journal d\'Achats', typeJournal: 'Achats' },
   { code: 'VENTE', intitule: 'Journal de Ventes', typeJournal: 'Ventes' },
@@ -299,6 +306,19 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '531',   // Coffre-fort (reçoit)
     creditAccount: '521',  // Caisse (envoie)
     descriptionTemplate: 'Versement caisse vers coffre-fort',
+    priority: 100,
+  },
+  // --- Approvisionnement externe du coffre (Banque, Capital) ---
+  {
+    code: 'SAFE_SUPPLY',
+    name: 'Approvisionnement Externe Coffre',
+    description: 'Approvisionnement coffre depuis source externe (Banque, Capital)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SAFE_SUPPLY',
+    journalCode: 'OD',
+    debitAccount: '531',   // Coffre-fort (reçoit les fonds)
+    creditAccount: '512',  // Banque (source des fonds)
+    descriptionTemplate: 'Approvisionnement externe coffre-fort',
     priority: 100,
   },
   // --- Inter-coffre transfers (transit via 581) ---
@@ -375,6 +395,547 @@ const ACCOUNTING_RULES_DATA = [
     creditAccount: '521',  // Caisse
     descriptionTemplate: 'Paiement salaire net — décaissement',
     priority: 100,
+  },
+
+  // ============================================================================
+  // DÉPÔTS ET RETRAITS PAR TYPE DE COMPTE
+  // ============================================================================
+
+  // --- Dépôts Compte Épargne (SAVINGS) ---
+  {
+    code: 'DEP_CASH_EPARGNE',
+    name: 'Dépôt espèces compte épargne',
+    description: 'Dépôt en espèces sur compte épargne client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_SAVINGS',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '571',   // Caisse siège
+    creditAccount: '4112', // Dépôts clients - Comptes épargne
+    descriptionTemplate: 'Dépôt espèces épargne - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'DEP_MTN_EPARGNE',
+    name: 'Dépôt MTN compte épargne',
+    description: 'Dépôt Mobile Money MTN sur compte épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_SAVINGS',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '4112', // Dépôts clients - Comptes épargne
+    descriptionTemplate: 'Dépôt MTN MoMo épargne - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'DEP_AIRTEL_EPARGNE',
+    name: 'Dépôt Airtel compte épargne',
+    description: 'Dépôt Mobile Money Airtel sur compte épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_SAVINGS',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '4112', // Dépôts clients - Comptes épargne
+    descriptionTemplate: 'Dépôt Airtel Money épargne - {clientName}',
+    priority: 10,
+  },
+
+  // --- Dépôts Compte Courant (CURRENT) ---
+  {
+    code: 'DEP_CASH_CURRENT',
+    name: 'Dépôt espèces compte courant',
+    description: 'Dépôt en espèces sur compte courant client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_CURRENT',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '571',   // Caisse siège
+    creditAccount: '4111', // Dépôts clients - Comptes courants
+    descriptionTemplate: 'Dépôt espèces courant - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'DEP_MTN_CURRENT',
+    name: 'Dépôt MTN compte courant',
+    description: 'Dépôt Mobile Money MTN sur compte courant',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_CURRENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '4111', // Dépôts clients - Comptes courants
+    descriptionTemplate: 'Dépôt MTN MoMo courant - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'DEP_AIRTEL_CURRENT',
+    name: 'Dépôt Airtel compte courant',
+    description: 'Dépôt Mobile Money Airtel sur compte courant',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_CURRENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '4111', // Dépôts clients - Comptes courants
+    descriptionTemplate: 'Dépôt Airtel Money courant - {clientName}',
+    priority: 10,
+  },
+
+  // --- Dépôts Compte Bloqué (BLOCKED) ---
+  {
+    code: 'DEP_CASH_BLOCKED',
+    name: 'Dépôt espèces compte bloqué',
+    description: 'Dépôt en espèces sur compte bloqué client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_BLOCKED',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '571',   // Caisse siège
+    creditAccount: '4113', // Dépôts clients - Comptes bloqués
+    descriptionTemplate: 'Dépôt espèces bloqué - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'DEP_MTN_BLOCKED',
+    name: 'Dépôt MTN compte bloqué',
+    description: 'Dépôt Mobile Money MTN sur compte bloqué',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_BLOCKED',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '4113', // Dépôts clients - Comptes bloqués
+    descriptionTemplate: 'Dépôt MTN MoMo bloqué - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'DEP_AIRTEL_BLOCKED',
+    name: 'Dépôt Airtel compte bloqué',
+    description: 'Dépôt Mobile Money Airtel sur compte bloqué',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_BLOCKED',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '4113', // Dépôts clients - Comptes bloqués
+    descriptionTemplate: 'Dépôt Airtel Money bloqué - {clientName}',
+    priority: 10,
+  },
+
+  // --- Retraits Compte Épargne (SAVINGS) ---
+  {
+    code: 'RET_CASH_EPARGNE',
+    name: 'Retrait espèces compte épargne',
+    description: 'Retrait en espèces depuis compte épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_SAVINGS',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4112',  // Dépôts clients - Comptes épargne
+    creditAccount: '571',  // Caisse siège
+    descriptionTemplate: 'Retrait espèces épargne - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'RET_MTN_EPARGNE',
+    name: 'Payout MTN compte épargne',
+    description: 'Payout vers Mobile Money MTN depuis compte épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_SAVINGS',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '4112',  // Dépôts clients - Comptes épargne
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Payout MTN épargne - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'RET_AIRTEL_EPARGNE',
+    name: 'Payout Airtel compte épargne',
+    description: 'Payout vers Mobile Money Airtel depuis compte épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_SAVINGS',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '4112',  // Dépôts clients - Comptes épargne
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Payout Airtel épargne - {clientName}',
+    priority: 10,
+  },
+
+  // --- Retraits Compte Courant (CURRENT) ---
+  {
+    code: 'RET_CASH_CURRENT',
+    name: 'Retrait espèces compte courant',
+    description: 'Retrait en espèces depuis compte courant',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_CURRENT',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4111',  // Dépôts clients - Comptes courants
+    creditAccount: '571',  // Caisse siège
+    descriptionTemplate: 'Retrait espèces courant - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'RET_MTN_CURRENT',
+    name: 'Payout MTN compte courant',
+    description: 'Payout vers Mobile Money MTN depuis compte courant',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_CURRENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '4111',  // Dépôts clients - Comptes courants
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Payout MTN courant - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'RET_AIRTEL_CURRENT',
+    name: 'Payout Airtel compte courant',
+    description: 'Payout vers Mobile Money Airtel depuis compte courant',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_CURRENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '4111',  // Dépôts clients - Comptes courants
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Payout Airtel courant - {clientName}',
+    priority: 10,
+  },
+
+  // --- Retraits Compte Bloqué (BLOCKED) - après déblocage ---
+  {
+    code: 'RET_CASH_BLOCKED',
+    name: 'Retrait espèces compte bloqué',
+    description: 'Retrait en espèces depuis compte bloqué après déblocage',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_BLOCKED',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4113',  // Dépôts clients - Comptes bloqués
+    creditAccount: '571',  // Caisse siège
+    descriptionTemplate: 'Retrait espèces bloqué - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'RET_MTN_BLOCKED',
+    name: 'Payout MTN compte bloqué',
+    description: 'Payout vers MTN depuis compte bloqué après déblocage',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_BLOCKED',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '4113',  // Dépôts clients - Comptes bloqués
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Payout MTN bloqué - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'RET_AIRTEL_BLOCKED',
+    name: 'Payout Airtel compte bloqué',
+    description: 'Payout vers Airtel depuis compte bloqué après déblocage',
+    sourceType: 'MOUVEMENT',
+    eventType: 'WITHDRAWAL_BLOCKED',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '4113',  // Dépôts clients - Comptes bloqués
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Payout Airtel bloqué - {clientName}',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // CRÉDITS
+  // ============================================================================
+
+  // --- Décaissement crédit ---
+  {
+    code: 'CREDIT_DECAISS_CASH',
+    name: 'Décaissement crédit espèces',
+    description: 'Décaissement d\'un crédit en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_DISBURSEMENT',
+    paymentMethod: 'CASH',
+    journalCode: 'CRD',
+    debitAccount: '2711',  // Prêts - Principal
+    creditAccount: '571',  // Caisse
+    descriptionTemplate: 'Décaissement crédit #{creditNumber} - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CREDIT_DECAISS_MTN',
+    name: 'Décaissement crédit MTN',
+    description: 'Décaissement d\'un crédit vers MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_DISBURSEMENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'CRD',
+    debitAccount: '2711',  // Prêts - Principal
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Décaissement crédit #{creditNumber} MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CREDIT_DECAISS_AIRTEL',
+    name: 'Décaissement crédit Airtel',
+    description: 'Décaissement d\'un crédit vers Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_DISBURSEMENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'CRD',
+    debitAccount: '2711',  // Prêts - Principal
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Décaissement crédit #{creditNumber} Airtel - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CREDIT_DECAISS_COMPTE',
+    name: 'Décaissement crédit vers compte',
+    description: 'Décaissement d\'un crédit vers compte client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_DISBURSEMENT',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'CRD',
+    debitAccount: '2711',  // Prêts - Principal
+    creditAccount: '4111', // Dépôts clients - Comptes courants
+    descriptionTemplate: 'Décaissement crédit #{creditNumber} vers compte - {clientName}',
+    priority: 10,
+  },
+
+  // --- Remboursement crédit ---
+  {
+    code: 'REMBOURS_CASH_PRINCIPAL',
+    name: 'Remboursement crédit principal espèces',
+    description: 'Remboursement du principal en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '571',   // Caisse
+    creditAccount: '2711', // Prêts - Principal
+    descriptionTemplate: 'Remboursement principal crédit #{creditNumber} - {clientName}',
+    priority: 20,
+  },
+  {
+    code: 'REMBOURS_MTN_PRINCIPAL',
+    name: 'Remboursement crédit principal MTN',
+    description: 'Remboursement du principal via MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '2711', // Prêts - Principal
+    descriptionTemplate: 'Remboursement principal crédit #{creditNumber} MTN - {clientName}',
+    priority: 20,
+  },
+  {
+    code: 'REMBOURS_AIRTEL_PRINCIPAL',
+    name: 'Remboursement crédit principal Airtel',
+    description: 'Remboursement du principal via Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '2711', // Prêts - Principal
+    descriptionTemplate: 'Remboursement principal crédit #{creditNumber} Airtel - {clientName}',
+    priority: 20,
+  },
+
+  // --- Intérêts crédit ---
+  {
+    code: 'REMBOURS_CASH_INTERET',
+    name: 'Remboursement intérêts espèces',
+    description: 'Remboursement des intérêts en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT_INTEREST',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '571',   // Caisse
+    creditAccount: '7071', // Intérêts sur prêts
+    descriptionTemplate: 'Remboursement intérêts crédit #{creditNumber} - {clientName}',
+    priority: 20,
+  },
+
+  // --- Pénalités crédit ---
+  {
+    code: 'REMBOURS_CASH_PENALITE',
+    name: 'Remboursement pénalités espèces',
+    description: 'Remboursement des pénalités en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT_PENALTY',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '571',   // Caisse
+    creditAccount: '7073', // Pénalités de retard
+    descriptionTemplate: 'Remboursement pénalités crédit #{creditNumber} - {clientName}',
+    priority: 20,
+  },
+
+  // --- Frais de dossier ---
+  {
+    code: 'FRAIS_DOSSIER',
+    name: 'Frais de dossier crédit',
+    description: 'Frais de dossier crédit',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_FEE',
+    journalCode: 'CRD',
+    debitAccount: '571',   // Caisse
+    creditAccount: '7072', // Frais de dossier
+    descriptionTemplate: 'Frais de dossier crédit #{creditNumber}',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // TONTINES
+  // ============================================================================
+
+  {
+    code: 'TONTINE_COTIS_CASH',
+    name: 'Cotisation tontine espèces',
+    description: 'Cotisation tontine en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TONTINE_CONTRIBUTION',
+    paymentMethod: 'CASH',
+    journalCode: 'TON',
+    debitAccount: '571',   // Caisse
+    creditAccount: '4191', // Fonds tontine - Cotisations
+    descriptionTemplate: 'Cotisation tontine {tontineName} - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'TONTINE_COTIS_MTN',
+    name: 'Cotisation tontine MTN',
+    description: 'Cotisation tontine via MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TONTINE_CONTRIBUTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'TON',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '4191', // Fonds tontine - Cotisations
+    descriptionTemplate: 'Cotisation tontine {tontineName} MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'TONTINE_COTIS_AIRTEL',
+    name: 'Cotisation tontine Airtel',
+    description: 'Cotisation tontine via Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TONTINE_CONTRIBUTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'TON',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '4191', // Fonds tontine - Cotisations
+    descriptionTemplate: 'Cotisation tontine {tontineName} Airtel - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'TONTINE_DISTRIB_CASH',
+    name: 'Distribution tontine espèces',
+    description: 'Distribution gain tontine en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TONTINE_DISTRIBUTION',
+    paymentMethod: 'CASH',
+    journalCode: 'TON',
+    debitAccount: '4191',  // Fonds tontine - Cotisations
+    creditAccount: '571',  // Caisse
+    descriptionTemplate: 'Distribution tontine {tontineName} - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'TONTINE_DISTRIB_MTN',
+    name: 'Distribution tontine MTN',
+    description: 'Distribution gain tontine via MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TONTINE_DISTRIBUTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'TON',
+    debitAccount: '4191',  // Fonds tontine - Cotisations
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Distribution tontine {tontineName} MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'TONTINE_DISTRIB_AIRTEL',
+    name: 'Distribution tontine Airtel',
+    description: 'Distribution gain tontine via Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TONTINE_DISTRIBUTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'TON',
+    debitAccount: '4191',  // Fonds tontine - Cotisations
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Distribution tontine {tontineName} Airtel - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'TONTINE_PENALITE',
+    name: 'Pénalité tontine',
+    description: 'Pénalité de retard tontine',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TONTINE_PENALTY',
+    journalCode: 'TON',
+    debitAccount: '571',   // Caisse
+    creditAccount: '4192', // Fonds tontine - Pénalités
+    descriptionTemplate: 'Pénalité tontine {tontineName} - {clientName}',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // COMMISSIONS ET FRAIS OPÉRATEURS
+  // ============================================================================
+
+  {
+    code: 'COMM_MTN',
+    name: 'Commission MTN',
+    description: 'Commission opérateur MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'OPERATOR_FEE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '6272',  // Commissions Mobile Money
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Commission MTN MoMo',
+    priority: 10,
+  },
+  {
+    code: 'COMM_AIRTEL',
+    name: 'Commission Airtel',
+    description: 'Commission opérateur Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'OPERATOR_FEE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '6272',  // Commissions Mobile Money
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Commission Airtel Money',
+    priority: 10,
   },
 ];
 
@@ -470,7 +1031,7 @@ async function upsertByName<T extends { nom: string }>(
 // ============================================================================
 
 async function seedGeography(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('📍 Seeding Geography...');
+  logger.info('Seeding Geography...');
   const results: SeedStepResult[] = [];
 
   // Zones - upsert by nom+ville
@@ -520,7 +1081,7 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
 }
 
 async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('⚙️ Seeding Core Settings...');
+  logger.info('Seeding Core Settings...');
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
@@ -622,7 +1183,7 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
 }
 
 async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('🏦 Seeding Products Catalog...');
+  logger.info('Seeding Products Catalog...');
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
@@ -723,7 +1284,7 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
 }
 
 async function seedAccountingBootstrap(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('📚 Seeding Accounting...');
+  logger.info('Seeding Accounting...');
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
@@ -792,7 +1353,7 @@ async function seedAccountingBootstrap(context: SeedContext, dryRun: boolean): P
 }
 
 async function seedVaultAndTransfersConfig(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('🔐 Seeding Vault & Transfers Config...');
+  logger.info('Seeding Vault & Transfers Config...');
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
@@ -907,7 +1468,7 @@ async function seedVaultAndTransfersConfig(context: SeedContext, dryRun: boolean
 }
 
 async function seedHRBootstrap(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('👔 Seeding HR...');
+  logger.info('Seeding HR...');
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
@@ -989,7 +1550,7 @@ async function seedHRBootstrap(context: SeedContext, dryRun: boolean): Promise<S
 }
 
 async function seedMaintenanceModules(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('🔧 Seeding Maintenance Modules...');
+  logger.info('Seeding Maintenance Modules...');
 
   if (dryRun) {
     return [{ table: 'maintenanceModules', action: 'skipped', count: MODULES_DATA.length, details: 'dry-run' }];
@@ -1021,7 +1582,7 @@ async function seedMaintenanceModules(context: SeedContext, dryRun: boolean): Pr
 // ============================================================================
 
 async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('🔔 Seeding Notification System...');
+  logger.info('Seeding Notification System...');
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
@@ -1851,7 +2412,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
 }
 
 async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
-  console.log('👤 Seeding Admin User...');
+  logger.info('Seeding Admin User...');
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
@@ -1861,7 +2422,7 @@ async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<See
   // Password from env or default (WARNING in logs)
   const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'password123';
   if (!process.env.SEED_ADMIN_PASSWORD) {
-    console.warn('⚠️  WARNING: Using default password. Set SEED_ADMIN_PASSWORD in production!');
+    logger.warn('WARNING: Using default password. Set SEED_ADMIN_PASSWORD in production!');
   }
 
   const [siege] = await db.select().from(agences).where(eq(agences.codeAgence, 'SIEGE'));
@@ -1940,7 +2501,7 @@ interface ValidationResult {
 }
 
 async function validateProdBootstrap(): Promise<ValidationResult[]> {
-  console.log('🔍 Validating production bootstrap...');
+  logger.info('Validating production bootstrap...');
   const results: ValidationResult[] = [];
 
   // 1. Agence Siège exists
@@ -2093,29 +2654,29 @@ async function seedProd() {
     success: false,
   };
 
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('🏭 COFINCO Production Seed v2.0');
-  console.log('═══════════════════════════════════════════════════════════════');
+  logger.info('═══════════════════════════════════════════════════════════════');
+  logger.info('COFINCO Production Seed v2.0');
+  logger.info('═══════════════════════════════════════════════════════════════');
 
   if (DRY_RUN) {
-    console.log('📋 DRY-RUN MODE - No changes will be made');
+    logger.info('DRY-RUN MODE - No changes will be made');
   }
   if (FORCE_RESET) {
-    console.log('⚠️  FORCE MODE - Will reset configuration tables');
+    logger.warn('FORCE MODE - Will reset configuration tables');
   }
 
   try {
     // 1. Detect context
     report.context = await detectContext();
-    console.log(`\n📊 Detected context: ${report.context}`);
+    logger.info({ context: report.context }, 'Detected context');
 
     if (report.context === 'PRODUCTION' && !FORCE_RESET) {
-      console.log('\n⚠️  Production data detected. Running in CONFIG SYNC mode.');
-      console.log('   Use --force to reset configuration (dangerous!)');
+      logger.warn('Production data detected. Running in CONFIG SYNC mode.');
+      logger.info('Use --force to reset configuration (dangerous!)');
     }
 
     // 2. Execute seed modules
-    console.log('\n───────────────────────────────────────────────────────────────');
+    logger.info('───────────────────────────────────────────────────────────────');
 
     // Geography
     const geoResults = await seedGeography(report.context, DRY_RUN);
@@ -2163,18 +2724,18 @@ async function seedProd() {
 
     // 3. Validation
     if (!DRY_RUN) {
-      console.log('\n───────────────────────────────────────────────────────────────');
+      logger.info('───────────────────────────────────────────────────────────────');
       const validationResults = await validateProdBootstrap();
 
       const failedCount = validationResults.filter(v => !v.passed).length;
       if (failedCount > 0) {
-        console.log('\n❌ VALIDATION FAILED:');
+        logger.error('VALIDATION FAILED:');
         validationResults.filter(v => !v.passed).forEach(v => {
-          console.log(`   - ${v.invariant}: ${v.details || 'FAILED'}`);
+          logger.error({ invariant: v.invariant, details: v.details || 'FAILED' }, 'Validation failed');
           report.errors.push(`Validation failed: ${v.invariant}`);
         });
       } else {
-        console.log('\n✅ All validations passed');
+        logger.info('All validations passed');
       }
     }
 
@@ -2182,24 +2743,23 @@ async function seedProd() {
     report.completedAt = new Date();
 
     // 4. Summary
-    console.log('\n═══════════════════════════════════════════════════════════════');
-    console.log(report.success ? '✅ PRODUCTION SEED COMPLETE' : '❌ SEED COMPLETED WITH ERRORS');
-    console.log('═══════════════════════════════════════════════════════════════');
+    logger.info('═══════════════════════════════════════════════════════════════');
+    if (report.success) {
+      logger.info('PRODUCTION SEED COMPLETE');
+    } else {
+      logger.error('SEED COMPLETED WITH ERRORS');
+    }
+    logger.info('═══════════════════════════════════════════════════════════════');
 
     if (!DRY_RUN) {
-      console.log('\n👤 Login: s.administrateur / [SEED_ADMIN_PASSWORD or password123]');
-      console.log('⚠️  IMPORTANT: Change password on first login (mustChangePassword=true)');
+      logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or password123]');
+      logger.warn('IMPORTANT: Change password on first login (mustChangePassword=true)');
     }
 
-    console.log('\n📊 Summary:');
     const created = report.steps.filter(s => s.action === 'created').length;
     const skipped = report.steps.filter(s => s.action === 'skipped').length;
-    console.log(`   - Created: ${created} tables`);
-    console.log(`   - Skipped: ${skipped} tables`);
-    if (report.errors.length > 0) {
-      console.log(`   - Errors: ${report.errors.length}`);
-    }
-    console.log('═══════════════════════════════════════════════════════════════');
+    logger.info({ created, skipped, errors: report.errors.length }, 'Summary');
+    logger.info('═══════════════════════════════════════════════════════════════');
 
     if (!report.success) {
       await pool.end();
@@ -2210,7 +2770,7 @@ async function seedProd() {
     process.exit(0);
 
   } catch (error) {
-    console.error('\n❌ FATAL ERROR:', error);
+    logger.error({ err: error }, 'FATAL ERROR');
     report.errors.push(String(error));
     await pool.end().catch(() => {});
     process.exit(1);

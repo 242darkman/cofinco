@@ -1,14 +1,33 @@
+/**
+ * Enhanced Sync Service with Background Sync Support
+ *
+ * Features:
+ * - Background sync via service worker
+ * - Periodic sync for data refresh
+ * - Priority-based sync queue
+ * - Conflict detection and resolution
+ * - Real-time progress tracking
+ * - Network quality awareness
+ */
+
 import {
   offlineDb,
   getPendingOperations,
   updateOperationStatus,
   addConflict,
+  getOperationStats,
   OfflineOperation,
-  OperationStatus
+  OperationStatus,
+  OperationType,
+  clearCompletedOperations
 } from './offline-db';
 import { connectivityService } from './connectivityService';
 
+// ========== TYPES ==========
+
 type SyncCallback = (stats: SyncStats) => void;
+type ConflictCallback = (conflict: ConflictInfo) => void;
+type ProgressCallback = (progress: SyncProgress) => void;
 
 export interface SyncStats {
   totalPending: number;
@@ -17,33 +36,103 @@ export interface SyncStats {
   conflicts: number;
   isSyncing: boolean;
   lastSyncAt: number | null;
+  byType: Record<OperationType, number>;
+  backgroundSyncSupported: boolean;
+  periodicSyncSupported: boolean;
 }
+
+export interface SyncProgress {
+  current: number;
+  total: number;
+  currentOperation?: {
+    uuid: string;
+    type: OperationType;
+    endpoint: string;
+  };
+  estimatedTimeRemaining?: number;
+}
+
+export interface ConflictInfo {
+  operationId: string;
+  entityType: OperationType;
+  entityId: string;
+  localData: any;
+  serverData: any;
+}
+
+export interface SyncOptions {
+  priority?: 'critical' | 'high' | 'medium' | 'low' | 'all';
+  type?: OperationType;
+  limit?: number;
+  useBackgroundSync?: boolean;
+}
+
+// ========== CONSTANTS ==========
+
+const BACKGROUND_SYNC_TAG = 'cofin-sync';
+const PERIODIC_SYNC_TAG = 'sync-pending-operations';
+const BATCH_SIZE = 10;
+const RETRY_DELAY_MS = 5000;
+const MAX_RETRY_DELAY_MS = 60000;
+
+// ========== SYNC SERVICE CLASS ==========
 
 class SyncService {
   private isSyncing: boolean = false;
   private callbacks: Set<SyncCallback> = new Set();
+  private conflictCallbacks: Set<ConflictCallback> = new Set();
+  private progressCallbacks: Set<ProgressCallback> = new Set();
   private syncStats: SyncStats = {
     totalPending: 0,
     synced: 0,
     failed: 0,
     conflicts: 0,
     isSyncing: false,
-    lastSyncAt: null
+    lastSyncAt: null,
+    byType: {
+      transfer: 0,
+      caisse: 0,
+      client: 0,
+      payment: 0,
+      epargne: 0,
+      credit: 0,
+      tontine: 0,
+      remise: 0,
+      enquete: 0,
+      other: 0
+    },
+    backgroundSyncSupported: false,
+    periodicSyncSupported: false
   };
   private syncTimeout: number | null = null;
-  private batchSize: number = 10;
-  private retryDelayMs: number = 5000;
+  private currentRetryDelay: number = RETRY_DELAY_MS;
+  private serviceWorkerReady: Promise<ServiceWorkerRegistration> | null = null;
 
   constructor() {
+    this.checkBackgroundSyncSupport();
     this.setupConnectivityListener();
+    this.setupServiceWorkerListener();
     this.initializeStats();
     console.log('[Sync Service] Service de synchronisation initialisé');
+  }
+
+  // ========== INITIALIZATION ==========
+
+  private async checkBackgroundSyncSupport(): Promise<void> {
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+      this.syncStats.backgroundSyncSupported = true;
+    }
+
+    if ('serviceWorker' in navigator && 'periodicSync' in (await navigator.serviceWorker.ready as any)) {
+      this.syncStats.periodicSyncSupported = true;
+    }
   }
 
   private setupConnectivityListener(): void {
     connectivityService.subscribe((isOnline) => {
       if (isOnline) {
         console.log('[Sync Service] Connexion rétablie, démarrage de la synchronisation');
+        this.currentRetryDelay = RETRY_DELAY_MS; // Reset retry delay
         this.scheduleSync(1000);
       } else {
         console.log('[Sync Service] Connexion perdue, synchronisation en pause');
@@ -52,11 +141,38 @@ class SyncService {
     });
   }
 
+  private setupServiceWorkerListener(): void {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        const { type, payload } = event.data || {};
+
+        switch (type) {
+          case 'SYNC_COMPLETED':
+            console.log('[Sync Service] Opération synchronisée via SW:', payload);
+            this.refreshPendingCount();
+            break;
+
+          case 'PERIODIC_SYNC_TRIGGER':
+            console.log('[Sync Service] Sync périodique déclenché');
+            this.sync({ useBackgroundSync: false });
+            break;
+
+          case 'CONFLICT_DETECTED':
+            this.notifyConflict(payload);
+            break;
+        }
+      });
+    }
+  }
+
   private async initializeStats(): Promise<void> {
-    const pending = await getPendingOperations();
-    this.syncStats.totalPending = pending.length;
+    const stats = await getOperationStats();
+    this.syncStats.totalPending = stats.pending;
+    this.syncStats.byType = stats.byType;
     this.notifyCallbacks();
   }
+
+  // ========== SCHEDULING ==========
 
   private scheduleSync(delayMs: number): void {
     this.cancelScheduledSync();
@@ -72,7 +188,60 @@ class SyncService {
     }
   }
 
-  public async sync(): Promise<SyncStats> {
+  // ========== BACKGROUND SYNC ==========
+
+  /**
+   * Request background sync via service worker
+   */
+  public async requestBackgroundSync(tag: string = BACKGROUND_SYNC_TAG): Promise<boolean> {
+    if (!this.syncStats.backgroundSyncSupported) {
+      console.log('[Sync Service] Background sync non supporté');
+      return false;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await (registration as any).sync.register(tag);
+      console.log('[Sync Service] Background sync demandé:', tag);
+      return true;
+    } catch (error) {
+      console.error('[Sync Service] Erreur background sync:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Register periodic background sync
+   */
+  public async registerPeriodicSync(minInterval: number = 60 * 60 * 1000): Promise<boolean> {
+    if (!this.syncStats.periodicSyncSupported) {
+      console.log('[Sync Service] Periodic sync non supporté');
+      return false;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const periodicSync = (registration as any).periodicSync;
+
+      // Check permission
+      const status = await navigator.permissions.query({
+        name: 'periodic-background-sync' as PermissionName
+      });
+
+      if (status.state === 'granted') {
+        await periodicSync.register(PERIODIC_SYNC_TAG, { minInterval });
+        console.log('[Sync Service] Periodic sync enregistré');
+        return true;
+      }
+    } catch (error) {
+      console.error('[Sync Service] Erreur periodic sync:', error);
+    }
+    return false;
+  }
+
+  // ========== MAIN SYNC ==========
+
+  public async sync(options: SyncOptions = {}): Promise<SyncStats> {
     if (this.isSyncing) {
       console.log('[Sync Service] Synchronisation déjà en cours');
       return this.syncStats;
@@ -80,6 +249,12 @@ class SyncService {
 
     if (!connectivityService.getStatus()) {
       console.log('[Sync Service] Hors ligne, synchronisation reportée');
+
+      // Try background sync if supported
+      if (options.useBackgroundSync !== false && this.syncStats.backgroundSyncSupported) {
+        await this.requestBackgroundSync();
+      }
+
       return this.syncStats;
     }
 
@@ -90,27 +265,43 @@ class SyncService {
     this.syncStats.conflicts = 0;
     this.notifyCallbacks();
 
-    console.log('[Sync Service] Démarrage de la synchronisation...');
+    console.log('[Sync Service] Démarrage de la synchronisation...', options);
 
     try {
-      const operations = await getPendingOperations();
-      this.syncStats.totalPending = operations.length;
+      const operations = await getPendingOperations({
+        type: options.type,
+        limit: options.limit
+      });
 
-      if (operations.length === 0) {
+      // Filter by priority if specified
+      let filteredOps = operations;
+      if (options.priority && options.priority !== 'all') {
+        const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+        const maxPriority = priorityOrder[options.priority];
+        filteredOps = operations.filter((op) => {
+          const opPriority = priorityOrder[op.priority];
+          return opPriority <= maxPriority;
+        });
+      }
+
+      this.syncStats.totalPending = filteredOps.length;
+
+      if (filteredOps.length === 0) {
         console.log('[Sync Service] Aucune opération en attente');
         return this.finishSync();
       }
 
-      console.log(`[Sync Service] ${operations.length} opération(s) à synchroniser`);
+      console.log(`[Sync Service] ${filteredOps.length} opération(s) à synchroniser`);
 
-      for (let i = 0; i < operations.length; i += this.batchSize) {
+      // Process in batches
+      for (let i = 0; i < filteredOps.length; i += BATCH_SIZE) {
         if (!connectivityService.getStatus()) {
           console.log('[Sync Service] Connexion perdue pendant la synchronisation');
           break;
         }
 
-        const batch = operations.slice(i, i + this.batchSize);
-        await this.processBatch(batch);
+        const batch = filteredOps.slice(i, i + BATCH_SIZE);
+        await this.processBatch(batch, i, filteredOps.length);
         this.notifyCallbacks();
       }
 
@@ -121,12 +312,33 @@ class SyncService {
     }
   }
 
-  private async processBatch(operations: OfflineOperation[]): Promise<void> {
-    const promises = operations.map(op => this.processOperation(op));
+  private async processBatch(
+    operations: OfflineOperation[],
+    startIndex: number,
+    total: number
+  ): Promise<void> {
+    const promises = operations.map((op, idx) =>
+      this.processOperation(op, startIndex + idx, total)
+    );
     await Promise.allSettled(promises);
   }
 
-  private async processOperation(operation: OfflineOperation): Promise<void> {
+  private async processOperation(
+    operation: OfflineOperation,
+    currentIndex: number,
+    total: number
+  ): Promise<void> {
+    // Notify progress
+    this.notifyProgress({
+      current: currentIndex + 1,
+      total,
+      currentOperation: {
+        uuid: operation.uuid,
+        type: operation.type,
+        endpoint: operation.endpoint
+      }
+    });
+
     if (operation.retryCount >= operation.maxRetries) {
       console.log(`[Sync Service] Opération ${operation.uuid} a atteint le max de tentatives`);
       await updateOperationStatus(operation.uuid, 'failed', 'Nombre maximum de tentatives atteint');
@@ -138,7 +350,7 @@ class SyncService {
 
     try {
       const payload = JSON.parse(operation.payload);
-      
+
       const response = await fetch(operation.endpoint, {
         method: operation.method,
         headers: {
@@ -154,14 +366,10 @@ class SyncService {
 
       if (response.ok) {
         console.log(`[Sync Service] Opération ${operation.uuid} synchronisée avec succès`);
-        await updateOperationStatus(
-          operation.uuid, 
-          'completed', 
-          undefined, 
-          JSON.stringify(responseData)
-        );
+        await updateOperationStatus(operation.uuid, 'completed', undefined, JSON.stringify(responseData));
         this.syncStats.synced++;
       } else if (response.status === 409) {
+        // Conflict
         console.log(`[Sync Service] Conflit détecté pour ${operation.uuid}`);
         await updateOperationStatus(operation.uuid, 'conflict', 'Conflit de données');
         await addConflict(
@@ -172,9 +380,24 @@ class SyncService {
           responseData
         );
         this.syncStats.conflicts++;
+
+        // Notify conflict listeners
+        this.notifyConflict({
+          operationId: operation.uuid,
+          entityType: operation.type,
+          entityId: operation.uuid,
+          localData: JSON.parse(operation.payload),
+          serverData: responseData
+        });
       } else if (response.status === 401 || response.status === 403) {
         console.log(`[Sync Service] Session expirée pour ${operation.uuid}`);
         await updateOperationStatus(operation.uuid, 'failed', 'Session expirée - reconnexion requise');
+        this.syncStats.failed++;
+      } else if (response.status === 422 || response.status === 400) {
+        // Validation error - don't retry
+        const errorMsg = responseData?.message || `Erreur de validation`;
+        console.log(`[Sync Service] Erreur de validation ${operation.uuid}: ${errorMsg}`);
+        await updateOperationStatus(operation.uuid, 'failed', errorMsg, JSON.stringify(responseData));
         this.syncStats.failed++;
       } else {
         const errorMsg = responseData?.message || `Erreur HTTP ${response.status}`;
@@ -195,36 +418,62 @@ class SyncService {
     this.syncStats.lastSyncAt = Date.now();
     this.notifyCallbacks();
 
+    // Clear progress
+    this.notifyProgress({ current: 0, total: 0 });
+
     console.log('[Sync Service] Synchronisation terminée:', {
       synced: this.syncStats.synced,
       failed: this.syncStats.failed,
       conflicts: this.syncStats.conflicts
     });
 
+    // Schedule retry with exponential backoff
     if (this.syncStats.failed > 0 && connectivityService.getStatus()) {
-      console.log('[Sync Service] Programmation nouvelle tentative dans', this.retryDelayMs, 'ms');
-      this.scheduleSync(this.retryDelayMs);
+      console.log('[Sync Service] Programmation nouvelle tentative dans', this.currentRetryDelay, 'ms');
+      this.scheduleSync(this.currentRetryDelay);
+      this.currentRetryDelay = Math.min(this.currentRetryDelay * 2, MAX_RETRY_DELAY_MS);
+    } else {
+      this.currentRetryDelay = RETRY_DELAY_MS; // Reset on success
     }
+
+    // Cleanup old completed operations
+    clearCompletedOperations(24 * 60 * 60 * 1000).catch(console.error);
 
     return this.syncStats;
   }
 
+  // ========== SUBSCRIPTIONS ==========
+
   public subscribe(callback: SyncCallback): () => void {
     this.callbacks.add(callback);
-    
+
     setTimeout(() => {
       if (this.callbacks.has(callback)) {
         callback({ ...this.syncStats });
       }
     }, 0);
-    
+
     return () => {
       this.callbacks.delete(callback);
     };
   }
 
+  public subscribeToConflicts(callback: ConflictCallback): () => void {
+    this.conflictCallbacks.add(callback);
+    return () => {
+      this.conflictCallbacks.delete(callback);
+    };
+  }
+
+  public subscribeToProgress(callback: ProgressCallback): () => void {
+    this.progressCallbacks.add(callback);
+    return () => {
+      this.progressCallbacks.delete(callback);
+    };
+  }
+
   private notifyCallbacks(): void {
-    this.callbacks.forEach(callback => {
+    this.callbacks.forEach((callback) => {
       try {
         callback({ ...this.syncStats });
       } catch (error) {
@@ -233,20 +482,130 @@ class SyncService {
     });
   }
 
+  private notifyConflict(conflict: ConflictInfo): void {
+    this.conflictCallbacks.forEach((callback) => {
+      try {
+        callback(conflict);
+      } catch (error) {
+        console.error('[Sync Service] Erreur dans conflict callback:', error);
+      }
+    });
+  }
+
+  private notifyProgress(progress: SyncProgress): void {
+    this.progressCallbacks.forEach((callback) => {
+      try {
+        callback(progress);
+      } catch (error) {
+        console.error('[Sync Service] Erreur dans progress callback:', error);
+      }
+    });
+  }
+
+  // ========== PUBLIC API ==========
+
   public getStats(): SyncStats {
     return { ...this.syncStats };
   }
 
-  public async forceSyncNow(): Promise<SyncStats> {
+  public async forceSyncNow(options?: SyncOptions): Promise<SyncStats> {
     this.cancelScheduledSync();
-    return this.sync();
+    return this.sync(options);
+  }
+
+  public async syncCriticalOnly(): Promise<SyncStats> {
+    return this.sync({ priority: 'critical' });
+  }
+
+  public async syncByType(type: OperationType): Promise<SyncStats> {
+    return this.sync({ type });
   }
 
   public async refreshPendingCount(): Promise<number> {
-    const operations = await getPendingOperations();
-    this.syncStats.totalPending = operations.length;
+    const stats = await getOperationStats();
+    this.syncStats.totalPending = stats.pending;
+    this.syncStats.byType = stats.byType;
     this.notifyCallbacks();
-    return operations.length;
+    return stats.pending;
+  }
+
+  /**
+   * Get queue status from service worker
+   */
+  public async getServiceWorkerQueueStatus(): Promise<{ financial: number; general: number; total: number } | null> {
+    if (!('serviceWorker' in navigator)) return null;
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      if (!registration.active) return null;
+
+      return new Promise((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = (event) => {
+          resolve(event.data);
+        };
+
+        registration.active!.postMessage({ type: 'GET_QUEUE_STATUS' }, [channel.port2]);
+
+        // Timeout after 5s
+        setTimeout(() => resolve(null), 5000);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Force service worker to replay queued requests
+   */
+  public async forceServiceWorkerSync(): Promise<boolean> {
+    if (!('serviceWorker' in navigator)) return false;
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      if (!registration.active) return false;
+
+      return new Promise((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = (event) => {
+          resolve(event.data?.success || false);
+        };
+
+        registration.active!.postMessage({ type: 'FORCE_SYNC' }, [channel.port2]);
+
+        setTimeout(() => resolve(false), 30000);
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Clear all service worker caches
+   */
+  public async clearServiceWorkerCaches(): Promise<void> {
+    if (!('serviceWorker' in navigator)) return;
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      registration.active?.postMessage({ type: 'CLEAR_CACHE' });
+    } catch (error) {
+      console.error('[Sync Service] Erreur clear cache:', error);
+    }
+  }
+
+  /**
+   * Cache specific URLs for offline access
+   */
+  public async cacheUrls(urls: string[]): Promise<void> {
+    if (!('serviceWorker' in navigator)) return;
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      registration.active?.postMessage({ type: 'CACHE_URLS', payload: { urls } });
+    } catch (error) {
+      console.error('[Sync Service] Erreur cache URLs:', error);
+    }
   }
 }
 

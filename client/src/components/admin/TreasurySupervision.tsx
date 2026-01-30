@@ -1,16 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { 
-  Building2, TrendingUp, TrendingDown, DollarSign, 
-  Search, Calendar, RefreshCcw, ChevronLeft, ChevronRight, X
+import {
+  Building2, TrendingUp, TrendingDown,
+  Search, ChevronLeft, ChevronRight, X,
+  Download, FileSpreadsheet, FileText
 } from 'lucide-react';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { Card, Button, Badge } from '../ui';
+import { Card, Button, Badge, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { api } from '../../lib/api-client';
 import { cn } from '@/lib/utils';
+import { TreasuryReconciliationPanel } from './TreasuryReconciliationPanel';
 
 // --- Constants & Helpers ---
 const AGENCY_COLORS = [
@@ -41,16 +43,8 @@ const formatCurrency = (val: number) => {
 
 function ChartSkeleton() {
   return (
-    <div className="w-full h-[350px] bg-slate-100 dark:bg-slate-800/50 rounded-xl animate-pulse flex flex-col items-center justify-center space-y-4">
-      <div className="w-4/5 h-1/2 bg-slate-200 dark:bg-slate-700/50 rounded-lg relative overflow-hidden">
-         <div className="absolute inset-0 flex items-center justify-center opacity-10">
-            <TrendingUp size={100} />
-         </div>
-      </div>
-      <div className="flex gap-4 w-1/2 justify-center">
-         <div className="h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded shadow-sm" />
-         <div className="h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded shadow-sm" />
-      </div>
+    <div className="w-full h-[160px] bg-slate-100 dark:bg-slate-800/50 rounded-lg animate-pulse flex items-center justify-center">
+      <TrendingUp size={40} className="opacity-10" />
     </div>
   );
 }
@@ -145,6 +139,7 @@ export function TreasurySupervision() {
   const [page, setPage] = useState(1);
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   const [period, setPeriod] = useState<Period>('30d');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const ITEMS_PER_PAGE = 12;
 
@@ -158,6 +153,110 @@ export function TreasurySupervision() {
     placeholderData: keepPreviousData
   });
   const globalStats = _globalStats as TreasuryStats | undefined;
+
+  // Export functionality
+  const handleExport = useCallback((format: 'csv' | 'excel' | 'pdf') => {
+    if (!globalStats) return;
+
+    const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period;
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `tresorerie_${periodLabel.replace(/\s/g, '_')}_${timestamp}`;
+
+    if (format === 'csv' || format === 'excel') {
+      // Generate CSV content
+      const headers = ['Agence', 'Ville', 'Solde (FCFA)', 'Statut'];
+      const rows = globalStats.breakdown.map(a => [
+        a.agenceNom,
+        a.ville || '-',
+        a.solde.toLocaleString('fr-FR'),
+        a.solde > 0 ? 'Actif' : 'Vide'
+      ]);
+
+      // Add summary row
+      rows.push([]);
+      rows.push(['TOTAL GLOBAL', '', globalStats.globalBalance.toLocaleString('fr-FR'), '']);
+      rows.push(['Nombre d\'agences', globalStats.breakdown.length.toString(), '', '']);
+      rows.push(['Période', periodLabel, '', '']);
+
+      const csvContent = [
+        headers.join(format === 'excel' ? '\t' : ','),
+        ...rows.map(row => row.join(format === 'excel' ? '\t' : ','))
+      ].join('\n');
+
+      const bom = '\uFEFF'; // UTF-8 BOM for Excel
+      const blob = new Blob([bom + csvContent], {
+        type: format === 'excel'
+          ? 'application/vnd.ms-excel;charset=utf-8'
+          : 'text/csv;charset=utf-8'
+      });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${filename}.${format === 'excel' ? 'xls' : 'csv'}`;
+      link.click();
+    } else if (format === 'pdf') {
+      // Open print dialog for PDF
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const tableRows = globalStats.breakdown.map(a => `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">${a.agenceNom}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${a.ville || '-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${a.solde.toLocaleString('fr-FR')} FCFA</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${a.solde > 0 ? '✓ Actif' : '○ Vide'}</td>
+          </tr>
+        `).join('');
+
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Rapport Trésorerie - ${periodLabel}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              h1 { color: #1e40af; margin-bottom: 5px; }
+              .subtitle { color: #64748b; margin-bottom: 20px; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th { background: #1e40af; color: white; padding: 10px; text-align: left; }
+              tr:nth-child(even) { background: #f8fafc; }
+              .summary { background: #f0f9ff; padding: 15px; border-radius: 8px; margin-top: 20px; }
+              .total { font-size: 24px; font-weight: bold; color: #1e40af; }
+              @media print { body { padding: 0; } }
+            </style>
+          </head>
+          <body>
+            <h1>Rapport de Trésorerie</h1>
+            <p class="subtitle">Période: ${periodLabel} | Généré le: ${new Date().toLocaleDateString('fr-FR')}</p>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Agence</th>
+                  <th>Ville</th>
+                  <th>Solde</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+
+            <div class="summary">
+              <p><strong>Résumé</strong></p>
+              <p class="total">${globalStats.globalBalance.toLocaleString('fr-FR')} FCFA</p>
+              <p>Trésorerie globale sur ${globalStats.breakdown.length} agences</p>
+            </div>
+
+            <script>window.onload = function() { window.print(); }</script>
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    }
+
+    setShowExportMenu(false);
+  }, [globalStats, period]);
 
   // 2. Specific History Poll (for drill-down)
   // Only fetch if agencies are selected
@@ -196,8 +295,6 @@ export function TreasurySupervision() {
     });
   };
 
-  const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || '1 mois';
-
   const getChartTitle = () => {
      if (selectedAgencies.length === 0) return `Évolution Trésorerie Globale`;
      if (selectedAgencies.length === 1) {
@@ -233,311 +330,252 @@ export function TreasurySupervision() {
   const isPositive = globalGrowth >= 0;
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-hidden animate-in fade-in duration-500 pt-1">
-      {/* 1. Header & Actions - Compact */}
-      <div className="shrink-0 flex items-center justify-between px-1">
+    <div className="flex flex-col h-full space-y-2 overflow-hidden animate-in fade-in duration-500">
+      {/* 1. Header - Ultra Compact */}
+      <div className="shrink-0 flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-3">
-             <div className="bg-primary/20 p-2 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-primary" />
-             </div>
-             <div>
-                <h1 className="text-lg font-bold tracking-tight">Supervision Trésorerie</h1>
-                <p className="text-[10px] text-muted-foreground">Vue temps réel ({globalStats?.breakdown.length} agences)</p>
-             </div>
+          <TrendingUp className="w-5 h-5 text-primary" />
+          <div>
+            <h2 className="text-sm font-bold text-white">Supervision Trésorerie</h2>
+            <p className="text-[10px] text-slate-500">{globalStats?.breakdown.length || 0} agences</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-             {selectedAgencies.length > 0 && (
-                 <Button variant="outline" size="sm" onClick={() => setSelectedAgencies([])} className="h-7 text-xs mr-1">
-                     <X size={12} className="mr-1"/>
-                     Reset
-                 </Button>
-             )}
-            <Button variant="ghost" size="sm" onClick={() => refetchGlobal()} className="h-7 w-7 p-0 rounded-full">
-               <RefreshCcw size={14} />
+        <div className="flex items-center gap-1">
+          {selectedAgencies.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setSelectedAgencies([])} className="h-6 px-2 text-[10px]">
+              <X size={10} className="mr-1"/> Reset
             </Button>
+          )}
+          <div className="relative">
+            <Button variant="outline" size="sm" onClick={() => setShowExportMenu(!showExportMenu)} className="h-6 px-2 text-[10px]" disabled={!globalStats}>
+              <Download size={10} className="mr-1" /> Export
+            </Button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 w-36 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
+                  <button onClick={() => handleExport('csv')} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-muted flex items-center gap-2">
+                    <FileText size={12} className="text-slate-500" /> CSV
+                  </button>
+                  <button onClick={() => handleExport('excel')} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-muted flex items-center gap-2">
+                    <FileSpreadsheet size={12} className="text-emerald-500" /> Excel
+                  </button>
+                  <button onClick={() => handleExport('pdf')} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-muted flex items-center gap-2">
+                    <FileText size={12} className="text-red-500" /> PDF
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 2. Main Scrollable Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1 space-y-4 pb-4">
-          
-          {/* Top Stats Row - Compact */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
-             <Card className="relative overflow-hidden bg-gradient-to-r from-blue-900/40 to-slate-900/40 border-blue-500/20 p-3 flex items-center justify-between">
-                <div>
-                   <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-0.5">Trésorerie Globale</p>
-                   <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black font-mono tracking-tighter text-foreground">
-                        {formatCurrency(globalStats?.globalBalance || 0)} 
-                      </span>
-                      <span className="text-sm font-medium text-muted-foreground">FCFA</span>
-                   </div>
-                </div>
-                <div className={`flex flex-col items-end ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                   <div className={`flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${isPositive ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                     {isPositive ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
-                     {Math.abs(globalGrowth).toFixed(2)}%
-                   </div>
-                   <span className="text-[10px] text-muted-foreground opacity-60 mt-0.5">24h</span>
-                </div>
-             </Card>
-
-             <Card className="bg-slate-900/20 border-slate-800 p-3 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                     <Building2 size={20} />
-                  </div>
-                  <div>
-                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Solde Moyen / Agence</p>
-                     <span className="text-xl font-bold text-foreground">
-                        {globalStats?.breakdown.length ? 
-                            Math.round((globalStats.globalBalance / globalStats.breakdown.length)).toLocaleString() 
-                            : 0} 
-                        <span className="text-xs text-muted-foreground ml-1 font-normal">FCFA</span>
-                    </span>
-                  </div>
-             </Card>
-          </div>
-
-          {/* Chart Section - Enhanced Visuals */}
-          <Card className="p-4 shadow-sm border-slate-800 bg-slate-950/30">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-sm flex items-center gap-2 text-slate-200">
-                      <Calendar size={16} className="text-primary" />
-                      {getChartTitle()}
-                  </h3>
-                   {selectedAgencies.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 ml-2">
-                            {selectedAgencies.map(id => {
-                                const agence = globalStats?.breakdown.find(a => a.agenceId === id);
-                                return (
-                                    <div 
-                                        key={id} 
-                                        className="flex items-center gap-1 px-2 py-0.5 bg-slate-800 rounded-full border border-slate-700"
-                                    >
-                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getAgencyColor(id) }} />
-                                        <span className="text-[10px] font-medium text-slate-300">{agence?.agenceNom || 'Agence'}</span>
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); toggleAgency(id); }}
-                                            className="ml-1 text-slate-500 hover:text-white"
-                                        >
-                                            <X size={10} />
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                   )}
+      {/* 2. Stats + Chart Row */}
+      <div className="grid grid-cols-12 gap-2 px-1 shrink-0">
+        {/* Stats Column */}
+        <div className="col-span-12 md:col-span-4 flex flex-col gap-2">
+          <Card className="relative overflow-hidden bg-gradient-to-r from-blue-900/40 to-slate-900/40 border-blue-500/20 p-2.5">
+            <p className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Trésorerie Globale</p>
+            <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-black font-mono text-foreground">
+                  {formatCurrency(globalStats?.globalBalance || 0)}
+                </span>
+                <span className="text-[9px] text-slate-500">FCFA</span>
               </div>
-              <div className="flex items-center gap-2">
-                {isLoadingChart && <div className="text-[10px] text-muted-foreground animate-pulse mr-2">Mise à jour...</div>}
-                <div className="flex items-center bg-slate-900 rounded-lg border border-slate-800 p-0.5">
-                  {PERIOD_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setPeriod(opt.value)}
-                      className={cn(
-                        "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all",
-                        period === opt.value
-                          ? "bg-primary text-white shadow-sm"
-                          : "text-slate-400 hover:text-slate-200"
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+              <div className={`flex items-center text-[10px] font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                {isPositive ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
+                {Math.abs(globalGrowth).toFixed(1)}%
               </div>
-            </div>
-
-            <div className="h-[320px] w-full">
-              {isLoadingChart ? (
-                <ChartSkeleton />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData || []} margin={{ top: 10, right: 0, left: 10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
-                      </linearGradient>
-                      {selectedAgencies.map(id => (
-                          <linearGradient key={`grad-${id}`} id={`color-${id}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={getAgencyColor(id)} stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor={getAgencyColor(id)} stopOpacity={0.05}/>
-                          </linearGradient>
-                      ))}
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(val) => {
-                          const d = new Date(val);
-                          if (period === 'today') return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                          if (period === '1y') return d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
-                          return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-                      }}
-                      stroke="transparent"
-                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 500 }}
-                      tickLine={false}
-                      axisLine={false}
-                      dy={10}
-                      minTickGap={30}
-                    />
-                    <YAxis 
-                      domain={['auto', 'auto']}
-                      tickFormatter={(val) => {
-                          if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
-                          return `${(val / 1000).toFixed(0)}k`;
-                      }}
-                      stroke="transparent"
-                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 500 }}
-                      tickLine={false}
-                      axisLine={false}
-                      dx={-5}
-                      width={45} 
-                    />
-                    <Tooltip 
-                      content={
-                        <CustomTooltip
-                            period={period}
-                            agencyMap={globalStats?.breakdown.reduce((acc, a) => {
-                                acc[a.agenceId] = a.agenceNom;
-                                return acc;
-                            }, {} as Record<string, string>) || {}}
-                        />
-                      }
-                      cursor={{ stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    />
-                    <Legend 
-                       wrapperStyle={{ paddingTop: '10px' }}
-                       iconType="circle"
-                       formatter={(value) => <span className="text-xs text-slate-400 font-medium ml-1">{value}</span>}
-                    />
-                    
-                    {selectedAgencies.length === 0 ? (
-                      <Area 
-                        type="monotone" 
-                        dataKey="balance" 
-                        name="Flux Global"
-                        stroke="#3b82f6" 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorBalance)" 
-                        activeDot={{ r: 4, strokeWidth: 0, stroke: '#fff' }}
-                      />
-                    ) : (
-                      selectedAgencies.map((id) => {
-                        const agence = globalStats?.breakdown.find(a => a.agenceId === id);
-                        return (
-                          <Area
-                            key={id}
-                            type="monotone"
-                            dataKey={id}
-                            name={agence?.agenceNom || 'Agence'}
-                            stroke={getAgencyColor(id)}
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill={`url(#color-${id})`}
-                            activeDot={{ r: 4, strokeWidth: 0, stroke: '#fff' }}
-                          />
-                        );
-                      })
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
             </div>
           </Card>
+          <Card className="bg-slate-900/20 border-slate-800 p-2.5 flex items-center gap-2">
+            <Building2 size={16} className="text-indigo-400 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold text-slate-500 uppercase truncate">Moyenne/Agence</p>
+              <span className="text-base font-bold text-foreground">
+                {globalStats?.breakdown.length ? Math.round((globalStats.globalBalance / globalStats.breakdown.length)).toLocaleString() : 0}
+                <span className="text-[9px] text-slate-500 ml-1">F</span>
+              </span>
+            </div>
+          </Card>
+        </div>
 
-          {/* Agency Grid & Filter */}
-          <div className="space-y-3">
-             <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/20 p-2 rounded-lg border border-slate-800/50 gap-3">
-                 <div className="flex items-center gap-2">
-                     <Building2 className="w-4 h-4 text-slate-500" />
-                     <span className="text-xs font-semibold text-slate-300">Réseau d'agences</span>
-                     <Badge value={filteredAgencies.length} variant="neutral" size="sm" className="h-5" />
-                 </div>
-                 
-                 <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
-                    <input
-                      type="text"
-                      placeholder="Filtrer..."
-                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-md focus:outline-none focus:border-primary/50 text-slate-200"
-                      value={searchTerm}
-                      onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                    />
-                 </div>
-             </div>
+        {/* Reconciliation Panel - Full Width */}
+        <div className="col-span-12">
+          <TreasuryReconciliationPanel />
+        </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {paginatedAgencies.map((agency: TreasuryStats['breakdown'][0]) => {
-                   const isSelected = selectedAgencies.includes(agency.agenceId);
-                   return (
-                   <Card 
-                        key={agency.agenceId} 
-                        className={cn(
-                            "cursor-pointer transition-all duration-200 hover:bg-slate-800/50 group relative overflow-hidden border-slate-800",
-                            isSelected ? "ring-1 ring-primary border-primary bg-primary/[0.05]" : "hover:border-slate-700"
-                        )}
-                        onClick={() => toggleAgency(agency.agenceId)}
-                   >
-                       {isSelected && (
-                           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: getAgencyColor(agency.agenceId) }} />
-                       )}
-
-                      <div className="p-3">
-                          <div className="flex justify-between items-center mb-2">
-                              <h4 className="font-semibold text-sm truncate text-slate-200">{agency.agenceNom}</h4>
-                              <Badge 
-                                value={agency.solde > 0 ? 'Actif' : 'Vide'} 
-                                variant={agency.solde > 0 ? 'success' : 'neutral'} 
-                                size="sm"
-                                className="text-[10px] h-5"
-                              />
-                          </div>
-                          
-                          <div className="flex items-end justify-between">
-                              <p className="text-[10px] text-slate-500 flex items-center gap-1 truncate max-w-[50%]">
-                                  {agency.ville || '—'}
-                              </p>
-                              <div className="text-sm font-bold font-mono text-white">
-                                  {agency.solde.toLocaleString()} <span className="text-[10px] font-sans text-slate-500 font-normal">F</span>
-                              </div>
-                          </div>
+        {/* Chart Column */}
+        <Card className="col-span-12 md:col-span-8 p-2 border-slate-800 bg-slate-950/30">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[10px] font-medium text-slate-400 shrink-0">{getChartTitle()}</span>
+              {selectedAgencies.length > 0 && (
+                <div className="flex gap-1 overflow-x-auto">
+                  {selectedAgencies.map(id => {
+                    const agence = globalStats?.breakdown.find(a => a.agenceId === id);
+                    return (
+                      <div key={id} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 rounded-full border border-slate-700 shrink-0">
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getAgencyColor(id) }} />
+                        <span className="text-[8px] font-medium text-slate-300">{agence?.agenceNom}</span>
+                        <button onClick={(e) => { e.stopPropagation(); toggleAgency(id); }} className="text-slate-500 hover:text-white">
+                          <X size={8} />
+                        </button>
                       </div>
-                   </Card>
-                )})}
-             </div>
-
-             {/* Pagination */}
-             {totalPages > 1 && (
-                 <div className="flex justify-center items-center gap-2 pt-2">
-                     <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="h-7 w-7 p-0"
-                     >
-                        <ChevronLeft size={14} />
-                     </Button>
-                     <span className="text-xs font-medium text-slate-500">
-                        {page}/{totalPages}
-                     </span>
-                     <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
-                        className="h-7 w-7 p-0"
-                     >
-                        <ChevronRight size={14} />
-                     </Button>
-                 </div>
-             )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center bg-slate-900 rounded p-0.5 shrink-0">
+              {PERIOD_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setPeriod(opt.value)}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded text-[9px] font-medium transition-all",
+                    period === opt.value ? "bg-primary text-white" : "text-slate-500 hover:text-slate-300"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
+          <div className="h-[120px] w-full">
+            {isLoadingChart ? <ChartSkeleton /> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData || []} margin={{ top: 5, right: 10, left: 5, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
+                    </linearGradient>
+                    {selectedAgencies.map(id => (
+                      <linearGradient key={`grad-${id}`} id={`color-${id}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={getAgencyColor(id)} stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor={getAgencyColor(id)} stopOpacity={0.05}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 8, fill: '#64748b' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#334155', strokeWidth: 0.5 }}
+                    tickFormatter={(value) => {
+                      const d = new Date(value);
+                      if (period === 'today') return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                      if (period === '1y') return d.toLocaleDateString('fr-FR', { month: 'short' });
+                      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+                    }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 8, fill: '#64748b' }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={45}
+                    tickFormatter={(value) => {
+                      if (value >= 1000000000) return `${(value / 1000000000).toFixed(0)}G`;
+                      if (value >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
+                      if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip content={<CustomTooltip period={period} agencyMap={globalStats?.breakdown.reduce((acc, a) => { acc[a.agenceId] = a.agenceNom; return acc; }, {} as Record<string, string>) || {}} />} />
+                  <Legend
+                    wrapperStyle={{ paddingTop: 0, fontSize: '9px' }}
+                    iconSize={8}
+                    iconType="circle"
+                    formatter={(value) => <span className="text-[9px] text-slate-400 ml-0.5">{value}</span>}
+                  />
+                  {selectedAgencies.length === 0 ? (
+                    <Area type="monotone" dataKey="balance" name="Flux Global" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorBalance)" />
+                  ) : (
+                    selectedAgencies.map((id) => {
+                      const agence = globalStats?.breakdown.find(a => a.agenceId === id);
+                      return (
+                        <Area key={id} type="monotone" dataKey={id} name={agence?.agenceNom || 'Agence'} stroke={getAgencyColor(id)} strokeWidth={2} fillOpacity={1} fill={`url(#color-${id})`} />
+                      );
+                    })
+                  )}
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* 3. Agency Grid - Compact */}
+      <div className="flex-1 min-h-0 px-1 space-y-2">
+        <div className="flex items-center justify-between bg-slate-900/20 px-2 py-1.5 rounded-lg border border-slate-800/50">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-[10px] font-semibold text-slate-300">Réseau</span>
+            <Badge value={filteredAgencies.length} variant="neutral" size="sm" className="h-4 text-[9px]" />
+          </div>
+          <div className="relative w-40">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Filtrer..."
+              className="w-full pl-6 pr-2 py-1 text-[10px] bg-slate-950 border border-slate-800 rounded focus:outline-none focus:border-primary/50 text-slate-200"
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 overflow-y-auto max-h-[calc(100%-40px)] custom-scrollbar pb-1">
+          {paginatedAgencies.map((agency: TreasuryStats['breakdown'][0]) => {
+            const isSelected = selectedAgencies.includes(agency.agenceId);
+            return (
+              <Card
+                key={agency.agenceId}
+                className={cn(
+                  "cursor-pointer transition-all duration-150 hover:bg-slate-800/50 relative overflow-hidden border-slate-800 p-2",
+                  isSelected ? "ring-1 ring-primary border-primary bg-primary/[0.05]" : "hover:border-slate-700"
+                )}
+                onClick={() => toggleAgency(agency.agenceId)}
+              >
+                {isSelected && (
+                  <div className="absolute top-0 left-0 w-0.5 h-full" style={{ backgroundColor: getAgencyColor(agency.agenceId) }} />
+                )}
+                <div className="flex justify-between items-start mb-0.5">
+                  <h4 className="font-semibold text-[11px] truncate text-slate-200 max-w-[70%]">{agency.agenceNom}</h4>
+                  <Badge
+                    value={agency.solde > 0 ? 'Actif' : '—'}
+                    variant={agency.solde > 0 ? 'success' : 'neutral'}
+                    size="sm"
+                    className="text-[8px] h-4 px-1"
+                  />
+                </div>
+                <div className="flex items-end justify-between">
+                  <span className="text-[9px] text-slate-500 truncate max-w-[40%]">{agency.ville || '—'}</span>
+                  <div className="text-xs font-bold font-mono text-white">
+                    {agency.solde.toLocaleString()}
+                    <span className="text-[8px] font-sans text-slate-500 ml-0.5">F</span>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-1 pt-1">
+            <Button variant="ghost" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="h-5 w-5 p-0">
+              <ChevronLeft size={12} />
+            </Button>
+            <span className="text-[10px] font-medium text-slate-500">{page}/{totalPages}</span>
+            <Button variant="ghost" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-5 w-5 p-0">
+              <ChevronRight size={12} />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -114,6 +114,61 @@ export interface PermissionCheckRequest {
 }
 
 /**
+ * CASL Condition Operators (MongoDB-style)
+ */
+export interface CaslConditionOperators {
+  $eq?: any;
+  $ne?: any;
+  $gt?: number | string;
+  $gte?: number | string;
+  $lt?: number | string;
+  $lte?: number | string;
+  $in?: any[];
+  $nin?: any[];
+  $exists?: boolean;
+  $regex?: string;
+}
+
+/**
+ * CASL Conditions type
+ * Supports nested field paths and operators
+ */
+export type CaslConditions = {
+  [field: string]: CaslConditionOperators | any;
+} & {
+  $and?: CaslConditions[];
+  $or?: CaslConditions[];
+  $not?: CaslConditions;
+};
+
+/**
+ * Condition template for reusable patterns
+ */
+export interface ConditionTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  conditionSchema: CaslConditions;
+  variables: string[];
+  examples: Array<{
+    description: string;
+    values: Record<string, any>;
+  }>;
+  isSystem: boolean;
+}
+
+/**
+ * Permission with conditions
+ */
+export interface PermissionWithConditions {
+  code: string;
+  granted: boolean;
+  conditions?: CaslConditions;
+  templateId?: string;
+  templateValues?: Record<string, any>;
+}
+
+/**
  * Result of a permission check
  */
 export interface PermissionCheckResult {

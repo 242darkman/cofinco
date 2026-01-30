@@ -37,6 +37,9 @@ import {
 } from "@shared/schema";
 import { mouvementsFinanciers, type MouvementFinancier } from "@shared/schema/finance";
 import { getWsInstance } from "../ws-server";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('AccountingPosting');
 
 // ============================================================================
 // ERRORS
@@ -410,7 +413,7 @@ export async function postGlForMouvement(
   // 1. Idempotency check — already posted is OK (return null silently)
   const existingEcritureId = await checkIdempotency(tx, agenceId, "MOUVEMENT", mouvement.id);
   if (existingEcritureId) {
-    console.log(`[AccountingPosting] Mouvement ${mouvement.id} already posted`);
+    logger.info({ mouvementId: mouvement.id }, 'Mouvement already posted');
     return null;
   }
 
@@ -557,7 +560,7 @@ export async function postGlForMouvement(
     })
     .where(eq(glPeriods.id, periodId));
 
-  console.log(`[AccountingPosting] GL posted mouvement ${mouvement.id} as ${numeroPiece} using rule ${rule.code}`);
+  logger.info({ mouvementId: mouvement.id, numeroPiece, ruleCode: rule.code }, 'GL posted mouvement');
 
   return {
     ecritureId: ecriture.id,
@@ -806,7 +809,7 @@ export async function postEntry(request: PostEntryRequest): Promise<PostEntryRes
       })
       .where(eq(glPeriods.id, periodId));
 
-    console.log(`[AccountingPosting] Posted entry ${numeroPiece} from ${sourceType}:${sourceId}`);
+    logger.info({ numeroPiece, sourceType, sourceId }, 'Posted entry');
 
     return {
       ecritureId: ecriture.id,
@@ -988,7 +991,7 @@ export async function reverseEntry(request: ReverseEntryRequest): Promise<Revers
       })
       .where(eq(glPeriods.id, periodId));
 
-    console.log(`[AccountingPosting] Reversed entry ${original.numeroPiece} with ${numeroPiece}`);
+    logger.info({ originalNumeroPiece: original.numeroPiece, reversalNumeroPiece: numeroPiece }, 'Reversed entry');
 
     return {
       originalEcritureId: ecritureId,
@@ -1064,7 +1067,7 @@ export async function closePeriod(request: ClosePeriodRequest): Promise<void> {
       })
       .where(eq(glPeriods.id, period.id));
 
-    console.log(`[AccountingPosting] Closed period ${month}/${year} with ${entryCount} entries`);
+    logger.info({ month, year, entryCount }, 'Closed period');
   });
 }
 

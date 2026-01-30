@@ -124,7 +124,7 @@ export default function CreditEcheancier() {
     loadEcheances();
   }, [loadEcheances]);
 
-  // Badge de statut mémorisé
+  // Badge de statut mémorisé — labels centralisés depuis status-constants
   const getStatutBadge = useCallback((statut: string, joursRetard: number) => {
     if (statut === StatutEcheanceCredit.PAID) {
       return (
@@ -132,7 +132,7 @@ export default function CreditEcheancier() {
           className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-semibold"
           role="status"
         >
-          Payé
+          {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.PAID]}
         </span>
       );
     }
@@ -141,9 +141,9 @@ export default function CreditEcheancier() {
         <span
           className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-semibold"
           role="status"
-          aria-label={`En retard de ${joursRetard} jours`}
+          aria-label={`${STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.LATE]} de ${joursRetard} jours`}
         >
-          Retard ({joursRetard}j)
+          {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.LATE]} ({joursRetard}j)
         </span>
       );
     }
@@ -152,7 +152,7 @@ export default function CreditEcheancier() {
         className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-semibold"
         role="status"
       >
-        En attente
+        {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.UPCOMING]}
       </span>
     );
   }, []);

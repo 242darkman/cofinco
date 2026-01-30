@@ -11,9 +11,11 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Search
+  Search,
+  Mail,
+  Send
 } from 'lucide-react';
-import { Card, Button, IconButton } from '../ui';
+import { Card, Button, IconButton, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -33,6 +35,8 @@ interface GeneratedCredential {
   username?: string;
   password?: string;
   error?: string;
+  emailSent?: boolean;
+  email?: string;
 }
 
 export default function AdminClientCredentials() {
@@ -44,6 +48,7 @@ export default function AdminClientCredentials() {
   const [showResults, setShowResults] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const [sendEmail, setSendEmail] = useState(true);
 
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
@@ -95,9 +100,10 @@ export default function AdminClientCredentials() {
 
   const handleGenerateCredentials = () => {
     const count = selectedClients.size || clients.length;
+    const emailNote = sendEmail ? ' Un email contenant leurs identifiants sera automatiquement envoyé aux clients ayant une adresse email valide.' : '';
     openConfirm({
       title: 'Générer les identifiants ?',
-      message: `Vous allez générer des identifiants de connexion pour ${count} client(s). Les mots de passe générés seront affichés une seule fois. Assurez-vous de les noter ou de les exporter.`,
+      message: `Vous allez générer des identifiants de connexion pour ${count} client(s).${emailNote} Les mots de passe générés seront affichés une seule fois. Assurez-vous de les noter ou de les exporter.`,
       variant: 'warning',
       confirmText: 'Générer',
       onConfirm: async () => {
@@ -109,6 +115,7 @@ export default function AdminClientCredentials() {
             credentials: 'include',
             body: JSON.stringify({
               clientIds: selectedClients.size > 0 ? Array.from(selectedClients) : undefined,
+              sendEmail,
             }),
           });
 
@@ -176,20 +183,31 @@ export default function AdminClientCredentials() {
       <Card variant="default" padding="none" className="overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-edge bg-surface-muted/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <FeatureHeader
+            featureKey="admin.credentials"
+            title={FEATURE_DESCRIPTIONS['admin.credentials'].title}
+            subtitle={`${FEATURE_DESCRIPTIONS['admin.credentials'].subtitle} (${clients.length} sans accès)`}
+            helpText={FEATURE_DESCRIPTIONS['admin.credentials'].helpText}
+            icon={
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-teal-500/10 rounded-xl flex items-center justify-center shrink-0">
                 <Key className="w-5 h-5 sm:w-6 sm:h-6 text-teal-400" />
               </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-content-primary">Accès Portail Client</h2>
-                <p className="text-xs sm:text-sm text-content-muted">
-                  Générer des identifiants pour les clients ({clients.length} sans accès)
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
+            }
+            actions={
+              <div className="flex items-center gap-2 flex-wrap">
+              {/* Toggle envoi email */}
+              <label className="flex items-center gap-2 px-3 py-1.5 bg-surface-muted/50 rounded-lg border border-edge cursor-pointer hover:bg-surface-muted transition-colors">
+                <input
+                  type="checkbox"
+                  checked={sendEmail}
+                  onChange={(e) => setSendEmail(e.target.checked)}
+                  className="rounded border-edge text-primary focus:ring-primary h-4 w-4"
+                />
+                <Mail size={14} className={sendEmail ? 'text-primary' : 'text-content-muted'} />
+                <span className="text-xs font-medium text-content-secondary">
+                  Envoyer par email
+                </span>
+              </label>
               <Button
                 variant="secondary"
                 size="sm"
@@ -202,15 +220,16 @@ export default function AdminClientCredentials() {
               <Button
                 variant="primary"
                 size="sm"
-                icon={generating ? Loader2 : Key}
+                icon={generating ? Loader2 : sendEmail ? Send : Key}
                 onClick={handleGenerateCredentials}
                 disabled={loading || generating || clients.length === 0}
                 className={generating ? 'animate-pulse' : ''}
               >
                 {generating ? 'Génération...' : `Générer ${selectedClients.size > 0 ? `(${selectedClients.size})` : 'Tous'}`}
               </Button>
-            </div>
-          </div>
+              </div>
+            }
+          />
 
           {/* Search */}
           <div className="mt-4">
@@ -325,6 +344,11 @@ export default function AdminClientCredentials() {
                 <h3 className="text-lg font-bold text-content-primary">Identifiants Générés</h3>
                 <p className="text-xs text-content-muted">
                   {generatedResults.filter(r => r.username).length} succès, {generatedResults.filter(r => r.error).length} erreurs
+                  {sendEmail && (
+                    <span className="ml-2 text-blue-400">
+                      • {generatedResults.filter(r => r.emailSent).length} emails envoyés
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -361,7 +385,21 @@ export default function AdminClientCredentials() {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-content-primary">{result.nom}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-content-primary">{result.nom}</p>
+                          {result.emailSent && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[10px] font-medium">
+                              <Mail size={10} />
+                              Email envoyé
+                            </span>
+                          )}
+                          {result.email && !result.emailSent && sendEmail && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded text-[10px] font-medium">
+                              <AlertTriangle size={10} />
+                              Email non envoyé
+                            </span>
+                          )}
+                        </div>
                         {result.error ? (
                           <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
                             <XCircle size={12} /> {result.error}
@@ -404,6 +442,12 @@ export default function AdminClientCredentials() {
                                 aria-label="Copier le mot de passe"
                               />
                             </div>
+                            {result.email && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-content-muted w-20">Email:</span>
+                                <span className="text-xs text-content-secondary">{result.email}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

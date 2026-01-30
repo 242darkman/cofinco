@@ -1,5 +1,8 @@
 import type { Express } from "express";
-import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections } from "@shared/schema";
+import { createLogger } from "../lib/logger";
+import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections, agentsTerrain, employes } from "@shared/schema";
+
+const logger = createLogger('Routes:Operations');
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
@@ -40,6 +43,30 @@ export function registerOperationsRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(agent));
   });
 
+  // Resolve current user's agent terrain profile (userId → agentTerrainId)
+  app.get("/api/agents-terrain/me", requireAuth, async (req, res) => {
+      const userId = (req as any).user?.id || req.session?.userId;
+      if (!userId) return res.status(401).json({ error: "Non authentifié" });
+
+      const [result] = await db
+        .select({ agentId: agentsTerrain.id })
+        .from(agentsTerrain)
+        .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+        .where(eq(employes.userId, userId))
+        .limit(1);
+
+      if (!result) {
+        return res.json({ data: null, message: "Aucun profil agent terrain pour cet utilisateur" });
+      }
+
+      const agent = await storage.getAgentTerrain(result.agentId);
+      if (!agent) {
+        return res.json({ data: null, message: "Agent terrain introuvable" });
+      }
+
+      res.json({ data: addSnakeCaseAliasesDeep(agent) });
+  });
+
   app.get("/api/agents-terrain/:id", requireAuth, async (req, res) => {
       const agent = await storage.getAgentTerrain(req.params.id);
       if (!agent) {
@@ -51,6 +78,11 @@ export function registerOperationsRoutes(app: Express) {
   app.get("/api/agents-terrain/:id/visites", requireAuth, async (req, res) => {
       const visites = await storage.getVisitesByAgent(req.params.id);
       res.json(addSnakeCaseAliasesDeep(visites));
+  });
+
+  app.get("/api/agents-terrain/:id/paiements", requireAuth, async (req, res) => {
+      const paiements = await storage.getPaiementsByAgent(req.params.id);
+      res.json(addSnakeCaseAliasesDeep(paiements));
   });
 
   // Prospections
@@ -88,7 +120,7 @@ export function registerOperationsRoutes(app: Express) {
 
             await StorageService.deleteEntityFiles('prospection', tempEntityId);
           } catch (relocateError) {
-            console.error(`⚠️ File relocation failed for prospection ${prospection.id}:`, relocateError);
+            logger.error({ err: relocateError, prospectionId: prospection.id }, 'File relocation failed for prospection');
           }
         }
 
@@ -118,9 +150,9 @@ export function registerOperationsRoutes(app: Express) {
         // Cleanup temp files if creation failed
         if (tempEntityId) {
           StorageService.deleteEntityFiles('prospection', tempEntityId)
-            .catch(err => console.error("Cleanup temp files failed:", err));
+            .catch(err => logger.error({ err }, 'Cleanup temp files failed'));
         }
-        console.error("Create prospection error:", error);
+        logger.error({ err: error }, 'Create prospection error');
         res.status(500).json({ message: "Erreur lors de la création de la prospection" });
       }
   });
@@ -176,7 +208,7 @@ export function registerOperationsRoutes(app: Express) {
         
         res.status(201).json(addSnakeCaseAliasesDeep(paiement));
       } catch (error: any) {
-        console.error('Error creating paiement terrain:', error);
+        logger.error({ err: error }, 'Error creating paiement terrain');
         res.status(400).json({ error: error.message || "Invalid data" });
       }
   });
@@ -218,7 +250,7 @@ export function registerOperationsRoutes(app: Express) {
 
       res.json(addSnakeCaseAliasesDeep({ ...paiement, mouvement_id: mouvement.id }));
     } catch (error: any) {
-      console.error('Error validating paiement terrain:', error);
+      logger.error({ err: error }, 'Error validating paiement terrain');
       res.status(400).json({ error: error.message || "Error validating payment" });
     }
   });
@@ -273,7 +305,7 @@ export function registerOperationsRoutes(app: Express) {
           })
         );
       } catch (error: any) {
-        console.error('Error fetching paiements terrain:', error);
+        logger.error({ err: error }, 'Error fetching paiements terrain');
         res.status(500).json({ error: 'Failed to fetch payments' });
       }
   });
@@ -302,7 +334,7 @@ export function registerOperationsRoutes(app: Express) {
           })
         );
       } catch (error: any) {
-        console.error('Error fetching POS devices:', error);
+        logger.error({ err: error }, 'Error fetching POS devices');
         res.status(500).json({ error: 'Failed to fetch POS devices' });
       }
   });

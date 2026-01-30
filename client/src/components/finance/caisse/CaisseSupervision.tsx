@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
-import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert, Shield, Info } from 'lucide-react';
+import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert, Shield, Info, Calendar } from 'lucide-react';
 import Tooltip from '../../ui/Tooltip';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
@@ -10,6 +10,9 @@ import { computeSessionStatus } from '../../../lib/format';
 import { useAgence } from '../../../contexts/AgenceContext';
 import { authService } from '../../../lib/auth';
 import SupervisionConfirmModal, { SupervisionSession } from './shared/SupervisionConfirmModal';
+import CaisseAuditLog from './CaisseAuditLog';
+import AgencyClosurePanel from './AgencyClosurePanel';
+import EcartApprovalPanel from './EcartApprovalPanel';
 
 // Types pour les filtres
 type CaissierStatusFilter = 'all' | 'en_caisse' | 'hors_caisse' | 'inactif';
@@ -52,10 +55,12 @@ export default function CaisseSupervision({
   activeSupervision?: SupervisionSession | null;
   onSupervisionStart?: (data: SupervisionCallbackData) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'sessions' | 'caissiers' | 'alertes'>('sessions');
+  const [activeTab, setActiveTab] = useState<'sessions' | 'caissiers' | 'alertes' | 'cloture' | 'audit'>('sessions');
   const [sessions, setSessions] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [riskAlerts, setRiskAlerts] = useState<any[]>([]);
+  const [ecartAlerts, setEcartAlerts] = useState<any[]>([]);
 
   // Contexte d'agence pour le sélecteur
   const { agences, selectedAgence, selectAgence } = useAgence();
@@ -83,8 +88,20 @@ export default function CaisseSupervision({
         fetchData();
     };
 
+    const handleRiskAlert = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        // Refresh alerts on risk alert
+        sessionCaisseApi.getRisky().then(data => setRiskAlerts(data || [])).catch(() => {});
+      }
+    };
+
     window.addEventListener('caisse-update', handleRealTimeUpdate);
-    return () => window.removeEventListener('caisse-update', handleRealTimeUpdate);
+    window.addEventListener('session-risk-alert', handleRiskAlert);
+    return () => {
+      window.removeEventListener('caisse-update', handleRealTimeUpdate);
+      window.removeEventListener('session-risk-alert', handleRiskAlert);
+    };
   }, [selectedAgence]); // Refetch when selected agency changes
 
   // Reset pagination quand les filtres changent
@@ -107,12 +124,16 @@ export default function CaisseSupervision({
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sessionsData, usersData] = await Promise.all([
+      const [sessionsData, usersData, riskyData, ecartsData] = await Promise.all([
         sessionCaisseApi.getAll(),
-        authApi.getUsers().catch(() => [])
+        authApi.getUsers().catch(() => []),
+        sessionCaisseApi.getRisky().catch(() => []),
+        sessionCaisseApi.getEcarts().catch(() => []),
       ]);
       setSessions(sessionsData || []);
       setUsers(usersData || []);
+      setRiskAlerts(riskyData || []);
+      setEcartAlerts(ecartsData || []);
     } catch (error) {
       console.error("Erreur chargement supervision", error);
     } finally {
@@ -241,7 +262,9 @@ export default function CaisseSupervision({
     { key: 'sessions', label: 'Caisses Ouvertes', icon: Wallet, badge: uniqueActiveCaisseCount },
     // L'onglet Caissiers est visible uniquement si l'utilisateur a la permission de voir les users
     ...(permissions.canViewUsers ? [{ key: 'caissiers', label: 'Caissiers', icon: User }] : []),
-    // { key: 'alertes', label: 'Anomalies', icon: AlertTriangle, badge: 0 }
+    { key: 'alertes', label: 'Alertes', icon: AlertTriangle, badge: riskAlerts.length + ecartAlerts.length },
+    ...(permissions.canManageCaisse ? [{ key: 'cloture', label: 'Clôture', icon: Calendar }] : []),
+    ...(permissions.canManageCaisse ? [{ key: 'audit', label: 'Audit', icon: Shield }] : [])
   ];
 
   const handleManageUser = async (user: any) => {
@@ -922,6 +945,155 @@ export default function CaisseSupervision({
                   </>
                 )}
              </div>
+          )}
+
+          {/* ===== ALERTES TAB ===== */}
+          {activeTab === 'alertes' && (
+            <div className="space-y-4 p-2">
+              {/* Sessions à risque (inactivité) */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <Clock size={14} className="text-orange-400" />
+                  Sessions inactives ({riskAlerts.length})
+                </h4>
+                {riskAlerts.length === 0 ? (
+                  <div className="text-center py-6 text-slate-500 text-sm">Aucune session à risque</div>
+                ) : (
+                  <div className="space-y-2">
+                    {riskAlerts.map((alert: any) => (
+                      <div
+                        key={alert.sessionId}
+                        className={`p-3 rounded-lg border ${
+                          alert.riskLevel === 'CRITICAL'
+                            ? 'bg-red-950/30 border-red-800/50'
+                            : 'bg-amber-950/20 border-amber-800/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle
+                              size={16}
+                              className={alert.riskLevel === 'CRITICAL' ? 'text-red-400' : 'text-amber-400'}
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-white">{alert.caisseNom}</div>
+                              <div className="text-[10px] text-slate-400">{alert.caissierNom}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-xs font-bold ${
+                              alert.riskLevel === 'CRITICAL' ? 'text-red-400' : 'text-amber-400'
+                            }`}>
+                              {alert.riskLevel}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {Math.round(alert.hoursInactive)}h inactive
+                            </div>
+                          </div>
+                        </div>
+                        {alert.soldeCurrent != null && (
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            Solde: {Number(alert.soldeCurrent).toLocaleString('fr-FR')} FCFA
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Écarts significatifs */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <TrendingUp size={14} className="text-red-400" />
+                  Écarts significatifs ({ecartAlerts.length})
+                </h4>
+                {ecartAlerts.length === 0 ? (
+                  <div className="text-center py-6 text-slate-500 text-sm">Aucun écart significatif</div>
+                ) : (
+                  <div className="space-y-2">
+                    {ecartAlerts.map((alert: any) => (
+                      <div
+                        key={alert.sessionId}
+                        className={`p-3 rounded-lg border ${
+                          alert.severity === 'HIGH'
+                            ? 'bg-red-950/30 border-red-800/50'
+                            : 'bg-amber-950/20 border-amber-800/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium text-white">{alert.caisseNom}</div>
+                            <div className="text-[10px] text-slate-400">{alert.caissierNom}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-sm font-bold ${
+                              Number(alert.ecart) < 0 ? 'text-red-400' : 'text-amber-400'
+                            }`}>
+                              {Number(alert.ecart) > 0 ? '+' : ''}{Number(alert.ecart).toLocaleString('fr-FR')} FCFA
+                            </div>
+                            <div className={`text-[10px] font-medium ${
+                              alert.severity === 'HIGH' ? 'text-red-400' : 'text-amber-400'
+                            }`}>
+                              {alert.severity}
+                            </div>
+                          </div>
+                        </div>
+                        {alert.closedAt && (
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            Fermé le {new Date(alert.closedAt).toLocaleDateString('fr-FR')} à {new Date(alert.closedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ===== CLÔTURE TAB ===== */}
+          {activeTab === 'cloture' && (
+            <div className="space-y-6 p-2 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <Calendar size={18} className="text-blue-400 sm:size-5" />
+                  Clôture Journalière
+                </h3>
+                <span className="text-xs text-slate-500">
+                  {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </span>
+              </div>
+
+              {selectedAgence ? (
+                <>
+                  {/* Panel clôture agence */}
+                  <AgencyClosurePanel
+                    agenceId={selectedAgence.id}
+                    agenceNom={selectedAgence.nom}
+                    onClosureComplete={() => fetchData()}
+                  />
+
+                  {/* Panel approbation écarts */}
+                  <EcartApprovalPanel
+                    agenceId={selectedAgence.id}
+                    onApprovalComplete={() => fetchData()}
+                  />
+                </>
+              ) : (
+                <div className="text-center py-12 text-slate-500">
+                  <Building2 size={32} className="mx-auto opacity-50 mb-3" />
+                  <p className="text-sm">Sélectionnez une agence pour gérer la clôture</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== AUDIT TAB ===== */}
+          {activeTab === 'audit' && (
+            <div className="h-full p-2 animate-in slide-in-from-right-4 duration-300">
+              <CaisseAuditLog />
+            </div>
           )}
 
         </div>

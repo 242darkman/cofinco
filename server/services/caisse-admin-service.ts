@@ -14,6 +14,9 @@ import {
 } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { ForcedCloseReason } from "@shared/enums";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('CaisseAdmin');
 
 export interface ForceCloseSessionParams {
   sessionId: string;
@@ -131,7 +134,7 @@ export class CaisseAdminService {
         session: closedSession,
       };
     } catch (error: any) {
-      console.error("Erreur force close session:", error);
+      logger.error({ err: error }, 'Error force closing session');
       return {
         success: false,
         error: error.message || "Erreur interne",
@@ -216,7 +219,7 @@ export class CaisseAdminService {
         },
       };
     } catch (error: any) {
-      console.error("Erreur check caisse deletion:", error);
+      logger.error({ err: error }, 'Error checking caisse deletion');
       return {
         canDelete: false,
         soldeActuel: "0",

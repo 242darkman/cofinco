@@ -12,7 +12,7 @@
  * - deleteEmploye: soft delete user + suppression rôles
  */
 
-import { employes, users, userRoles, jobPositions, departments, agences } from "@shared/schema";
+import { employes, users, userRoles, jobPositions, departments, agences, agentsTerrain } from "@shared/schema";
 import { type Employe, type InsertEmploye, type User, type EmployeWithUser } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser } from "@shared/enum/status-constants";
@@ -20,6 +20,9 @@ import { db } from "../db";
 import { eq, desc, and, isNull, asc } from "drizzle-orm";
 import { StorageService } from "../services/storage-service";
 import crypto from "crypto";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Employes');
 
 /**
  * Génère un matricule unique pour un employé
@@ -456,6 +459,16 @@ export async function createEmployeForUser(
       });
     }
 
+    // Si le rôle est AGENT_TERRAIN, créer l'entrée agents_terrain synchrone
+    if (role === SystemRole.AGENT_TERRAIN) {
+      await tx.insert(agentsTerrain).values({
+        employeId: employe.id,
+        zoneAffectation: null,
+        objectifMensuel: '100000',
+        statut: StatutUser.ACTIVE,
+      });
+    }
+
     return employe;
   });
 }
@@ -547,6 +560,22 @@ export async function updateEmployeWithUser(
           agenceId: employeData?.agenceId || currentEmploye.agenceId,
           isPrimary: true,
         });
+      }
+
+      // Si le nouveau rôle est AGENT_TERRAIN, créer l'entrée agents_terrain si elle n'existe pas
+      if (newRole === SystemRole.AGENT_TERRAIN) {
+        const [existingAgentTerrain] = await tx.select()
+          .from(agentsTerrain)
+          .where(eq(agentsTerrain.employeId, employeId));
+
+        if (!existingAgentTerrain) {
+          await tx.insert(agentsTerrain).values({
+            employeId: employeId,
+            zoneAffectation: null,
+            objectifMensuel: '100000',
+            statut: StatutUser.ACTIVE,
+          });
+        }
       }
     }
 
@@ -672,11 +701,11 @@ export async function deleteEmploye(id: string): Promise<boolean> {
     try {
       const { publicDeleted, privateDeleted } = await StorageService.deleteEntityFiles('employe', id);
       if (publicDeleted > 0 || privateDeleted > 0) {
-        console.log(`🗑️  Employe ${id}: suppression cascade MinIO (${publicDeleted} publics, ${privateDeleted} privés)`);
+        logger.info({ employeId: id, publicDeleted, privateDeleted }, 'Employe cascade MinIO deletion completed');
       }
     } catch (storageError) {
       // Log l'erreur mais continue la suppression
-      console.error(`⚠️  Erreur suppression fichiers MinIO pour employe ${id}:`, storageError);
+      logger.error({ err: storageError, employeId: id }, 'Error deleting MinIO files for employe');
     }
 
     // Soft delete du user

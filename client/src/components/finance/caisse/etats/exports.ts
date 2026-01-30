@@ -8,6 +8,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { SessionCaisse, CaisseTransaction } from '@/types/finance';
 import { computeSessionStatus, getSessionStatusLabel } from '@/lib/format';
+import { addPdfLogoHeader as addSharedLogoHeader, addPdfLogoFooter as addSharedLogoFooter } from '@/lib/pdf-logo';
 
 // ============================================================================
 // TYPES & HELPERS
@@ -113,65 +114,25 @@ function getOperationLabel(type?: string): string {
 // ============================================================================
 
 function addPDFHeader(doc: jsPDF, title: string, subtitle: string, config: ExportConfig) {
-  const pageWidth = doc.internal.pageSize.getWidth();
+  const y = addSharedLogoHeader(doc, {
+    title,
+    subtitle,
+    dateRight: `Généré le ${formatDateTime(new Date())}`,
+  });
 
-  // Background header bar
-  doc.setFillColor(...COLORS.secondary);
-  doc.rect(0, 0, pageWidth, 35, 'F');
-
-  // Company name
-  doc.setFontSize(20);
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.text(config.companyName, 14, 18);
-
-  // Company subtitle
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184); // slate-400
-  doc.text(config.companySubtitle, 14, 26);
-
-  // Date on the right
-  doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(`Généré le ${formatDateTime(new Date())}`, pageWidth - 14, 18, { align: 'right' });
-
-  // Report title
-  doc.setFontSize(16);
-  doc.setTextColor(...COLORS.text);
-  doc.setFont('helvetica', 'bold');
-  doc.text(title, 14, 50);
-
-  // Subtitle with period
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.textLight);
-  doc.text(subtitle, 14, 58);
-
-  // Period info
+  // Period info below header
   if (config.dateDebut && config.dateFin) {
-    doc.text(`Période: du ${formatDate(config.dateDebut)} au ${formatDate(config.dateFin)}`, 14, 65);
+    doc.setFontSize(10);
+    doc.setTextColor(...COLORS.textLight);
+    doc.text(`Période: du ${formatDate(config.dateDebut)} au ${formatDate(config.dateFin)}`, 14, y);
+    return y + 10;
   }
 
-  return 75; // Y position to start content
+  return y;
 }
 
 function addPDFFooter(doc: jsPDF) {
-  const pageCount = doc.getNumberOfPages();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(...COLORS.textLight);
-
-    // Left: Company
-    doc.text('COFINCO - Document confidentiel', 14, pageHeight - 10);
-
-    // Right: Page number
-    doc.text(`Page ${i} / ${pageCount}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
-  }
+  addSharedLogoFooter(doc);
 }
 
 // ============================================================================

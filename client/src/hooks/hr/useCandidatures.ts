@@ -99,6 +99,60 @@ export function useCandidatures() {
     }
   };
 
+  const uploadCv = async (candidatureId: number, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/hr/candidatures/${candidatureId}/cv`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Erreur lors de l\'upload du CV');
+      }
+
+      const updated = await response.json();
+      setCandidats(prev => prev.map(c => c.id === candidatureId ? { ...c, cvUrl: updated.cvUrl } : c));
+      return updated;
+    } catch (err) {
+      console.error('Erreur upload CV:', err);
+      return null;
+    }
+  };
+
+  const getCvUrl = async (candidatureId: number): Promise<string | null> => {
+    try {
+      const response = await fetch(`/api/hr/candidatures/${candidatureId}/cv`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.url;
+    } catch {
+      return null;
+    }
+  };
+
+  const updateCandidature = async (id: number, data: { statut?: string; notes?: string; dateEntretien?: string }) => {
+    try {
+      const response = await fetch(`/api/hr/candidatures/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
+
+      const updated = await response.json();
+      setCandidats(prev => prev.map(c => c.id === id ? updated : c));
+      return true;
+    } catch (err) {
+      console.error('Erreur mise à jour candidature:', err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchCandidatures();
   }, []);
@@ -109,6 +163,9 @@ export function useCandidatures() {
     error,
     createCandidature,
     updateStatut,
+    updateCandidature,
+    uploadCv,
+    getCvUrl,
     fetchCandidatures
   };
 }

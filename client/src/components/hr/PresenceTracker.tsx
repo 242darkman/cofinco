@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, Clock, XCircle, UserCheck } from 'lucide-react';
+import { CheckCircle, Clock, XCircle, UserCheck, MapPin, Loader2, BarChart3, Calendar } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { Card, StatCard, Badge, Button, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { hrPresenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import { useGeolocation } from '../../hooks/useGeolocation';
+import AttendanceAnalytics from './AttendanceAnalytics';
 
 // Interfaces typées pour remplacer les `any`
 interface PresenceRecord {
@@ -47,7 +49,11 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
   const [modalStatus, setModalStatus] = useState('');
   const [modalEmployees, setModalEmployees] = useState<PresenceRecord[]>([]);
   const [userPresence, setUserPresence] = useState<PresenceRecord | null>(null);
-  
+
+  // View mode: 'daily' or 'analytics'
+  const [viewMode, setViewMode] = useState<'daily' | 'analytics'>('daily');
+  const [selectedEmployeeForAnalytics, setSelectedEmployeeForAnalytics] = useState<Employe | null>(null);
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
@@ -79,15 +85,45 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
     }
   }, [user?.id]);
 
+  const geo = useGeolocation({ desiredAccuracy: 50, maxWait: 15000 });
+  const [isCapturingGps, setIsCapturingGps] = useState(false);
+
   const handleCheckIn = useCallback(async () => {
+    // Try to capture GPS before check-in
+    setIsCapturingGps(true);
     try {
-        await hrPresenceApi.checkIn();
-        toast.success('Arrivée enregistrée');
+        let gpsData: { latitude?: number | null; longitude?: number | null; accuracy?: number | null; gpsSource?: string } | undefined;
+
+        if (geo.isSupported) {
+            try {
+                const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0,
+                    });
+                });
+                gpsData = {
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy,
+                    gpsSource: "gps",
+                };
+            } catch {
+                // GPS failed — proceed without it
+                console.warn("[Presence] GPS capture failed, proceeding without location");
+            }
+        }
+
+        await hrPresenceApi.checkIn(gpsData);
+        toast.success(gpsData ? 'Arrivée enregistrée (avec localisation)' : 'Arrivée enregistrée');
         fetchPresenceStats();
     } catch (error) {
         toast.error(handleApiError(error, 'Erreur lors du pointage'));
+    } finally {
+        setIsCapturingGps(false);
     }
-  }, [fetchPresenceStats]);
+  }, [fetchPresenceStats, geo.isSupported]);
 
   const handleCheckOut = useCallback(async () => {
     try {
@@ -189,26 +225,57 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
 
   return (
     <div className="flex flex-col h-full space-y-2">
-      {/* Stats Cards - Compact */}
-      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <StatCard
-          title="Présents"
-          value={`${stats.presents}/${stats.totalEmployes}`}
-          subtitle={`${stats.tauxPresence}%`}
-          icon={CheckCircle}
-          color="success"
-          onClick={() => handleShowEmployees('Présent')}
-          className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
-        />
+      {/* Header with tabs */}
+      <div className="shrink-0 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 bg-slate-800/50 rounded-lg p-0.5">
+            <button
+              onClick={() => { setViewMode('daily'); setSelectedEmployeeForAnalytics(null); }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition flex items-center gap-1.5 ${
+                viewMode === 'daily' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Clock size={12} />
+              Journalier
+            </button>
+            <button
+              onClick={() => setViewMode('analytics')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition flex items-center gap-1.5 ${
+                viewMode === 'analytics' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BarChart3 size={12} />
+              Historique
+            </button>
+          </div>
+        </div>
+        {viewMode === 'analytics' && !selectedEmployeeForAnalytics && (
+          <span className="text-xs text-slate-500">Sélectionnez un employé pour voir son historique</span>
+        )}
+      </div>
 
-        <StatCard
-          title="Retards"
-          value={stats.retards}
-          icon={Clock}
-          color="warning"
-          onClick={() => handleShowEmployees('Retard')}
-          className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
-        />
+      {viewMode === 'daily' ? (
+        <>
+          {/* Stats Cards - Compact */}
+          <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <StatCard
+              title="Présents"
+              value={`${stats.presents}/${stats.totalEmployes}`}
+              subtitle={`${stats.tauxPresence}%`}
+              icon={CheckCircle}
+              color="success"
+              onClick={() => handleShowEmployees('Présent')}
+              className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
+            />
+
+            <StatCard
+              title="Retards"
+              value={stats.retards}
+              icon={Clock}
+              color="warning"
+              onClick={() => handleShowEmployees('Retard')}
+              className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
+            />
 
         <StatCard
           title="Absents"
@@ -222,8 +289,16 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
         <div className="bg-slate-800/50 rounded-xl p-2 border border-slate-700/50 flex flex-col justify-center items-center gap-1.5 h-full">
             <h4 className="text-white text-[10px] font-bold uppercase tracking-wider">Pointage</h4>
             {!userPresence?.heureArrivee && (
-              <Button variant="primary" size="sm" fullWidth icon={UserCheck} onClick={handleCheckIn} className="h-8 text-xs">
-                Pointer Arrivée
+              <Button
+                variant="primary"
+                size="sm"
+                fullWidth
+                icon={isCapturingGps ? Loader2 : UserCheck}
+                onClick={handleCheckIn}
+                disabled={isCapturingGps}
+                className={`h-8 text-xs ${isCapturingGps ? '[&_svg]:animate-spin' : ''}`}
+              >
+                {isCapturingGps ? 'Localisation...' : 'Pointer Arrivée'}
               </Button>
             )}
             {userPresence?.heureArrivee && !userPresence?.pauseDebut && !userPresence?.heureDepart && (
@@ -265,7 +340,7 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
         </div>
         
         <div className="flex-1 overflow-hidden">
-          <ResponsiveTable 
+          <ResponsiveTable
               data={paginatedPresenceData}
               columns={columns}
               loading={loading}
@@ -279,9 +354,72 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
               density="compact"
               className="border-0 rounded-none h-full"
               headerClassName="bg-slate-900 sticky top-0"
+              onRowClick={(emp: EmployePresenceData) => {
+                setSelectedEmployeeForAnalytics(emp);
+                setViewMode('analytics');
+              }}
           />
         </div>
       </div>
+        </>
+      ) : (
+        /* Analytics View */
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {selectedEmployeeForAnalytics ? (
+            <div className="h-full flex flex-col">
+              <div className="shrink-0 flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                  {selectedEmployeeForAnalytics.nom?.charAt(0)}{selectedEmployeeForAnalytics.prenom?.charAt(0)}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-white">
+                    {selectedEmployeeForAnalytics.nom} {selectedEmployeeForAnalytics.prenom}
+                  </h3>
+                  <p className="text-xs text-slate-400">{selectedEmployeeForAnalytics.poste}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedEmployeeForAnalytics(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  Changer
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <AttendanceAnalytics
+                  employeId={selectedEmployeeForAnalytics.id}
+                  employeNom={`${selectedEmployeeForAnalytics.nom} ${selectedEmployeeForAnalytics.prenom}`}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 h-full overflow-y-auto">
+              <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                <Calendar size={14} className="text-slate-400" />
+                Sélectionner un employé
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {employes.map(emp => (
+                  <button
+                    key={emp.id}
+                    onClick={() => setSelectedEmployeeForAnalytics(emp)}
+                    className="flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition text-left"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
+                      {emp.nom?.charAt(0)}{emp.prenom?.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-white truncate">{emp.nom} {emp.prenom}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{emp.poste}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal Liste Employés */}
       {showModal && (

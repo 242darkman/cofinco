@@ -1,10 +1,66 @@
-import React, { useState, useEffect, Suspense, useMemo } from 'react';
-import { MapPin, Save, X, Circle, Edit2, AlertCircle, CheckCircle, Users, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, Button, SearchInput, Badge, FormField, LoadingSpinner, IconButton } from '../ui';
+import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
+import { MapPin, Save, X, Circle, Edit2, AlertCircle, CheckCircle, Users, ChevronLeft, ChevronRight, Trash2, AlertTriangle } from 'lucide-react';
+import { Card, Button, SearchInput, Badge, FormField, LoadingSpinner, IconButton, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import AdminGestionZonesMap from '../maps/AdminGestionZonesMap';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { agentTerrainApi } from '../../lib/api-client';
 import { StatutClient } from '@shared/enum/status-constants';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { toast, handleApiError } from '../../lib/toast';
+
+// Calculate distance between two coordinates using Haversine formula
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Detect overlapping zones
+function detectZoneOverlaps(agents: Agent[]): Map<string, string[]> {
+  const overlaps = new Map<string, string[]>();
+  const agentsWithZones = agents.filter(
+    (a) => a.zoneLatitude && a.zoneLongitude && a.statut === StatutClient.ACTIVE
+  );
+
+  for (let i = 0; i < agentsWithZones.length; i++) {
+    for (let j = i + 1; j < agentsWithZones.length; j++) {
+      const agent1 = agentsWithZones[i];
+      const agent2 = agentsWithZones[j];
+
+      const lat1 = parseFloat(agent1.zoneLatitude!);
+      const lon1 = parseFloat(agent1.zoneLongitude!);
+      const lat2 = parseFloat(agent2.zoneLatitude!);
+      const lon2 = parseFloat(agent2.zoneLongitude!);
+      const radius1 = parseFloat(agent1.zoneRayon || '2');
+      const radius2 = parseFloat(agent2.zoneRayon || '2');
+
+      const distance = haversineDistance(lat1, lon1, lat2, lon2);
+      const sumRadii = radius1 + radius2;
+
+      // Zones overlap if distance between centers is less than sum of radii
+      if (distance < sumRadii) {
+        const overlapPercent = Math.round(((sumRadii - distance) / Math.min(radius1, radius2)) * 100);
+
+        if (!overlaps.has(agent1.id)) overlaps.set(agent1.id, []);
+        if (!overlaps.has(agent2.id)) overlaps.set(agent2.id, []);
+
+        overlaps.get(agent1.id)!.push(`${agent2.prenom} ${agent2.nom} (~${overlapPercent}%)`);
+        overlaps.get(agent2.id)!.push(`${agent1.prenom} ${agent1.nom} (~${overlapPercent}%)`);
+      }
+    }
+  }
+
+  return overlaps;
+}
 
 interface Agent {
   id: string;
@@ -36,12 +92,16 @@ export default function AdminGestionZones() {
   const { hasPermission } = usePermissions();
   const canEditZones = hasPermission('terrain', 'edit') || hasPermission('terrain', 'manage');
 
+  // Confirm dialog hook
+  const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
+
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyWithZone, setShowOnlyWithZone] = useState(false);
+  const [showOnlyOverlapping, setShowOnlyOverlapping] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
@@ -70,6 +130,49 @@ export default function AdminGestionZones() {
       setLoading(false);
     }
   };
+
+  // Detect overlapping zones
+  const zoneOverlaps = useMemo(() => detectZoneOverlaps(agents), [agents]);
+
+  // Count agents with overlapping zones
+  const overlappingCount = useMemo(() => zoneOverlaps.size, [zoneOverlaps]);
+
+  // Delete zone for an agent
+  const deleteZone = useCallback((agent: Agent) => {
+    openConfirm({
+      title: 'Supprimer la zone ?',
+      message: `Voulez-vous vraiment supprimer la zone d'affectation de ${agent.prenom} ${agent.nom} ?`,
+      variant: 'danger',
+      confirmText: 'Supprimer',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/agents-terrain/${agent.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              zoneLatitude: null,
+              zoneLongitude: null,
+              zoneRayon: null,
+              zoneAffectation: ''
+            })
+          });
+
+          if (response.ok) {
+            toast.success('Zone supprimée avec succès');
+            await loadAgents();
+            if (selectedAgent?.id === agent.id) setSelectedAgent(null);
+            if (editingAgent?.id === agent.id) cancelEditing();
+          } else {
+            const error = await response.json();
+            toast.error(error.error || 'Erreur lors de la suppression');
+          }
+        } catch (error) {
+          toast.error(handleApiError(error, 'Erreur de connexion'));
+        }
+      },
+    });
+  }, [openConfirm, selectedAgent, editingAgent]);
 
   const handleMapClick = (lat: number, lng: number) => {
     if (editingAgent) {
@@ -135,12 +238,13 @@ export default function AdminGestionZones() {
   };
 
   const filteredAgents = agents.filter(agent => {
-    const matchSearch = 
+    const matchSearch =
       agent.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       agent.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       agent.zoneAffectation.toLowerCase().includes(searchTerm.toLowerCase());
     const matchZone = !showOnlyWithZone || (agent.zoneLatitude && agent.zoneLongitude);
-    return matchSearch && matchZone && agent.statut === StatutClient.ACTIVE;
+    const matchOverlap = !showOnlyOverlapping || zoneOverlaps.has(agent.id);
+    return matchSearch && matchZone && matchOverlap && agent.statut === StatutClient.ACTIVE;
   });
 
   // Pagination logic
@@ -153,7 +257,7 @@ export default function AdminGestionZones() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, showOnlyWithZone]);
+  }, [searchTerm, showOnlyWithZone, showOnlyOverlapping]);
 
   const agentsWithZones = agents.filter(a => a.zoneLatitude && a.zoneLongitude && a.statut === StatutClient.ACTIVE);
   const activeAgentsCount = agents.filter(a => a.statut === StatutClient.ACTIVE).length;
@@ -169,26 +273,24 @@ export default function AdminGestionZones() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header - Compact mobile */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <FeatureHeader
+        featureKey="admin.zones"
+        title={FEATURE_DESCRIPTIONS['admin.zones'].title}
+        subtitle={FEATURE_DESCRIPTIONS['admin.zones'].subtitle}
+        helpText={FEATURE_DESCRIPTIONS['admin.zones'].helpText}
+        icon={
           <div className="p-2 sm:p-3 bg-blue-500/20 rounded-xl">
             <MapPin className="text-blue-400" size={22} />
           </div>
-          <div>
-            <h2 className="text-lg sm:text-2xl font-bold text-white">
-              Gestion des Zones d'Affectation
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Définissez les zones géographiques d'intervention des agents terrain
-            </p>
-          </div>
-        </div>
-        <Card className="bg-slate-800 border-slate-700 px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2">
-          <Users size={16} className="text-slate-400" />
-          <span className="text-xs sm:text-sm text-slate-400">Agents avec zone:</span>
-          <span className="text-white font-bold text-sm sm:text-base">{agentsWithZones.length}/{activeAgentsCount}</span>
-        </Card>
-      </div>
+        }
+        actions={
+          <Card className="bg-slate-800 border-slate-700 px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2">
+            <Users size={16} className="text-slate-400" />
+            <span className="text-xs sm:text-sm text-slate-400">Agents avec zone:</span>
+            <span className="text-white font-bold text-sm sm:text-base">{agentsWithZones.length}/{activeAgentsCount}</span>
+          </Card>
+        }
+      />
 
       {/* Message Alert */}
       {message && (
@@ -209,6 +311,29 @@ export default function AdminGestionZones() {
         </Card>
       )}
 
+      {/* Overlap Warning Banner */}
+      {overlappingCount > 0 && (
+        <Card className="p-3 flex items-center gap-3 bg-amber-500/10 border-amber-500/30">
+          <AlertTriangle size={20} className="text-amber-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm text-amber-300 font-medium">
+              Chevauchement détecté : {overlappingCount} agent(s) ont des zones qui se superposent
+            </p>
+            <p className="text-xs text-amber-400/70 mt-0.5">
+              Cela peut causer des conflits d'attribution de clients. Vérifiez les zones concernées.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowOnlyOverlapping(!showOnlyOverlapping)}
+            className="text-amber-400 border-amber-500/50 hover:bg-amber-500/20"
+          >
+            {showOnlyOverlapping ? 'Voir tous' : 'Voir les conflits'}
+          </Button>
+        </Card>
+      )}
+
       {/* Main Layout - Stack on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Agents List */}
@@ -223,28 +348,47 @@ export default function AdminGestionZones() {
               data-testid="input-search-agent"
             />
 
-            {/* Filter Toggle */}
-            <label className="flex items-center gap-2 text-slate-300 text-xs sm:text-sm mb-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showOnlyWithZone}
-                onChange={(e) => setShowOnlyWithZone(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500"
-              />
-              Afficher uniquement les agents avec zone
-            </label>
+            {/* Filter Toggles */}
+            <div className="space-y-2 mb-3">
+              <label className="flex items-center gap-2 text-slate-300 text-xs sm:text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showOnlyWithZone}
+                  onChange={(e) => setShowOnlyWithZone(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500"
+                />
+                Agents avec zone uniquement
+              </label>
+              {overlappingCount > 0 && (
+                <label className="flex items-center gap-2 text-amber-300 text-xs sm:text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyOverlapping}
+                    onChange={(e) => setShowOnlyOverlapping(e.target.checked)}
+                    className="w-4 h-4 rounded border-amber-600 bg-slate-700 text-amber-500"
+                  />
+                  Zones en chevauchement ({overlappingCount})
+                </label>
+              )}
+            </div>
 
             {/* Agent List */}
             <div className="space-y-2">
               {paginatedAgents.map((agent, index) => {
                 // Calculate actual index for consistent color mapping
                 const actualIndex = filteredAgents.findIndex(a => a.id === agent.id);
+                const hasOverlap = zoneOverlaps.has(agent.id);
+                const overlapsWith = zoneOverlaps.get(agent.id) || [];
+                const hasZone = agent.zoneLatitude && agent.zoneLongitude;
+
                 return (
                   <div
                     key={agent.id}
                     className={`p-2.5 sm:p-3 rounded-lg cursor-pointer transition-all ${
                       selectedAgent?.id === agent.id || editingAgent?.id === agent.id
                         ? 'bg-blue-600/30 border border-blue-500'
+                        : hasOverlap
+                        ? 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
                         : 'bg-slate-800 hover:bg-slate-700 border border-transparent'
                     }`}
                     onClick={() => !editingAgent && setSelectedAgent(agent)}
@@ -256,24 +400,43 @@ export default function AdminGestionZones() {
                           {agent.prenom} {agent.nom}
                         </div>
                         <div className="text-xs text-slate-400 truncate">{agent.zoneAffectation}</div>
+                        {hasOverlap && (
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400">
+                            <AlertTriangle size={10} />
+                            <span className="truncate">Chevauche: {overlapsWith.slice(0, 2).join(', ')}{overlapsWith.length > 2 ? '...' : ''}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {agent.zoneLatitude && agent.zoneLongitude ? (
-                          <span 
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {hasZone ? (
+                          <span
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: zoneColors[actualIndex % zoneColors.length] }}
                           />
                         ) : (
-                          <AlertCircle size={14} className="text-amber-400" />
+                          <span title="Aucune zone définie"><AlertCircle size={14} className="text-slate-500" /></span>
                         )}
                         {canEditZones && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); startEditing(agent); }}
-                            className="p-1 text-slate-400 hover:text-blue-400 transition"
-                            data-testid={`button-edit-zone-${agent.id}`}
-                          >
-                            <Edit2 size={14} />
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); startEditing(agent); }}
+                              className="p-1 text-slate-400 hover:text-blue-400 transition"
+                              data-testid={`button-edit-zone-${agent.id}`}
+                              title="Modifier la zone"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            {hasZone && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteZone(agent); }}
+                                className="p-1 text-slate-400 hover:text-red-400 transition"
+                                data-testid={`button-delete-zone-${agent.id}`}
+                                title="Supprimer la zone"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -403,6 +566,22 @@ export default function AdminGestionZones() {
               <h3 className="font-bold text-white text-sm sm:text-base mb-3">
                 {selectedAgent.prenom} {selectedAgent.nom}
               </h3>
+
+              {/* Overlap Warning */}
+              {zoneOverlaps.has(selectedAgent.id) && (
+                <div className="mb-3 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-amber-400 text-xs">
+                    <AlertTriangle size={14} />
+                    <span className="font-medium">Zone en chevauchement avec:</span>
+                  </div>
+                  <ul className="mt-1 text-xs text-amber-300/80 pl-5 list-disc">
+                    {zoneOverlaps.get(selectedAgent.id)!.map((overlap, i) => (
+                      <li key={i}>{overlap}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Zone:</span>
@@ -424,16 +603,27 @@ export default function AdminGestionZones() {
                 )}
               </div>
               {canEditZones && (
-                <Button
-                  variant="primary"
-                  icon={Edit2}
-                  onClick={() => startEditing(selectedAgent)}
-                  fullWidth
-                  className="mt-3"
-                  data-testid="button-modify-zone"
-                >
-                  Modifier la zone
-                </Button>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="primary"
+                    icon={Edit2}
+                    onClick={() => startEditing(selectedAgent)}
+                    className="flex-1 justify-center"
+                    data-testid="button-modify-zone"
+                  >
+                    Modifier
+                  </Button>
+                  {selectedAgent.zoneLatitude && selectedAgent.zoneLongitude && (
+                    <Button
+                      variant="danger"
+                      icon={Trash2}
+                      onClick={() => deleteZone(selectedAgent)}
+                      data-testid="button-delete-zone"
+                    >
+                      Supprimer
+                    </Button>
+                  )}
+                </div>
               )}
             </Card>
           )}
@@ -501,6 +691,17 @@ export default function AdminGestionZones() {
           </Card>
         </div>
       </div>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={handleConfirm}
+        title={confirmState.title || ''}
+        message={confirmState.message || ''}
+        variant={confirmState.variant}
+        confirmText={confirmState.confirmText}
+      />
     </div>
   );
 }

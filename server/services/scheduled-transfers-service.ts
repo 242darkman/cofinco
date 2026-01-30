@@ -23,6 +23,7 @@ import {
 } from "@shared/schema";
 import { and, eq, lte, isNull, sql, desc } from "drizzle-orm";
 import { canDeposit, canWithdraw } from "./comptes";
+import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 import {
   FrequenceVirement,
   FrequenceVirementType,
@@ -33,6 +34,9 @@ import {
   StatutTransaction,
 } from "@shared/enum/status-constants";
 import type { PostgresJsTransaction } from "drizzle-orm/postgres-js";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('ScheduledTransfers');
 
 // ============================================
 // TYPES
@@ -105,6 +109,17 @@ export function computeNextExecution(
       next.setDate(next.getDate() + 7);
       return next;
 
+    case FrequenceVirement.BI_MONTHLY: {
+      // Bimensuel = 2×/mois: alternance 1er ↔ 15 du mois
+      if (next.getDate() <= 15) {
+        next.setDate(15);
+      } else {
+        next.setMonth(next.getMonth() + 1);
+        next.setDate(1);
+      }
+      return next;
+    }
+
     case FrequenceVirement.MONTHLY: {
       // Passer au mois suivant
       next.setMonth(next.getMonth() + 1);
@@ -114,6 +129,15 @@ export function computeNextExecution(
       // Limiter a 28 pour eviter les problemes de fin de mois
       const safeDay = Math.min(targetDay, 28);
       next.setDate(safeDay);
+      return next;
+    }
+
+    case FrequenceVirement.QUARTERLY: {
+      // Trimestriel = +3 mois
+      next.setMonth(next.getMonth() + 3);
+      const targetDayQ = jourExecution ?? next.getDate();
+      const safeDayQ = Math.min(targetDayQ, 28);
+      next.setDate(safeDayQ);
       return next;
     }
 
@@ -226,6 +250,9 @@ async function executeCompteTransferInTx(
         type: "VIREMENT_PROGRAMME",
         description: description || `Virement vers ${compteDest.numero_compte}`,
         compteDestId: compteDest.id,
+        // Numéros de compte pour libellés bancaires
+        compteSourceNumero: compteSource.numero_compte,
+        compteDestNumero: compteDest.numero_compte,
       },
     })
     .returning();
@@ -245,10 +272,12 @@ async function executeCompteTransferInTx(
     .where(eq(comptes.id, compteDest.id));
 
   // Creer les transactions compte (pour historique)
+  // TRANSFER_OUT = DEBIT (argent sort), TRANSFER_IN = CREDIT (argent entre)
   await tx.insert(transactionsCompte).values({
     compteId: compteSource.id,
     mouvementId,
     typePaiement: "TRANSFER_OUT",
+    sens: "DEBIT",
     montant: montant.toString(),
     soldeApres: nouveauSoldeSource,
     methodePaiement: "TRANSFER",
@@ -260,6 +289,7 @@ async function executeCompteTransferInTx(
     compteId: compteDest.id,
     mouvementId,
     typePaiement: "TRANSFER_IN",
+    sens: "CREDIT",
     montant: montant.toString(),
     soldeApres: nouveauSoldeDest,
     methodePaiement: "TRANSFER",
@@ -400,11 +430,11 @@ export async function processScheduledTransfers(
   const schedules = claimedSchedules.rows as any[];
 
   if (schedules.length === 0) {
-    console.log(`[ScheduledTransfers] Aucun virement a traiter`);
+    logger.info('Aucun virement a traiter');
     return results;
   }
 
-  console.log(`[ScheduledTransfers] ${schedules.length} virements revendiques par ${WORKER_ID}`);
+  logger.info({ count: schedules.length, workerId: WORKER_ID }, 'Virements revendiques');
 
   // Etape 2: Traiter chaque virement dans sa propre transaction
   for (const schedule of schedules) {
@@ -435,7 +465,7 @@ export async function processScheduledTransfers(
 
         // Si aucune ligne inseree = deja execute aujourd'hui
         if (insertResult.rows.length === 0) {
-          console.log(`[ScheduledTransfers] ${schedule.id} deja execute (${executionKey})`);
+          logger.debug({ scheduleId: schedule.id, executionKey }, 'Schedule deja execute');
 
           // Liberer le verrou
           await tx
@@ -528,13 +558,27 @@ export async function processScheduledTransfers(
         results.push({ id: schedule.id, success: true, skipped: true });
       } else {
         results.push({ id: schedule.id, success: true, mouvementId: result.mouvementId });
+
+        // Notify client of successful transfer (fire-and-forget)
+        dispatchDomainEvent({
+          type: "SCHEDULED_TRANSFER_EXECUTED",
+          data: {
+            scheduleId: schedule.id,
+            montant: Number(schedule.montant),
+            compteSourceId: schedule.compte_source_id,
+            compteDestId: schedule.compte_dest_id,
+            executionKey,
+          },
+          timestamp: new Date(),
+          agenceId: schedule.agence_id || undefined,
+        });
       }
 
     } catch (error) {
       const executionTimeMs = Math.round(performance.now() - startTime);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
 
-      console.error(`[ScheduledTransfers] Echec ${schedule.id}: ${errorMessage}`);
+      logger.error({ scheduleId: schedule.id, error: errorMessage }, 'Scheduled transfer failed');
 
       // Gerer l'echec dans une nouvelle transaction
       try {
@@ -619,8 +663,25 @@ export async function processScheduledTransfers(
           }
         });
       } catch (cleanupError) {
-        console.error(`[ScheduledTransfers] Erreur cleanup ${schedule.id}:`, cleanupError);
+        logger.error({ err: cleanupError, scheduleId: schedule.id }, 'Error during cleanup');
       }
+
+      // Notify client of failed transfer (fire-and-forget)
+      const failRetryCount = (schedule.retry_count || 0) + 1;
+      const failMaxRetries = schedule.max_retries || 3;
+      dispatchDomainEvent({
+        type: "SCHEDULED_TRANSFER_FAILED",
+        data: {
+          scheduleId: schedule.id,
+          montant: Number(schedule.montant),
+          errorMessage,
+          retryCount: failRetryCount,
+          maxRetries: failMaxRetries,
+          disabled: failRetryCount >= failMaxRetries,
+        },
+        timestamp: new Date(),
+        agenceId: schedule.agence_id || undefined,
+      });
 
       results.push({ id: schedule.id, success: false, error: errorMessage });
     }
@@ -653,7 +714,7 @@ export async function cleanupStaleProcessingLocks(
     .returning({ id: virementsProgrammes.id });
 
   if (result.length > 0) {
-    console.log(`[ScheduledTransfers] ${result.length} verrous orphelins nettoyes`);
+    logger.info({ count: result.length }, 'Verrous orphelins nettoyes');
   }
 
   return result.length;
@@ -712,6 +773,6 @@ export { executeCompteTransferInTx };
  * @deprecated Utiliser processScheduledTransfers() a la place
  */
 export async function runVirementsProgrammes(referenceDate = new Date()) {
-  console.warn("[DEPRECATED] runVirementsProgrammes() - utiliser processScheduledTransfers()");
+  logger.warn('DEPRECATED: runVirementsProgrammes() - utiliser processScheduledTransfers()');
   return processScheduledTransfers(referenceDate);
 }

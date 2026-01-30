@@ -1,11 +1,14 @@
 import { db } from './db';
-import { 
-  transferts, transfertAuditLogs, transfertLimits, transfertBlacklist, 
-  transfertWebhooks, kycLevels, users 
+import {
+  transferts, transfertAuditLogs, transfertLimits, transfertBlacklist,
+  transfertWebhooks, kycLevels, users
 } from '@shared/schema';
 import { eq, and, gte, sql, desc, count } from 'drizzle-orm';
 import crypto from 'crypto';
 import type { Request } from 'express';
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('TransferSecurity');
 
 // ============ CONFIGURATION SÉCURITÉ (BEAC/CEMAC Conformité) ============
 
@@ -177,7 +180,7 @@ export async function checkBlacklist(params: BlacklistCheckParams): Promise<{ bl
         else if (blocked[0].severite === 'medium' && maxSeverity === 'low') maxSeverity = 'medium';
       }
     } catch (error) {
-      console.error(`Erreur vérification ${type}:`, error);
+      logger.error({ err: error, type }, 'Error checking blacklist entity');
     }
   };
 
@@ -334,7 +337,7 @@ export async function checkTransferLimits(
       }
     };
   } catch (error) {
-    console.error('Erreur vérification limites:', error);
+    logger.error({ err: error }, 'Error checking transfer limits');
     return {
       allowed: false,
       message: 'Erreur de vérification des limites',
@@ -484,7 +487,7 @@ export async function logTransferAudit(
 
     return currentHash;
   } catch (error) {
-    console.error('Erreur audit log:', error);
+    logger.error({ err: error, transfertId }, 'Error logging transfer audit');
     throw error;
   }
 }
@@ -622,7 +625,7 @@ export async function updateTransferLimits(
       })
       .where(eq(transfertLimits.telephone, phone));
   } catch (error) {
-    console.error('Erreur mise à jour limites:', error);
+    logger.error({ err: error, phone }, 'Error updating transfer limits');
   }
 }
 
@@ -684,4 +687,4 @@ setInterval(() => {
   }
 }, 60000);
 
-console.log('[Transfer Security Service] Initialisé avec les normes CEMAC/BEAC');
+logger.info('Transfer Security Service initialized with CEMAC/BEAC standards');

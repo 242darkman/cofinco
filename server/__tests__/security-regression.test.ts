@@ -11,6 +11,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, resolve } from "path";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('SecurityTest');
 
 const ROOT = resolve(__dirname, "..");
 
@@ -110,8 +113,7 @@ describe("Coffre balance — No app-layer arithmetic", () => {
     }
 
     if (violations.length > 0) {
-      console.warn("App-layer arithmetic on coffre/caisse solde detected:");
-      violations.forEach(v => console.warn(`  ${v}`));
+      logger.warn({ violations }, "App-layer arithmetic on coffre/caisse solde detected");
     }
     expect(violations).toEqual([]);
   });

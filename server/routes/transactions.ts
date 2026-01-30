@@ -1,7 +1,10 @@
 import { Router } from "express";
+import { createLogger } from "../lib/logger";
 import { GlobalTransactionService } from "../services/global-transaction-service";
 import { z } from "zod";
 import { requireAuth } from "../auth";
+
+const logger = createLogger('Routes:Transactions');
 
 export const transactionsRouter = Router();
 
@@ -11,7 +14,7 @@ export const transactionsRouter = Router();
 const transactionSchema = z.object({
   clientId: z.string().uuid("ID Client invalide"),
   amount: z.number().positive("Le montant doit être positif"),
-  paymentMethod: z.enum(["CASH", "MOMO", "TRANSFER"]),
+  paymentMethod: z.enum(["CASH", "MOBILE_MONEY", "TRANSFER"]),
   natureOperation: z.string(),
   
   // Champs optionnels selon le type
@@ -40,7 +43,7 @@ transactionsRouter.post("/process", requireAuth, async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error("Global Transaction Error:", error);
+    logger.error({ err: error }, 'Global Transaction Error');
     
     // Distinction des erreurs
     if (error instanceof z.ZodError) {

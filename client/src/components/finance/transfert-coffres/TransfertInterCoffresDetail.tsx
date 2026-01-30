@@ -283,62 +283,60 @@ export default function TransfertInterCoffresDetail({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 animate-in fade-in duration-200"
         onClick={onClose}
       />
 
-      {/* Modal Container */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div
-          className="
-            pointer-events-auto
-            w-full max-w-3xl lg:max-w-4xl
-            bg-slate-900 border border-slate-700/50 rounded-2xl
-            shadow-2xl shadow-black/50
-            flex flex-col
-            max-h-[90vh]
-            animate-in fade-in zoom-in-95 duration-200
-          "
-          onClick={(e) => e.stopPropagation()}
-        >
+      {/* Slider Panel */}
+      <div
+        className="
+          fixed inset-y-0 right-0 z-50
+          w-full max-w-xl lg:max-w-2xl
+          bg-slate-900 border-l border-slate-700/50
+          shadow-2xl shadow-black/50
+          flex flex-col
+          animate-in slide-in-from-right duration-300
+        "
+        onClick={(e) => e.stopPropagation()}
+      >
           {/* ═══════════════════════════════════════════════════════════════════
               HEADER - Reference & Status
           ═══════════════════════════════════════════════════════════════════ */}
-          <div className={`flex-shrink-0 p-5 sm:p-6 border-b border-slate-700/50 rounded-t-2xl ${statutConfig.bg}`}>
-            <div className="flex items-start justify-between gap-4 mb-5">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${statutConfig.bg} ${statutConfig.border} border`}>
+          <div className={`flex-shrink-0 p-4 sm:p-5 border-b border-slate-700/50 ${statutConfig.bg}`}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-lg ${statutConfig.bg} ${statutConfig.border} border`}>
                   {statutConfig.icon}
                   <span className={statutConfig.color} />
                 </div>
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
                     {transfert.reference}
                     {transfert.verrouille && (
-                      <span title="Transfert verrouillé" className="p-1 rounded bg-amber-500/20">
-                        <Lock size={14} className="text-amber-400" />
+                      <span title="Transfert verrouillé" className="p-0.5 rounded bg-amber-500/20">
+                        <Lock size={12} className="text-amber-400" />
                       </span>
                     )}
                   </h2>
-                  <div className={`inline-flex items-center gap-2 mt-1 text-sm font-medium ${statutConfig.color}`}>
+                  <div className={`inline-flex items-center gap-1.5 text-xs font-medium ${statutConfig.color}`}>
                     {statutConfig.icon}
                     <span>{ALL_STATUS_LABELS[transfert.statut] || transfert.statut}</span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => handlePrint()}
-                  className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-cyan-600/20 text-slate-400 hover:text-cyan-400 transition-all border border-slate-700/50"
+                  className="p-2 rounded-lg bg-slate-800/80 hover:bg-cyan-600/20 text-slate-400 hover:text-cyan-400 transition-all border border-slate-700/50"
                   title="Imprimer le reçu"
                 >
-                  <Printer size={20} />
+                  <Printer size={18} />
                 </button>
                 <button
                   onClick={onClose}
-                  className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all border border-slate-700/50"
+                  className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all border border-slate-700/50"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
@@ -346,30 +344,30 @@ export default function TransfertInterCoffresDetail({
             {/* ─────────────────────────────────────────────────────────────────
                 HERO SECTION - Transfer Flow & Amount
             ───────────────────────────────────────────────────────────────── */}
-            <div className="bg-slate-950/40 rounded-xl p-5 border border-slate-800/50">
+            <div className="bg-slate-950/40 rounded-xl p-4 border border-slate-800/50">
               {/* Transfer Route - Horizontal */}
-              <div className="flex items-center justify-center gap-4 sm:gap-8 mb-5">
+              <div className="flex items-center justify-center gap-3 sm:gap-6 mb-4">
                 {/* Source */}
                 <div className="text-center flex-shrink-0">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-2 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 flex items-center justify-center shadow-lg">
-                    <Building2 size={28} className="text-slate-300" />
+                  <div className="w-12 h-12 mx-auto mb-1.5 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 flex items-center justify-center shadow-lg">
+                    <Building2 size={22} className="text-slate-300" />
                   </div>
-                  <p className="font-semibold text-white text-sm sm:text-base max-w-[100px] sm:max-w-[140px] truncate">
+                  <p className="font-semibold text-white text-xs sm:text-sm max-w-[80px] sm:max-w-[120px] truncate">
                     {transfert.coffreSource?.nom || 'Coffre Source'}
                   </p>
-                  <p className="text-xs text-slate-500">{transfert.coffreSource?.code}</p>
+                  <p className="text-[10px] text-slate-500">{transfert.coffreSource?.code}</p>
                 </div>
 
                 {/* Arrow with Type */}
                 <div className="flex-shrink-0 flex flex-col items-center">
-                  <div className="px-3 py-1.5 bg-slate-800/80 rounded-full text-xs text-slate-400 uppercase tracking-wide mb-2">
+                  <div className="px-2 py-1 bg-slate-800/80 rounded-full text-[10px] text-slate-400 uppercase tracking-wide mb-1.5">
                     {transfert.typeTransfert.replace(/_/g, ' → ')}
                   </div>
                   <div className="relative">
-                    <div className="w-12 sm:w-20 h-1 bg-gradient-to-r from-cyan-500/50 via-cyan-400 to-cyan-500/50 rounded-full" />
+                    <div className="w-10 sm:w-16 h-0.5 bg-gradient-to-r from-cyan-500/50 via-cyan-400 to-cyan-500/50 rounded-full" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="p-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/40">
-                        <ArrowRightLeft size={16} className="text-cyan-400" />
+                      <div className="p-1 rounded-full bg-cyan-500/20 border border-cyan-500/40">
+                        <ArrowRightLeft size={12} className="text-cyan-400" />
                       </div>
                     </div>
                   </div>
@@ -377,22 +375,22 @@ export default function TransfertInterCoffresDetail({
 
                 {/* Destination */}
                 <div className="text-center flex-shrink-0">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-2 rounded-xl bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 border border-cyan-600/50 flex items-center justify-center shadow-lg shadow-cyan-500/10">
-                    <Vault size={28} className="text-cyan-400" />
+                  <div className="w-12 h-12 mx-auto mb-1.5 rounded-lg bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 border border-cyan-600/50 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+                    <Vault size={22} className="text-cyan-400" />
                   </div>
-                  <p className="font-semibold text-white text-sm sm:text-base max-w-[100px] sm:max-w-[140px] truncate">
+                  <p className="font-semibold text-white text-xs sm:text-sm max-w-[80px] sm:max-w-[120px] truncate">
                     {transfert.coffreDestination?.nom || 'Coffre Destination'}
                   </p>
-                  <p className="text-xs text-slate-500">{transfert.coffreDestination?.code}</p>
+                  <p className="text-[10px] text-slate-500">{transfert.coffreDestination?.code}</p>
                 </div>
               </div>
 
-              {/* Amount - Massive & Centered */}
-              <div className="text-center py-4 bg-slate-900/60 rounded-xl border border-slate-800">
-                <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight">
+              {/* Amount - Centered */}
+              <div className="text-center py-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
                   {formatMoney(parseFloat(transfert.montant))}
                 </p>
-                <p className="text-sm sm:text-base text-slate-400 mt-1 font-medium uppercase tracking-wider">
+                <p className="text-xs text-slate-400 mt-0.5 font-medium uppercase tracking-wider">
                   {transfert.devise}
                 </p>
               </div>
@@ -402,7 +400,7 @@ export default function TransfertInterCoffresDetail({
           {/* ═══════════════════════════════════════════════════════════════════
               SCROLLABLE CONTENT (single overflow container)
           ═══════════════════════════════════════════════════════════════════ */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 custom-scrollbar">
 
             {/* ─────────────────────────────────────────────────────────────────
                 PROGRESSION TIMELINE
@@ -735,7 +733,7 @@ export default function TransfertInterCoffresDetail({
               STICKY FOOTER - Action Buttons
           ═══════════════════════════════════════════════════════════════════ */}
           {availableActions.length > 0 && (
-            <div className="flex-shrink-0 p-5 sm:p-6 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur rounded-b-2xl">
+            <div className="flex-shrink-0 p-4 sm:p-5 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur">
               <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
                 <Button variant="ghost" onClick={onClose} className="sm:min-w-[100px]">
                   Fermer
@@ -765,7 +763,7 @@ export default function TransfertInterCoffresDetail({
 
           {/* Close button only footer if no actions */}
           {availableActions.length === 0 && (
-            <div className="flex-shrink-0 p-5 sm:p-6 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur rounded-b-2xl">
+            <div className="flex-shrink-0 p-4 sm:p-5 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur">
               <div className="flex justify-end">
                 <Button variant="ghost" onClick={onClose} className="min-w-[100px]">
                   Fermer
@@ -773,7 +771,6 @@ export default function TransfertInterCoffresDetail({
               </div>
             </div>
           )}
-        </div>
       </div>
 
       {/* Hidden Receipt for Printing */}

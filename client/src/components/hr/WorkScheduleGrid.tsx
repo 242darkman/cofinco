@@ -1,19 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Save, Plus, Trash2 } from 'lucide-react';
-import { Card, Button, FormField } from '../ui';
+import { Calendar, Clock, Save, Plus, Trash2, FileDown, FileUp, ChevronDown } from 'lucide-react';
+import { Card, Button, FormField, SelectField } from '../ui';
+import { toast } from '../../lib/toast';
 
 const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
-interface WorkScheduleGridProps {
-  employeId: string;
+interface ShiftTemplate {
+  id: string;
+  nom: string;
+  description?: string;
+  horaires: { jourSemaine: number; heureDebut: string; heureFin: string; pauseMinutes: number }[];
 }
 
-export default function WorkScheduleGrid({ employeId }: WorkScheduleGridProps) {
+interface WorkScheduleGridProps {
+  employeId: string;
+  agenceId?: string;
+}
+
+export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGridProps) {
   const [horaires, setHoraires] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   useEffect(() => {
     fetchHoraires();
+    fetchTemplates();
   }, [employeId]);
 
   const fetchHoraires = async () => {
@@ -28,6 +43,105 @@ export default function WorkScheduleGrid({ employeId }: WorkScheduleGridProps) {
     }
   };
 
+  const fetchTemplates = async () => {
+    try {
+      const url = agenceId ? `/api/hr/shift-templates?agenceId=${agenceId}` : '/api/hr/shift-templates';
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data);
+      }
+    } catch (e) {
+      console.error("Erreur chargement templates:", e);
+    }
+  };
+
+  const handleApplyTemplate = async (templateId: string) => {
+    if (!templateId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/hr/shift-templates/${templateId}/apply/${employeId}`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        toast.success('Modèle appliqué avec succès');
+        fetchHoraires();
+      } else {
+        toast.error("Erreur lors de l'application du modèle");
+      }
+    } catch (e) {
+      toast.error("Erreur lors de l'application du modèle");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      toast.error('Veuillez saisir un nom pour le modèle');
+      return;
+    }
+    if (horaires.length === 0) {
+      toast.error('Aucun horaire à sauvegarder');
+      return;
+    }
+
+    setSavingTemplate(true);
+    try {
+      const templateHoraires = horaires.map(h => ({
+        jourSemaine: h.jourSemaine,
+        heureDebut: h.heureDebut,
+        heureFin: h.heureFin,
+        pauseMinutes: h.pauseMinutes || 60,
+      }));
+
+      const res = await fetch('/api/hr/shift-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nom: templateName,
+          description: templateDescription || null,
+          agenceId: agenceId || null,
+          horaires: templateHoraires,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Modèle sauvegardé avec succès');
+        setShowSaveTemplate(false);
+        setTemplateName('');
+        setTemplateDescription('');
+        fetchTemplates();
+      } else {
+        toast.error('Erreur lors de la sauvegarde du modèle');
+      }
+    } catch (e) {
+      toast.error('Erreur lors de la sauvegarde du modèle');
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const timeToMinutes = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const checkOverlap = (jourSemaine: number, debut: string, fin: string, excludeIndex?: number): boolean => {
+    const newStart = timeToMinutes(debut);
+    const newEnd = timeToMinutes(fin);
+    if (newStart >= newEnd) return false; // Invalid range, let validation handle it
+
+    return horaires.some((h, i) => {
+      if (i === excludeIndex) return false;
+      if (h.jourSemaine !== jourSemaine) return false;
+      const existStart = timeToMinutes(h.heureDebut);
+      const existEnd = timeToMinutes(h.heureFin);
+      // Overlap: newStart < existEnd AND newEnd > existStart
+      return newStart < existEnd && newEnd > existStart;
+    });
+  };
+
   const handleAddJour = (jourSemaine: number) => {
     const newHoraire = {
       jourSemaine,
@@ -37,12 +151,34 @@ export default function WorkScheduleGrid({ employeId }: WorkScheduleGridProps) {
       actif: true,
       isNew: true
     };
+
+    if (checkOverlap(jourSemaine, newHoraire.heureDebut, newHoraire.heureFin)) {
+      toast.error(`Chevauchement détecté pour ${JOURS[jourSemaine]}. Ajustez les horaires existants.`);
+      return;
+    }
+
     setHoraires([...horaires, newHoraire]);
   };
 
   const handleUpdateHoraire = (index: number, field: string, value: any) => {
     const updated = [...horaires];
     updated[index] = { ...updated[index], [field]: value };
+
+    // Check overlap when time fields change
+    if (field === 'heureDebut' || field === 'heureFin') {
+      const entry = updated[index];
+      if (entry.heureDebut && entry.heureFin) {
+        if (timeToMinutes(entry.heureDebut) >= timeToMinutes(entry.heureFin)) {
+          toast.error("L'heure de fin doit être après l'heure de début");
+          return;
+        }
+        if (checkOverlap(entry.jourSemaine, entry.heureDebut, entry.heureFin, index)) {
+          toast.error(`Chevauchement détecté pour ${JOURS[entry.jourSemaine]}`);
+          return;
+        }
+      }
+    }
+
     setHoraires(updated);
   };
 
@@ -76,11 +212,11 @@ export default function WorkScheduleGrid({ employeId }: WorkScheduleGridProps) {
           });
         }
       }
-      alert('Horaires sauvegardés');
+      toast.success('Horaires sauvegardés');
       fetchHoraires();
     } catch (e) {
       console.error("Erreur sauvegarde:", e);
-      alert('Erreur lors de la sauvegarde');
+      toast.error('Erreur lors de la sauvegarde');
     } finally {
       setLoading(false);
     }
@@ -92,10 +228,71 @@ export default function WorkScheduleGrid({ employeId }: WorkScheduleGridProps) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-center gap-3">
-        <Calendar className="w-6 h-6 text-blue-400" />
-        <h3 className="text-base sm:text-lg font-bold text-white">Emploi du Temps</h3>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Calendar className="w-6 h-6 text-blue-400" />
+          <h3 className="text-base sm:text-lg font-bold text-white">Emploi du Temps</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          {templates.length > 0 && (
+            <select
+              className="bg-slate-700 text-white text-sm px-3 py-2 rounded-lg border border-slate-600 focus:border-blue-500"
+              onChange={(e) => handleApplyTemplate(e.target.value)}
+              defaultValue=""
+            >
+              <option value="" disabled>Appliquer un modèle...</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.nom}</option>
+              ))}
+            </select>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={FileUp}
+            onClick={() => setShowSaveTemplate(true)}
+            disabled={horaires.length === 0}
+          >
+            <span className="hidden sm:inline">Sauvegarder modèle</span>
+          </Button>
+        </div>
       </div>
+
+      {/* Save Template Modal */}
+      {showSaveTemplate && (
+        <Card className="p-4 bg-slate-750 border border-blue-500/30">
+          <h4 className="text-sm font-bold text-white mb-3">Sauvegarder comme modèle</h4>
+          <div className="space-y-3">
+            <FormField
+              name="templateName"
+              label="Nom du modèle"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Ex: Horaires standard bureau"
+            />
+            <FormField
+              name="templateDescription"
+              label="Description (optionnel)"
+              value={templateDescription}
+              onChange={(e) => setTemplateDescription(e.target.value)}
+              placeholder="Description du modèle"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setShowSaveTemplate(false)}>
+                Annuler
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveAsTemplate}
+                disabled={savingTemplate || !templateName.trim()}
+              >
+                {savingTemplate ? 'Sauvegarde...' : 'Sauvegarder'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4 sm:p-6">
         <div className="space-y-4">

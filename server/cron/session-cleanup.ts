@@ -11,6 +11,9 @@ import * as sessionService from "../services/caisse/session-service";
 import { cleanupOrphanSessions } from "../session-tracker";
 import { getWsInstance } from "../ws-server";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Cron:SessionCleanup');
 
 // Configuration
 const SESSION_TIMEOUT_HOURS = 12; // Fermer les sessions après 12h d'inactivité
@@ -24,7 +27,7 @@ let riskyCheckIntervalId: NodeJS.Timeout | null = null;
  * Ferme les sessions expirées et notifie via WebSocket
  */
 async function runSessionCleanup(): Promise<void> {
-  console.log(`[CRON] Vérification des sessions expirées (timeout: ${SESSION_TIMEOUT_HOURS}h)...`);
+  logger.info({ timeoutHours: SESSION_TIMEOUT_HOURS }, 'Vérification des sessions expirées...');
 
   try {
     // 1. Nettoyage des sessions orphelines (Technique)
@@ -34,9 +37,9 @@ async function runSessionCleanup(): Promise<void> {
     const closedSessions = await sessionService.closeExpiredSessions(SESSION_TIMEOUT_HOURS);
 
     if (closedSessions.length > 0) {
-      console.log(`[CRON] ${closedSessions.length} session(s) fermée(s) automatiquement:`);
+      logger.info({ count: closedSessions.length }, 'Sessions fermées automatiquement');
       closedSessions.forEach((s) => {
-        console.log(`  - Session ${s.sessionId} (Caisse: ${s.caisseId}, inactive: ${s.hoursInactive}h)`);
+        logger.debug({ sessionId: s.sessionId, caisseId: s.caisseId, hoursInactive: s.hoursInactive }, 'Session fermée');
       });
 
       // Notifier via WebSocket
@@ -70,10 +73,10 @@ async function runSessionCleanup(): Promise<void> {
         timestamp: new Date(),
       });
     } else {
-      console.log("[CRON] Aucune session expirée trouvée.");
+      logger.debug('Aucune session expirée trouvée');
     }
   } catch (error) {
-    console.error("[CRON] Erreur lors du nettoyage des sessions:", error);
+    logger.error({ err: error }, 'Erreur lors du nettoyage des sessions');
   }
 }
 
@@ -85,17 +88,20 @@ async function checkRiskySessions(): Promise<void> {
     const riskySessions = await sessionService.getRiskySessions();
 
     if (riskySessions.length > 0) {
-      console.log(`[CRON] ${riskySessions.length} session(s) à risque détectée(s):`);
+      logger.warn({ count: riskySessions.length }, 'Sessions à risque détectées');
 
       const wsInstance = getWsInstance();
 
       for (const session of riskySessions) {
-        console.log(
-          `  - ${session.caisseNom} (${session.caissierNom}): ${session.hoursInactive}h inactive [${session.riskLevel}]`
-        );
+        logger.warn({
+          caisseNom: session.caisseNom,
+          caissierNom: session.caissierNom,
+          hoursInactive: session.hoursInactive,
+          riskLevel: session.riskLevel
+        }, 'Session à risque');
 
-        // Envoyer une alerte WebSocket pour les sessions critiques
-        if (session.riskLevel === "CRITICAL" && wsInstance) {
+        // Envoyer une alerte WebSocket pour les sessions à risque (WARNING + CRITICAL)
+        if (wsInstance) {
           wsInstance.broadcast({
             type: "SESSION_RISK_ALERT",
             payload: {
@@ -111,7 +117,7 @@ async function checkRiskySessions(): Promise<void> {
       }
     }
   } catch (error) {
-    console.error("[CRON] Erreur lors de la vérification des sessions à risque:", error);
+    logger.error({ err: error }, 'Erreur lors de la vérification des sessions à risque');
   }
 }
 
@@ -119,7 +125,7 @@ async function checkRiskySessions(): Promise<void> {
  * Démarre les jobs de nettoyage périodiques
  */
 export function startSessionCleanupCron(): void {
-  console.log("[CRON] Démarrage du job de nettoyage des sessions...");
+  logger.info('Démarrage du job de nettoyage des sessions...');
 
   // Exécuter immédiatement au démarrage
   runSessionCleanup();
@@ -129,9 +135,10 @@ export function startSessionCleanupCron(): void {
   cleanupIntervalId = setInterval(runSessionCleanup, CHECK_INTERVAL_MS);
   riskyCheckIntervalId = setInterval(checkRiskySessions, RISKY_SESSION_CHECK_INTERVAL_MS);
 
-  console.log(`[CRON] Job de nettoyage configuré:`);
-  console.log(`  - Fermeture sessions expirées: toutes les ${CHECK_INTERVAL_MS / 60000} minutes`);
-  console.log(`  - Vérification sessions à risque: toutes les ${RISKY_SESSION_CHECK_INTERVAL_MS / 60000} minutes`);
+  logger.info({
+    cleanupIntervalMinutes: CHECK_INTERVAL_MS / 60000,
+    riskyCheckIntervalMinutes: RISKY_SESSION_CHECK_INTERVAL_MS / 60000
+  }, 'Job de nettoyage configuré');
 }
 
 /**
@@ -146,7 +153,7 @@ export function stopSessionCleanupCron(): void {
     clearInterval(riskyCheckIntervalId);
     riskyCheckIntervalId = null;
   }
-  console.log("[CRON] Jobs de nettoyage arrêtés.");
+  logger.info('Jobs de nettoyage arrêtés');
 }
 
 /**

@@ -12,6 +12,9 @@
  */
 
 import * as crypto from "crypto";
+import { createLogger } from "../../../../lib/logger";
+
+const logger = createLogger('AirtelEncryption');
 
 interface CachedPublicKey {
   key: string;
@@ -45,7 +48,7 @@ export class AirtelEncryptionService {
     }
 
     try {
-      console.log("[Airtel Encryption] Fetching RSA public key...");
+      logger.info('Fetching RSA public key');
 
       const response = await fetch(`${this.baseUrl}/v1/rsa/encryption-keys`, {
         method: "GET",
@@ -79,12 +82,10 @@ export class AirtelEncryptionService {
         expiresAt: now + this.keyTtlMs,
       };
 
-      console.log(
-        `[Airtel Encryption] Public key fetched and cached (TTL: ${Math.round(this.keyTtlMs / 1000 / 60)}min)`
-      );
+      logger.info({ ttlMinutes: Math.round(this.keyTtlMs / 1000 / 60) }, 'Public key fetched and cached');
       return key;
     } catch (error) {
-      console.error("[Airtel Encryption] Failed to fetch public key:", error);
+      logger.error({ err: error }, 'Failed to fetch public key');
       throw new Error("AIRTEL_ENCRYPTION_KEY_FETCH_FAILED");
     }
   }
@@ -95,7 +96,7 @@ export class AirtelEncryptionService {
    */
   invalidatePublicKey(): void {
     this.cachedKey = null;
-    console.log("[Airtel Encryption] Public key cache invalidated");
+    logger.debug('Public key cache invalidated');
   }
 
   /**
@@ -204,7 +205,7 @@ export class AirtelEncryptionService {
     hmacSecret: string
   ): boolean {
     if (!signature || !hmacSecret) {
-      console.warn("[Airtel Encryption] Missing signature or HMAC secret for verification");
+      logger.warn('Missing signature or HMAC secret for verification');
       return false;
     }
 
@@ -223,13 +224,13 @@ export class AirtelEncryptionService {
       );
 
       if (!isValid) {
-        console.warn("[Airtel Encryption] Callback signature mismatch");
+        logger.warn('Callback signature mismatch');
       }
 
       return isValid;
     } catch (error) {
       // En cas d'erreur (ex: longueurs différentes), la signature est invalide
-      console.error("[Airtel Encryption] Signature verification error:", error);
+      logger.error({ err: error }, 'Signature verification error');
       return false;
     }
   }

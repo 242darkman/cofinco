@@ -34,6 +34,9 @@ import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
 import { paymentService } from "../mobile-money/payment-service";
 import { generateReference } from "../ledger";
 import type { InitiateCollectionParams } from "../mobile-money/types";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger('AgentMmPayment');
 
 // ============================================
 // TYPES
@@ -128,7 +131,7 @@ class AgentMmPaymentService {
     if (idempotencyKey) {
       const existing = await this.getByIdempotencyKey(idempotencyKey);
       if (existing) {
-        console.log(`[AgentMmPaymentService] Idempotent request, returning existing: ${existing.id}`);
+        logger.info({ paymentId: existing.id }, 'Idempotent request, returning existing payment');
         return { success: true, payment: existing, paymentIntentId: existing.paymentIntentId || undefined };
       }
     }
@@ -191,7 +194,7 @@ class AgentMmPaymentService {
       })
       .returning();
 
-    console.log(`[AgentMmPaymentService] Created agent payment: ${payment.id}`);
+    logger.info({ paymentId: payment.id }, 'Created agent payment');
 
     try {
       // 7. Initier le paiement via paymentService
@@ -229,7 +232,7 @@ class AgentMmPaymentService {
         .where(eq(agentMmPayments.id, payment.id))
         .returning();
 
-      console.log(`[AgentMmPaymentService] Linked to payment intent: ${intent.id}`);
+      logger.info({ paymentIntentId: intent.id }, 'Linked to payment intent');
 
       return {
         success: true,
@@ -238,7 +241,7 @@ class AgentMmPaymentService {
       };
     } catch (error) {
       // En cas d'erreur, marquer le paiement comme FAILED
-      console.error(`[AgentMmPaymentService] Failed to initiate:`, error);
+      logger.error({ err: error }, 'Failed to initiate payment');
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const errorCode = (error as any)?.code || "PROVIDER_ERROR";
@@ -274,7 +277,7 @@ class AgentMmPaymentService {
       .where(eq(agentMmPayments.paymentIntentId, paymentIntentId));
 
     if (!payment) {
-      console.warn(`[AgentMmPaymentService] No agent payment found for intent: ${paymentIntentId}`);
+      logger.warn({ paymentIntentId }, 'No agent payment found for intent');
       return;
     }
 
@@ -288,7 +291,7 @@ class AgentMmPaymentService {
       })
       .where(eq(agentMmPayments.id, payment.id));
 
-    console.log(`[AgentMmPaymentService] Payment settled: ${payment.id}`);
+    logger.info({ paymentId: payment.id }, 'Payment settled');
   }
 
   /**
@@ -301,7 +304,7 @@ class AgentMmPaymentService {
       .where(eq(agentMmPayments.paymentIntentId, paymentIntentId));
 
     if (!payment) {
-      console.warn(`[AgentMmPaymentService] No agent payment found for intent: ${paymentIntentId}`);
+      logger.warn({ paymentIntentId }, 'No agent payment found for intent');
       return;
     }
 
@@ -315,7 +318,7 @@ class AgentMmPaymentService {
       })
       .where(eq(agentMmPayments.id, payment.id));
 
-    console.log(`[AgentMmPaymentService] Payment failed: ${payment.id}`);
+    logger.info({ paymentId: payment.id }, 'Payment failed');
   }
 
   /**
@@ -458,7 +461,7 @@ class AgentMmPaymentService {
       try {
         await paymentService.cancelPayment(payment.paymentIntentId, userId);
       } catch (error) {
-        console.warn(`[AgentMmPaymentService] Could not cancel payment intent:`, error);
+        logger.warn({ err: error }, 'Could not cancel payment intent');
       }
     }
 

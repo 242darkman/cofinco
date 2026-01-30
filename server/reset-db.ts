@@ -1,19 +1,22 @@
 
 import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
+import { createLogger } from './lib/logger';
+
+const logger = createLogger('ResetDB');
 
 async function resetDatabase() {
   const client = await pool.connect();
   try {
-    console.log("⚠️  STARTING FULL DATABASE RESET ⚠️");
-    console.log("This will delete ALL data and drop ALL tables/types.");
+    logger.warn("STARTING FULL DATABASE RESET");
+    logger.info("This will delete ALL data and drop ALL tables/types.");
 
     // 1. Drop Drizzle migrations table
-    console.log("Dropping migration history...");
+    logger.info("Dropping migration history...");
     await client.query(`DROP SCHEMA IF EXISTS drizzle CASCADE;`);
 
     // 2. Drop all tables in public schema
-    console.log("Dropping all tables...");
+    logger.info("Dropping all tables...");
     await client.query(`
       DO $$ DECLARE
         r RECORD;
@@ -25,7 +28,7 @@ async function resetDatabase() {
     `);
 
     // 3. Drop all custom types (enums)
-    console.log("Dropping all custom types...");
+    logger.info("Dropping all custom types...");
     await client.query(`
       DO $$ DECLARE
         r RECORD;
@@ -37,7 +40,7 @@ async function resetDatabase() {
     `);
 
     // 4. Drop all functions/procedures (optional but safer)
-    console.log("Dropping all custom functions...");
+    logger.info("Dropping all custom functions...");
     await client.query(`
         DO $$ DECLARE
             r RECORD;
@@ -48,10 +51,10 @@ async function resetDatabase() {
         END $$;
     `);
 
-    console.log("✅ Database reset complete. Ready for clean migration.");
+    logger.info("Database reset complete. Ready for clean migration.");
 
   } catch (err) {
-    console.error("❌ Reset failed:", err);
+    logger.error({ err }, "Reset failed");
     process.exit(1);
   } finally {
     client.release();
