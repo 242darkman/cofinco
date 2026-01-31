@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   Wallet, RefreshCw, AlertCircle, User, CreditCard, Clock,
-  CheckCircle, XCircle, Banknote, FileText, Calendar, ChevronRight
+  CheckCircle, XCircle, Banknote, FileText, ChevronDown, X, Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button, Card, Badge } from '../../ui';
+import { Button, Badge } from '../../ui';
 import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { api } from '../../../lib/api-client';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -45,17 +45,16 @@ export default function PendingDisbursements({
   const queryClient = useQueryClient();
   const { socket } = useWebSocket();
 
-  // État pour les modales
-  const [selectedCredit, setSelectedCredit] = useState<PendingCredit | null>(null);
-  const [showPayoutConfirm, setShowPayoutConfirm] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [receiptNumber, setReceiptNumber] = useState('');
+  const [creditToCancel, setCreditToCancel] = useState<PendingCredit | null>(null);
+  const [receiptNumbers, setReceiptNumbers] = useState<Record<string, string>>({});
 
-  // Batch selection state
+  // Batch selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBatchConfirm, setShowBatchConfirm] = useState(false);
 
-  // Fetch pending disbursements (must be declared before callbacks that use it)
+  // Fetch pending disbursements
   const {
     data: pendingData,
     isLoading,
@@ -67,7 +66,7 @@ export default function PendingDisbursements({
       const response = await api.get<{ success: boolean; data: PendingCredit[]; count: number }>('/credits/pending-disbursements');
       return response;
     },
-    staleTime: 60000 // Updates come via WebSocket in real-time
+    staleTime: 60000
   });
 
   const toggleSelect = useCallback((creditId: string, e: React.MouseEvent) => {
@@ -89,7 +88,7 @@ export default function PendingDisbursements({
     }
   }, [pendingData, selectedIds]);
 
-  // Listen for WebSocket updates
+  // WebSocket updates
   useEffect(() => {
     if (!socket) return;
 
@@ -98,92 +97,74 @@ export default function PendingDisbursements({
         const data = JSON.parse(event.data);
         if (data.type === 'CAISSE_UPDATE') {
           const { subtype, clientName, montant } = data.payload || {};
-          if (
-            subtype === 'NEW_LOAN_DISBURSEMENT' ||
-            subtype === 'LOAN_DISBURSEMENT_COMPLETED' ||
-            subtype === 'LOAN_DISBURSEMENT_CANCELLED'
-          ) {
-            // Show toast for new disbursement
+          if (['NEW_LOAN_DISBURSEMENT', 'LOAN_DISBURSEMENT_COMPLETED', 'LOAN_DISBURSEMENT_CANCELLED'].includes(subtype)) {
             if (subtype === 'NEW_LOAN_DISBURSEMENT' && clientName && montant) {
-              toast.info(
-                `Nouveau prêt à décaisser: ${formatMoney(montant)} pour ${clientName}`,
-                { duration: 6000 }
-              );
+              toast.info(`Nouveau prêt: ${formatMoney(montant)} - ${clientName}`, { duration: 5000 });
             }
-            // Refetch the list
             refetch();
           }
         }
-      } catch (e) {
-        // Ignore parse errors
-      }
+      } catch (e) { /* ignore */ }
     };
 
     socket.addEventListener('message', handleMessage);
     return () => socket.removeEventListener('message', handleMessage);
   }, [socket, refetch]);
 
-  // Mutation for processing payout
+  // Payout mutation
   const payoutMutation = useMutation({
-    mutationFn: async (creditId: string) => {
-      const response = await api.post<{ success: boolean; message: string }>(`/credits/${creditId}/caisse-payout`, {
+    mutationFn: async ({ creditId, receipt }: { creditId: string; receipt?: string }) => {
+      return api.post<{ success: boolean; message: string }>(`/credits/${creditId}/caisse-payout`, {
         sessionCaisseId,
-        paymentReference: receiptNumber || undefined
+        paymentReference: receipt || undefined
       });
-      return response;
     },
-    onSuccess: (data) => {
-      toast.success(data?.message || 'Décaissement effectué avec succès');
+    onSuccess: (data, variables) => {
+      toast.success(data?.message || 'Décaissement effectué');
       queryClient.invalidateQueries({ queryKey: ['pending-disbursements'] });
       queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
-      setShowPayoutConfirm(false);
-      setSelectedCredit(null);
-      setReceiptNumber('');
+      setExpandedId(null);
+      setReceiptNumbers(prev => { const n = {...prev}; delete n[variables.creditId]; return n; });
       onDisbursementComplete?.();
     },
     onError: (error: any) => {
       if (error?.error?.code === 'INSUFFICIENT_FUNDS') {
-        toast.error(
-          `Solde insuffisant. Il manque ${formatMoney(error.error.deficit)} dans le coffre.`,
-          { duration: 6000 }
-        );
+        toast.error(`Solde insuffisant. Déficit: ${formatMoney(error.error.deficit)}`, { duration: 6000 });
       } else {
         toast.error(error.message || 'Erreur lors du décaissement');
       }
     }
   });
 
-  // Mutation for cancelling disbursement
+  // Cancel mutation
   const cancelMutation = useMutation({
     mutationFn: async (creditId: string) => {
-      const response = await api.post<{ success: boolean; message: string }>(`/credits/${creditId}/cancel-disbursement`, {
+      return api.post<{ success: boolean; message: string }>(`/credits/${creditId}/cancel-disbursement`, {
         raison: 'Client non présenté'
       });
-      return response;
     },
     onSuccess: (data) => {
       toast.success(data?.message || 'Décaissement annulé');
       queryClient.invalidateQueries({ queryKey: ['pending-disbursements'] });
       setShowCancelConfirm(false);
-      setSelectedCredit(null);
+      setCreditToCancel(null);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de l\'annulation');
     }
   });
 
-  // Mutation for batch payout
+  // Batch payout mutation
   const batchPayoutMutation = useMutation({
     mutationFn: async (creditIds: string[]) => {
-      const response = await api.post<{ success: boolean; message: string; successCount: number; failCount: number }>('/credits/batch-disburse', {
+      return api.post<{ success: boolean; message: string; successCount: number; failCount: number }>('/credits/batch-disburse', {
         creditIds,
         sessionCaisseId,
       });
-      return response;
     },
     onSuccess: (data) => {
       if (data.failCount === 0) {
-        toast.success(`${data.successCount} décaissement(s) effectué(s) avec succès`);
+        toast.success(`${data.successCount} décaissement(s) effectué(s)`);
       } else {
         toast.warning(`${data.successCount} réussi(s), ${data.failCount} erreur(s)`);
       }
@@ -194,325 +175,257 @@ export default function PendingDisbursements({
       onDisbursementComplete?.();
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors du décaissement groupé');
+      toast.error(error.message || 'Erreur décaissement groupé');
     }
   });
 
   const pendingCredits: PendingCredit[] = pendingData?.data || [];
   const count = pendingCredits.length;
+  const totalAmount = pendingCredits.reduce((sum, c) => sum + parseFloat(c.montant), 0);
 
-  // Handler for payout
-  const handlePayout = useCallback((credit: PendingCredit) => {
-    setSelectedCredit(credit);
-    setShowPayoutConfirm(true);
-  }, []);
+  const handleExpand = (creditId: string) => {
+    setExpandedId(expandedId === creditId ? null : creditId);
+  };
 
-  // Handler for cancel
-  const handleCancel = useCallback((credit: PendingCredit) => {
-    setSelectedCredit(credit);
+  const handlePayout = (credit: PendingCredit) => {
+    payoutMutation.mutate({ creditId: credit.id, receipt: receiptNumbers[credit.id] });
+  };
+
+  const handleCancelClick = (credit: PendingCredit, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCreditToCancel(credit);
     setShowCancelConfirm(true);
-  }, []);
-
-  const confirmPayout = () => {
-    if (selectedCredit) {
-      payoutMutation.mutate(selectedCredit.id);
-    }
-  };
-
-  const confirmCancel = () => {
-    if (selectedCredit) {
-      cancelMutation.mutate(selectedCredit.id);
-    }
-  };
-
-  // Format date helper
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   if (isLoading) {
     return (
-      <Card className="p-6">
-        <div className="flex items-center justify-center gap-3 text-slate-400">
-          <RefreshCw className="animate-spin" size={20} />
-          <span>Chargement des décaissements en attente...</span>
-        </div>
-      </Card>
+      <div className="flex items-center justify-center gap-2 text-slate-400 p-8">
+        <RefreshCw className="animate-spin" size={18} />
+        <span className="text-sm">Chargement...</span>
+      </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col font-sans selection:bg-orange-500/30 p-2">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
-        
-        {/* LEFT COL: List of Pending Loans (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-3 h-full overflow-y-auto overflow-x-hidden">
-            {/* Header / Stats */}
-            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                         <div className="p-1.5 rounded-lg bg-orange-500/10">
-                            <Wallet className="w-4 h-4 text-orange-400" aria-hidden="true" />
-                        </div>
-                        <h3 className="font-semibold text-sm text-slate-200">Prêts en Attente</h3>
-                    </div>
-                     <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => refetch()}
-                        disabled={isRefetching}
-                        className="h-6 w-6 p-0 rounded-full hover:bg-slate-800 text-slate-400"
-                    >
-                        <RefreshCw className={`${isRefetching ? 'animate-spin' : ''}`} size={12} />
-                    </Button>
-                </div>
-                
-                {count > 0 ? (
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-slate-400">
-                        <span className="font-bold text-white">{count}</span> dossiers à traiter
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {selectedIds.size > 0 && (
-                          <button
-                            onClick={() => setShowBatchConfirm(true)}
-                            disabled={batchPayoutMutation.isPending}
-                            className="px-2 py-1 text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg hover:bg-orange-500/30 transition"
-                          >
-                            {batchPayoutMutation.isPending ? 'Traitement...' : `Décaisser (${selectedIds.size})`}
-                          </button>
-                        )}
-                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.size === count && count > 0}
-                            onChange={toggleSelectAll}
-                            className="w-3 h-3 rounded border-slate-600 text-orange-500 focus:ring-orange-500/30"
-                          />
-                          Tout
-                        </label>
-                      </div>
-                    </div>
-                ) : (
-                    <div className="text-[10px] text-slate-500 italic">Aucun dossier en attente</div>
-                )}
-            </Card>
-
-            {/* List */}
-             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar min-h-0">
-                {count > 0 ? (
-                    pendingCredits.map((credit) => (
-                        <div
-                            key={credit.id}
-                            onClick={() => {
-                                setSelectedCredit(credit);
-                                setReceiptNumber('');
-                                setShowPayoutConfirm(false);
-                            }}
-                            className={`p-3 rounded-xl border cursor-pointer transition-all group ${
-                                selectedCredit?.id === credit.id
-                                ? 'bg-orange-950/30 border-orange-500/50 shadow-lg shadow-orange-900/10'
-                                : selectedIds.has(credit.id)
-                                ? 'bg-orange-950/20 border-orange-500/30'
-                                : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
-                            }`}
-                        >
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedIds.has(credit.id)}
-                                      onClick={(e) => toggleSelect(credit.id, e)}
-                                      onChange={() => {}}
-                                      className="w-3.5 h-3.5 rounded border-slate-600 text-orange-500 focus:ring-orange-500/30 shrink-0"
-                                    />
-                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
-                                        {credit.client.photoUrl ? (
-                                            <img src={resolveStorageUrl(credit.client.photoUrl)} className="w-full h-full object-cover" alt="" />
-                                        ) : (
-                                            <User size={14} className="text-slate-500" />
-                                        )}
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-200 leading-tight">
-                                            {formatClientName(credit.client.nom, credit.client.prenom)}
-                                        </p>
-                                        <p className="text-[10px] text-slate-500 font-mono">
-                                            #{credit.numeroCredit || credit.numero_credit}
-                                        </p>
-                                    </div>
-                                </div>
-                                <ChevronRight size={14} className={`transition-transform duration-300 ${selectedCredit?.id === credit.id ? 'text-orange-400 rotate-90' : 'text-slate-600 group-hover:text-slate-400'}`} />
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-950/30 px-1.5 py-0.5 rounded">
-                                    <Clock size={10} />
-                                    {credit.createdAt ? new Date(credit.createdAt).toLocaleDateString([], {day: '2-digit', month: '2-digit'}) : '-'}
-                                </div>
-                                <p className="text-sm font-bold text-orange-400 font-mono">
-                                    {formatMoney(parseFloat(credit.montant))}
-                                </p>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                     <div className="h-full flex flex-col items-center justify-center text-slate-500 p-6 border-2 border-dashed border-slate-800 rounded-xl">
-                        <div className="p-3 bg-slate-900 rounded-full mb-3">
-                            <CheckCircle size={24} className="text-slate-700" />
-                        </div>
-                        <p className="text-xs text-center font-medium">Tout est à jour</p>
-                        <p className="text-[10px] text-center mt-1 opacity-70">Les nouveaux prêts apparaîtront ici</p>
-                     </div>
-                )}
-             </div>
+    <div className="h-full flex flex-col bg-slate-950/50 rounded-xl border border-slate-800 overflow-hidden">
+      {/* Compact Header */}
+      <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-900/80 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-orange-500/10 shrink-0">
+            <Wallet className="w-4 h-4 text-orange-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">Décaissements Prêts</h3>
+            {count > 0 && (
+              <p className="text-[10px] text-slate-500">
+                {count} en attente • {formatMoney(totalAmount)}
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* RIGHT COL: Detail Cockpit (8 cols) */}
-        <div className="lg:col-span-8 h-full flex flex-col">
-            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative">
-                {selectedCredit ? (
-                    <>
-                        {/* Cockpit Header */}
-                        <div className="p-4 border-b border-slate-800 bg-slate-950/30 flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Banknote className="text-orange-400" size={20} />
-                                Validation Décaissement
-                            </h2>
-                            <Badge variant="warning" value="En attente client" className="animate-pulse" />
-                        </div>
-
-                        {/* Main Cockpit Content */}
-                        <div className="flex-1 p-6 overflow-y-auto">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                {/* Zone Identité */}
-                                <div className="space-y-4">
-                                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bénéficiaire</h3>
-                                     <div className="flex items-center gap-4 bg-slate-800/40 p-4 rounded-xl border border-slate-700/50">
-                                         <div className="w-16 h-16 rounded-full bg-slate-900 border-2 border-slate-700 overflow-hidden shrink-0">
-                                            {selectedCredit.client.photoUrl ? (
-                                                <img src={resolveStorageUrl(selectedCredit.client.photoUrl)} className="w-full h-full object-cover" alt="" />
-                                            ) : (
-                                                <User size={24} className="w-full h-full p-4 text-slate-500" />
-                                            )}
-                                         </div>
-                                         <div className="min-w-0">
-                                             <p className="text-lg font-bold text-white truncate">
-                                                 {formatClientName(selectedCredit.client.nom, selectedCredit.client.prenom)}
-                                             </p>
-                                             <div className="flex flex-wrap gap-2 mt-1">
-                                                <span className="text-xs text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
-                                                    ID: {selectedCredit.client.id.slice(0, 8)}...
-                                                </span>
-                                             </div>
-                                         </div>
-                                     </div>
-
-                                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 flex gap-3">
-                                         <AlertCircle className="text-orange-400 shrink-0 mt-0.5" size={16} />
-                                         <div className="space-y-1">
-                                             <p className="text-xs font-bold text-orange-200">Vérification Requise</p>
-                                             <p className="text-[10px] text-orange-200/70 leading-relaxed">
-                                                 Veuillez vérifier la pièce d'identité du client et confirmer qu'il correspond à la photo ci-dessus avant de procéder.
-                                             </p>
-                                         </div>
-                                     </div>
-                                </div>
-
-                                {/* Zone Transaction */}
-                                <div className="space-y-4">
-                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Détails Transaction</h3>
-                                    
-                                    <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 text-center">
-                                        <p className="text-xs text-slate-500 mb-1">Montant à décaisser</p>
-                                        <p className="text-4xl font-black text-white tracking-tight mb-2">
-                                            {formatMoney(parseFloat(selectedCredit.montant))}
-                                        </p>
-                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400">
-                                            <CreditCard size={12} />
-                                            Prêt #{selectedCredit.numeroCredit || selectedCredit.numero_credit}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-400 ml-1">Référence Reçu (Facultatif)</label>
-                                        <div className="relative">
-                                            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
-                                            <input
-                                                type="text"
-                                                value={receiptNumber}
-                                                onChange={(e) => setReceiptNumber(e.target.value)}
-                                                placeholder="ex: REC-123456"
-                                                className="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500/50 outline-none transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer Actions */}
-                        <div className="p-4 border-t border-slate-800 bg-slate-950/50 flex gap-3 mt-auto">
-                            <Button
-                                variant="outline"
-                                onClick={() => handleCancel(selectedCredit)}
-                                className="flex-1 border-rose-900/30 text-rose-400 hover:bg-rose-950/30 hover:border-rose-800"
-                            >
-                                <XCircle className="mr-2" size={16} />
-                                Annuler le Prêt
-                            </Button>
-                            
-                            <Button
-                                onClick={confirmPayout}
-                                disabled={payoutMutation.isPending}
-                                className="flex-[2] py-6 text-base font-bold tracking-wide bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 shadow-lg shadow-orange-900/20"
-                            >
-                                {payoutMutation.isPending ? (
-                                    <><RefreshCw className="animate-spin mr-2" size={18} /> Traitement...</>
-                                ) : (
-                                    <><CheckCircle className="mr-2" size={18} /> CONFIRMER LE DÉCAISSEMENT</>
-                                )}
-                            </Button>
-                        </div>
-                    </>
-                ) : (
-                    /* Empty Selection State */
-                    <div className="h-full flex flex-col items-center justify-center text-slate-500">
-                        <div className="w-24 h-24 bg-slate-950 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-inner">
-                            <Banknote size={40} className="text-slate-700" />
-                        </div>
-                        <h2 className="text-xl font-bold text-slate-400 mb-2">Aucun prêt sélectionné</h2>
-                        <p className="max-w-xs text-center text-sm opacity-70">
-                            Sélectionnez un dossier dans la liste de gauche pour procéder au décaissement des fonds.
-                        </p>
-                    </div>
-                )}
-            </Card>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => setShowBatchConfirm(true)}
+              disabled={batchPayoutMutation.isPending}
+              className="px-2 py-1 text-[10px] font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition flex items-center gap-1"
+            >
+              <CheckCircle size={12} />
+              {batchPayoutMutation.isPending ? '...' : `(${selectedIds.size})`}
+            </button>
+          )}
+          {count > 1 && (
+            <label className="flex items-center gap-1 cursor-pointer text-[10px] text-slate-400 px-1.5 py-1 rounded hover:bg-slate-800">
+              <input
+                type="checkbox"
+                checked={selectedIds.size === count && count > 0}
+                onChange={toggleSelectAll}
+                className="w-3 h-3 rounded border-slate-600 text-orange-500 focus:ring-0"
+              />
+              <span className="hidden sm:inline">Tout</span>
+            </label>
+          )}
+          <button
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 transition"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
-      {/* Cancel Confirmation Dialog (Keep existing modal for cancellation as it's destructive) */}
+      {/* Scrollable List */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1.5">
+        {count > 0 ? (
+          pendingCredits.map((credit) => {
+            const isExpanded = expandedId === credit.id;
+            const isSelected = selectedIds.has(credit.id);
+            const isPaying = payoutMutation.isPending && payoutMutation.variables?.creditId === credit.id;
+
+            return (
+              <div
+                key={credit.id}
+                className={`rounded-lg border transition-all ${
+                  isExpanded
+                    ? 'bg-slate-800/80 border-orange-500/40 shadow-lg'
+                    : isSelected
+                    ? 'bg-orange-950/20 border-orange-500/20'
+                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                {/* Collapsed Row */}
+                <div
+                  onClick={() => handleExpand(credit.id)}
+                  className="p-2.5 cursor-pointer"
+                >
+                  {/* Top Row: Client Info */}
+                  <div className="flex items-start gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onClick={(e) => toggleSelect(credit.id, e)}
+                      onChange={() => {}}
+                      className="w-3.5 h-3.5 rounded border-slate-600 text-orange-500 focus:ring-0 shrink-0 mt-1"
+                    />
+
+                    <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 overflow-hidden shrink-0">
+                      {credit.client.photoUrl ? (
+                        <img src={resolveStorageUrl(credit.client.photoUrl)} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <User size={16} className="text-slate-500" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-white leading-tight">
+                        {formatClientName(credit.client.nom, credit.client.prenom)}
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-mono">
+                        #{credit.numeroCredit || credit.numero_credit}
+                      </p>
+                    </div>
+
+                    <ChevronDown
+                      size={14}
+                      className={`text-slate-500 transition-transform shrink-0 ${isExpanded ? 'rotate-180 text-orange-400' : ''}`}
+                    />
+                  </div>
+
+                  {/* Bottom Row: Amount & Date */}
+                  <div className="flex items-center justify-between pl-6">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <Clock size={10} />
+                      {new Date(credit.createdAt || credit.created_at || '').toLocaleDateString('fr', { day: '2-digit', month: '2-digit' })}
+                    </div>
+                    <p className="text-sm font-bold text-orange-400 tabular-nums">
+                      {formatMoney(parseFloat(credit.montant))}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Expanded Detail Panel */}
+                {isExpanded && (
+                  <div className="px-3 pb-3 pt-1 border-t border-slate-700/50 animate-in slide-in-from-top-1 duration-200">
+                    {/* Identity Verification Alert */}
+                    <div className="flex items-start gap-2 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg mb-3">
+                      <Shield size={14} className="text-orange-400 shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-orange-200/80 leading-relaxed">
+                        <span className="font-bold text-orange-200">Vérifiez l'identité</span> du client avant de procéder au décaissement.
+                      </p>
+                    </div>
+
+                    {/* Transaction Info Grid */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="bg-slate-950/50 rounded-lg p-2 text-center">
+                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Montant</p>
+                        <p className="text-lg font-black text-white tabular-nums">
+                          {formatMoney(parseFloat(credit.montant))}
+                        </p>
+                      </div>
+                      <div className="bg-slate-950/50 rounded-lg p-2 text-center">
+                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Crédit</p>
+                        <p className="text-xs font-bold text-slate-300 font-mono mt-1">
+                          #{credit.numeroCredit || credit.numero_credit}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Receipt Input */}
+                    <div className="mb-3">
+                      <div className="relative">
+                        <FileText size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                          type="text"
+                          value={receiptNumbers[credit.id] || ''}
+                          onChange={(e) => setReceiptNumbers(prev => ({ ...prev, [credit.id]: e.target.value }))}
+                          placeholder="Réf. reçu (optionnel)"
+                          className="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:border-orange-500 outline-none"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => handleCancelClick(credit, e)}
+                        disabled={cancelMutation.isPending}
+                        className="flex-1 py-2 px-3 text-[10px] font-bold text-rose-400 border border-rose-500/30 rounded-lg hover:bg-rose-500/10 transition flex items-center justify-center gap-1"
+                      >
+                        <XCircle size={12} />
+                        Annuler
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePayout(credit); }}
+                        disabled={isPaying}
+                        className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-gradient-to-r from-orange-600 to-amber-600 rounded-lg hover:from-orange-500 hover:to-amber-500 transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-900/20"
+                      >
+                        {isPaying ? (
+                          <><RefreshCw size={14} className="animate-spin" /> Traitement...</>
+                        ) : (
+                          <><CheckCircle size={14} /> Confirmer Décaissement</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          /* Empty State */
+          <div className="h-full flex flex-col items-center justify-center text-slate-500 py-12">
+            <div className="p-3 bg-slate-900 rounded-full mb-3 border border-slate-800">
+              <CheckCircle size={20} className="text-emerald-500/50" />
+            </div>
+            <p className="text-xs font-medium text-slate-400">Aucun décaissement en attente</p>
+            <p className="text-[10px] mt-1 opacity-60">Les nouveaux prêts apparaîtront ici</p>
+          </div>
+        )}
+      </div>
+
+      {/* Cancel Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showCancelConfirm}
         title="Annuler le décaissement"
         message={
-          selectedCredit
-            ? `Voulez-vous vraiment annuler ce prêt de ${formatMoney(parseFloat(selectedCredit.montant))} ? Cette action est irréversible.`
+          creditToCancel
+            ? `Annuler le prêt de ${formatMoney(parseFloat(creditToCancel.montant))} pour ${formatClientName(creditToCancel.client.nom, creditToCancel.client.prenom)} ?`
             : ''
         }
         confirmText="Confirmer l'annulation"
         onConfirm={() => {
-             if (selectedCredit) {
-                 cancelMutation.mutate(selectedCredit.id);
-             }
+          if (creditToCancel) {
+            cancelMutation.mutate(creditToCancel.id);
+          }
         }}
         onClose={() => {
           setShowCancelConfirm(false);
+          setCreditToCancel(null);
         }}
         variant="danger"
       />
@@ -524,7 +437,7 @@ export default function PendingDisbursements({
         message={(() => {
           const selected = pendingCredits.filter(c => selectedIds.has(c.id));
           const totalMontant = selected.reduce((sum, c) => sum + parseFloat(c.montant), 0);
-          return `Voulez-vous décaisser ${selectedIds.size} crédit(s) pour un total de ${formatMoney(totalMontant)} ? Cette action débitera le coffre-fort.`;
+          return `Décaisser ${selectedIds.size} crédit(s) pour un total de ${formatMoney(totalMontant)} ?`;
         })()}
         confirmText={`Décaisser ${selectedIds.size} crédit(s)`}
         onConfirm={() => {
