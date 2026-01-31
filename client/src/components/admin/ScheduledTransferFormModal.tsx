@@ -3,13 +3,15 @@ import {
   X,
   Search,
   ArrowRight,
-  CalendarClock,
+  Clock,
   Banknote,
   Loader2,
   CheckCircle,
   AlertCircle,
   User,
-  Building2
+  Building2,
+  Repeat,
+  Wallet,
 } from 'lucide-react';
 import { compteEpargneApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
@@ -57,11 +59,11 @@ interface Props {
 
 type Frequence = 'ONCE' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
-const FREQUENCES: { value: Frequence; label: string; description: string }[] = [
-  { value: 'ONCE', label: 'Une seule fois', description: 'Exécution unique à la date prévue' },
-  { value: 'DAILY', label: 'Quotidien', description: 'Chaque jour à la même heure' },
-  { value: 'WEEKLY', label: 'Hebdomadaire', description: 'Une fois par semaine' },
-  { value: 'MONTHLY', label: 'Mensuel', description: 'Une fois par mois' },
+const FREQUENCES: { value: Frequence; label: string; shortLabel: string }[] = [
+  { value: 'ONCE', label: 'Une fois', shortLabel: 'Une fois' },
+  { value: 'DAILY', label: 'Quotidien', shortLabel: 'Quotidien' },
+  { value: 'WEEKLY', label: 'Hebdomadaire', shortLabel: 'Hebdo' },
+  { value: 'MONTHLY', label: 'Mensuel', shortLabel: 'Mensuel' },
 ];
 
 const getOwnerName = (compte: Compte) => {
@@ -72,6 +74,14 @@ const getOwnerName = (compte: Compte) => {
 
 const getNumero = (compte: Compte) => compte.numeroCompte || compte.numero_compte || '';
 
+// Get default datetime (now + 1 hour, rounded to nearest 15 min)
+const getDefaultDateTime = () => {
+  const now = new Date();
+  now.setHours(now.getHours() + 1);
+  now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
+  return now.toISOString().slice(0, 16);
+};
+
 export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess, editTransfer }: Props) {
   const isEditing = !!editTransfer;
 
@@ -81,7 +91,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
   const [destAccountNumber, setDestAccountNumber] = useState('');
   const [montant, setMontant] = useState('');
   const [frequence, setFrequence] = useState<Frequence>('MONTHLY');
-  const [prochaineExecution, setProchaineExecution] = useState('');
+  const [startDateTime, setStartDateTime] = useState(getDefaultDateTime());
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -104,10 +114,8 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
       setMontant(String(editTransfer.montant));
       setFrequence((editTransfer.frequence?.toUpperCase() || 'MONTHLY') as Frequence);
       if (editTransfer.prochaineExecution) {
-        setProchaineExecution(editTransfer.prochaineExecution.split('T')[0]);
+        setStartDateTime(editTransfer.prochaineExecution.slice(0, 16));
       }
-      // For editing, we'd need to fetch the source and dest comptes
-      // For now, just show the numbers
       setDestAccountNumber(editTransfer.destNumero || '');
     }
   }, [editTransfer, isOpen]);
@@ -120,7 +128,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
       setDestAccountNumber('');
       setMontant('');
       setFrequence('MONTHLY');
-      setProchaineExecution('');
+      setStartDateTime(getDefaultDateTime());
       setSelectedSource(null);
       setSelectedDest(null);
       setSourceSearch('');
@@ -260,7 +268,11 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
     if (!montant || isNaN(montantNum) || montantNum <= 0) {
       errs.montant = 'Montant invalide';
     } else if (montantNum < 100) {
-      errs.montant = 'Montant minimum: 100 FCFA';
+      errs.montant = 'Min: 100 FCFA';
+    }
+
+    if (!startDateTime) {
+      errs.startDateTime = 'Date requise';
     }
 
     if (sourceCompteId && destCompteId && sourceCompteId === destCompteId) {
@@ -268,9 +280,36 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
     }
 
     return errs;
-  }, [sourceCompteId, destCompteId, selectedSource, selectedDest, destAccountNumber, destVerified, montant]);
+  }, [sourceCompteId, destCompteId, selectedSource, selectedDest, destAccountNumber, destVerified, montant, startDateTime]);
 
-  const isValid = Object.keys(errors).length === 0 && (sourceCompteId || selectedSource) && (destCompteId || selectedDest || (destAccountNumber && destVerified?.found));
+  const isValid = Object.keys(errors).length === 0 &&
+    (sourceCompteId || selectedSource) &&
+    (destCompteId || selectedDest || (destAccountNumber && destVerified?.found)) &&
+    startDateTime;
+
+  // Cron summary helper
+  const getCronSummary = () => {
+    if (!startDateTime || !montant || parseFloat(montant) <= 0) {
+      return "Configurez les paramètres du virement...";
+    }
+
+    const date = new Date(startDateTime);
+    const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const dayOfWeek = date.toLocaleDateString('fr-FR', { weekday: 'long' });
+    const dayOfMonth = date.getDate();
+
+    switch (frequence) {
+      case 'DAILY':
+        return `Chaque jour à ${timeStr}, à partir du ${dateStr}.`;
+      case 'WEEKLY':
+        return `Chaque ${dayOfWeek} à ${timeStr}, à partir du ${dateStr}.`;
+      case 'MONTHLY':
+        return `Le ${dayOfMonth} de chaque mois à ${timeStr}, à partir du ${dateStr}.`;
+      default:
+        return `Exécution unique le ${dateStr} à ${timeStr}.`;
+    }
+  };
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -282,6 +321,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
         montant: parseFloat(montant),
         scheduled: true,
         frequence: frequence,
+        prochaineExecution: new Date(startDateTime).toISOString(),
       };
 
       // Use either destCompteId or destAccountNumber
@@ -292,15 +332,13 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
       }
 
       if (isEditing && editTransfer) {
-        // Update existing
         await compteEpargneApi.updateScheduledTransfer(editTransfer.id, {
           montant: parseFloat(montant),
           frequence: frequence.toLowerCase() as any,
-          prochaineExecution: prochaineExecution || null,
+          prochaineExecution: startDateTime || null,
         });
         toast.success('Virement programmé mis à jour');
       } else {
-        // Create new using createTransfer with scheduled: true
         await compteEpargneApi.createTransfer(payload);
         toast.success('Virement programmé créé');
       }
@@ -317,58 +355,55 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col border border-slate-700 shadow-2xl">
-        {/* Header */}
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      <div className="w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+
+        {/* HEADER */}
+        <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-500/20 rounded-lg">
-              <CalendarClock className="w-5 h-5 text-cyan-400" />
+            <div className="p-2 bg-indigo-500/20 rounded-xl">
+              <Clock className="w-5 h-5 text-indigo-400" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">
-                {isEditing ? 'Modifier le virement' : 'Nouveau virement programmé'}
+                {isEditing ? 'Modifier le virement' : 'Virement Programmé'}
               </h2>
-              <p className="text-xs text-slate-400">
-                {isEditing ? 'Modifiez les paramètres du virement' : 'Automatisez vos transferts entre comptes'}
-              </p>
+              <p className="text-xs text-slate-400">Automatisation des transferts</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-slate-400" />
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-slate-500 hover:text-white" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Source Account */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Compte source
-            </label>
-            <div className="relative">
-              {selectedSource ? (
-                <div className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-600">
-                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-400" />
+        {/* BODY - Compact & Aligned */}
+        <div className="p-6 space-y-5">
+
+          {/* 1. FLUX (Source -> Dest) */}
+          <div className="flex flex-col md:flex-row items-stretch gap-3">
+            {/* Source Account */}
+            <div className="flex-1 space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+                Compte Source
+              </label>
+              <div className="relative">
+                {selectedSource ? (
+                  <div className="h-12 flex items-center gap-2 px-3 bg-slate-900 border border-slate-700 rounded-xl">
+                    <User className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{getOwnerName(selectedSource)}</p>
+                    </div>
+                    <span className="text-xs text-emerald-400 font-medium">{formatMoney(Number(selectedSource.solde))}</span>
+                    <button onClick={clearSource} className="p-1 hover:bg-slate-800 rounded">
+                      <X className="w-3 h-3 text-slate-500" />
+                    </button>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-white">{getOwnerName(selectedSource)}</p>
-                    <p className="text-xs text-slate-400">{getNumero(selectedSource)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-emerald-400">
-                      {formatMoney(Number(selectedSource.solde))}
-                    </p>
-                  </div>
-                  <button onClick={clearSource} className="p-1 hover:bg-slate-700 rounded">
-                    <X className="w-4 h-4 text-slate-400" />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                ) : (
+                  <>
+                    <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input
                       type="text"
                       value={sourceSearch}
@@ -377,263 +412,234 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                         setShowSourceDropdown(true);
                       }}
                       onFocus={() => setShowSourceDropdown(true)}
-                      placeholder="Rechercher par nom ou numéro..."
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+                      onBlur={() => setTimeout(() => setShowSourceDropdown(false), 200)}
+                      placeholder="Rechercher..."
+                      className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 text-white text-sm placeholder:text-slate-600 focus:border-indigo-500 outline-none"
                     />
                     {searchingSource && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400 animate-spin" />
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 animate-spin" />
                     )}
-                  </div>
-
-                  {showSourceDropdown && sourceComptes.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                      {sourceComptes.map((compte) => (
-                        <button
-                          key={compte.id}
-                          onClick={() => handleSelectSource(compte)}
-                          className="w-full px-3 py-2 text-left hover:bg-slate-700 flex items-center gap-3 transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                    {showSourceDropdown && sourceComptes.length > 0 && (
+                      <div className="absolute z-20 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                        {sourceComptes.map((compte) => (
+                          <button
+                            key={compte.id}
+                            onClick={() => handleSelectSource(compte)}
+                            className="w-full px-3 py-2 text-left hover:bg-slate-700 flex items-center gap-3 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                          >
                             <User className="w-4 h-4 text-slate-400" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white truncate">{getOwnerName(compte)}</p>
-                            <p className="text-xs text-slate-500">{getNumero(compte)}</p>
-                          </div>
-                          <p className="text-xs font-medium text-emerald-400">{formatMoney(Number(compte.solde))}</p>
-                        </button>
-                      ))}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white truncate">{getOwnerName(compte)}</p>
+                              <p className="text-xs text-slate-500">{getNumero(compte)}</p>
+                            </div>
+                            <p className="text-xs font-medium text-emerald-400">{formatMoney(Number(compte.solde))}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {errors.source && <p className="text-[10px] text-red-400 ml-1">{errors.source}</p>}
+            </div>
+
+            {/* Arrow Connector */}
+            <div className="flex items-center justify-center pt-6">
+              <div className="hidden md:flex p-2 text-slate-600">
+                <ArrowRight className="w-5 h-5" />
+              </div>
+              <div className="md:hidden p-2 text-slate-600 rotate-90">
+                <ArrowRight className="w-5 h-5" />
+              </div>
+            </div>
+
+            {/* Destination Account */}
+            <div className="flex-1 space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+                Bénéficiaire
+              </label>
+              <div className="relative">
+                {selectedDest ? (
+                  <div className="h-12 flex items-center gap-2 px-3 bg-slate-900 border border-slate-700 rounded-xl">
+                    <User className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{getOwnerName(selectedDest)}</p>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
-            {errors.source && <p className="mt-1 text-xs text-red-400">{errors.source}</p>}
-          </div>
-
-          {/* Arrow */}
-          <div className="flex justify-center">
-            <div className="p-2 bg-slate-800 rounded-full">
-              <ArrowRight className="w-4 h-4 text-slate-400" />
-            </div>
-          </div>
-
-          {/* Destination Account */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Compte destinataire
-            </label>
-
-            {selectedDest ? (
-              <div className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-600">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <User className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{getOwnerName(selectedDest)}</p>
-                  <p className="text-xs text-slate-400">{getNumero(selectedDest)}</p>
-                </div>
-                <button onClick={clearDest} className="p-1 hover:bg-slate-700 rounded">
-                  <X className="w-4 h-4 text-slate-400" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {/* Search mode */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    value={destSearch}
-                    onChange={(e) => {
-                      setDestSearch(e.target.value);
-                      setShowDestDropdown(true);
-                      setDestAccountNumber('');
-                    }}
-                    onFocus={() => setShowDestDropdown(true)}
-                    placeholder="Rechercher ou saisir le numéro..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
-                  />
-                  {searchingDest && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400 animate-spin" />
-                  )}
-                </div>
-
-                {showDestDropdown && destComptes.length > 0 && (
-                  <div className="absolute z-10 w-[calc(100%-2rem)] bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                    {destComptes.map((compte) => (
-                      <button
-                        key={compte.id}
-                        onClick={() => handleSelectDest(compte)}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-700 flex items-center gap-3 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                          <User className="w-4 h-4 text-slate-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{getOwnerName(compte)}</p>
-                          <p className="text-xs text-slate-500">{getNumero(compte)}</p>
-                        </div>
-                      </button>
-                    ))}
+                    <button onClick={clearDest} className="p-1 hover:bg-slate-800 rounded">
+                      <X className="w-3 h-3 text-slate-500" />
+                    </button>
                   </div>
-                )}
-
-                {/* Or direct number input */}
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <div className="flex-1 h-px bg-slate-700" />
-                  <span>ou saisir le numéro</span>
-                  <div className="flex-1 h-px bg-slate-700" />
-                </div>
-
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    value={destAccountNumber}
-                    onChange={(e) => {
-                      setDestAccountNumber(e.target.value);
-                      setDestSearch('');
-                      setDestVerified(null);
-                    }}
-                    placeholder="Numéro de compte (ex: EP-2025-001234)"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
-                  />
-                  {verifyingDest && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400 animate-spin" />
-                  )}
-                  {destVerified && !verifyingDest && (
-                    destVerified.found ? (
-                      <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-400" />
-                    )
-                  )}
-                </div>
-
-                {destVerified?.found && destVerified.ownerName && (
-                  <p className="text-xs text-emerald-400 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    Titulaire: {destVerified.ownerName}
-                  </p>
+                ) : destAccountNumber && destVerified?.found ? (
+                  <div className="h-12 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{destVerified.ownerName || destAccountNumber}</p>
+                    </div>
+                    <button onClick={clearDest} className="p-1 hover:bg-slate-800 rounded">
+                      <X className="w-3 h-3 text-slate-500" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      value={destSearch || destAccountNumber}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // If looks like account number (starts with EP- or contains numbers)
+                        if (val.startsWith('EP-') || /^\d/.test(val)) {
+                          setDestAccountNumber(val);
+                          setDestSearch('');
+                        } else {
+                          setDestSearch(val);
+                          setDestAccountNumber('');
+                          setShowDestDropdown(true);
+                        }
+                      }}
+                      onFocus={() => setShowDestDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowDestDropdown(false), 200)}
+                      placeholder="Nom ou N° compte..."
+                      className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-10 text-white text-sm placeholder:text-slate-600 focus:border-indigo-500 outline-none"
+                    />
+                    {(searchingDest || verifyingDest) && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 animate-spin" />
+                    )}
+                    {destVerified && !verifyingDest && destAccountNumber && (
+                      destVerified.found ? (
+                        <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-400" />
+                      )
+                    )}
+                    {showDestDropdown && destComptes.length > 0 && (
+                      <div className="absolute z-20 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                        {destComptes.map((compte) => (
+                          <button
+                            key={compte.id}
+                            onClick={() => handleSelectDest(compte)}
+                            className="w-full px-3 py-2 text-left hover:bg-slate-700 flex items-center gap-3 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                          >
+                            <User className="w-4 h-4 text-slate-400" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white truncate">{getOwnerName(compte)}</p>
+                              <p className="text-xs text-slate-500">{getNumero(compte)}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            )}
-            {errors.dest && <p className="mt-1 text-xs text-red-400">{errors.dest}</p>}
-          </div>
-
-          {/* Amount */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Montant
-            </label>
-            <div className="relative">
-              <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                inputMode="numeric"
-                value={montant}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  setMontant(val);
-                }}
-                placeholder="0"
-                className="w-full pl-10 pr-16 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white text-lg font-bold placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">FCFA</span>
+              {errors.dest && <p className="text-[10px] text-red-400 ml-1">{errors.dest}</p>}
             </div>
-            {errors.montant && <p className="mt-1 text-xs text-red-400">{errors.montant}</p>}
           </div>
 
-          {/* Frequency */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Fréquence
+          {/* 2. CONFIG (Montant & Date Cron) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Montant */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+                Montant (FCFA)
+              </label>
+              <div className="relative">
+                <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={montant}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setMontant(val);
+                  }}
+                  placeholder="0"
+                  className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-16 text-white font-bold placeholder:text-slate-600 focus:border-indigo-500 outline-none"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm">FCFA</span>
+              </div>
+              {errors.montant && <p className="text-[10px] text-red-400 ml-1">{errors.montant}</p>}
+            </div>
+
+            {/* Date & Heure Début (Cron Trigger) */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex justify-between items-center">
+                <span>Démarrer le</span>
+                <span className="text-indigo-400 normal-case font-medium">Référence Cron</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={startDateTime}
+                onChange={(e) => setStartDateTime(e.target.value)}
+                className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl px-4 text-white text-sm focus:border-indigo-500 outline-none"
+              />
+              {errors.startDateTime && <p className="text-[10px] text-red-400 ml-1">{errors.startDateTime}</p>}
+            </div>
+          </div>
+
+          {/* 3. FRÉQUENCE (Segmented Control - Single Line) */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+              Répétition
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-4 gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
               {FREQUENCES.map((freq) => (
                 <button
                   key={freq.value}
                   type="button"
                   onClick={() => setFrequence(freq.value)}
-                  className={`p-3 rounded-lg border transition-all text-left ${
-                    frequence === freq.value
-                      ? 'bg-cyan-500/20 border-cyan-500/50 ring-1 ring-cyan-500/30'
-                      : 'bg-slate-800 border-slate-600 hover:border-slate-500'
-                  }`}
+                  className={`
+                    h-10 rounded-lg text-xs font-bold transition-all flex items-center justify-center
+                    ${frequence === freq.value
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+                  `}
                 >
-                  <p className={`text-sm font-medium ${frequence === freq.value ? 'text-cyan-400' : 'text-white'}`}>
-                    {freq.label}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">{freq.description}</p>
+                  <span className="hidden sm:inline">{freq.label}</span>
+                  <span className="sm:hidden">{freq.shortLabel}</span>
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Next execution (optional for new, shows for edit) */}
-          {isEditing && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Prochaine exécution
-              </label>
-              <input
-                type="date"
-                value={prochaineExecution}
-                onChange={(e) => setProchaineExecution(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-cyan-500 focus:outline-none"
-              />
-            </div>
-          )}
-
-          {/* Summary */}
-          {isValid && montant && parseFloat(montant) > 0 && (
-            <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
-              <p className="text-xs text-cyan-400 mb-1">Résumé</p>
-              <p className="text-sm text-white">
-                {formatMoney(parseFloat(montant))} transféré{' '}
-                {FREQUENCES.find(f => f.value === frequence)?.label.toLowerCase() || ''}
-              </p>
-              {frequence !== 'ONCE' && (
-                <p className="text-xs text-slate-400 mt-1">
-                  Volume mensuel estimé: {formatMoney(
-                    parseFloat(montant) * (
-                      frequence === 'DAILY' ? 30 :
-                      frequence === 'WEEKLY' ? 4 :
-                      1
-                    )
-                  )}
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-700 flex items-center justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!isValid || loading}
-            className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-bold rounded-lg hover:from-cyan-400 hover:to-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {isEditing ? 'Mise à jour...' : 'Création...'}
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-4 h-4" />
-                {isEditing ? 'Mettre à jour' : 'Planifier'}
-              </>
-            )}
-          </button>
+        {/* FOOTER */}
+        <div className="p-6 bg-slate-900 border-t border-slate-800 space-y-4">
+          {/* Cron Summary Banner */}
+          <div className="flex items-start gap-3 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+            <Repeat className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+            <div className="text-xs">
+              <span className="font-bold text-indigo-400 block mb-0.5">Résumé de la planification</span>
+              <span className="text-indigo-200">{getCronSummary()}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!isValid || loading}
+              className="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {isEditing ? 'Mise à jour...' : 'Planification...'}
+                </>
+              ) : (
+                <>
+                  <Clock className="w-4 h-4" />
+                  {isEditing ? 'Mettre à jour' : 'Planifier'}
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

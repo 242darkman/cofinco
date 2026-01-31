@@ -849,6 +849,7 @@ export const compteEpargneApi = {
     montant: number;
     scheduled?: boolean;
     frequence?: 'once' | 'daily' | 'weekly' | 'monthly';
+    prochaineExecution?: string; // ISO datetime for Cron start date
   }) =>
     request<any>('/comptes/transferts', {
       method: 'POST',

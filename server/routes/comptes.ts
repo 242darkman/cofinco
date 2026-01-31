@@ -98,6 +98,7 @@ const virementCompteSchema = z.object({
   montant: z.coerce.number().positive("Le montant doit etre positif"),
   scheduled: z.boolean().optional().default(false),
   frequence: z.enum(["ONCE", "DAILY", "WEEKLY", "MONTHLY"]).optional().default("ONCE"),
+  prochaineExecution: z.string().datetime({ offset: true }).optional(), // ISO datetime for Cron start
 });
 
 const updateVirementProgrammeSchema = z.object({
@@ -695,6 +696,7 @@ export function registerComptesRoutes(app: Express) {
             montant: parsed.montant,
             frequence: parsed.frequence,
             createdBy: userId,
+            prochaineExecution: parsed.prochaineExecution ? new Date(parsed.prochaineExecution) : undefined,
           });
 
           return res.status(201).json(

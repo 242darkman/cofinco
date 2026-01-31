@@ -63,6 +63,7 @@ interface ScheduleTransferInput {
   timezone?: string;
   jourExecution?: number;
   libelle?: string;
+  prochaineExecution?: Date; // User-defined start date for Cron scheduling
 }
 
 interface ProcessResult {
@@ -318,6 +319,7 @@ export async function createVirementProgramme(input: ScheduleTransferInput) {
     timezone = "Africa/Brazzaville",
     jourExecution,
     libelle,
+    prochaineExecution,
   } = input;
 
   // Recuperer l'agence depuis le compte source si non fournie
@@ -338,7 +340,7 @@ export async function createVirementProgramme(input: ScheduleTransferInput) {
       compteDestId,
       montant: montant.toString(),
       frequence,
-      prochaineExecution: new Date(),
+      prochaineExecution: prochaineExecution || new Date(),
       actif: true,
       agenceId: resolvedAgenceId,
       timezone,
