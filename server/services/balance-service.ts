@@ -570,6 +570,10 @@ class BalanceService {
 
   /**
    * Réconcilie le solde d'un coffre-fort avec les transferts exécutés
+   * Inclut:
+   * - transferts_coffre_caisse (EXECUTED)
+   * - transferts_inter_coffres (RECEIVED/RECEIVED_WITH_DISCREPANCY)
+   * - mouvements_financiers directs (approvisionnements externes, remboursements, etc.)
    */
   async reconcileCoffre(coffreId: string): Promise<ReconciliationResult> {
     const [coffre] = await db.select({
@@ -586,7 +590,7 @@ class BalanceService {
 
     const persistedBalance = Number(coffre.solde || 0);
 
-    // Calculate balance from coffre-caisse transfers (EXECUTED only)
+    // 1. Calculate balance from coffre-caisse transfers (EXECUTED only)
     // CAISSE_VERS_COFFRE = inflow, COFFRE_VERS_CAISSE = outflow
     const [coffreCaisseResult] = await db.select({
       inflow: sql<number>`COALESCE(SUM(CASE WHEN ${transfertsCoffreCaisse.typeTransfert} = 'CAISSE_VERS_COFFRE' THEN CAST(${transfertsCoffreCaisse.montant} AS DECIMAL) ELSE 0 END), 0)`,
@@ -598,7 +602,7 @@ class BalanceService {
       eq(transfertsCoffreCaisse.statut, 'EXECUTED' as any)
     ));
 
-    // Calculate from inter-coffre transfers (RECEIVED only)
+    // 2. Calculate from inter-coffre transfers (RECEIVED only)
     const [interCoffreInflow] = await db.select({
       total: sql<number>`COALESCE(SUM(CAST(${transfertsInterCoffres.montant} AS DECIMAL)), 0)`,
     })
@@ -617,9 +621,26 @@ class BalanceService {
       sql`${transfertsInterCoffres.statut} IN ('RECEIVED', 'RECEIVED_WITH_DISCREPANCY')`
     ));
 
+    // 3. Calculate from direct mouvements_financiers (approvisionnements externes, remboursements, etc.)
+    // These are mouvements where metadata->>'coffreId' = coffreId but NOT from COFFRE_TRANSFER source
+    // (COFFRE_TRANSFER mouvements are already counted via transferts_coffre_caisse)
+    const [directMouvements] = await db.select({
+      credits: sql<number>`COALESCE(SUM(CASE WHEN ${mouvementsFinanciers.sens} = 'CREDIT' THEN CAST(${mouvementsFinanciers.montant} AS DECIMAL) ELSE 0 END), 0)`,
+      debits: sql<number>`COALESCE(SUM(CASE WHEN ${mouvementsFinanciers.sens} = 'DEBIT' THEN CAST(${mouvementsFinanciers.montant} AS DECIMAL) ELSE 0 END), 0)`,
+    })
+    .from(mouvementsFinanciers)
+    .where(and(
+      sql`${mouvementsFinanciers.metadata}->>'coffreId' = ${coffreId}`,
+      sql`${mouvementsFinanciers.sourceModule} != 'COFFRE_TRANSFER'`
+    ));
+
     const calculatedBalance =
+      // From coffre-caisse transfers
       Number(coffreCaisseResult?.inflow || 0) - Number(coffreCaisseResult?.outflow || 0) +
-      Number(interCoffreInflow?.total || 0) - Number(interCoffreOutflow?.total || 0);
+      // From inter-coffre transfers
+      Number(interCoffreInflow?.total || 0) - Number(interCoffreOutflow?.total || 0) +
+      // From direct mouvements (approvisionnements, remboursements, etc.)
+      Number(directMouvements?.credits || 0) - Number(directMouvements?.debits || 0);
 
     const discrepancy = Math.abs(persistedBalance - calculatedBalance);
 
