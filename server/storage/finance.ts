@@ -2147,6 +2147,17 @@ export async function payerFraisEngagement(data: {
       throw new Error("Une session de caisse active est requise pour le paiement des frais en espèces");
   }
 
+  // Get agenceId from session caisse if available (for GL posting)
+  let agenceId: string | undefined;
+  if (data.sessionCaisseId) {
+    const [session] = await db
+      .select({ agenceId: sessionsCaisse.agenceId })
+      .from(sessionsCaisse)
+      .where(eq(sessionsCaisse.id, data.sessionCaisseId))
+      .limit(1);
+    agenceId = session?.agenceId || undefined;
+  }
+
   const ledgerResult = await executeWithLedger(
     "CREDIT",
     {
@@ -2157,6 +2168,7 @@ export async function payerFraisEngagement(data: {
       methodePaiement: data.methodePaiement,
       typePaiement: "ENGAGEMENT_FEE",
       idempotencyKey: data.idempotencyKey,
+      agenceId, // Pass agenceId to ledger for GL posting
     },
     async (tx, mouvement) => {
       // 2. Mettre à jour la demande

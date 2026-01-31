@@ -52,6 +52,7 @@ import {
 } from "./coffre/coffre-guard";
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-posting-service";
 
 const logger = createLogger('AgencyMigration');
 
@@ -1476,7 +1477,7 @@ export class AgencyMigrationService {
             // 4. Create BOTH mouvement financier entries (DEBIT + CREDIT)
             const reference = `MIG-TRF-${Date.now()}`;
 
-            await tx.insert(mouvementsFinanciers).values({
+            const [mouvementDebit] = await tx.insert(mouvementsFinanciers).values({
               reference: `${reference}-D`,
               dateOperation: new Date(),
               montant: amount.toString(),
@@ -1493,9 +1494,9 @@ export class AgencyMigrationService {
                 sourceAgencyId: migration.sourceAgencyId,
                 targetAgencyId: migration.targetTreasuryAgencyId,
               },
-            });
+            }).returning();
 
-            await tx.insert(mouvementsFinanciers).values({
+            const [mouvementCredit] = await tx.insert(mouvementsFinanciers).values({
               reference: `${reference}-C`,
               dateOperation: new Date(),
               montant: amount.toString(),
@@ -1512,7 +1513,57 @@ export class AgencyMigrationService {
                 sourceAgencyId: migration.sourceAgencyId,
                 targetAgencyId: migration.targetTreasuryAgencyId,
               },
-            });
+            }).returning();
+
+            // 4b. Post GL entries for migration mouvements (non-blocking)
+            // Debit mouvement
+            if (migration.sourceAgencyId) {
+              try {
+                const glResult = await postGlForMouvement(tx, mouvementDebit, migration.sourceAgencyId, ctx?.userId, {
+                  operationType: 'MIGRATION_AGENCE',
+                  migrationId,
+                });
+                if (glResult) {
+                  logger.info({ mouvementId: mouvementDebit.id, numeroPiece: glResult.numeroPiece }, 'GL posted for migration debit');
+                }
+                await tx
+                  .update(mouvementsFinanciers)
+                  .set({ glPostingStatus: "POSTED" })
+                  .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+              } catch (glError: unknown) {
+                const message = glError instanceof Error ? glError.message : "Unknown GL error";
+                const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+                logger.warn({ mouvementId: mouvementDebit.id, error: message }, `GL ${status.toLowerCase()} for migration debit`);
+                await tx
+                  .update(mouvementsFinanciers)
+                  .set({ glPostingStatus: status, glPostingError: message })
+                  .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+              }
+            }
+            // Credit mouvement
+            if (migration.targetTreasuryAgencyId) {
+              try {
+                const glResult = await postGlForMouvement(tx, mouvementCredit, migration.targetTreasuryAgencyId, ctx?.userId, {
+                  operationType: 'MIGRATION_AGENCE',
+                  migrationId,
+                });
+                if (glResult) {
+                  logger.info({ mouvementId: mouvementCredit.id, numeroPiece: glResult.numeroPiece }, 'GL posted for migration credit');
+                }
+                await tx
+                  .update(mouvementsFinanciers)
+                  .set({ glPostingStatus: "POSTED" })
+                  .where(eq(mouvementsFinanciers.id, mouvementCredit.id));
+              } catch (glError: unknown) {
+                const message = glError instanceof Error ? glError.message : "Unknown GL error";
+                const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+                logger.warn({ mouvementId: mouvementCredit.id, error: message }, `GL ${status.toLowerCase()} for migration credit`);
+                await tx
+                  .update(mouvementsFinanciers)
+                  .set({ glPostingStatus: status, glPostingError: message })
+                  .where(eq(mouvementsFinanciers.id, mouvementCredit.id));
+              }
+            }
 
             // 5. Entity log with snapshotBefore (for rollback)
             await tx.insert(migrationEntityLogs).values({
@@ -1770,7 +1821,7 @@ export class AgencyMigrationService {
           // Créer mouvements financiers inverses
           const reverseRef = `ROLLBACK-${snapshot.reference || Date.now()}`;
 
-          await tx.insert(mouvementsFinanciers).values({
+          const [rollbackDebit] = await tx.insert(mouvementsFinanciers).values({
             reference: `${reverseRef}-D`,
             dateOperation: new Date(),
             montant: snapshot.amount.toString(),
@@ -1786,9 +1837,9 @@ export class AgencyMigrationService {
               direction: "DEBIT",
               originalReference: snapshot.reference,
             },
-          });
+          }).returning();
 
-          await tx.insert(mouvementsFinanciers).values({
+          const [rollbackCredit] = await tx.insert(mouvementsFinanciers).values({
             reference: `${reverseRef}-C`,
             dateOperation: new Date(),
             montant: snapshot.amount.toString(),
@@ -1804,7 +1855,53 @@ export class AgencyMigrationService {
               direction: "CREDIT",
               originalReference: snapshot.reference,
             },
-          });
+          }).returning();
+
+          // Post GL entries for rollback mouvements (non-blocking)
+          if (migration.targetTreasuryAgencyId) {
+            try {
+              const glResult = await postGlForMouvement(tx, rollbackDebit, migration.targetTreasuryAgencyId, ctx?.userId, {
+                operationType: 'MIGRATION_ROLLBACK',
+                migrationId,
+              });
+              if (glResult) {
+                logger.info({ mouvementId: rollbackDebit.id }, 'GL posted for rollback debit');
+              }
+              await tx
+                .update(mouvementsFinanciers)
+                .set({ glPostingStatus: "POSTED" })
+                .where(eq(mouvementsFinanciers.id, rollbackDebit.id));
+            } catch (glError: unknown) {
+              const message = glError instanceof Error ? glError.message : "Unknown GL error";
+              const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+              await tx
+                .update(mouvementsFinanciers)
+                .set({ glPostingStatus: status, glPostingError: message })
+                .where(eq(mouvementsFinanciers.id, rollbackDebit.id));
+            }
+          }
+          if (migration.sourceAgencyId) {
+            try {
+              const glResult = await postGlForMouvement(tx, rollbackCredit, migration.sourceAgencyId, ctx?.userId, {
+                operationType: 'MIGRATION_ROLLBACK',
+                migrationId,
+              });
+              if (glResult) {
+                logger.info({ mouvementId: rollbackCredit.id }, 'GL posted for rollback credit');
+              }
+              await tx
+                .update(mouvementsFinanciers)
+                .set({ glPostingStatus: "POSTED" })
+                .where(eq(mouvementsFinanciers.id, rollbackCredit.id));
+            } catch (glError: unknown) {
+              const message = glError instanceof Error ? glError.message : "Unknown GL error";
+              const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+              await tx
+                .update(mouvementsFinanciers)
+                .set({ glPostingStatus: status, glPostingError: message })
+                .where(eq(mouvementsFinanciers.id, rollbackCredit.id));
+            }
+          }
 
           rollbackReport.treasuryReversed = true;
         }

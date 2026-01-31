@@ -32,6 +32,7 @@ import { getWsInstance } from "../../ws-server";
 import { updateCoffreBalance, updateCaisseBalance } from "../coffre/coffre-guard";
 import { balanceService } from "../balance-service";
 import { createLogger } from "../../lib/logger";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
 
 const logger = createLogger('SessionOpening');
 
@@ -939,7 +940,7 @@ export class SessionOpeningService {
               // Créer les mouvements d'annulation dans le ledger
               const refPrefix = `ANN-${Date.now().toString().slice(-6)}`;
 
-              await tx.insert(mouvementsFinanciers).values({
+              const [mouvementCoffreCredit] = await tx.insert(mouvementsFinanciers).values({
                 montant: montant.toString(),
                 sens: "CREDIT",
                 sourceModule: "TRANSFERT",
@@ -956,9 +957,9 @@ export class SessionOpeningService {
                   categorie: "Annulation Transfert",
                   sessionId,
                 },
-              });
+              }).returning();
 
-              await tx.insert(mouvementsFinanciers).values({
+              const [mouvementCaisseDebit] = await tx.insert(mouvementsFinanciers).values({
                 montant: montant.toString(),
                 sens: "DEBIT",
                 sourceModule: "TRANSFERT",
@@ -975,7 +976,35 @@ export class SessionOpeningService {
                   categorie: "Annulation Transfert",
                   sessionId,
                 },
-              });
+              }).returning();
+
+              // Post GL entries for reversal mouvements (non-blocking)
+              const agenceId = transfert.agenceId;
+              if (agenceId) {
+                for (const mouvement of [mouvementCoffreCredit, mouvementCaisseDebit]) {
+                  try {
+                    const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, {
+                      operationType: 'RESTITUTION',
+                      sessionId,
+                    });
+                    if (glResult) {
+                      logger.info({ mouvementId: mouvement.id, numeroPiece: glResult.numeroPiece }, 'GL posted for session cancellation');
+                    }
+                    await tx
+                      .update(mouvementsFinanciers)
+                      .set({ glPostingStatus: "POSTED" })
+                      .where(eq(mouvementsFinanciers.id, mouvement.id));
+                  } catch (glError: unknown) {
+                    const message = glError instanceof Error ? glError.message : "Unknown GL error";
+                    const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+                    logger.warn({ mouvementId: mouvement.id, error: message }, `GL ${status.toLowerCase()} for session cancellation`);
+                    await tx
+                      .update(mouvementsFinanciers)
+                      .set({ glPostingStatus: status, glPostingError: message })
+                      .where(eq(mouvementsFinanciers.id, mouvement.id));
+                  }
+                }
+              }
             }
 
             // Annuler le transfert (REQUESTED/VALIDATED/EXECUTED → CANCELLED)

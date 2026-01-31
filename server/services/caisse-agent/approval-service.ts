@@ -34,6 +34,8 @@ import {
   comptes,
   evenementsOutbox,
   sessionsCaisse,
+  agentsTerrain,
+  employes,
   type OperationTerrain,
   type ApproveOperationInput,
   type RejectOperationInput,
@@ -45,6 +47,7 @@ import {
 import { StatutTransaction, TypeCompte, TypeOperationCaisse, type TypeOperationCaisseType } from "@shared/enum/status-constants";
 import { eq, sql, and, isNull } from "drizzle-orm";
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Type pour les résultats d'approbation
@@ -54,6 +57,89 @@ interface ApprovalResult {
   mouvements?: MouvementFinancier[];
   error?: string;
   errorCode?: string;
+}
+
+/**
+ * Helper: Get agenceId from agent (via employes table)
+ */
+async function getAgenceIdFromAgent(
+  tx: PgTransaction<any, any, any>,
+  agentId: string
+): Promise<string | undefined> {
+  const [result] = await tx
+    .select({ agenceId: employes.agenceId })
+    .from(agentsTerrain)
+    .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .where(eq(agentsTerrain.id, agentId))
+    .limit(1);
+  return result?.agenceId || undefined;
+}
+
+/**
+ * Helper: Get agenceId from caisse
+ */
+async function getAgenceIdFromCaisse(
+  tx: PgTransaction<any, any, any>,
+  caisseId: string
+): Promise<string | undefined> {
+  const [result] = await tx
+    .select({ agenceId: caisses.agenceId })
+    .from(caisses)
+    .where(eq(caisses.id, caisseId))
+    .limit(1);
+  return result?.agenceId || undefined;
+}
+
+/**
+ * Helper: Post GL entry for a mouvement, handling errors gracefully
+ * Returns true if posted, false if skipped/failed (non-critical)
+ */
+async function tryPostGl(
+  tx: PgTransaction<any, any, any>,
+  mouvement: MouvementFinancier,
+  agenceId: string | undefined,
+  userId: string,
+  additionalMetadata?: Record<string, any>
+): Promise<boolean> {
+  if (!agenceId) {
+    logger.warn({ mouvementId: mouvement.id }, 'GL posting skipped: no agenceId');
+    await tx
+      .update(mouvementsFinanciers)
+      .set({ glPostingStatus: "SKIPPED", glPostingError: "No agenceId available" })
+      .where(eq(mouvementsFinanciers.id, mouvement.id));
+    return false;
+  }
+
+  try {
+    const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, additionalMetadata);
+    if (glResult) {
+      logger.info({ mouvementId: mouvement.id, numeroPiece: glResult.numeroPiece }, 'GL posted for mouvement');
+    }
+    await tx
+      .update(mouvementsFinanciers)
+      .set({ glPostingStatus: "POSTED" })
+      .where(eq(mouvementsFinanciers.id, mouvement.id));
+    return true;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown GL error";
+
+    if (error instanceof AccountingRuleNotFoundError) {
+      // No accounting rule - mark as SKIPPED (non-critical for approval flow)
+      logger.warn({ mouvementId: mouvement.id, error: message }, 'GL skipped: no accounting rule');
+      await tx
+        .update(mouvementsFinanciers)
+        .set({ glPostingStatus: "SKIPPED", glPostingError: message })
+        .where(eq(mouvementsFinanciers.id, mouvement.id));
+    } else {
+      // Other error - mark as FAILED
+      logger.error({ mouvementId: mouvement.id, error: message }, 'GL posting failed');
+      await tx
+        .update(mouvementsFinanciers)
+        .set({ glPostingStatus: "FAILED", glPostingError: message })
+        .where(eq(mouvementsFinanciers.id, mouvement.id));
+    }
+    return false;
+  }
 }
 
 export class ApprovalService {
@@ -207,6 +293,13 @@ export class ApprovalService {
         updatedAt: new Date(),
       })
       .where(eq(caissesAgent.id, operation.caisseAgentId));
+
+    // 2b. Post GL entry for caisse agent mouvement
+    const agenceId = await getAgenceIdFromAgent(tx, operation.agentId);
+    await tryPostGl(tx, mouvementCaisseAgent, agenceId, approvedBy, {
+      operationType: "COLLECT_CASH",
+      caisseAgentId: operation.caisseAgentId,
+    });
 
     const mouvements: MouvementFinancier[] = [mouvementCaisseAgent];
 
@@ -630,6 +723,13 @@ export class ApprovalService {
       })
       .where(eq(caissesAgent.id, operation.caisseAgentId));
 
+    // 3b. Post GL entry for caisse agent mouvement
+    const agenceIdAgent = await getAgenceIdFromAgent(tx, operation.agentId);
+    await tryPostGl(tx, mouvementCaisseAgent, agenceIdAgent, approvedBy, {
+      operationType: "SETTLEMENT_CASH",
+      caisseAgentId: operation.caisseAgentId,
+    });
+
     // 4. Créer mouvement CaisseAgence (Crédit = entrée)
     const refCaisse = generateReference("CAISSE");
     const [mouvementCaisse] = await tx
@@ -652,6 +752,14 @@ export class ApprovalService {
         },
       })
       .returning();
+
+    // 4b. Post GL entry for caisse agence mouvement
+    const agenceIdCaisse = await getAgenceIdFromCaisse(tx, operation.destinationCaisseId!);
+    await tryPostGl(tx, mouvementCaisse, agenceIdCaisse, approvedBy, {
+      operationType: "SETTLEMENT_CASH",
+      fromCaisseAgent: operation.caisseAgentId,
+      destinationCaisseId: operation.destinationCaisseId,
+    });
 
     // 5. Mettre à jour solde CaisseAgence (atomique)
     // Vérifier s'il y a une session active sur la caisse de destination

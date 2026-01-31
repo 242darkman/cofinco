@@ -26,6 +26,7 @@ import {
   updateCoffreBalance,
 } from "./coffre/coffre-guard";
 import { balanceService } from "./balance-service";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-posting-service";
 
 export interface LiquidationDestination {
   id: string;
@@ -358,6 +359,66 @@ export class CaisseLiquidationService {
             sourceCaisseId: params.caisseId,
           },
         }).returning();
+
+        // 3d-bis. Post GL entries for both mouvements (non-blocking)
+        const agenceId = caisse.agenceId;
+        if (agenceId) {
+          // GL for debit mouvement
+          try {
+            const glResultDebit = await postGlForMouvement(tx, mouvementDebit, agenceId, params.executedBy, {
+              operationType: 'LIQUIDATION',
+              caisseNom: caisse.nom,
+            });
+            if (glResultDebit) {
+              logger.info({ mouvementId: mouvementDebit.id, numeroPiece: glResultDebit.numeroPiece }, 'GL posted for liquidation debit');
+            }
+            await tx
+              .update(mouvementsFinanciers)
+              .set({ glPostingStatus: "POSTED" })
+              .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+          } catch (glError: unknown) {
+            const message = glError instanceof Error ? glError.message : "Unknown GL error";
+            const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+            logger.warn({ mouvementId: mouvementDebit.id, error: message }, `GL ${status.toLowerCase()} for liquidation debit`);
+            await tx
+              .update(mouvementsFinanciers)
+              .set({ glPostingStatus: status, glPostingError: message })
+              .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+          }
+
+          // GL for credit mouvement
+          try {
+            const glResultCredit = await postGlForMouvement(tx, mouvementCredit, agenceId, params.executedBy, {
+              operationType: 'LIQUIDATION',
+              destinationType: params.destinationType,
+            });
+            if (glResultCredit) {
+              logger.info({ mouvementId: mouvementCredit.id, numeroPiece: glResultCredit.numeroPiece }, 'GL posted for liquidation credit');
+            }
+            await tx
+              .update(mouvementsFinanciers)
+              .set({ glPostingStatus: "POSTED" })
+              .where(eq(mouvementsFinanciers.id, mouvementCredit.id));
+          } catch (glError: unknown) {
+            const message = glError instanceof Error ? glError.message : "Unknown GL error";
+            const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+            logger.warn({ mouvementId: mouvementCredit.id, error: message }, `GL ${status.toLowerCase()} for liquidation credit`);
+            await tx
+              .update(mouvementsFinanciers)
+              .set({ glPostingStatus: status, glPostingError: message })
+              .where(eq(mouvementsFinanciers.id, mouvementCredit.id));
+          }
+        } else {
+          logger.warn({ caisseId: params.caisseId }, 'GL posting skipped for liquidation: no agenceId');
+          await tx
+            .update(mouvementsFinanciers)
+            .set({ glPostingStatus: "SKIPPED", glPostingError: "No agenceId" })
+            .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+          await tx
+            .update(mouvementsFinanciers)
+            .set({ glPostingStatus: "SKIPPED", glPostingError: "No agenceId" })
+            .where(eq(mouvementsFinanciers.id, mouvementCredit.id));
+        }
 
         // 3e. Debit source caisse atomically (full balance)
         await updateCaisseBalance(tx, params.caisseId, -montantTransfert);

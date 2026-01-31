@@ -10,6 +10,7 @@ import {
   Priorite,
 } from "@shared/enum/status-constants";
 import { createLogger } from "../lib/logger";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-posting-service";
 
 const logger = createLogger('AutoTransfer');
 
@@ -189,6 +190,46 @@ export async function executeAutomaticTransfer(
           methodePaiement: "TRANSFER",
           observations: `Versement automatique depuis ${compteSource.numeroCompte}`,
         });
+
+        // Post GL entry (non-blocking - failures don't stop the transfer)
+        const agenceId = compteDest.agenceId;
+        if (agenceId) {
+          try {
+            const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, {
+              type: "VERSEMENT_AUTO",
+              compteSourceNumero: compteSource.numeroCompte,
+              compteDestNumero: compteDest.numeroCompte,
+            });
+            if (glResult) {
+              logger.info({ mouvementId: mouvement.id, numeroPiece: glResult.numeroPiece }, 'GL posted for auto transfer');
+            }
+            await tx
+              .update(mouvementsFinanciers)
+              .set({ glPostingStatus: "POSTED" })
+              .where(eq(mouvementsFinanciers.id, mouvement.id));
+          } catch (glError: unknown) {
+            const message = glError instanceof Error ? glError.message : "Unknown GL error";
+            if (glError instanceof AccountingRuleNotFoundError) {
+              logger.warn({ mouvementId: mouvement.id, error: message }, 'GL skipped for auto transfer: no accounting rule');
+              await tx
+                .update(mouvementsFinanciers)
+                .set({ glPostingStatus: "SKIPPED", glPostingError: message })
+                .where(eq(mouvementsFinanciers.id, mouvement.id));
+            } else {
+              logger.error({ mouvementId: mouvement.id, error: message }, 'GL posting failed for auto transfer');
+              await tx
+                .update(mouvementsFinanciers)
+                .set({ glPostingStatus: "FAILED", glPostingError: message })
+                .where(eq(mouvementsFinanciers.id, mouvement.id));
+            }
+          }
+        } else {
+          logger.warn({ mouvementId: mouvement.id }, 'GL posting skipped: no agenceId on account');
+          await tx
+            .update(mouvementsFinanciers)
+            .set({ glPostingStatus: "SKIPPED", glPostingError: "No agenceId on account" })
+            .where(eq(mouvementsFinanciers.id, mouvement.id));
+        }
 
         // Record in versements_automatiques history
         await tx.insert(versementsAutomatiques).values({
