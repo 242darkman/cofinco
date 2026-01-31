@@ -17,6 +17,7 @@ import { isIncomingOperation, isOutgoingOperation } from '@shared/config/caisse-
 import { CaisseQuickActions } from './CaisseQuickActions';
 import CaisseOuverture from './CaisseOuverture';
 import { useCaisseWebSocket } from '../../../hooks/useCaisseWebSocket';
+import { useWebSocket } from '../../../hooks/useWebSocket';
 import CaisseOperations from './CaisseOperations';
 import CaisseRapprochement from './CaisseRapprochement';
 import CaisseTransferts from './CaisseTransferts';
@@ -191,6 +192,44 @@ export default function CaisseDashboard({
   });
 
   const comptesEnAttenteCount = pendingActivations.length;
+
+  // Pending loan disbursements count - for badge on Prêts tab (real-time via WebSocket)
+  const { data: pendingDisbursementsData, refetch: refetchPendingDisbursements } = useQuery({
+    queryKey: ['pending-disbursements'],
+    queryFn: () => api.get<{ success: boolean; data: any[]; count: number }>('/credits/pending-disbursements'),
+    enabled: !!currentSession,
+    staleTime: 60000 // Keep data fresh for 1 min, updates come via WebSocket
+  });
+
+  const pendingDisbursementsCount = pendingDisbursementsData?.count || pendingDisbursementsData?.data?.length || 0;
+
+  // WebSocket listener for real-time loan disbursement updates
+  const { socket } = useWebSocket();
+  useEffect(() => {
+    if (!socket || !currentSession) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'CAISSE_UPDATE') {
+          const { subtype } = data.payload || {};
+          if (
+            subtype === 'NEW_LOAN_DISBURSEMENT' ||
+            subtype === 'LOAN_DISBURSEMENT_COMPLETED' ||
+            subtype === 'LOAN_DISBURSEMENT_CANCELLED'
+          ) {
+            // Refresh pending disbursements count instantly
+            refetchPendingDisbursements();
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, [socket, currentSession, refetchPendingDisbursements]);
 
   useEffect(() => {
     if (activeView) {
@@ -503,7 +542,7 @@ export default function CaisseDashboard({
     { key: 'infos-client', label: 'Info Client', icon: Users, disabled: !isSessionOpen },
     { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !isSessionOpen || isClosingWorkflow },
-    { key: 'prets-decaissement', label: 'Prêts', icon: CreditCard, disabled: !isSessionOpen || isClosingWorkflow },
+    { key: 'prets-decaissement', label: 'Prêts', icon: CreditCard, disabled: !isSessionOpen || isClosingWorkflow, badge: pendingDisbursementsCount > 0 ? pendingDisbursementsCount : undefined, badgeClassName: 'bg-orange-500 text-white animate-pulse' },
     { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'etats', label: 'États', icon: FileText, disabled: !isSessionOpen },

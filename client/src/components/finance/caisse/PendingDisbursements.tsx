@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, Card, Badge } from '../../ui';
-import { formatMoney, formatClientName } from '../../../lib/format';
+import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { api } from '../../../lib/api-client';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -67,8 +67,7 @@ export default function PendingDisbursements({
       const response = await api.get<{ success: boolean; data: PendingCredit[]; count: number }>('/credits/pending-disbursements');
       return response;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 10000
+    staleTime: 60000 // Updates come via WebSocket in real-time
   });
 
   const toggleSelect = useCallback((creditId: string, e: React.MouseEvent) => {
@@ -334,7 +333,7 @@ export default function PendingDisbursements({
                                     />
                                     <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
                                         {credit.client.photoUrl ? (
-                                            <img src={credit.client.photoUrl} className="w-full h-full object-cover" alt="" />
+                                            <img src={resolveStorageUrl(credit.client.photoUrl)} className="w-full h-full object-cover" alt="" />
                                         ) : (
                                             <User size={14} className="text-slate-500" />
                                         )}
@@ -397,7 +396,7 @@ export default function PendingDisbursements({
                                      <div className="flex items-center gap-4 bg-slate-800/40 p-4 rounded-xl border border-slate-700/50">
                                          <div className="w-16 h-16 rounded-full bg-slate-900 border-2 border-slate-700 overflow-hidden shrink-0">
                                             {selectedCredit.client.photoUrl ? (
-                                                <img src={selectedCredit.client.photoUrl} className="w-full h-full object-cover" alt="" />
+                                                <img src={resolveStorageUrl(selectedCredit.client.photoUrl)} className="w-full h-full object-cover" alt="" />
                                             ) : (
                                                 <User size={24} className="w-full h-full p-4 text-slate-500" />
                                             )}
