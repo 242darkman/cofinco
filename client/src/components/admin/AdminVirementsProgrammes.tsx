@@ -36,6 +36,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useWebSocketContext } from '../../contexts/WebSocketContext';
 import ScheduledTransferDetails, { ScheduledTransfer } from './ScheduledTransferDetails';
+import ScheduledTransferFormModal from './ScheduledTransferFormModal';
 
 // --- Types ---
 // Reusing/Expanding type to match API better if needed, but keeping local for now or importing if I moved it.
@@ -99,6 +100,8 @@ export default function AdminVirementsProgrammes() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<ScheduledTransferType | null>(null);
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [editingTransfer, setEditingTransfer] = useState<ScheduledTransferType | null>(null);
 
   const [stats, setStats] = useState({
       totalCount: 0,
@@ -140,14 +143,24 @@ export default function AdminVirementsProgrammes() {
     
     try {
       // Parallel fetch for stats and list
+      // Filter logic: all -> no filter, active -> actif=true, paused -> actif=false, failed -> statut=FAILED
+      const filterParams: any = {
+        search: debouncedSearch || undefined,
+        page,
+        limit,
+      };
+
+      if (statusFilter === 'active') {
+        filterParams.actif = true;
+      } else if (statusFilter === 'paused') {
+        filterParams.actif = false;
+      } else if (statusFilter === 'failed') {
+        filterParams.statut = 'FAILED';
+      }
+
       const [listRes, statsRes] = await Promise.all([
-         compteEpargneApi.getScheduledTransfers({
-            search: debouncedSearch || undefined,
-            page,
-            limit,
-            actif: statusFilter === 'all' ? undefined : statusFilter === 'active',
-          }),
-          compteEpargneApi.getScheduledTransferStats()
+         compteEpargneApi.getScheduledTransfers(filterParams),
+         compteEpargneApi.getScheduledTransferStats()
       ]);
 
       setTransfers(listRes?.data || []);
@@ -459,12 +472,13 @@ export default function AdminVirementsProgrammes() {
                   <RefreshCw size={16} />
               </Button>
 
-              <Button 
-                variant="primary" 
-                icon={Plus} 
+              <Button
+                variant="primary"
+                icon={Plus}
                 size="sm"
                 onClick={() => {
-                     toast.info("Création à venir");
+                     setEditingTransfer(null);
+                     setFormModalOpen(true);
                 }}
                 className="h-8 text-xs"
               >
@@ -487,13 +501,16 @@ export default function AdminVirementsProgrammes() {
              </div>
          ) : (
              <div className="flex-1 flex flex-col justify-center">
-                 <EmptyState 
+                 <EmptyState
                     icon={CalendarIcon}
                     title="Aucun virement programmé"
                     description="Automatisez vos flux financiers en créant votre premier virement programmé."
                     action={{
                         label: "Planifier un virement",
-                        onClick: () => toast.info("Création à venir")
+                        onClick: () => {
+                            setEditingTransfer(null);
+                            setFormModalOpen(true);
+                        }
                     }}
                  />
              </div>
@@ -501,15 +518,30 @@ export default function AdminVirementsProgrammes() {
       </div>
 
       {/* Details Drawer */}
-      <ScheduledTransferDetails 
+      <ScheduledTransferDetails
           isOpen={detailsOpen}
           onClose={() => setDetailsOpen(false)}
           transfer={selectedTransfer}
           onToggleActive={handleToggleActive}
           onRunNow={handleRunNow}
           onEdit={(t) => {
-              toast.info("Mode édition");
+              setEditingTransfer(t);
+              setDetailsOpen(false);
+              setFormModalOpen(true);
           }}
+      />
+
+      {/* Form Modal for Create/Edit */}
+      <ScheduledTransferFormModal
+          isOpen={formModalOpen}
+          onClose={() => {
+              setFormModalOpen(false);
+              setEditingTransfer(null);
+          }}
+          onSuccess={() => {
+              loadData(true);
+          }}
+          editTransfer={editingTransfer}
       />
 
       <ConfirmDialog

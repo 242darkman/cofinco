@@ -22,6 +22,8 @@ import { formatDate, formatMoney } from '../../lib/format';
 // but for now I'll define a satisfying interface locally or import if I refactor types later.
 export type ScheduledTransfer = {
   id: string;
+  compteSourceId?: string;
+  compteDestId?: string;
   montant?: string | number;
   frequence?: 'once' | 'daily' | 'weekly' | 'monthly';
   prochaineExecution?: string | Date | null;
@@ -35,7 +37,6 @@ export type ScheduledTransfer = {
   destNumero?: string;
   destClientNom?: string;
   destClientPrenom?: string;
-  // ... any other fields
 };
 
 interface ScheduledTransferDetailsProps {

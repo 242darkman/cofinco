@@ -854,12 +854,13 @@ export const compteEpargneApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  getScheduledTransfers: (params?: { search?: string; page?: number; limit?: number; actif?: boolean }) => {
+  getScheduledTransfers: (params?: { search?: string; page?: number; limit?: number; actif?: boolean; statut?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
     if (params?.page) queryParams.append('page', String(params.page));
     if (params?.limit) queryParams.append('limit', String(params.limit));
     if (params?.actif !== undefined) queryParams.append('actif', String(params.actif));
+    if (params?.statut) queryParams.append('statut', params.statut);
     const query = queryParams.toString();
     return request<{
       data: any[];

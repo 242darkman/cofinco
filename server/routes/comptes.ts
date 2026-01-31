@@ -867,6 +867,12 @@ export function registerComptesRoutes(app: Express) {
           conditions.push(eq(virementsProgrammes.actif, actif));
         }
 
+        // Filter by statutDernier (for "failed" filter)
+        const statutParam = req.query.statut as string | undefined;
+        if (statutParam && (statutParam === 'SUCCESS' || statutParam === 'FAILED')) {
+          conditions.push(eq(virementsProgrammes.statutDernier, statutParam));
+        }
+
         if (search) {
           const pattern = `%${search}%`;
           // Architecture V3: nom/prenom sont dans users, pas dans clients
@@ -1804,7 +1810,7 @@ export function registerComptesRoutes(app: Express) {
               continue;
             }
 
-            const montantInitial = Number(compte.soldeInitial || compte.depotInitialRequis || 0);
+            const montantInitial = Number(compte.depotInitialRequis || 0);
             if (montantInitial <= 0) {
               results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Montant initial non défini" });
               continue;
@@ -2765,7 +2771,7 @@ export function registerComptesRoutes(app: Express) {
             agentName: user.nom || "Agent",
           },
           userId: user.id,
-          agenceId: (user as Record<string, string>).agence || undefined,
+          agenceId: (user as any).agence || undefined,
         });
 
         await logAudit(
@@ -2814,7 +2820,7 @@ export function registerComptesRoutes(app: Express) {
     "/api/comptes/admin/reconcile-sens",
     requireAuth,
     attachAbility,
-    requireAbility(Actions.manage, Subjects.all),
+    requireAbility(Actions.MANAGE, Subjects.ALL),
     async (req, res) => {
       try {
         const { fix } = req.query;
