@@ -9,7 +9,7 @@ import {
   Users, Filter, Search, ChevronRight, Loader2, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatMoney, formatClientName } from '../../../lib/format';
+import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { Pagination } from '../../ui';
 import { STATUT_REEVALUATION_LABELS } from '@shared/enum/status-constants';
 
@@ -34,6 +34,8 @@ interface Reevaluation {
     nom: string;
     prenom?: string;
     photo_url?: string;
+    photoUrl?: string;
+    photoProfile?: string;
   };
 }
 
@@ -238,17 +240,25 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                   {/* Client Avatar & Info - Compact */}
                   <div className="flex items-center gap-3 w-[200px] shrink-0">
                     <div className="shrink-0 relative">
-                      {reeval.client?.photo_url ? (
-                        <img 
-                          src={reeval.client.photo_url} 
-                          alt="Client" 
-                          className="w-9 h-9 rounded-full object-cover border border-slate-600 group-hover:border-cyan-500/50 transition-colors"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600 group-hover:border-cyan-500/50 transition-colors">
-                          {(reeval.client?.nom?.[0] || 'C').toUpperCase()}
-                        </div>
-                      )}
+                      {(() => {
+                        const photoUrl = reeval.client?.photoUrl || reeval.client?.photo_url || reeval.client?.photoProfile;
+                        const initials = `${reeval.client?.nom?.[0] || ''}${reeval.client?.prenom?.[0] || ''}`.toUpperCase() || 'C';
+
+                        if (photoUrl) {
+                          return (
+                            <img
+                              src={resolveStorageUrl(photoUrl)}
+                              alt="Client"
+                              className="w-9 h-9 rounded-full object-cover border border-slate-600 group-hover:border-cyan-500/50 transition-colors"
+                            />
+                          );
+                        }
+                        return (
+                          <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600 group-hover:border-cyan-500/50 transition-colors">
+                            {initials}
+                          </div>
+                        );
+                      })()}
                       {/* Status Dot for very compact view */}
                       <div className={`absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full border-2 border-slate-800 ${statutConfig.bg.replace('/10', '')} ${statutConfig.color.replace('text-', 'bg-')}`}></div>
                     </div>

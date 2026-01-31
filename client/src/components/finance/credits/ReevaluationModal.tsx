@@ -110,10 +110,16 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
   const addElement = (type: string) => {
     if (formData.elementsNouveaux.some(e => e.type === type)) {
       // Remove if already selected
-      setFormData(prev => ({
-        ...prev,
-        elementsNouveaux: prev.elementsNouveaux.filter(e => e.type !== type)
-      }));
+      setFormData(prev => {
+        const updates: Partial<ReevaluationFormData> = {
+          elementsNouveaux: prev.elementsNouveaux.filter(e => e.type !== type)
+        };
+        // Si on retire "Réduction montant demandé", remettre le montant initial
+        if (type === 'Réduction montant demandé') {
+          updates.nouveauMontantDemande = Number(demande.montantDemande);
+        }
+        return { ...prev, ...updates };
+      });
     } else {
       setFormData(prev => ({
         ...prev,
@@ -132,10 +138,18 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
   };
 
   const removeElement = (idx: number) => {
-    setFormData(prev => ({
-      ...prev,
-      elementsNouveaux: prev.elementsNouveaux.filter((_, i) => i !== idx)
-    }));
+    setFormData(prev => {
+      const elementToRemove = prev.elementsNouveaux[idx];
+      const newElements = prev.elementsNouveaux.filter((_, i) => i !== idx);
+
+      // Si on retire "Réduction montant demandé", remettre le montant initial
+      const updates: Partial<ReevaluationFormData> = { elementsNouveaux: newElements };
+      if (elementToRemove?.type === 'Réduction montant demandé') {
+        updates.nouveauMontantDemande = Number(demande.montantDemande);
+      }
+
+      return { ...prev, ...updates };
+    });
   };
 
   const handleSubmit = async () => {
@@ -293,6 +307,47 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                       <X size={14} />
                     </button>
                   </div>
+
+                  {/* Special input for "Réduction montant demandé" */}
+                  {element.type === 'Réduction montant demandé' && (
+                    <div className="mb-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={element.valeurAjoutee ?? ''}
+                          onChange={(e) => {
+                            // N'accepter que les chiffres
+                            const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                            const reduction = rawValue === '' ? undefined : parseInt(rawValue, 10);
+                            updateElement(idx, 'valeurAjoutee', reduction);
+                            // Calculer automatiquement le nouveau montant
+                            const montantInitial = Number(demande.montantDemande);
+                            const nouveauMontant = reduction ? Math.max(0, montantInitial - reduction) : montantInitial;
+                            setFormData(prev => ({ ...prev, nouveauMontantDemande: nouveauMontant }));
+                          }}
+                          placeholder="Montant de la réduction"
+                          className="w-full bg-slate-900/50 rounded p-2 text-white text-sm border border-slate-700 focus:border-amber-500 focus:outline-none"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">FCFA</span>
+                      </div>
+                      {element.valeurAjoutee && element.valeurAjoutee > 0 && (
+                        <div className="mt-1.5 p-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs">
+                          <div className="flex items-center justify-between text-emerald-400">
+                            <span>Nouveau montant:</span>
+                            <span className="font-bold">
+                              {formatMoney(Math.max(0, Number(demande.montantDemande) - element.valeurAjoutee))}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-400 mt-0.5">
+                            <span>Réduction:</span>
+                            <span>-{Math.round((element.valeurAjoutee / Number(demande.montantDemande)) * 100)}%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <textarea
                     value={element.description}
                     onChange={(e) => updateElement(idx, 'description', e.target.value)}
