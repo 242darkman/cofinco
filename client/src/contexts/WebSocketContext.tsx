@@ -691,6 +691,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
            debounceInvalidate(['transferts-coffre', aggregateId]);
            debounceInvalidate(['coffre-stats', aggregateId]);
            debounceInvalidate(['coffre-mouvements', aggregateId]);
+         } else if (aggregateType === 'operation_terrain') {
+           // Dispatch operation-update event for badge and list real-time updates
+           window.dispatchEvent(new CustomEvent('operation-update', {
+             detail: { type: eventType, id: aggregateId, ...data }
+           }));
+           // Invalidate operations queries
+           debounceInvalidate(['/api/caisse-agent/operations-terrain']);
          }
          break;
 

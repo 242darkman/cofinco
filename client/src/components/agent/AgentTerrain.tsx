@@ -64,7 +64,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [agentSummary, setAgentSummary] = useState<{ disponible: number; valide: number } | null>(null);
+  const [agentSummary, setAgentSummary] = useState<{ disponible: number; valide: number; pendingIn: number } | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [kpis, setKpis] = useState<KPIData>({
     objectifPct: 0, commissionsNet: 0, planningToday: 0,
@@ -116,12 +116,28 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
   const loadAgents = async () => {
     try {
+      // For non-admin users, first try to get their own agent profile
+      if (!isAdmin) {
+        try {
+          const meResponse = await agentTerrainApi.getMe();
+          if (meResponse.data) {
+            setCurrentAgent(meResponse.data);
+            setAllAgents([meResponse.data]);
+            return;
+          }
+        } catch (err) {
+          console.warn('Could not fetch current agent profile:', err);
+        }
+      }
+
+      // For admins or fallback: load all agents
       const agents = await agentTerrainApi.getAllList();
       setAllAgents(agents);
-      if (!isAdmin) {
+      if (!isAdmin && agents.length > 0) {
+        // Fallback: if getMe failed, use first active agent (legacy behavior)
         const activeAgent = agents.find((a: Agent) => a.statut === StatutUser.ACTIVE) || agents[0];
         setCurrentAgent(activeAgent);
-      } else {
+      } else if (isAdmin) {
         setLoading(false);
       }
     } catch (error) {
@@ -139,7 +155,8 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       const summary = await caisseAgentApi.getCaisseSummary(agentId);
       setAgentSummary({
         disponible: parseFloat(summary.disponible || '0'),
-        valide: parseFloat(summary.soldeValide || '0')
+        valide: parseFloat(summary.soldeValide || '0'),
+        pendingIn: parseFloat(summary.pendingIn || '0')
       });
 
       const ops = await caisseAgentApi.listOperations({ agentId, limit: 5 });
@@ -418,7 +435,14 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     <div className="text-lg font-bold text-emerald-400 leading-tight">
                       {loading ? '...' : formatMoney(agentSummary?.disponible || 0)}
                     </div>
-                    <div className="text-[9px] text-emerald-600 font-bold">FCFA</div>
+                    {!loading && agentSummary && agentSummary.pendingIn > 0 && (
+                      <div className="text-[10px] text-amber-400 font-medium mt-0.5">
+                        +{formatMoney(agentSummary.pendingIn)} FCFA en attente
+                      </div>
+                    )}
+                    {(!agentSummary?.pendingIn || agentSummary.pendingIn === 0) && (
+                      <div className="text-[9px] text-emerald-600 font-bold">FCFA</div>
+                    )}
                  </div>
 
                  {isAdmin && (

@@ -12,6 +12,7 @@ import {
   caisses,
   users,
   employes,
+  evenementsOutbox,
   type OperationTerrain,
   type CreateCollectCashInput,
   type CreateSettlementCashInput,
@@ -21,6 +22,7 @@ import {
 import { eq, and, isNull, desc, gte, lte, sql, count } from "drizzle-orm";
 import { caisseAgentService } from "./caisse-agent-service";
 import { StatutCaisseAgent } from "@shared/enum/status-constants";
+import { normalizeRole, SystemRole } from "@shared/types/roles";
 
 /**
  * Génère une référence unique pour une opération terrain
@@ -151,6 +153,20 @@ export class OperationService {
         userId: params.submittedBy,
       });
 
+      // 7. Broadcast event for real-time updates (badge, list)
+      await tx.insert(evenementsOutbox).values({
+        type: "OPERATION_TERRAIN_CREATED" as any,
+        aggregateType: "operation_terrain",
+        aggregateId: operation.id,
+        payload: {
+          operationId: operation.id,
+          type: "COLLECT_CASH",
+          montant: params.montant.toString(),
+          agentId: params.agentId,
+          statut: "SUBMITTED",
+        },
+      });
+
       return { success: true, operation };
     });
   }
@@ -265,6 +281,20 @@ export class OperationService {
           soldeDisponibleAvant: balanceCheck.disponible,
         },
         userId: params.submittedBy,
+      });
+
+      // 8. Broadcast event for real-time updates (badge, list)
+      await tx.insert(evenementsOutbox).values({
+        type: "OPERATION_TERRAIN_CREATED" as any,
+        aggregateType: "operation_terrain",
+        aggregateId: operation.id,
+        payload: {
+          operationId: operation.id,
+          type: "SETTLEMENT_CASH",
+          montant: params.montant.toString(),
+          agentId: params.agentId,
+          statut: "SUBMITTED",
+        },
       });
 
       return { success: true, operation };
@@ -500,9 +530,11 @@ export class OperationService {
       conditions.push(lte(operationsTerrain.submittedAt, filters.dateTo));
     }
 
-    // Filtre par agence si non-admin
-    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPERVISEUR';
-    const needsAgencyFilter = !isAdmin && agenceId;
+    // Filtre par agence: seul ADMIN voit toutes les agences
+    // SUPERVISEUR voit uniquement son agence de rattachement
+    const normalizedUserRole = normalizeRole(userRole);
+    const isGlobalAdmin = normalizedUserRole === SystemRole.ADMIN;
+    const needsAgencyFilter = !isGlobalAdmin && agenceId;
 
     let baseQuery;
     if (needsAgencyFilter) {
@@ -669,10 +701,12 @@ export class OperationService {
       return { count: 0 };
     }
 
-    // Admin et Superviseur voient toutes les opérations
-    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPERVISEUR';
+    // Seul ADMIN voit toutes les opérations de toutes les agences
+    // SUPERVISEUR et autres rôles voient uniquement leur agence
+    const normalizedUserRole = normalizeRole(userRole);
+    const isGlobalAdmin = normalizedUserRole === SystemRole.ADMIN;
 
-    if (isAdmin) {
+    if (isGlobalAdmin) {
       const [result] = await db
         .select({ val: count() })
         .from(operationsTerrain)
@@ -681,7 +715,7 @@ export class OperationService {
       return { count: Number(result?.val || 0) };
     }
 
-    // Pour les autres rôles, filtrer par agence via l'agent
+    // Pour SUPERVISEUR et autres rôles, filtrer par agence via l'agent
     if (!agenceId) {
       return { count: 0 };
     }

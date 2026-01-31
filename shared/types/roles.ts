@@ -64,6 +64,7 @@ const ROLE_ALIASES: Record<string, SystemRole> = {
 
   // SUPERVISEUR aliases
   'superviseur': SystemRole.SUPERVISEUR,
+  'supervision': SystemRole.SUPERVISEUR,
 
   // GESTIONNAIRE_CREDIT aliases
   'gestionnaire crédit': SystemRole.GESTIONNAIRE_CREDIT,

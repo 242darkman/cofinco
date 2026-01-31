@@ -108,15 +108,16 @@ export default function AgentValidations() {
   useEffect(() => {
     loadData(false); // Initial load
 
-    // Polling interval to refresh data every 30 seconds (background refresh)
-    const intervalId = setInterval(() => {
-      loadData(true); // Background refresh
-    }, 30000);
-
-    // Listen for operation events to refresh immediately (background refresh)
+    // Listen for real-time operation events via WebSocket (no polling)
     const handleOperationEvent = (event: CustomEvent) => {
       const { type } = event.detail || {};
-      if (type && ['OPERATION_TERRAIN_CREATED', 'OPERATION_TERRAIN_APPROVED', 'OPERATION_TERRAIN_REJECTED', 'BULK_APPROVE'].includes(type)) {
+      if (type && [
+        'OPERATION_TERRAIN_CREATED',
+        'OPERATION_TERRAIN_APPROVED',
+        'OPERATION_TERRAIN_REJECTED',
+        'OPERATION_TERRAIN_SETTLED',
+        'BULK_APPROVE'
+      ].includes(type)) {
         loadData(true); // Background refresh
       }
     };
@@ -124,7 +125,6 @@ export default function AgentValidations() {
     window.addEventListener('operation-update', handleOperationEvent as EventListener);
 
     return () => {
-      clearInterval(intervalId);
       window.removeEventListener('operation-update', handleOperationEvent as EventListener);
     };
   }, []);
@@ -144,7 +144,8 @@ export default function AgentValidations() {
       const [opsResponse, agencesResponse] = await Promise.all([opsPromise, agencesPromise]);
 
       // Handle pagination wrapper or array
-      const opsData = Array.isArray(opsResponse) ? opsResponse : opsResponse.data || [];
+      // Backend returns { operations: [...], total, pagination } not { data: [...] }
+      const opsData = Array.isArray(opsResponse) ? opsResponse : (opsResponse.operations || opsResponse.data || []);
       setOperations(opsData);
 
       if (Array.isArray(agencesResponse)) {

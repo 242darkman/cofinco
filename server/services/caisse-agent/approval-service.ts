@@ -260,6 +260,16 @@ export class ApprovalService {
     const montant = parseFloat(operation.montant);
     const metadata = operation.metadata as OperationTerrainMetadata | null;
 
+    // Validate caisseAgentId exists (schema says notNull but let's be safe)
+    if (!operation.caisseAgentId) {
+      logger.error({ operationId: operation.id }, 'CRITICAL: Operation has no caisseAgentId');
+      return {
+        success: false,
+        error: "Opération sans caisse agent associée",
+        errorCode: "MISSING_CAISSE_AGENT",
+      };
+    }
+
     // 1. Créer mouvement CaisseAgent (Débit = Augmente la créance envers l'agent)
     const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
     const [mouvementCaisseAgent] = await tx
@@ -285,14 +295,27 @@ export class ApprovalService {
       })
       .returning();
 
-    // 2. Mettre à jour solde CaisseAgent (atomique)
-    await tx
+    // 2. Mettre à jour solde CaisseAgent (atomique) avec vérification
+    const [updatedCaisse] = await tx
       .update(caissesAgent)
       .set({
         soldeValide: sql`${caissesAgent.soldeValide} + ${montant}`,
         updatedAt: new Date(),
       })
-      .where(eq(caissesAgent.id, operation.caisseAgentId));
+      .where(eq(caissesAgent.id, operation.caisseAgentId))
+      .returning({ id: caissesAgent.id, soldeValide: caissesAgent.soldeValide });
+
+    if (!updatedCaisse) {
+      logger.error({ operationId: operation.id, caisseAgentId: operation.caisseAgentId }, 'Caisse agent update failed - no rows matched');
+      throw new Error(`Caisse agent ${operation.caisseAgentId} introuvable pour mise à jour du solde`);
+    }
+
+    logger.info({
+      operationId: operation.id,
+      caisseAgentId: operation.caisseAgentId,
+      montant,
+      nouveauSolde: updatedCaisse.soldeValide,
+    }, 'Caisse agent solde updated after collect approval');
 
     // 2b. Post GL entry for caisse agent mouvement
     const agenceId = await getAgenceIdFromAgent(tx, operation.agentId);

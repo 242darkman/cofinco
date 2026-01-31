@@ -1385,6 +1385,8 @@ export const agentTerrainApi = {
     requestPaginated<any>('/agents-terrain', params),
   getAllList: (params?: { perPage?: number; statut?: string }) =>
     requestAllPages<any>('/agents-terrain', params),
+  /** Get the agent terrain profile for the currently logged-in user */
+  getMe: () => request<{ data: any | null; message?: string }>('/agents-terrain/me'),
   getById: (id: string) => request<any>(`/agents-terrain/${id}`),
   create: (data: any) => request<any>('/agents-terrain', {
     method: 'POST',
