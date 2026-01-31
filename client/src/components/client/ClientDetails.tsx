@@ -140,7 +140,7 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
                 onClick={() => setShowSavingsModal(true)}
             >
                 <div>
-                     <p className="text-[10px] uppercase text-slate-500 mb-0.5">Épargne Total</p>
+                     <p className="text-[10px] uppercase text-slate-500 mb-0.5">Total des comptes</p>
                      <p className="text-base font-bold text-white">{summary.total_savings.toLocaleString()} FCFA</p>
                 </div>
                  {/* Trend / Chevron */}
