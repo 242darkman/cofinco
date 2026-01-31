@@ -109,20 +109,46 @@ export const SESSION_CONFIG = {
 // Redis is auto-selected when REDIS_URL env var is set
 
 const PostgresStore = pgSession(session);
-const pool = new pg.Pool({
+
+// Pool dédié aux sessions avec configuration robuste
+// Séparé du pool principal pour éviter les contentions
+const sessionPool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
+  // Sizing pour les sessions
+  max: 10,                        // Maximum de connexions pour les sessions
+  min: 2,                         // Minimum maintenu
+  // Timeouts stricts
+  idleTimeoutMillis: 60000,       // Fermer après 1 min d'inactivité
+  connectionTimeoutMillis: 5000,  // 5s max pour se connecter
+  // Résilience
+  allowExitOnIdle: false,
 });
+
+// Gestion des erreurs du pool de session
+sessionPool.on('error', (err) => {
+  logger.error({ err: err.message }, '[Session Pool] Unexpected error on idle client');
+});
+
+sessionPool.on('connect', () => {
+  logger.debug('[Session Pool] New client connected');
+});
+
+// Alias pour compatibilité (utilisé par le session store)
+const pool = sessionPool;
 
 /**
  * Type for session store - either Redis or PostgreSQL
  */
 type SessionStore = session.Store;
 
+// Variable pour suivre le client Redis (pour reconnexion)
+let redisClient: any = null;
+
 /**
  * Creates the appropriate session store based on environment configuration.
  *
  * Priority:
- * 1. Redis (if REDIS_URL is set) - Recommended for production
+ * 1. Redis (if REDIS_URL is set) - Recommended for production (10x plus rapide)
  * 2. PostgreSQL (fallback) - Good for dev/small deployments
  *
  * @returns Promise<SessionStore> The configured session store
@@ -132,43 +158,89 @@ async function createSessionStore(): Promise<SessionStore> {
 
   if (redisUrl) {
     try {
-      // Dynamic import to avoid requiring redis when not used
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { createClient } = await import('redis') as any;
       const { default: RedisStore } = await import('connect-redis') as any;
 
-      const redisClient = createClient({ url: redisUrl });
+      // Configuration Redis robuste avec reconnexion automatique
+      redisClient = createClient({
+        url: redisUrl,
+        socket: {
+          reconnectStrategy: (retries: number) => {
+            if (retries > 10) {
+              logger.error('[Redis] Max reconnection attempts reached');
+              return new Error('Max reconnection attempts reached');
+            }
+            // Délai exponentiel: 100ms, 200ms, 400ms, ... max 30s
+            const delay = Math.min(100 * Math.pow(2, retries), 30000);
+            logger.warn({ retries, delay }, '[Redis] Reconnecting...');
+            return delay;
+          },
+          connectTimeout: 10000, // 10s timeout
+        },
+      });
 
+      // Gestion des événements Redis
       redisClient.on('error', (err: Error) => {
-        logger.error({ err }, 'Redis connection error');
+        logger.error({ err: err.message }, '[Redis] Connection error');
       });
 
       redisClient.on('connect', () => {
-        logger.info('Redis connected successfully');
+        logger.info('[Redis] Connected successfully');
+      });
+
+      redisClient.on('reconnecting', () => {
+        logger.warn('[Redis] Reconnecting...');
+      });
+
+      redisClient.on('ready', () => {
+        logger.info('[Redis] Ready to accept commands');
       });
 
       await redisClient.connect();
 
-      logger.info('Using Redis session store (high performance mode)');
+      logger.info('[Session] Using Redis store (high performance mode)');
 
       return new RedisStore({
         client: redisClient,
         prefix: 'cofin:sess:',
-        ttl: SESSION_CONFIG.INACTIVITY_TIMEOUT_SEC, // 2 hours (microfinance standard)
+        ttl: SESSION_CONFIG.INACTIVITY_TIMEOUT_SEC,
+        // Désactiver les touches pour éviter les race conditions
+        disableTouch: false,
       });
     } catch (error) {
-      logger.warn({ err: error }, 'Redis connection failed, falling back to PostgreSQL');
-      // Fall through to PostgreSQL
+      logger.warn({ err: error }, '[Redis] Connection failed, falling back to PostgreSQL');
     }
   }
 
-  // PostgreSQL fallback
-  logger.info('Using PostgreSQL session store');
-  return new PostgresStore({
+  // PostgreSQL fallback avec gestion d'erreur améliorée
+  logger.info('[Session] Using PostgreSQL store');
+
+  const pgStore = new PostgresStore({
     pool,
     tableName: 'session',
-    createTableIfMissing: false, // We create it manually in setupAuth
+    createTableIfMissing: false,
+    pruneSessionInterval: 60,
+    errorLog: (err: Error) => {
+      logger.error({ err: err.message }, '[Session Store] PostgreSQL error');
+    },
   });
+
+  pgStore.on('error', (err: Error) => {
+    logger.error({ err: err.message }, '[Session Store] Store error event');
+  });
+
+  return pgStore;
+}
+
+/**
+ * Ferme proprement le client Redis (pour graceful shutdown)
+ */
+export async function closeRedisClient(): Promise<void> {
+  if (redisClient) {
+    logger.info('[Redis] Closing connection...');
+    await redisClient.quit();
+    logger.info('[Redis] Connection closed');
+  }
 }
 
 declare module 'express-session' {
@@ -233,29 +305,49 @@ export async function setupAuth(app: Express) {
   // Detect which store we're using
   sessionStoreType = process.env.REDIS_URL ? 'redis' : 'postgresql';
 
+  // Configuration de session robuste
+  const sessionSecret = process.env.SESSION_SECRET || 'cofin-secret-key-change-in-production';
+  if (!process.env.SESSION_SECRET && isProduction) {
+    logger.warn('[Session] SESSION_SECRET not set in production - using default (INSECURE!)');
+  }
+
   sessionMiddleware = session({
     store,
-    secret: process.env.SESSION_SECRET || 'cofin-secret-key-change-in-production',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    rolling: true, // Refresh session with every request
-    name: isProduction ? '__Host-cofin_sess' : 'cofin_sess', // __Host- prefix requires Secure attribute
+    rolling: true, // Refresh session with every request (réinitialise le maxAge)
+    name: isProduction ? '__Host-cofin_sess' : 'cofin_sess',
     proxy: true,
     cookie: {
-      secure: isProduction, // __Host- requires true, but localhost dev might be http
+      secure: isProduction,
       httpOnly: true,
-      maxAge: SESSION_CONFIG.INACTIVITY_TIMEOUT_MS, // 2 hours (rolling resets on activity)
-      sameSite: 'lax',
-      // Don't set domain - let browser handle it automatically
+      maxAge: SESSION_CONFIG.INACTIVITY_TIMEOUT_MS, // 2 heures (rolling réinitialise à chaque requête)
+      sameSite: 'lax', // Permet les redirections depuis sites externes
+      path: '/', // S'assurer que le cookie est envoyé pour toutes les routes
     },
+    // Gérer les erreurs de session sans crasher le serveur
+    unset: 'destroy', // Détruire la session quand req.session = null
   });
+
+  // Wrapper pour gérer les erreurs de session
+  const safeSessionMiddleware = (req: any, res: any, next: any) => {
+    sessionMiddleware(req, res, (err: any) => {
+      if (err) {
+        logger.error({ err: err.message, path: req.path }, '[Session] Middleware error');
+        // Ne pas crasher - continuer sans session
+        return next();
+      }
+      next();
+    });
+  };
 
   // Skip session middleware for webhook endpoints (external providers like MTN/Airtel)
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/webhooks')) {
       return next();
     }
-    return sessionMiddleware!(req, res, next);
+    return safeSessionMiddleware(req, res, next);
   });
 
   logger.info({ sessionStoreType }, 'Session middleware configured');

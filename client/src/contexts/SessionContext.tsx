@@ -50,6 +50,11 @@ const CONFIG = {
 
   // Throttle pour les événements d'activité
   ACTIVITY_THROTTLE: 5000,             // 5s entre mises à jour d'activité
+
+  // ========== REFRESH AUTOMATIQUE ==========
+  // Renouveler la session automatiquement avant expiration
+  SESSION_REFRESH_THRESHOLD: 10 * 60 * 1000,  // 10 minutes avant expiration
+  SESSION_INFO_CHECK_INTERVAL: 5 * 60 * 1000, // Vérifier l'expiration toutes les 5 min
 };
 
 // ============================================
@@ -63,6 +68,9 @@ interface SessionState {
   lastActivity: number;
   consecutiveFailures: number;
   error: string | null;
+  // Session expiration info
+  expiresAt: number | null;
+  isRefreshing: boolean;
 }
 
 interface SessionContextValue extends SessionState {
@@ -72,6 +80,10 @@ interface SessionContextValue extends SessionState {
   touchActivity: () => void;
   /** Réinitialise l'état après connexion */
   resetState: () => void;
+  /** Prolonge manuellement la session */
+  extendSession: () => Promise<boolean>;
+  /** Temps restant avant expiration (ms) */
+  timeUntilExpiry: number | null;
 }
 
 const initialState: SessionState = {
@@ -81,6 +93,8 @@ const initialState: SessionState = {
   lastActivity: Date.now(),
   consecutiveFailures: 0,
   error: null,
+  expiresAt: null,
+  isRefreshing: false,
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -239,6 +253,94 @@ export function SessionProvider({
   }, []);
 
   // ----------------------------------------
+  // Refresh automatique de session
+  // ----------------------------------------
+
+  /**
+   * Récupère les infos d'expiration de la session
+   */
+  const fetchSessionInfo = useCallback(async () => {
+    if (disabled) return;
+
+    try {
+      const response = await fetch('/api/auth/session-info', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.expiresAt) {
+          const expiresAt = new Date(data.expiresAt).getTime();
+          setState(prev => ({ ...prev, expiresAt }));
+        }
+      }
+    } catch (error) {
+      console.warn('[Session] Failed to fetch session info:', error);
+    }
+  }, [disabled]);
+
+  /**
+   * Prolonge la session manuellement ou automatiquement
+   */
+  const extendSession = useCallback(async (): Promise<boolean> => {
+    if (disabled || stateRef.current.isRefreshing) return false;
+
+    setState(prev => ({ ...prev, isRefreshing: true }));
+
+    try {
+      const response = await fetch('/api/auth/extend-session', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const newExpiresAt = data.newExpiresAt
+          ? new Date(data.newExpiresAt).getTime()
+          : null;
+
+        setState(prev => ({
+          ...prev,
+          isRefreshing: false,
+          expiresAt: newExpiresAt,
+          error: null,
+        }));
+
+        console.log('[Session] Extended successfully');
+        return true;
+      } else {
+        throw new Error('Failed to extend session');
+      }
+    } catch (error) {
+      console.warn('[Session] Failed to extend:', error);
+      setState(prev => ({ ...prev, isRefreshing: false }));
+      return false;
+    }
+  }, [disabled]);
+
+  /**
+   * Vérifie si la session doit être rafraîchie automatiquement
+   */
+  const checkAndRefreshSession = useCallback(async () => {
+    if (disabled || !stateRef.current.expiresAt) return;
+
+    const now = Date.now();
+    const timeUntilExpiry = stateRef.current.expiresAt - now;
+
+    // Si proche de l'expiration et utilisateur actif, rafraîchir
+    if (timeUntilExpiry > 0 && timeUntilExpiry <= CONFIG.SESSION_REFRESH_THRESHOLD) {
+      const timeSinceActivity = now - stateRef.current.lastActivity;
+
+      // Ne rafraîchir que si l'utilisateur est actif (activité < 5 min)
+      if (timeSinceActivity < 5 * 60 * 1000) {
+        console.log('[Session] Auto-refreshing (expires in', Math.round(timeUntilExpiry / 1000), 's)');
+        await extendSession();
+      }
+    }
+  }, [disabled, extendSession]);
+
+  // ----------------------------------------
   // Gestion de la visibilité
   // ----------------------------------------
 
@@ -395,14 +497,47 @@ export function SessionProvider({
   }, [disabled, verifySession]);
 
   // ----------------------------------------
+  // Effet: Auto-refresh de session
+  // ----------------------------------------
+
+  useEffect(() => {
+    if (disabled) return;
+
+    // Récupérer les infos de session initiales
+    fetchSessionInfo();
+
+    // Vérifier périodiquement si on doit rafraîchir
+    const refreshCheckInterval = setInterval(() => {
+      checkAndRefreshSession();
+    }, CONFIG.SESSION_INFO_CHECK_INTERVAL);
+
+    // Aussi rafraîchir les infos de session périodiquement
+    const sessionInfoInterval = setInterval(() => {
+      fetchSessionInfo();
+    }, CONFIG.SESSION_INFO_CHECK_INTERVAL);
+
+    return () => {
+      clearInterval(refreshCheckInterval);
+      clearInterval(sessionInfoInterval);
+    };
+  }, [disabled, fetchSessionInfo, checkAndRefreshSession]);
+
+  // ----------------------------------------
   // Render
   // ----------------------------------------
+
+  // Calculer le temps restant avant expiration
+  const timeUntilExpiry = state.expiresAt
+    ? Math.max(0, state.expiresAt - Date.now())
+    : null;
 
   const contextValue: SessionContextValue = {
     ...state,
     forceVerify: () => verifySession(true),
     touchActivity,
     resetState,
+    extendSession,
+    timeUntilExpiry,
   };
 
   return (

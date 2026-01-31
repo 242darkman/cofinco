@@ -553,6 +553,21 @@ export function registerFinanceRoutes(app: Express) {
         paymentReference: data.paymentReference || data.receiptNumber
       }, user.id);
 
+      const shouldAutoCloseSession = Boolean(data.closeSessionAfterDisbursement);
+      if (shouldAutoCloseSession) {
+        try {
+          await sessionService.closeSessionTemporarily({
+            sessionId: data.sessionCaisseId,
+            closedBy: user.id,
+            observation: "Fermeture automatique après décaissement crédit urgent",
+            ipAddress: req.ip,
+            userAgent: req.get("User-Agent"),
+          });
+        } catch (closeError: any) {
+          logger.error({ err: closeError, sessionId: data.sessionCaisseId }, 'Auto-clôture session après décaissement crédit échouée');
+        }
+      }
+
       // Log audit
       await logAudit(
         req,

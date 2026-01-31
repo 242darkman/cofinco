@@ -438,7 +438,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-300 overflow-hidden font-sans">
+    <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-300 overflow-y-auto overflow-x-hidden font-sans">
       {/* 1. Header & Quick Actions (Fixed) */}
       <div className="shrink-0 flex items-center justify-between gap-4 p-2 pb-0">
          <div className="flex items-center gap-3">

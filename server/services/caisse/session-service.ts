@@ -13,7 +13,7 @@ import { db } from "../../db";
 import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers, clients } from "@shared/schema";
 import { eq, and, sql, desc, lt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
 import { ForcedCloseReason, SessionComputedStatus } from "@shared/enums";
-import { StatutTransaction } from "@shared/enum/status-constants";
+import { StatutTransaction, StatutSessionCaisse } from "@shared/enum/status-constants";
 import {
   getOperationDelta,
   CAISSE_THRESHOLDS,
@@ -834,6 +834,118 @@ export async function closeExpiredSessions(
   }
 
   return closedSessions;
+}
+
+interface TemporaryCloseSessionParams {
+  sessionId: string;
+  closedBy: string;
+  observation?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export async function closeSessionTemporarily(params: TemporaryCloseSessionParams): Promise<{ sessionId: string; soldeTheorique: number }> {
+  const { sessionId, closedBy, observation, ipAddress, userAgent } = params;
+  const now = new Date();
+
+  const result = await db.transaction(async (tx) => {
+    const [session] = await tx
+      .select()
+      .from(sessionsCaisse)
+      .where(eq(sessionsCaisse.id, sessionId))
+      .for("update");
+
+    if (!session) {
+      throw new Error("Session de caisse introuvable");
+    }
+
+    if (session.closedAt) {
+      throw new Error("La session de caisse est déjà fermée");
+    }
+
+    const operations = await tx
+      .select()
+      .from(operationsCaisse)
+      .where(eq(operationsCaisse.sessionId, sessionId));
+
+    let soldeTheorique = Number(session.montantOuverture || 0);
+    for (const op of operations) {
+      soldeTheorique += calculateOperationDelta({
+        typeOperation: op.typeOperation,
+        montant: op.montant,
+        reference: op.reference,
+        description: op.description,
+      });
+    }
+
+    const [caisse] = await tx
+      .select()
+      .from(caisses)
+      .where(eq(caisses.id, session.caisseId))
+      .for("update");
+
+    if (!caisse) {
+      throw new Error("Caisse associée introuvable");
+    }
+
+    await tx
+      .update(caisses)
+      .set({
+        solde: soldeTheorique.toString(),
+        updatedAt: now,
+      })
+      .where(eq(caisses.id, caisse.id));
+
+    const mergedObservations = [session.observations?.trim(), observation?.trim()]
+      .filter(Boolean)
+      .join(" | ");
+
+    await tx
+      .update(sessionsCaisse)
+      .set({
+        closedAt: now,
+        statut: StatutSessionCaisse.CLOSED,
+        montantFermetureTheorique: soldeTheorique.toString(),
+        montantFermetureDeclare: soldeTheorique.toString(),
+        montantPhysique: soldeTheorique.toString(),
+        montantVersCoffre: null,
+        montantReporte: null,
+        ecart: "0",
+        observations: mergedObservations || null,
+        fundsKeptInCaisse: false,
+        transferToCoffreId: null,
+        closingFinalizedAt: now,
+        forceClosedBy: null,
+        forceClosedAt: null,
+        forcedCloseReason: null,
+        soldeActuel: soldeTheorique.toString(),
+      })
+      .where(eq(sessionsCaisse.id, sessionId));
+
+    await tx.insert(sessionsCaisseAuditLogs).values({
+      sessionId,
+      action: "CLOSED",
+      statutAvant: SessionComputedStatus.OPEN,
+      statutApres: SessionComputedStatus.CLOSED,
+      details: {
+        autoClosed: true,
+        soldeInitial: Number(session.montantOuverture || 0),
+        soldeTheorique,
+        nbOperations: operations.length,
+        observation,
+      },
+      userId: closedBy,
+      ipAddress,
+      userAgent,
+    });
+
+    return {
+      sessionId,
+      soldeTheorique,
+    };
+  });
+
+  return result;
 }
 
 /**

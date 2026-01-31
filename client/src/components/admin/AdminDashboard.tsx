@@ -152,10 +152,10 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="h-full w-full overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-4 p-1">
-      
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden grid grid-cols-1 lg:grid-cols-12 gap-4 p-1">
+
       {/* LEFT COLUMN: KPIs (3 cols) -> 2x2 Grid */}
-      <div className="lg:col-span-3 flex flex-col h-full overflow-hidden">
+      <div className="lg:col-span-3 flex flex-col h-full">
          <div className="grid grid-cols-2 gap-3 h-full">
             <CompactStatBox 
               icon={Users} 
@@ -191,7 +191,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* MIDDLE COLUMN: Health & Roles (5 cols) */}
-      <div className="lg:col-span-5 flex flex-col gap-4 h-full overflow-hidden">
+      <div className="lg:col-span-5 flex flex-col gap-4 h-full">
         
         {/* System Health */}
         <Card variant="glass" padding="sm" className="shrink-0 bg-slate-900/50">
@@ -281,7 +281,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* RIGHT COLUMN: Activity Feed (4 cols) */}
-      <div className="lg:col-span-4 h-full overflow-hidden flex flex-col">
+      <div className="lg:col-span-4 h-full flex flex-col">
          <div className="bg-slate-900/80 border border-slate-700 rounded-t-xl p-3 flex items-center justify-between shrink-0 backdrop-blur-sm">
             <div className="flex items-center gap-2">
                <Activity className="w-4 h-4 text-amber-400" />

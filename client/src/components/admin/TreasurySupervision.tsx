@@ -330,7 +330,7 @@ export function TreasurySupervision() {
   const isPositive = globalGrowth >= 0;
 
   return (
-    <div className="flex flex-col h-full space-y-2 overflow-hidden animate-in fade-in duration-500">
+    <div className="flex flex-col h-full space-y-2 overflow-y-auto overflow-x-hidden animate-in fade-in duration-500">
       {/* 1. Header - Ultra Compact */}
       <div className="shrink-0 flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-3">

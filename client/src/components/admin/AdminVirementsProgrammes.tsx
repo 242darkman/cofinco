@@ -363,7 +363,7 @@ export default function AdminVirementsProgrammes() {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-3 overflow-hidden animate-in fade-in duration-500">
+    <div className="flex flex-col h-full space-y-3 overflow-y-auto overflow-x-hidden animate-in fade-in duration-500">
       
       {/* 1. Hero Zone: KPIs - Compact */}
       <div className="shrink-0 grid grid-cols-1 md:grid-cols-3 gap-3">

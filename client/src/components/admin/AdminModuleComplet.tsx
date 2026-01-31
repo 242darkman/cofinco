@@ -245,7 +245,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const activeRolePermissionsCount = (permissions || []).filter(p => singleRoleHasPermission(p.code)).length;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-slate-900">
+    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden bg-slate-900">
       {/* TOP NAVIGATION BAR */}
       <header className="shrink-0 bg-slate-950 border-b border-slate-800 flex items-center h-14 px-4 gap-4 sticky top-0 z-20">
         {/* Title / Brand */}
@@ -326,8 +326,8 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-hidden relative bg-slate-900">
-        <div className="h-full overflow-hidden p-2 md:p-3 flex flex-col">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-slate-900">
+        <div className="h-full p-2 md:p-3 flex flex-col">
            <div className="w-full h-full flex flex-col">
               
               {/* Optional Section Header if needed, or streamlined */}
@@ -367,7 +367,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'product-rates' && <AdminProductRates />}
 
                   {activeTab === 'roles' && (
-                    <div className="flex flex-col h-full overflow-hidden space-y-4">
+                    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden space-y-4">
                       <div className="border-b border-slate-800 pb-2 shrink-0">
                         <div className="flex items-center gap-4">
                             <span className="text-sm text-slate-400 font-medium">Vue :</span>

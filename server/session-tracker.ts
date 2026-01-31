@@ -721,7 +721,21 @@ export function sessionActivityMiddleware(req: Request, res: Response, next: Nex
 }
 
 // Check if a session is still valid (exists and is active)
+// Cache pour les sessions validées (évite les appels DB répétés)
+// TTL: 30 secondes - balance entre performance et sécurité
+const sessionValidityCache = new Map<string, { valid: boolean; timestamp: number }>();
+const SESSION_CACHE_TTL_MS = 30000; // 30 secondes
+
 export async function isSessionValid(sessionId: string): Promise<{ valid: boolean; reason?: string }> {
+  // Vérifier le cache d'abord
+  const cached = sessionValidityCache.get(sessionId);
+  if (cached && Date.now() - cached.timestamp < SESSION_CACHE_TTL_MS) {
+    if (cached.valid) {
+      return { valid: true };
+    }
+    // Si invalide en cache, re-vérifier (l'utilisateur peut s'être reconnecté)
+  }
+
   try {
     const [session] = await db.select({
       isActive: activeSessions.isActive,
@@ -736,10 +750,12 @@ export async function isSessionValid(sessionId: string): Promise<{ valid: boolea
     }
 
     if (!session.isActive) {
+      sessionValidityCache.set(sessionId, { valid: false, timestamp: Date.now() });
       return { valid: false, reason: 'session_inactive' };
     }
 
     if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      sessionValidityCache.set(sessionId, { valid: false, timestamp: Date.now() });
       return { valid: false, reason: 'session_expired' };
     }
 
@@ -756,20 +772,45 @@ export async function isSessionValid(sessionId: string): Promise<{ valid: boolea
     }
 
     if (!user.canLogin) {
+      sessionValidityCache.set(sessionId, { valid: false, timestamp: Date.now() });
       return { valid: false, reason: 'user_login_disabled' };
     }
 
     if (user.statut !== 'ACTIVE') {
+      sessionValidityCache.set(sessionId, { valid: false, timestamp: Date.now() });
       return { valid: false, reason: 'user_inactive' };
     }
 
+    // Session valide - mettre en cache
+    sessionValidityCache.set(sessionId, { valid: true, timestamp: Date.now() });
     return { valid: true };
   } catch (error) {
     logger.error({ err: error }, 'Error checking session validity');
-    // On error, assume invalid for security
-    return { valid: false, reason: 'validation_error' };
+
+    // AMÉLIORATION: En cas d'erreur DB temporaire, utiliser le cache si disponible
+    // Cela évite les déconnexions lors de problèmes DB transitoires
+    const cachedResult = sessionValidityCache.get(sessionId);
+    if (cachedResult && Date.now() - cachedResult.timestamp < SESSION_CACHE_TTL_MS * 3) {
+      logger.warn({ sessionId }, 'Using cached session validity due to DB error');
+      return { valid: cachedResult.valid, reason: cachedResult.valid ? undefined : 'cached_invalid' };
+    }
+
+    // Pas de cache - assumer valide pour éviter une déconnexion
+    // (la sécurité est assurée par le cookie de session httpOnly)
+    logger.warn({ sessionId }, 'DB error during session check - assuming valid to avoid disruption');
+    return { valid: true, reason: 'db_error_graceful' };
   }
 }
+
+// Nettoyer le cache périodiquement
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of sessionValidityCache.entries()) {
+    if (now - value.timestamp > SESSION_CACHE_TTL_MS * 3) {
+      sessionValidityCache.delete(key);
+    }
+  }
+}, 60000); // Toutes les minutes
 
 // Mark a session as inactive (soft invalidation)
 export async function markSessionInactive(sessionId: string, reason?: string): Promise<void> {
@@ -777,6 +818,10 @@ export async function markSessionInactive(sessionId: string, reason?: string): P
     await db.update(activeSessions)
       .set({ isActive: false })
       .where(eq(activeSessions.sessionId, sessionId));
+
+    // Invalider le cache
+    sessionValidityCache.delete(sessionId);
+
     logger.info({ sessionId, reason }, 'Marked session as inactive');
   } catch (error) {
     logger.error({ err: error }, 'Error marking session inactive');

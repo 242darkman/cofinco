@@ -204,7 +204,7 @@ export default function AdminProductRates() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-y-auto overflow-x-hidden">
       {/* Header - Fixed */}
       <div className="flex-shrink-0 p-6 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700">
         <div className="flex items-center justify-between">

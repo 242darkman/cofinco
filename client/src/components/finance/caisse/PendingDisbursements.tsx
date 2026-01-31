@@ -252,7 +252,7 @@ export default function PendingDisbursements({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
         
         {/* LEFT COL: List of Pending Loans (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-3 h-full overflow-hidden">
+        <div className="lg:col-span-4 flex flex-col gap-3 h-full overflow-y-auto overflow-x-hidden">
             {/* Header / Stats */}
             <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
                 <div className="flex items-center justify-between mb-2">

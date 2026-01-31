@@ -12,8 +12,12 @@ import refreshTokenService, { REFRESH_TOKEN_COOKIE_NAME } from "../services/refr
 import { requestOtp, verifyOtp, OtpRateLimitError } from "../services/notifications/otp/otp-service";
 import { z } from "zod";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, withTimeout } from "../db";
 import { StatutUser } from "@shared/enum/status-constants";
+
+// Timeouts pour les opérations critiques (en ms)
+const LOGIN_TIMEOUT_MS = 15000;      // 15 secondes max pour tout le processus de login
+const DB_OPERATION_TIMEOUT_MS = 5000; // 5 secondes max par opération DB
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { StorageService } from "../services/storage-service";
 import { createLogger } from "../lib/logger";
@@ -172,16 +176,28 @@ async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string;
 
 export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/login", async (req, res) => {
+    const loginStartTime = Date.now();
+    const { username } = req.body;
+
+    logger.info({ username, step: 'start' }, '[Login] Request received');
+
     try {
-      const { username, password, deviceFingerprint, deviceFingerprintPartial, rememberMe } = req.body;
+      const { password, deviceFingerprint, deviceFingerprintPartial, rememberMe } = req.body;
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      const lockoutInfo = await getLoginLockoutInfo(username);
+      // Step 1: Check lockout with timeout
+      logger.debug({ username, step: 'lockout_check' }, '[Login] Checking lockout status');
+      const lockoutInfo = await withTimeout(
+        getLoginLockoutInfo(username),
+        DB_OPERATION_TIMEOUT_MS,
+        'getLoginLockoutInfo'
+      );
 
       if (lockoutInfo.locked) {
         await logLoginAttempt(username, req, false, "account_locked");
+        logger.warn({ username, step: 'locked' }, '[Login] Account locked');
         return res.status(403).json({
           message: "Compte verrouillé suite à trop de tentatives échouées.",
           locked: true,
@@ -190,12 +206,18 @@ export function registerAuthRoutes(app: Express) {
         });
       }
 
-      const user = await loginUser(username, password);
+      // Step 2: Authenticate user with timeout
+      logger.debug({ username, step: 'authenticate' }, '[Login] Authenticating user');
+      const user = await withTimeout(
+        loginUser(username, password),
+        DB_OPERATION_TIMEOUT_MS,
+        'loginUser'
+      );
 
       if (!user) {
         await logLoginAttempt(username, req, false, "invalid_credentials");
-        // Recalculer après enregistrement de la tentative
         const updatedInfo = await getLoginLockoutInfo(username);
+        logger.info({ username, step: 'invalid_credentials' }, '[Login] Invalid credentials');
         return res.status(401).json({
           message: "Identifiant ou mot de passe incorrect",
           remainingAttempts: updatedInfo.remainingAttempts,
@@ -209,14 +231,22 @@ export function registerAuthRoutes(app: Express) {
 
       if (user.statut !== StatutUser.ACTIVE) {
         await logLoginAttempt(username, req, false, "account_disabled");
+        logger.warn({ username, step: 'account_disabled' }, '[Login] Account disabled');
         return res.status(403).json({ message: "Compte désactivé. Contactez un administrateur." });
       }
 
-      // Success
+      // Step 3: User authenticated successfully
+      logger.debug({ username, userId: user.id, step: 'authenticated' }, '[Login] User authenticated');
       await clearLoginAttemptsOnSuccess(username);
       await logLoginAttempt(username, req, true);
-      
-      const primaryAgence = await resolvePrimaryAgence(user.id);
+
+      // Step 4: Resolve primary agence with timeout
+      logger.debug({ username, step: 'resolve_agence' }, '[Login] Resolving primary agence');
+      const primaryAgence = await withTimeout(
+        resolvePrimaryAgence(user.id),
+        DB_OPERATION_TIMEOUT_MS,
+        'resolvePrimaryAgence'
+      );
 
       // Notify Admins
       // Notify Admins
@@ -248,8 +278,13 @@ export function registerAuthRoutes(app: Express) {
         logger.error({ err: e }, 'Failed to send WS notification');
       }
       
-      // Récupérer le rôle effectif depuis userRoles (Architecture V3)
-      const effectiveRole = await getEffectiveRole(user.id, primaryAgence?.agenceId);
+      // Step 5: Get effective role with timeout
+      logger.debug({ username, step: 'get_role' }, '[Login] Getting effective role');
+      const effectiveRole = await withTimeout(
+        getEffectiveRole(user.id, primaryAgence?.agenceId),
+        DB_OPERATION_TIMEOUT_MS,
+        'getEffectiveRole'
+      );
 
       req.session.userId = user.id;
       req.session.user = {
@@ -265,21 +300,25 @@ export function registerAuthRoutes(app: Express) {
           mustChangePassword: user.mustChangePassword || false
       };
 
-      // Save session and wait for it to complete before responding
+      // Step 6: Save session with timeout
+      logger.debug({ username, step: 'save_session' }, '[Login] Saving session');
       try {
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) {
-              logger.error({ err }, 'Session save error');
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
+        await withTimeout(
+          new Promise<void>((resolve, reject) => {
+            req.session.save((err) => {
+              if (err) {
+                logger.error({ err }, 'Session save error');
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          }),
+          DB_OPERATION_TIMEOUT_MS,
+          'sessionSave'
+        );
       } catch (sessionErr) {
-        // Log but don't fail the login - session might still work
-        logger.warn({ err: sessionErr }, 'Session save failed, but continuing login');
+        logger.warn({ err: sessionErr }, '[Login] Session save failed, but continuing login');
       }
 
       // Enforce session limit (max 3 sessions per user)
@@ -316,8 +355,13 @@ export function registerAuthRoutes(app: Express) {
         "low"
       );
 
-      // Charger les permissions pour inclure dans la réponse (évite race condition)
-      const permissionsData = await getPermissionsForUser(user.id, effectiveRole);
+      // Step 7: Load permissions with timeout (critical step that can block)
+      logger.debug({ username, step: 'load_permissions' }, '[Login] Loading permissions');
+      const permissionsData = await withTimeout(
+        getPermissionsForUser(user.id, effectiveRole),
+        DB_OPERATION_TIMEOUT_MS,
+        'getPermissionsForUser'
+      );
 
       // Handle "Remember Me" - create refresh token for persistent sessions
       let rememberMeInfo: { expiresAt: Date } | null = null;
@@ -335,16 +379,44 @@ export function registerAuthRoutes(app: Express) {
         logger.info({ userId: user.id }, 'Created remember-me refresh token');
       }
 
+      // Step 8: Success - send response
+      const totalDuration = Date.now() - loginStartTime;
+      logger.info({
+        username,
+        userId: user.id,
+        role: effectiveRole,
+        agence: primaryAgence?.agenceNom,
+        durationMs: totalDuration,
+        step: 'complete'
+      }, `[Login] Success in ${totalDuration}ms`);
+
       res.json({
         user: req.session.user,
         message: "Login successful",
         mustChangePassword: user.mustChangePassword || false,
-        permissions: permissionsData, // Inclus pour éviter un second appel API
+        permissions: permissionsData,
         rememberMe: rememberMeInfo,
       });
     } catch (error) {
-      logger.error({ err: error }, 'Login error');
-      res.status(500).json({ message: "Internal server error during login" });
+      const totalDuration = Date.now() - loginStartTime;
+      const isTimeout = error instanceof Error && error.message.includes('Timeout');
+
+      logger.error({
+        username,
+        durationMs: totalDuration,
+        isTimeout,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      }, `[Login] Failed after ${totalDuration}ms`);
+
+      if (isTimeout) {
+        return res.status(504).json({
+          message: "Le serveur met trop de temps à répondre. Veuillez réessayer.",
+          error: "TIMEOUT"
+        });
+      }
+
+      res.status(500).json({ message: "Erreur interne lors de la connexion" });
     }
   });
 

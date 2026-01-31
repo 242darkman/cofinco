@@ -126,7 +126,7 @@ export default function AvantagesManager({
 
   return (
 
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden">
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3 min-h-0">
         
         {/* Colonne gauche : Liste des Avantages */}

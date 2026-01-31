@@ -201,7 +201,7 @@ export default function ReconciliationPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-2 p-2 max-w-7xl mx-auto overflow-hidden">
+    <div className="flex flex-col h-full space-y-2 p-2 max-w-7xl mx-auto overflow-y-auto overflow-x-hidden">
       {/* Header - Compact */}
       <div className="shrink-0 flex items-center justify-between">
         <div>

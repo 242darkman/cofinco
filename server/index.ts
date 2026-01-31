@@ -128,6 +128,23 @@ app.use(metricsMiddleware());
 // Register metrics endpoint (/api/metrics) - before auth to allow Prometheus scraping
 registerMetricsRoute(app);
 
+// ========== HEALTH CHECK ENDPOINT ==========
+// Simple health check that verifies DB connectivity (no auth required)
+app.get("/api/health", async (_req, res) => {
+  const { checkDatabaseHealth } = await import("./db");
+  const dbHealth = await checkDatabaseHealth();
+
+  const status = dbHealth.healthy ? "healthy" : "unhealthy";
+  const httpStatus = dbHealth.healthy ? 200 : 503;
+
+  res.status(httpStatus).json({
+    status,
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || "1.0.0",
+    uptime: Math.floor(process.uptime()),
+    database: dbHealth,
+  });
+});
 
 (async () => {
   // Ensure custom SQL functions exist (for db:push compatibility)
@@ -280,4 +297,40 @@ registerMetricsRoute(app);
       logger.info({ port }, `Server listening on port ${port}`);
     },
   );
+
+  // ========== GRACEFUL SHUTDOWN ==========
+  // Properly close all connections when the server is stopped
+  const gracefulShutdown = async (signal: string) => {
+    logger.info({ signal }, `Received ${signal}. Starting graceful shutdown...`);
+
+    // Stop accepting new connections
+    httpServer.close(() => {
+      logger.info('HTTP server closed');
+    });
+
+    try {
+      // Close Redis client (if used)
+      const { closeRedisClient } = await import("./auth");
+      await closeRedisClient();
+
+      // Close database pool
+      const { closePool } = await import("./db");
+      await closePool();
+      logger.info('All connections closed');
+
+      // Give time for pending requests to complete (max 10 seconds)
+      setTimeout(() => {
+        logger.warn('Forced shutdown after timeout');
+        process.exit(0);
+      }, 10000);
+
+      process.exit(0);
+    } catch (error) {
+      logger.error({ error }, 'Error during shutdown');
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 })();

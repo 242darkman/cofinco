@@ -5,7 +5,6 @@ import { creditApi, clientApi, compteEpargneApi } from '../../../lib/api-client'
 import { toast, handleApiError } from '../../../lib/toast';
 import { Button, StatCard, TabGroup } from '../../ui';
 import { formatMoney, parseMoney, formatClientName } from '../../../lib/format';
-import { escapeHtml } from '../../../lib/sanitize';
 import { generateLoanSchedule, getInstallmentStatusLabel } from '../../../lib/credit-logic';
 import { StatutEcheanceCredit, TypeCompte } from '@shared/enum/status-constants';
 import { CreditSchedulePDF } from '../../ui/printable/CreditScheduleTemplate';
@@ -175,16 +174,16 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl p-6 space-y-6">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-4xl p-4 sm:p-6 space-y-4">
           <div className="flex justify-between items-center">
-            <SkeletonCard className="h-8 w-48" />
-            <SkeletonCard className="h-8 w-8 rounded-full" />
+            <SkeletonCard className="h-6 sm:h-8 w-40 sm:w-48" />
+            <SkeletonCard className="h-6 sm:h-8 w-6 sm:w-8 rounded-full" />
           </div>
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} className="h-24" />)}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} className="h-20" />)}
           </div>
-          <SkeletonCard className="h-64 h-full" />
+          <SkeletonCard className="h-48 sm:h-64" />
         </div>
       </div>
     );
@@ -192,9 +191,9 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
 
   if (error || !credit) {
     return (
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center max-w-md">
-          <p className="text-red-400 mb-4">{error || 'Crédit non trouvé'}</p>
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-slate-900 rounded-xl border border-slate-700 p-6 text-center max-w-md">
+          <p className="text-red-400 mb-4 text-sm">{error || 'Crédit non trouvé'}</p>
           <Button onClick={onClose} variant="primary">Fermer</Button>
         </div>
       </div>
@@ -205,22 +204,22 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
   const { montant, taux, soldeRestant, totalAvecInterets, totalPaye, progression } = stats;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-7xl max-h-[95vh] flex overflow-hidden shadow-2xl">
-        
-        {/* Left Sidebar: Timeline */}
-        <div className="w-80 border-r border-slate-700 bg-slate-900/50 flex flex-col hidden lg:flex">
-           <div className="p-4 border-b border-slate-700 bg-slate-800/80">
-              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                 <Clock size={16} className="text-blue-400" />
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-700 w-full max-w-6xl max-h-[98vh] sm:max-h-[95vh] flex flex-col sm:flex-row overflow-hidden shadow-2xl">
+
+        {/* Left Sidebar: Timeline - Hidden on mobile, visible on lg+ */}
+        <div className="hidden lg:flex lg:w-64 xl:w-72 border-r border-slate-700 bg-slate-900/50 flex-col">
+           <div className="p-3 border-b border-slate-700 bg-slate-800/80">
+              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                 <Clock size={14} className="text-blue-400" />
                  Parcours
               </h3>
            </div>
-           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+           <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
               {credit.demandeId ? (
                  <CreditTimeline demandeId={credit.demandeId} compact />
               ) : (
-                 <div className="text-center py-8 text-slate-500 italic text-sm">
+                 <div className="text-center py-6 text-slate-500 italic text-xs">
                     Liaison demande indisponible
                  </div>
               )}
@@ -229,39 +228,51 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-slate-800">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-700 flex justify-between items-center shrink-0">
-          <div>
-            <h2 className="text-2xl font-bold text-white uppercase tracking-tight flex items-center gap-3">
-              Dossier Crédit
-              <span className={`px-2.5 py-1 rounded-full text-xs font-bold border uppercase tracking-wide ${
-                  credit.fraisDossierPaye 
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                  : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-              }`}>
-                  {credit.fraisDossierPaye ? 'Frais Payés' : 'Frais Non Payés'}
-              </span>
-            </h2>
-            <p className="text-slate-400 font-medium">#{credit.numeroCredit} - {client ? formatClientName(client.nom, client.prenom) : 'Sans client'}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button 
-               variant="ghost" 
-               size="sm" 
-               icon={Download}
-               onClick={() => handlePrint()}
-               className="text-slate-400 hover:text-white"
-            >
-              Échéancier PDF
-            </Button>
-            <button onClick={onClose} className="text-slate-400 hover:text-white transition p-2 hover:bg-slate-700 rounded-lg">
-              <X size={24} />
-            </button>
+        {/* Header - Compact */}
+        <div className="p-3 sm:p-4 border-b border-slate-700 shrink-0">
+          <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-xl font-bold text-white uppercase tracking-tight">
+                  Dossier Crédit
+                </h2>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide shrink-0 ${
+                    credit.fraisDossierPaye
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                }`}>
+                    {credit.fraisDossierPaye ? 'Frais Payés' : 'Frais Non Payés'}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1 truncate">
+                #{credit.numeroCredit} - {client ? formatClientName(client.nom, client.prenom) : 'Sans client'}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <Button
+                 variant="ghost"
+                 size="sm"
+                 icon={Download}
+                 onClick={() => handlePrint()}
+                 className="text-slate-400 hover:text-white hidden sm:flex"
+              >
+                <span className="hidden md:inline">PDF</span>
+              </Button>
+              <button
+                onClick={() => handlePrint()}
+                className="sm:hidden p-1.5 text-slate-400 hover:text-white transition hover:bg-slate-700 rounded-lg"
+              >
+                <Download size={18} />
+              </button>
+              <button onClick={onClose} className="text-slate-400 hover:text-white transition p-1.5 hover:bg-slate-700 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Tabs navigation */}
-        <div className="px-6 border-b border-slate-700 shrink-0 bg-slate-800/50">
+        {/* Tabs navigation - Compact */}
+        <div className="px-3 sm:px-4 border-b border-slate-700 shrink-0 bg-slate-800/50">
           <TabGroup
             tabs={[
               { key: 'overview', label: "Vue d'ensemble" },
@@ -270,91 +281,95 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
             activeTab={activeTab}
             onTabChange={(key) => setActiveTab(key as any)}
             variant="pills"
-            className="py-2"
+            className="py-1.5"
           />
         </div>
 
-        <div className="p-6 overflow-y-auto flex-grow custom-scrollbar">
+        <div className="p-3 sm:p-4 md:p-5 overflow-y-auto flex-grow custom-scrollbar">
           {activeTab === 'overview' ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              {/* Financial Summary - Clean Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="space-y-3 sm:space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {/* Financial Summary - Compact Responsive Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <StatCard
                   title="Capital"
-                  value={<span className="tabular-nums">{formatMoney(montant)}</span>}
+                  value={<span className="tabular-nums text-sm sm:text-base">{formatMoney(montant)}</span>}
                   color="primary"
                   variant="glass"
+                  className="p-3"
                 />
                 <StatCard
                   title="Reste à payer"
-                  value={<span className="tabular-nums">{formatMoney(soldeRestant)}</span>}
+                  value={<span className="tabular-nums text-sm sm:text-base">{formatMoney(soldeRestant)}</span>}
                   color="warning"
                   variant="glass"
+                  className="p-3"
                 />
                 <StatCard
                   title="Déjà remboursé"
-                  value={<span className="tabular-nums">{formatMoney(totalPaye)}</span>}
+                  value={<span className="tabular-nums text-sm sm:text-base">{formatMoney(totalPaye)}</span>}
                   color="success"
                   variant="glass"
+                  className="p-3"
                 />
                 <StatCard
                   title="Taux d'intérêt"
-                  value={`${taux}%`}
+                  value={<span className="text-sm sm:text-base">{taux}%</span>}
                   color="neutral"
                   variant="glass"
+                  className="p-3"
                 />
               </div>
 
-              {/* Two Column details - Clean Design */}
-              <div className="grid md:grid-cols-2 gap-4">
+              {/* Details Grid - Compact & Responsive */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                 {client && (
-                  <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
-                    <div className="flex items-center gap-2 mb-4">
-                      <User size={16} className="text-blue-400" />
-                      <span className="text-slate-300 text-sm font-medium">Client</span>
+                  <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30">
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <User size={14} className="text-blue-400" />
+                      <span className="text-slate-300 text-xs font-medium">Client</span>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500 text-sm">Nom</span>
-                        <span className="text-white font-medium text-sm">{formatClientName(client.nom, client.prenom)}</span>
+                        <span className="text-slate-500 text-xs">Nom</span>
+                        <span className="text-white font-medium text-xs truncate ml-2">{formatClientName(client.nom, client.prenom)}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500 text-sm">Téléphone</span>
-                        <span className="text-slate-300 text-sm">{client.telephone || '-'}</span>
+                        <span className="text-slate-500 text-xs">Téléphone</span>
+                        <span className="text-slate-300 text-xs">{client.telephone || '-'}</span>
                       </div>
                     </div>
                   </div>
                 )}
-                
-                {/* Auto Repayment Config */}
-                <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
-                   <div className="flex items-center gap-2 mb-4">
-                      <Settings size={16} className="text-purple-400" />
-                      <span className="text-slate-300 text-sm font-medium">Automatisation</span>
+
+                {/* Auto Repayment Config - Compact */}
+                <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30">
+                   <div className="flex items-center gap-1.5 mb-2.5">
+                      <Settings size={14} className="text-purple-400" />
+                      <span className="text-slate-300 text-xs font-medium">Automatisation</span>
                    </div>
-                   
-                   <div className="space-y-4">
+
+                   <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                         <span className="text-slate-500 text-sm">Remboursement Auto</span>
+                         <span className="text-slate-500 text-xs">Remboursement Auto</span>
                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input 
-                               type="checkbox" 
-                               checked={!!credit.remboursementAutomatique} 
+                            <input
+                               type="checkbox"
+                               checked={!!credit.remboursementAutomatique}
                                onChange={(e) => handleUpdateAutoRepayment(e.target.checked, credit.remboursementCompteId || accounts.find(a => a.typeCompte === TypeCompte.CURRENT)?.id)}
                                className="sr-only peer"
                                disabled={updatingAutoRepay}
                             />
-                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                            <div className="w-8 h-4 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
                          </label>
                       </div>
 
                       {credit.remboursementAutomatique && (
-                         <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                             <span className="text-xs text-slate-500 uppercase tracking-wider font-bold">Compte Source</span>
-                             <select 
+                         <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                             <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Compte Source</span>
+                             <select
                                 value={credit.remboursementCompteId || ''}
                                 onChange={(e) => handleUpdateAutoRepayment(true, e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500"
                                 disabled={updatingAutoRepay}
                              >
                                 <option value="" disabled>Sélectionner un compte</option>
@@ -364,11 +379,11 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                                     </option>
                                 ))}
                              </select>
-                             
+
                              {credit.prochaineEcheance && (
-                                 <div className="flex items-center gap-2 text-xs text-purple-300 bg-purple-500/10 p-2 rounded mt-2">
-                                     <CalendarClock size={12} />
-                                     Prochain prélèvement: {new Date(credit.prochaineEcheance).toLocaleDateString()}
+                                 <div className="flex items-center gap-1.5 text-[10px] text-purple-300 bg-purple-500/10 p-1.5 rounded">
+                                     <CalendarClock size={10} />
+                                     Prochain: {new Date(credit.prochaineEcheance).toLocaleDateString()}
                                  </div>
                              )}
                          </div>
@@ -376,28 +391,28 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                    </div>
                 </div>
 
-                <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
-                  <div className="flex items-center gap-2 mb-4">
-                    <FileText size={16} className="text-blue-400" />
-                    <span className="text-slate-300 text-sm font-medium">Contrat</span>
+                <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30 md:col-span-2">
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <FileText size={14} className="text-blue-400" />
+                    <span className="text-slate-300 text-xs font-medium">Contrat</span>
                   </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 text-sm">Type</span>
-                      <span className="text-white font-medium text-sm">{credit.typeCredit || 'Standard'}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-xs mb-0.5">Type</span>
+                      <span className="text-white font-medium text-xs">{credit.typeCredit || 'Standard'}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 text-sm">Durée</span>
-                      <span className="text-slate-300 text-sm">
-                        {credit.duree} {credit.echeance === 'Journalier' ? 'jours' : credit.echeance === 'Hebdomadaire' ? 'semaines' : 'mois'}
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-xs mb-0.5">Durée</span>
+                      <span className="text-slate-300 text-xs">
+                        {credit.duree} {credit.echeance === 'Journalier' ? 'jours' : credit.echeance === 'Hebdomadaire' ? 'sem' : 'mois'}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 text-sm">Échéance</span>
-                      <div className="text-right">
-                        <span className="text-white font-semibold text-sm">{formatMoney(stats.installmentAmount)}</span>
-                        <span className="text-slate-500 text-xs ml-1">
-                          /{credit.echeance === 'Journalier' ? 'jour' : credit.echeance === 'Hebdomadaire' ? 'sem' : 'mois'}
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-xs mb-0.5">Échéance</span>
+                      <div>
+                        <span className="text-white font-semibold text-xs">{formatMoney(stats.installmentAmount)}</span>
+                        <span className="text-slate-500 text-[10px] ml-0.5">
+                          /{credit.echeance === 'Journalier' ? 'j' : credit.echeance === 'Hebdomadaire' ? 's' : 'm'}
                         </span>
                       </div>
                     </div>
@@ -405,72 +420,72 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                 </div>
               </div>
 
-              {/* Progress Section - Minimal Design */}
-              <div className="bg-slate-800/40 rounded-xl p-4 sm:p-5 border border-slate-700/30">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp size={16} className="text-emerald-400" />
-                    <span className="text-slate-300 text-sm font-medium">Progression</span>
+              {/* Progress Section - Compact */}
+              <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-emerald-400" />
+                    <span className="text-slate-300 text-xs font-medium">Progression</span>
                   </div>
-                  <span className="text-2xl font-bold text-white tabular-nums">{progression.toFixed(0)}%</span>
+                  <span className="text-xl sm:text-2xl font-bold text-white tabular-nums">{progression.toFixed(0)}%</span>
                 </div>
 
-                {/* Progress Bar - Sleek Design */}
-                <div className="relative h-2 bg-slate-700/50 rounded-full overflow-hidden mb-5">
+                {/* Progress Bar - Compact */}
+                <div className="relative h-1.5 bg-slate-700/50 rounded-full overflow-hidden mb-3">
                   <div
                     className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700 ease-out"
                     style={{ width: `${progression}%` }}
                   />
                 </div>
 
-                {/* Summary Row */}
-                <div className="flex items-center justify-between text-sm">
+                {/* Summary Row - Compact */}
+                <div className="flex items-center justify-between text-xs sm:text-sm flex-wrap gap-2">
                   <div>
                     <span className="text-slate-500">Total dû</span>
-                    <span className="text-white font-semibold ml-2 tabular-nums">{formatMoney(totalAvecInterets)}</span>
+                    <span className="text-white font-semibold ml-1.5 tabular-nums">{formatMoney(totalAvecInterets)}</span>
                   </div>
                   <div className="text-right">
                     <span className="text-slate-500">Restant</span>
-                    <span className="text-amber-400 font-semibold ml-2 tabular-nums">{formatMoney(soldeRestant)}</span>
+                    <span className="text-amber-400 font-semibold ml-1.5 tabular-nums">{formatMoney(soldeRestant)}</span>
                   </div>
                 </div>
               </div>
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-tight">
-                     <Clock className="text-blue-400" size={22} /> Plan de Remboursement
+               <div className="flex justify-between items-center mb-3 sm:mb-4">
+                  <h3 className="text-sm sm:text-lg font-bold text-white flex items-center gap-1.5 uppercase tracking-tight">
+                     <Clock className="text-blue-400" size={16} /> Plan de Remboursement
                   </h3>
                </div>
 
-               <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-900/30">
-                  <table className="w-full text-left min-w-[600px]">
+               <div className="overflow-x-auto rounded-lg border border-slate-700 bg-slate-900/30">
+                  <table className="w-full text-left min-w-[500px]">
                      <thead>
-                        <tr className="bg-slate-800 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-700">
-                           <th className="px-4 py-4">N°</th>
-                           <th className="px-6 py-4">Date</th>
-                           <th className="px-6 py-4 text-right">Montant</th>
-                           <th className="px-6 py-4 text-right">Solde Progressif</th>
-                           <th className="px-4 py-4 text-center">État</th>
+                        <tr className="bg-slate-800 text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-widest border-b border-slate-700">
+                           <th className="px-2 sm:px-3 py-2 sm:py-3">N°</th>
+                           <th className="px-3 sm:px-4 py-2 sm:py-3">Date</th>
+                           <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Montant</th>
+                           <th className="px-3 sm:px-4 py-2 sm:py-3 text-right hidden sm:table-cell">Solde</th>
+                           <th className="px-2 sm:px-3 py-2 sm:py-3 text-center">État</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-700/50">
                         {stats.schedule.map((item) => (
                            <tr key={item.number} className={`hover:bg-slate-700/20 transition-colors ${item.status === StatutEcheanceCredit.SETTLED ? 'opacity-30' : ''}`}>
-                              <td className="px-4 py-4 text-slate-500 font-mono text-xs">{item.number}</td>
-                              <td className="px-6 py-4 font-bold text-white whitespace-nowrap">
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 text-slate-500 font-mono text-[10px] sm:text-xs">{item.number}</td>
+                              <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-white whitespace-nowrap text-[10px] sm:text-sm">
                                  {format(item.dueDate, 'dd MMM yyyy', { locale: fr })}
                               </td>
-                              <td className="px-6 py-4 text-right font-mono text-white whitespace-nowrap">
+                              <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-white whitespace-nowrap text-[10px] sm:text-sm">
                                  {formatMoney(item.amount)}
                               </td>
-                              <td className="px-6 py-4 text-right font-mono text-blue-400 whitespace-nowrap">
+                              <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-blue-400 whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">
                                  {formatMoney(item.remainingBalance)}
                               </td>
-                              <td className="px-4 py-4 text-center">
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 text-center">
                                  <span className={`
-                                    px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border
+                                    px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider border
                                     ${item.status === StatutEcheanceCredit.PAID || item.status === StatutEcheanceCredit.SETTLED ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                                       item.status === StatutEcheanceCredit.LATE ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                                       'bg-slate-700/50 text-slate-500 border-slate-600'}
@@ -484,9 +499,9 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                   </table>
                </div>
 
-               <div className="mt-8 p-6 bg-blue-500/5 rounded-xl border border-blue-500/10 flex gap-4">
-                  <PieChart className="text-blue-400 shrink-0" size={24} />
-                  <div className="text-sm text-slate-400 italic">
+               <div className="mt-4 p-3 bg-blue-500/5 rounded-lg border border-blue-500/10 flex gap-2 sm:gap-3">
+                  <PieChart className="text-blue-400 shrink-0" size={16} />
+                  <div className="text-[10px] sm:text-xs text-slate-400 italic">
                      Les échéances passées sont marquées comme <span className="text-green-400 font-bold">PAYÉ</span> si le capital correspondant a été amorti. Un remboursement total par anticipation solde l'ensemble de l'échéancier.
                   </div>
                </div>
@@ -494,9 +509,9 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
           )}
         </div>
 
-        {/* Action Button Footer */}
-        <div className="p-6 border-t border-slate-700 shrink-0 bg-slate-800/80">
-          <Button onClick={onClose} variant="ghost" className="w-full uppercase font-black tracking-widest py-3">
+        {/* Action Button Footer - Compact */}
+        <div className="p-3 sm:p-4 border-t border-slate-700 shrink-0 bg-slate-800/80">
+          <Button onClick={onClose} variant="ghost" className="w-full uppercase font-black tracking-widest py-2 text-xs sm:text-sm">
             Fermer le Dossier
           </Button>
         </div>

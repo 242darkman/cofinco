@@ -282,7 +282,7 @@ export default function RessourcesHumaines() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#020617] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#020617] overflow-y-auto overflow-x-hidden">
       {/* Header & Tabs Section - Fixed */}
       <div className="shrink-0 space-y-2 p-2 sm:p-4 pb-0 bg-[#020617] border-b border-slate-800/50">
         <FeatureHeader

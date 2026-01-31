@@ -251,7 +251,7 @@ export default function AdminActivityLogs({
   // FULL MODE RENDER
   // ============================================
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-white overflow-hidden relative font-sans">
+    <div className="flex flex-col h-full bg-slate-950 text-white overflow-y-auto overflow-x-hidden relative font-sans">
 
       {/* 1. TOOLBAR */}
       <div className="h-16 px-4 border-b border-slate-800 flex items-center gap-3 bg-slate-900/50 flex-none">
