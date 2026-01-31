@@ -78,6 +78,22 @@ const formatDate = (dateStr?: string) => {
   return new Date(dateStr).toLocaleDateString('fr-FR');
 };
 
+// Traduit l'unité de durée en français
+const formatDureeUnite = (unite: string, valeur: number): string => {
+  const uniteNormalized = unite?.toUpperCase() || '';
+  if (uniteNormalized === 'DAY' || uniteNormalized === 'JOUR' || uniteNormalized === 'DAYS' || uniteNormalized === 'JOURS') {
+    return valeur > 1 ? 'jours' : 'jour';
+  }
+  if (uniteNormalized === 'WEEK' || uniteNormalized === 'SEMAINE' || uniteNormalized === 'WEEKS' || uniteNormalized === 'SEMAINES') {
+    return valeur > 1 ? 'semaines' : 'semaine';
+  }
+  if (uniteNormalized === 'MONTH' || uniteNormalized === 'MOIS' || uniteNormalized === 'MONTHS') {
+    return 'mois';
+  }
+  // Fallback: retourne l'unité telle quelle
+  return unite;
+};
+
 export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props) {
   const [step, setStep] = useState<Step>('elements');
   const [formData, setFormData] = useState<ReevaluationFormData>({
@@ -529,7 +545,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                   <div className="text-xs text-red-400">Initiale</div>
                   <div className="text-lg font-bold text-white">{formatMoney(demande.montantDemande)}</div>
                   <div className="text-xs text-slate-400">
-                    {demande.dureeValeur} {demande.dureeUnite}{(demande.dureeValeur > 1 && demande.dureeUnite !== "Mois") ? "s" : ""}
+                    {demande.dureeValeur} {formatDureeUnite(demande.dureeUnite, demande.dureeValeur)}
                   </div>
                 </div>
 
@@ -537,7 +553,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                   <div className="text-xs text-amber-400">Nouvelle</div>
                   <div className="text-lg font-bold text-white">{formatMoney(formData.nouveauMontantDemande)}</div>
                   <div className="text-xs text-slate-400">
-                    {formData.nouvelleDureeValeur || demande.dureeValeur} {(formData.nouvelleDureeUnite || demande.dureeUnite)}{(Number(formData.nouvelleDureeValeur || demande.dureeValeur) > 1 && (formData.nouvelleDureeUnite || demande.dureeUnite) !== "Mois") ? "s" : ""}
+                    {formData.nouvelleDureeValeur || demande.dureeValeur} {formatDureeUnite(formData.nouvelleDureeUnite || demande.dureeUnite, Number(formData.nouvelleDureeValeur || demande.dureeValeur))}
                     {Number(formData.nouveauMontantDemande) < Number(demande.montantDemande) && formData.nouveauMontantDemande !== '' && (
                       <span className="ml-2 text-emerald-400">-{Math.round((1 - Number(formData.nouveauMontantDemande) / Number(demande.montantDemande)) * 100)}%</span>
                     )}
