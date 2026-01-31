@@ -684,7 +684,9 @@ export function registerFinanceRoutes(app: Express) {
       // Mettre à jour la demande associée si elle existe
       if (credit.demandeId) {
         await storage.updateDemandeCredit(credit.demandeId, {
-          statut: StatutDemande.REJECTED
+          statut: StatutDemande.REJECTED,
+          motifRejet: 'Décaissement annulé',
+          dateRejet: new Date()
         });
       }
 
@@ -1134,6 +1136,13 @@ export function registerFinanceRoutes(app: Express) {
       if (!existing) return res.status(404).json({ message: "Demande non trouvée" });
 
       let updated;
+
+      // Auto-set dateRejet when status is REJECTED or DEFINITIVELY_REJECTED
+      if (updateData.statut === StatutDemande.REJECTED || updateData.statut === StatutDemande.DEFINITIVELY_REJECTED) {
+        if (!updateData.dateRejet) {
+          updateData.dateRejet = new Date();
+        }
+      }
 
       // Auto-transition: UNDER_INVESTIGATION → INVESTIGATION_COMPLETE → PENDING_APPROVAL → APPROVED
       // When approving from investigation status, automatically route through intermediate states

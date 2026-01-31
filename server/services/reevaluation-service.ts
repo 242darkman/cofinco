@@ -337,6 +337,7 @@ export async function validateEligibility(
         statut: shouldBeDefinitivelyRejected ? StatutDemande.DEFINITIVELY_REJECTED : StatutDemande.REJECTED,
         reevaluationEnCours: false,
         motifRejet: eligibilityResult.motifRefus || 'Éligibilité à la réévaluation refusée',
+        dateRejet: new Date(),
       })
       .where(eq(demandesCredit.id, reevaluation.demandeId));
   }

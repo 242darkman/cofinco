@@ -82,7 +82,7 @@ export const REEVALUATION_RULES = {
         message: 'La date de rejet est manquante'
       };
     }
-    
+
     const joursDepuisRejet = differenceInDays(new Date(), dateRejet);
     if (joursDepuisRejet < config.delaiMinimumJours) {
       return {
