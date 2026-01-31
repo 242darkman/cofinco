@@ -24,6 +24,17 @@ interface Compte {
   typeCompte: string;
   type_compte?: string;
   solde: number | string;
+  soldeCourant?: number | string;
+  solde_courant?: number | string;
+  // Nested client object from API
+  clients?: {
+    id?: string;
+    nom?: string;
+    prenom?: string;
+    telephone?: string;
+    email?: string;
+  };
+  // Legacy flat fields (for compatibility)
   clientNom?: string;
   clientPrenom?: string;
   client_nom?: string;
@@ -67,12 +78,18 @@ const FREQUENCES: { value: Frequence; label: string; shortLabel: string }[] = [
 ];
 
 const getOwnerName = (compte: Compte) => {
-  const nom = compte.clientNom || compte.client_nom || compte.userNom || compte.user_nom || '';
-  const prenom = compte.clientPrenom || compte.client_prenom || compte.userPrenom || compte.user_prenom || '';
-  return `${prenom} ${nom}`.trim() || 'Compte';
+  // Check nested clients object first (from API response)
+  const nom = compte.clients?.nom || compte.clientNom || compte.client_nom || compte.userNom || compte.user_nom || '';
+  const prenom = compte.clients?.prenom || compte.clientPrenom || compte.client_prenom || compte.userPrenom || compte.user_prenom || '';
+  return `${prenom} ${nom}`.trim() || 'Titulaire';
 };
 
 const getNumero = (compte: Compte) => compte.numeroCompte || compte.numero_compte || '';
+
+const getSolde = (compte: Compte) => {
+  const solde = compte.soldeCourant || compte.solde_courant || compte.solde || 0;
+  return Number(solde);
+};
 
 // Get default datetime (now + 1 hour, rounded to nearest 15 min)
 const getDefaultDateTime = () => {
@@ -391,12 +408,13 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
               </label>
               <div className="relative">
                 {selectedSource ? (
-                  <div className="h-12 flex items-center gap-2 px-3 bg-slate-900 border border-slate-700 rounded-xl">
+                  <div className="h-14 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
                     <User className="w-4 h-4 text-blue-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{getOwnerName(selectedSource)}</p>
+                      <p className="text-sm text-white font-medium truncate">{getNumero(selectedSource)}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{getOwnerName(selectedSource)}</p>
                     </div>
-                    <span className="text-xs text-emerald-400 font-medium">{formatMoney(Number(selectedSource.solde))}</span>
+                    <span className="text-xs text-emerald-400 font-medium">{formatMoney(getSolde(selectedSource))}</span>
                     <button onClick={clearSource} className="p-1 hover:bg-slate-800 rounded">
                       <X className="w-3 h-3 text-slate-500" />
                     </button>
@@ -432,7 +450,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                               <p className="text-sm text-white truncate">{getOwnerName(compte)}</p>
                               <p className="text-xs text-slate-500">{getNumero(compte)}</p>
                             </div>
-                            <p className="text-xs font-medium text-emerald-400">{formatMoney(Number(compte.solde))}</p>
+                            <p className="text-xs font-medium text-emerald-400">{formatMoney(getSolde(compte))}</p>
                           </button>
                         ))}
                       </div>
@@ -460,20 +478,22 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
               </label>
               <div className="relative">
                 {selectedDest ? (
-                  <div className="h-12 flex items-center gap-2 px-3 bg-slate-900 border border-slate-700 rounded-xl">
+                  <div className="h-14 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
                     <User className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{getOwnerName(selectedDest)}</p>
+                      <p className="text-sm text-white font-medium truncate">{getNumero(selectedDest)}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{getOwnerName(selectedDest)}</p>
                     </div>
                     <button onClick={clearDest} className="p-1 hover:bg-slate-800 rounded">
                       <X className="w-3 h-3 text-slate-500" />
                     </button>
                   </div>
                 ) : destAccountNumber && destVerified?.found ? (
-                  <div className="h-12 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
+                  <div className="h-14 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
                     <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{destVerified.ownerName || destAccountNumber}</p>
+                      <p className="text-sm text-white font-medium truncate">{destAccountNumber}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{destVerified.ownerName || 'Titulaire vérifié'}</p>
                     </div>
                     <button onClick={clearDest} className="p-1 hover:bg-slate-800 rounded">
                       <X className="w-3 h-3 text-slate-500" />
@@ -563,9 +583,8 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
 
             {/* Date & Heure Début (Cron Trigger) */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex justify-between items-center">
-                <span>Démarrer le</span>
-                <span className="text-indigo-400 normal-case font-medium">Référence Cron</span>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+                Démarrer le
               </label>
               <input
                 type="datetime-local"

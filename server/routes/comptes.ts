@@ -917,6 +917,13 @@ export function registerComptesRoutes(app: Express) {
             createdAt: virementsProgrammes.createdAt,
             updatedAt: virementsProgrammes.updatedAt,
             createdBy: virementsProgrammes.createdBy,
+            // Technical configuration fields
+            timezone: virementsProgrammes.timezone,
+            jourExecution: virementsProgrammes.jourExecution,
+            retryCount: virementsProgrammes.retryCount,
+            maxRetries: virementsProgrammes.maxRetries,
+            libelle: virementsProgrammes.libelle,
+            // Source account info
             sourceNumero: sourceCompte.numeroCompte,
             sourceType: sourceCompte.typeCompte,
             sourceAgenceId: sourceCompte.agenceId,

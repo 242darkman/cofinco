@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Drawer } from 'vaul';
-import { 
-    X, 
-    Play, 
-    Pause, 
-    Edit2, 
-    History, 
-    Code, 
-    CheckCircle, 
-    AlertCircle, 
-    Clock, 
-    Calendar,
-    ArrowRight
+import {
+    X,
+    Play,
+    Edit2,
+    Code,
+    Clock,
+    ArrowRight,
+    Loader2
 } from 'lucide-react';
 import { Button, Badge, IconButton, Switch } from '../ui';
 import { formatDate, formatMoney } from '../../lib/format';
+import { compteEpargneApi } from '../../lib/api-client';
+import { authService } from '../../lib/auth';
 
 // --- Types ---
 
@@ -25,16 +23,37 @@ export type ScheduledTransfer = {
   compteSourceId?: string;
   compteDestId?: string;
   montant?: string | number;
-  frequence?: 'once' | 'daily' | 'weekly' | 'monthly';
+  frequence?: 'ONCE' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'once' | 'daily' | 'weekly' | 'monthly';
   prochaineExecution?: string | Date | null;
   actif?: boolean;
   dernierExecution?: string | Date | null;
   statutDernier?: string | null;
   erreurDerniere?: string | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  createdBy?: string | null;
+  // Technical configuration
+  timezone?: string;
+  jourExecution?: number | null;
+  retryCount?: number;
+  maxRetries?: number;
+  libelle?: string | null;
+  // Source account info
   sourceNumero?: string;
+  sourceType?: string;
+  sourceAgenceId?: string;
+  sourceUserNom?: string;
+  sourceUserPrenom?: string;
+  // Legacy fields (for compatibility)
   sourceClientNom?: string;
   sourceClientPrenom?: string;
+  // Destination account info
   destNumero?: string;
+  destType?: string;
+  destAgenceId?: string;
+  destUserNom?: string;
+  destUserPrenom?: string;
+  // Legacy fields (for compatibility)
   destClientNom?: string;
   destClientPrenom?: string;
 };
@@ -60,37 +79,90 @@ function useMediaQuery(query: string) {
     return matches;
 }
 
-export default function ScheduledTransferDetails({ 
-    transfer, 
-    isOpen, 
+interface HistoryItem {
+    id: string;
+    status: string;
+    createdAt: string;
+    errorMessage?: string | null;
+}
+
+export default function ScheduledTransferDetails({
+    transfer,
+    isOpen,
     onClose,
     onToggleActive,
     onEdit,
     onRunNow
 }: ScheduledTransferDetailsProps) {
     const isDesktop = useMediaQuery('(min-width: 768px)');
+    const [history, setHistory] = useState<HistoryItem[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const isAdmin = authService.isAdmin();
+
+    // Fetch real execution history
+    useEffect(() => {
+        if (!transfer?.id || !isOpen) return;
+
+        const fetchHistory = async () => {
+            setLoadingHistory(true);
+            try {
+                const result = await compteEpargneApi.getScheduledTransferHistory(transfer.id, { limit: 10 });
+                setHistory(result?.data || []);
+            } catch (err) {
+                console.error('Error fetching transfer history:', err);
+                setHistory([]);
+            } finally {
+                setLoadingHistory(false);
+            }
+        };
+
+        fetchHistory();
+    }, [transfer?.id, isOpen]);
 
     if (!transfer && !isOpen) return null;
-
-    // --- Mock History ---
-    const history = [
-         { date: new Date(), status: transfer?.statutDernier || 'success', message: transfer?.erreurDerniere || 'Exécution réussie' },
-         { date: new Date(Date.now() - 86400000 * 30), status: 'success', message: 'Exécution réussie' },
-         { date: new Date(Date.now() - 86400000 * 60), status: 'failed', message: 'Solde insuffisant' },
-    ];
 
     const Content = () => {
         if (!transfer) return null;
 
-        const getStatusColor = (status: string | null | undefined) => {
-             if (status === 'success') return 'text-emerald-500 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400';
-             if (status === 'failed') return 'text-red-500 bg-red-100 dark:bg-red-500/10 dark:text-red-400';
-             return 'text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400';
+        // Helper to get source owner name (API returns sourceUserNom/sourceUserPrenom)
+        const getSourceName = () => {
+            const prenom = transfer.sourceUserPrenom || transfer.sourceClientPrenom || '';
+            const nom = transfer.sourceUserNom || transfer.sourceClientNom || '';
+            return `${prenom} ${nom}`.trim() || null;
         };
+
+        // Helper to get dest owner name
+        const getDestName = () => {
+            const prenom = transfer.destUserPrenom || transfer.destClientPrenom || '';
+            const nom = transfer.destUserNom || transfer.destClientNom || '';
+            return `${prenom} ${nom}`.trim() || null;
+        };
+
+        // Get initials from name
+        const getInitial = (name: string | null) => name?.[0]?.toUpperCase() || '?';
+
+        // Format frequency for display
+        const formatFrequence = (freq: string | undefined) => {
+            if (!freq) return null;
+            const map: Record<string, string> = {
+                'ONCE': 'Une fois',
+                'DAILY': 'Quotidien',
+                'WEEKLY': 'Hebdomadaire',
+                'MONTHLY': 'Mensuel',
+                'once': 'Une fois',
+                'daily': 'Quotidien',
+                'weekly': 'Hebdomadaire',
+                'monthly': 'Mensuel',
+            };
+            return map[freq] || freq;
+        };
+
+        const sourceName = getSourceName();
+        const destName = getDestName();
 
         return (
             <div className="flex flex-col h-full bg-white dark:bg-slate-900 md:rounded-l-[16px] overflow-hidden relative border-l border-slate-200 dark:border-slate-800">
-                
+
                 {/* Header */}
                 <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex justify-between items-start mb-4">
@@ -115,7 +187,11 @@ export default function ScheduledTransferDetails({
                         <div className="text-right">
                              <span className="text-xs text-slate-400 uppercase tracking-wider font-bold">Fréquence</span>
                              <div className="flex justify-end mt-1">
-                                <Badge value={transfer.frequence || 'Once'} variant="info" />
+                                {transfer.frequence ? (
+                                    <Badge value={formatFrequence(transfer.frequence)} variant="info" />
+                                ) : (
+                                    <span className="text-sm text-slate-500">-</span>
+                                )}
                              </div>
                         </div>
                     </div>
@@ -133,32 +209,32 @@ export default function ScheduledTransferDetails({
                              {/* Source */}
                              <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30">
                                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
-                                     {transfer.sourceClientPrenom?.[0] || 'S'}
+                                     {getInitial(sourceName)}
                                  </div>
                                  <div>
                                      <div className="font-medium text-slate-900 dark:text-white">
-                                         {transfer.sourceClientPrenom} {transfer.sourceClientNom}
+                                         {sourceName || <span className="text-slate-400 italic">Non renseigné</span>}
                                      </div>
                                      <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                                         {transfer.sourceNumero}
+                                         {transfer.sourceNumero || '-'}
                                      </div>
                                  </div>
                              </div>
 
                              {/* Arrow Connector */}
                              <div className="absolute left-5 top-12 bottom-12 w-0.5 bg-slate-200 dark:bg-slate-700 -z-10" />
-                             
+
                              {/* Dest */}
                              <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 mt-2">
                                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold">
-                                     {transfer.destClientPrenom?.[0] || 'D'}
+                                     {getInitial(destName)}
                                  </div>
                                  <div>
                                      <div className="font-medium text-slate-900 dark:text-white">
-                                         {transfer.destClientPrenom} {transfer.destClientNom}
+                                         {destName || <span className="text-slate-400 italic">Non renseigné</span>}
                                      </div>
                                      <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                                         {transfer.destNumero}
+                                         {transfer.destNumero || '-'}
                                      </div>
                                  </div>
                              </div>
@@ -170,43 +246,65 @@ export default function ScheduledTransferDetails({
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                             <Clock size={16} /> Historique d'exécution
                         </h3>
-                        <div className="space-y-4 border-l-2 border-slate-100 dark:border-slate-800 pl-4 ml-2">
-                            {history.map((event, idx) => (
-                                <div key={idx} className="relative">
-                                    <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full ${
-                                        event.status === 'success' ? 'bg-emerald-400 ring-4 ring-emerald-50 dark:ring-emerald-900/20' : 
-                                        event.status === 'failed' ? 'bg-red-400 ring-4 ring-red-50 dark:ring-red-900/20' : 'bg-slate-300'
-                                    }`} />
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-900 dark:text-white">{event.message}</p>
-                                            <p className="text-xs text-slate-500">{event.status === 'success' ? 'Succès' : 'Échec'}</p>
+                        {loadingHistory ? (
+                            <div className="flex items-center justify-center py-8">
+                                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                            </div>
+                        ) : history.length === 0 ? (
+                            <p className="text-sm text-slate-500 text-center py-4">Aucune exécution enregistrée</p>
+                        ) : (
+                            <div className="space-y-4 border-l-2 border-slate-100 dark:border-slate-800 pl-4 ml-2">
+                                {history.map((event) => (
+                                    <div key={event.id} className="relative">
+                                        <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full ${
+                                            event.status === 'SUCCESS' ? 'bg-emerald-400 ring-4 ring-emerald-50 dark:ring-emerald-900/20' :
+                                            event.status === 'FAILED' ? 'bg-red-400 ring-4 ring-red-50 dark:ring-red-900/20' : 'bg-slate-300'
+                                        }`} />
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-900 dark:text-white">
+                                                    {event.status === 'SUCCESS' ? 'Exécution réussie' : event.errorMessage || 'Échec'}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    {event.status === 'SUCCESS' ? 'Succès' : 'Échec'}
+                                                </p>
+                                            </div>
+                                            <span className="text-xs text-slate-400 whitespace-nowrap">
+                                                {formatDate(event.createdAt)}
+                                            </span>
                                         </div>
-                                        <span className="text-xs text-slate-400 whitespace-nowrap">
-                                            {formatDate(event.date)}
-                                        </span>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </section>
                     
-                    {/* JSON Technical */}
-                    <section>
-                         <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Code size={16} /> Configuration Technique
-                        </h3>
-                        <div className="bg-slate-900 rounded-lg p-4 overflow-x-auto">
-                            <pre className="text-xs font-mono text-emerald-400">
-                                {JSON.stringify({ 
-                                    id: transfer.id, 
-                                    cron: transfer.frequence === 'monthly' ? '0 0 5 * *' : 'custom',
-                                    next_run: transfer.prochaineExecution,
-                                    retry_policy: 'exponential_backoff'
-                                }, null, 2)}
-                            </pre>
-                        </div>
-                    </section>
+                    {/* JSON Technical - Admin only */}
+                    {isAdmin && (
+                        <section>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Code size={16} /> Configuration Technique
+                            </h3>
+                            <div className="bg-slate-900 rounded-lg p-4 overflow-x-auto">
+                                <pre className="text-xs font-mono text-emerald-400">
+                                    {JSON.stringify({
+                                        id: transfer.id,
+                                        frequence: transfer.frequence,
+                                        timezone: transfer.timezone,
+                                        jour_execution: transfer.jourExecution,
+                                        prochaine_execution: transfer.prochaineExecution,
+                                        derniere_execution: transfer.dernierExecution,
+                                        statut_dernier: transfer.statutDernier,
+                                        retry_count: transfer.retryCount,
+                                        max_retries: transfer.maxRetries,
+                                        libelle: transfer.libelle,
+                                        created_at: transfer.createdAt,
+                                        created_by: transfer.createdBy,
+                                    }, null, 2)}
+                                </pre>
+                            </div>
+                        </section>
+                    )}
 
                 </div>
 
