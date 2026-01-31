@@ -64,7 +64,7 @@ export default function PendingDisbursements({
   } = useQuery({
     queryKey: ['pending-disbursements'],
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: PendingCredit[]; count: number }>('/api/credits/pending-disbursements');
+      const response = await api.get<{ success: boolean; data: PendingCredit[]; count: number }>('/credits/pending-disbursements');
       return response;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -127,7 +127,7 @@ export default function PendingDisbursements({
   // Mutation for processing payout
   const payoutMutation = useMutation({
     mutationFn: async (creditId: string) => {
-      const response = await api.post<{ success: boolean; message: string }>(`/api/credits/${creditId}/caisse-payout`, {
+      const response = await api.post<{ success: boolean; message: string }>(`/credits/${creditId}/caisse-payout`, {
         sessionCaisseId,
         paymentReference: receiptNumber || undefined
       });
@@ -157,7 +157,7 @@ export default function PendingDisbursements({
   // Mutation for cancelling disbursement
   const cancelMutation = useMutation({
     mutationFn: async (creditId: string) => {
-      const response = await api.post<{ success: boolean; message: string }>(`/api/credits/${creditId}/cancel-disbursement`, {
+      const response = await api.post<{ success: boolean; message: string }>(`/credits/${creditId}/cancel-disbursement`, {
         raison: 'Client non présenté'
       });
       return response;
@@ -176,7 +176,7 @@ export default function PendingDisbursements({
   // Mutation for batch payout
   const batchPayoutMutation = useMutation({
     mutationFn: async (creditIds: string[]) => {
-      const response = await api.post<{ success: boolean; message: string; successCount: number; failCount: number }>('/api/credits/batch-disburse', {
+      const response = await api.post<{ success: boolean; message: string; successCount: number; failCount: number }>('/credits/batch-disburse', {
         creditIds,
         sessionCaisseId,
       });
