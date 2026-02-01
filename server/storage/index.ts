@@ -92,6 +92,7 @@ export interface IStorage {
     createEcheances(echeances: InsertEcheanceCredit[]): Promise<EcheanceCredit[]>;
     getEcheancesByCredit(creditId: string): Promise<EcheanceCredit[]>;
     getProchaineEcheance(creditId: string): Promise<EcheanceCredit | undefined>;
+    generateCreditSchedule(creditId: string, tx?: PgTransaction<any, any, any>): Promise<EcheanceCredit[]>;
 
     // Demandes
     getDemandeCredit(id: string, includeDeleted?: boolean): Promise<DemandeCredit | undefined>;

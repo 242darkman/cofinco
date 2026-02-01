@@ -103,6 +103,7 @@ export const Subjects = {
   // Financial Aliases
   ECRITURE: 'Ecriture',
   EPARGNE: 'Epargne',
+  SYSTEM: 'system',
 } as const;
 
 export type Subject = (typeof Subjects)[keyof typeof Subjects];
@@ -265,6 +266,7 @@ export const SUBJECT_LABELS: Record<Subject, string> = {
   // Treasury Module
   [Subjects.TREASURY]: 'Trésorerie',
   [Subjects.ACCOUNTING]: 'Comptabilité GL',
+  [Subjects.SYSTEM]: 'Système',
 };
 
 // Module to Entity mapping (which entities belong to which module)

@@ -38,49 +38,10 @@ import {
   getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
 
-// ============================================================================
-// ERREUR TYPÉE : SOLDE INSUFFISANT POUR DÉCAISSEMENT
-// ============================================================================
+import { DecaissementInsufficientFundsError, InsufficientFundsErrorData } from "./errors";
+// Re-export for compatibility
+export { DecaissementInsufficientFundsError, type InsufficientFundsErrorData };
 
-export interface InsufficientFundsErrorData {
-  code: "INSUFFICIENT_FUNDS";
-  message: string;
-  required: number;
-  current: number;
-  deficit: number;
-  coffreId: string;
-  coffreCode: string;
-  coffreName?: string;
-}
-
-export class DecaissementInsufficientFundsError extends Error {
-  public readonly code = "INSUFFICIENT_FUNDS" as const;
-  public readonly httpStatus = 400;
-  public readonly data: InsufficientFundsErrorData;
-
-  constructor(
-    required: number,
-    current: number,
-    coffreId: string,
-    coffreCode: string,
-    coffreName?: string
-  ) {
-    const deficit = required - current;
-    const message = `Solde du coffre insuffisant pour cette opération`;
-    super(message);
-    this.name = "DecaissementInsufficientFundsError";
-    this.data = {
-      code: "INSUFFICIENT_FUNDS",
-      message,
-      required,
-      current,
-      deficit,
-      coffreId,
-      coffreCode,
-      coffreName,
-    };
-  }
-}
   import {
     type Credit, type InsertCredit, type DemandeCredit, type InsertDemandeCredit,
     type EnqueteCredit, type InsertEnqueteCredit, type Remboursement, type InsertRemboursement,
@@ -2829,6 +2790,15 @@ export async function createDecaissementWithLedger(data: {
             logger.error({ err: e }, 'Error broadcasting coffre disbursement');
         }
         return { credit: result, mouvement };
+    }).then(async (result) => {
+        // Generate repayment schedule (echeancier)
+        try {
+            await generateCreditSchedule(data.creditId);
+        } catch (scheduleError) {
+             logger.error({ err: scheduleError, creditId: data.creditId }, 'Failed to generate credit schedule after disbursement');
+             // We don't throw here to avoid rolling back the disbursement, but it should be alerted
+        }
+        return result;
     });
 }
 
@@ -2988,7 +2958,7 @@ export async function processLoanCashPayout(data: {
             };
         },
         userId
-    ).then(({ result, mouvement }) => {
+    ).then(async ({ result, mouvement }) => {
         // Broadcast coffre balance update for real-time UI
         try {
             const previousBalance = parseFloat(targetCoffre.solde || "0");
@@ -3005,10 +2975,19 @@ export async function processLoanCashPayout(data: {
         } catch (e) {
             logger.error({ err: e }, 'Error broadcasting caisse coffre disbursement');
         }
+
+        // Generate repayment schedule (echeancier)
+        let echeances: any[] = [];
+        try {
+            echeances = await generateCreditSchedule(data.creditId);
+        } catch (scheduleError) {
+             logger.error({ err: scheduleError, creditId: data.creditId }, 'Failed to generate credit schedule after cash payout');
+        }
+
         return {
             credit: result as Credit,
             mouvement,
-            echeances: []
+            echeances
         };
     });
 }
@@ -3606,4 +3585,68 @@ export async function createFactureForDepotInitial(data: {
   }
   
   return facture;
+}
+
+/**
+ * Automatically generate payment schedule for a credit
+ */
+export async function generateCreditSchedule(
+  creditId: string,
+  tx?: PgTransaction<any, any, any>
+): Promise<EcheanceCredit[]> {
+  const executor = tx || db;
+  
+  // 1. Get Credit
+  const [credit] = await executor.select().from(credits).where(eq(credits.id, creditId));
+  if (!credit) throw new Error("Credit not found for schedule generation");
+
+  // 2. Check if schedule already exists
+  const existing = await executor.select().from(echeancesCredits).where(eq(echeancesCredits.creditId, creditId));
+  if (existing.length > 0) return existing;
+
+  // 3. Calculate Schedule
+  const startDate = new Date(credit.dateDebut || Date.now());
+  const amount = Number(credit.montant); 
+  const rate = Number(credit.taux) / 100;
+  const duration = credit.duree || 1;
+  const frequency = credit.echeance as string;
+
+  // Simple Interest Calculation
+  const totalAmount = amount * (1 + rate);
+  const installmentAmount = totalAmount / duration;
+  const interestTotal = totalAmount - amount;
+  const interestPerInstallment = interestTotal / duration;
+  const capitalPerInstallment = amount / duration;
+
+  const schedule: InsertEcheanceCredit[] = [];
+  let currentDate = new Date(startDate);
+
+  for (let i = 1; i <= duration; i++) {
+    // Advance date based on frequency
+    if (frequency === FrequenceRemboursement.WEEKLY) {
+      currentDate.setDate(currentDate.getDate() + 7);
+    } else if (frequency === FrequenceRemboursement.BI_MONTHLY) {
+      currentDate.setDate(currentDate.getDate() + 15);
+    } else if (frequency === FrequenceRemboursement.DAILY) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    } else {
+      // MONTHLY default
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    schedule.push({
+      creditId: credit.id,
+      numeroEcheance: i,
+      dateEcheance: new Date(currentDate),
+      montantCapital: capitalPerInstallment.toFixed(2),
+      montantInteret: interestPerInstallment.toFixed(2),
+      montantTotal: installmentAmount.toFixed(2),
+      statut: 'UPCOMING',
+      sequence: i
+    });
+  }
+
+  if (schedule.length === 0) return [];
+
+  return await executor.insert(echeancesCredits).values(schedule).returning();
 }

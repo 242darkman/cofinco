@@ -24,7 +24,9 @@ import {
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
 import { postGlForMouvement, AccountingRuleNotFoundError } from "../services/accounting-posting-service";
-import { getComptesByClient, DecaissementInsufficientFundsError } from "../storage/finance";
+import { getComptesByClient } from "../storage/finance";
+import { DecaissementInsufficientFundsError } from "../storage/errors";
+
 import { isCoffreCaisseError } from "../services/coffre/coffre-errors";
 // State Machine errors for proper error handling
 import { CreditTransitionError } from "@shared/machines/credit-workflow";
