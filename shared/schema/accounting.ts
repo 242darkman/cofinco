@@ -134,8 +134,8 @@ export const ecritures = pgTable("ecritures_comptables", {
   // Metadata for analytics (clientId, loanId, etc.)
   metadata: jsonb("metadata").default({}),
 
-  // Multi-tenant
-  agenceId: uuid("agence_id").references(() => agences.id),
+  // Multi-tenant (obligatoire pour la réconciliation par agence)
+  agenceId: uuid("agence_id").notNull().references(() => agences.id),
 
   // Audit
   validatedBy: uuid("validated_by").references(() => users.id),
