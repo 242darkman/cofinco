@@ -94,10 +94,11 @@ export class DecaissementInsufficientFundsError extends Error {
     type Agence, type CaisseAssignation,
     type DureeSuggeree, type InsertDureeSuggeree,
     creditPlans, type UserCreditPlan, type InsertCreditPlan, insertCreditPlanSchema,
-    creditRefundRequests, type CreditRefundRequest, type InsertCreditRefundRequest
+    creditRefundRequests, type CreditRefundRequest, type InsertCreditRefundRequest,
+    echeancesCredits, type EcheanceCredit, type InsertEcheanceCredit
   } from "@shared/schema";
   import { db } from "../db";
-import { eq, desc, and, or, gte, lte, lt, gt, count, inArray, sql, getTableColumns, aliasedTable, isNull, isNotNull } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, lt, gt, count, inArray, sql, getTableColumns, aliasedTable, isNull, isNotNull, asc, ne } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { computeSessionStatus } from "../services/caisse/session-status";
 
@@ -369,7 +370,46 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return credit || undefined;
   }
 
-  // Credit Plans
+  // Echeances Credits
+  export async function createEcheances(echeances: InsertEcheanceCredit[]): Promise<EcheanceCredit[]> {
+    if (echeances.length === 0) return [];
+    
+    // We can't use returning() with multiple inserts easily in all drivers, but Drizzle PG supports it.
+    const results = await db.insert(echeancesCredits).values(echeances).returning();
+    return results;
+  }
+
+  export async function getEcheancesByCredit(creditId: string): Promise<EcheanceCredit[]> {
+    return db.select()
+      .from(echeancesCredits)
+      .where(eq(echeancesCredits.creditId, creditId))
+      .orderBy(asc(echeancesCredits.dateEcheance));
+  }
+
+  export async function getProchaineEcheance(creditId: string): Promise<EcheanceCredit | undefined> {
+    const [result] = await db.select()
+      .from(echeancesCredits)
+      // On cherche la première échéance qui n'est pas complètement payée (UPCOMING ou LATE)
+      // On exclut celles qui sont PAID
+      .where(and(
+        eq(echeancesCredits.creditId, creditId),
+        ne(echeancesCredits.statut, 'PAID'), 
+        ne(echeancesCredits.statut, 'SETTLED')
+      ))
+      .orderBy(asc(echeancesCredits.dateEcheance))
+      .limit(1);
+      
+    return result;
+  }
+
+  export async function updateEcheance(id: string, updateData: Partial<InsertEcheanceCredit>): Promise<EcheanceCredit | undefined> {
+    const [updated] = await db.update(echeancesCredits)
+      .set(updateData)
+      .where(eq(echeancesCredits.id, id))
+      .returning();
+    return updated;
+  }
+
   export async function getAllCreditPlans(filter: { actif?: boolean, agenceId?: string } = {}): Promise<UserCreditPlan[]> {
     const conditions = [];
     if (filter.actif !== undefined) conditions.push(eq(creditPlans.actif, filter.actif));

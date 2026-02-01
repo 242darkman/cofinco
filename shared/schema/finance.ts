@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -146,6 +146,48 @@ export const credits = pgTable(
 export const insertCreditSchema = createInsertSchema(credits).omit({ createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertCredit = z.infer<typeof insertCreditSchema>;
 export type Credit = typeof credits.$inferSelect;
+
+// Echéances de crédit
+export const echeancesCredits = pgTable("echeances_credits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  creditId: uuid("credit_id").notNull().references(() => credits.id),
+  numeroEcheance: integer("numero_echeance").notNull(),
+  dateEcheance: timestamp("date_echeance").notNull(),
+  
+  montantCapital: numeric("montant_capital").notNull(),
+  montantInteret: numeric("montant_interet").notNull(),
+  montantTotal: numeric("montant_total").notNull(),
+  
+  montantPaye: numeric("montant_paye").default('0'),
+  
+  statut: statutEcheanceCreditEnum("statut").notNull().default('UPCOMING'),
+  
+  datePaiement: timestamp("date_paiement"),
+  
+  // Nouveaux champs pour allocations partielles/FIFO
+  sequence: integer("sequence"),
+  paidAt: timestamp("paid_at"),
+  lateMarkedAt: timestamp("late_marked_at"),
+  lastPaymentDate: timestamp("last_payment_date"),
+  montantCapitalPaye: numeric("montant_capital_paye").default('0'),
+  montantInteretPaye: numeric("montant_interet_paye").default('0'),
+  penaliteMontant: numeric("penalite_montant").default('0'),
+  penalitePayee: numeric("penalite_payee").default('0'),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxCredit: index("idx_echeances_credits_credit_id").on(t.creditId),
+  idxDate: index("idx_echeances_credits_date").on(t.dateEcheance),
+  idxStatut: index("idx_echeances_credits_statut").on(t.statut),
+
+  // New FIFO and Status indexes
+  idxFifo: index("idx_echeances_credits_fifo").on(t.creditId, t.dateEcheance, t.sequence),
+  idxStatutDate: index("idx_echeances_credits_statut_date").on(t.statut, t.dateEcheance).where(sql`statut != 'PAID'`),
+}));
+
+export const insertEcheanceCreditSchema = createInsertSchema(echeancesCredits).omit({ id: true, createdAt: true });
+export type InsertEcheanceCredit = z.infer<typeof insertEcheanceCreditSchema>;
+export type EcheanceCredit = typeof echeancesCredits.$inferSelect;
 
 // Demandes de crédit
 export const demandesCredit = pgTable(
@@ -294,6 +336,15 @@ export const remboursements = pgTable(
 
     annulledAt: timestamp("annulled_at"),
     reversedAt: timestamp("reversed_at"),
+
+    // Allocation tracking
+    overpaymentAmount: numeric("overpayment_amount").default('0'),
+    allocationStrategy: text("allocation_strategy").default('FIFO'),
+    
+    // Reversal tracking (enhanced)
+    isReversed: boolean("is_reversed").default(false),
+    reversedBy: uuid("reversed_by").references(() => users.id), // Overrides generic reversedByUserId if exists or specific to reimbursement logic
+    reversalReason: text("reversal_reason"),
 
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete

@@ -109,6 +109,20 @@ export const statutCreditEnum = pgEnum("statut_credit_enum", [
 ]);
 
 // ============================================
+// ECHEANCES CREDIT
+// ============================================
+
+export const statutEcheanceCreditEnum = pgEnum("statut_echeance_credit_enum", [
+  "UPCOMING",
+  "PAID",
+  "LATE",
+  "SETTLED",
+  "DUE",
+  "PARTIALLY_PAID",
+  "RESTRUCTURED",
+]);
+
+// ============================================
 // CANAL DE DÉCAISSEMENT
 // ============================================
 

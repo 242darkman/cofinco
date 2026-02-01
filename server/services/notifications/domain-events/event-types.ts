@@ -57,7 +57,9 @@ export type DomainEventType =
   | "EMPLOYEE_CREATED"
   // Operations terrain
   | "PROSPECTION_CREATED"
-  | "PAIEMENT_TERRAIN_VALIDATED";
+  | "PAIEMENT_TERRAIN_VALIDATED"
+  | "CREDIT_INSTALLMENT_LATE"
+  | "SYSTEM_JOB_FAILED";
 
 // ============================================================================
 // EVENT DATA INTERFACES
@@ -488,6 +490,23 @@ export interface PaiementTerrainValidatedData {
 // ============================================================================
 // DOMAIN EVENT (Union)
 // ============================================================================
+
+export interface CreditInstallmentLateData {
+  creditId: string;
+  numeroCredit: string;
+  clientId: string;
+  clientName: string;
+  agenceId?: string;
+  metadata?: {
+    markedAt: string;
+  };
+}
+
+export interface SystemJobFailedData {
+  jobName: string;
+  error: string;
+  timestamp: string;
+}
 
 export interface DomainEvent<T = unknown> {
   type: DomainEventType;

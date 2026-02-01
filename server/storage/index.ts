@@ -34,7 +34,8 @@ import {
     InsertAvantage, ObjectifMensuel, InsertObjectifMensuel,
     CaisseAssignation, InsertCaisseAssignation,
     DureeSuggeree, InsertDureeSuggeree,
-    CreditRefundRequest, InsertCreditRefundRequest
+    CreditRefundRequest, InsertCreditRefundRequest,
+    EcheanceCredit, InsertEcheanceCredit
 } from "@shared/schema";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
@@ -86,6 +87,11 @@ export interface IStorage {
     createCreditPlan(plan: InsertCreditPlan): Promise<UserCreditPlan>;
     updateCreditPlan(id: string, plan: Partial<InsertCreditPlan>): Promise<UserCreditPlan | undefined>;
     deleteCreditPlan(id: string): Promise<boolean>;
+
+    // Echeances Credits
+    createEcheances(echeances: InsertEcheanceCredit[]): Promise<EcheanceCredit[]>;
+    getEcheancesByCredit(creditId: string): Promise<EcheanceCredit[]>;
+    getProchaineEcheance(creditId: string): Promise<EcheanceCredit | undefined>;
 
     // Demandes
     getDemandeCredit(id: string, includeDeleted?: boolean): Promise<DemandeCredit | undefined>;

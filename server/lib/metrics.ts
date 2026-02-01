@@ -120,6 +120,32 @@ export const dbQueryDuration = new Histogram({
 });
 
 // =============================================================================
+// CRON JOB METRICS
+// =============================================================================
+
+// Late installments marked count
+export const lateInstallmentsMarked = new Gauge({
+  name: 'cofinco_late_installments_marked',
+  help: 'Number of installments marked as late in the last run',
+  registers: [metricsRegistry],
+});
+
+// Late credits count
+export const lateCreditsCount = new Gauge({
+  name: 'cofinco_late_credits_count',
+  help: 'Number of credits with late installments found in the last run',
+  registers: [metricsRegistry],
+});
+
+// Late installments job duration
+export const lateInstallmentsJobDuration = new Histogram({
+  name: 'cofinco_late_installments_job_duration_ms',
+  help: 'Duration of the late installments job in milliseconds',
+  buckets: [100, 500, 1000, 5000, 10000],
+  registers: [metricsRegistry],
+});
+
+// =============================================================================
 // MIDDLEWARE
 // =============================================================================
 

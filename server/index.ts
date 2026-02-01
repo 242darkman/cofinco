@@ -34,6 +34,7 @@ import { startTempPermissionExpiryCron } from "./cron/temp-permission-expiry";
 import { startBalanceReconciliationCron } from "./cron/balance-reconciliation";
 import { startReconciliationReportCron } from "./cron/mm-reconciliation-report";
 import { startTreasuryReconciliationCron } from "./cron/treasury-reconciliation";
+import { startLateInstallmentsJob } from "./cron/late-installments-job";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -252,7 +253,13 @@ app.get("/api/health", async (_req, res) => {
   startBalanceReconciliationCron();
   startReconciliationReportCron();
   startTreasuryReconciliationCron();
-  logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation');
+  
+  // Start Late Installments Job (toutes les heures pour marquer les échéances en retard)
+  const lateInstallmentsJob = startLateInstallmentsJob();
+  lateInstallmentsJob.start();
+  logger.info('Late installments marking job started (hourly)');
+  
+  logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, late-installments');
 
   // Start Account Cleanup Cron
   const { accountCleanup } = await import("./services/account-cleanup");

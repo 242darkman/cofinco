@@ -42,6 +42,7 @@ import {
   StatutCaisse,
   TypeCompte,
   DureeUnite as DureeUniteEnum,
+  FrequenceRemboursement,
 } from "@shared/enum/status-constants";
 import { requireAuth } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
@@ -55,7 +56,7 @@ import { z } from "zod";
 import {
   validerCoherenceFrequenceDuree,
   calculerNombreEcheances,
-  type FrequenceRemboursement,
+  type FrequenceRemboursement as FrequenceRemboursementType,
   type DureeUnite
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
@@ -927,7 +928,93 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(credit));
   });
 
-  // Demandes
+  // --- ECHEANCES CREDIT ---
+  
+  app.get("/api/credits/:id/echeances", requireAuth, requireAgenceAccess(), async (req, res) => {
+    const echeances = await storage.getEcheancesByCredit(req.params.id);
+    res.json(addSnakeCaseAliasesDeep(echeances));
+  });
+
+  app.get("/api/credits/:id/echeances/prochaine", requireAuth, requireAgenceAccess(), async (req, res) => {
+    const echeance = await storage.getProchaineEcheance(req.params.id);
+    // Si pas d'échéance trouvée (toutes payées ou aucune générée), on renvoie null ou 204
+    if (!echeance) return res.json(null);
+    
+    // Enrichir avec des infos utiles pour le frontend si besoin
+    res.json(addSnakeCaseAliasesDeep(echeance));
+  });
+
+  app.post("/api/credits/:id/generate-schedule", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CREDIT), async (req, res) => {
+    try {
+      const creditId = req.params.id;
+      const credit = await storage.getCredit(creditId);
+      
+      if (!credit) return res.status(404).json({ message: "Crédit non trouvé" });
+      if (credit.statut !== StatutCredit.ACTIVE && credit.statut !== StatutCredit.LATE) {
+        return res.status(400).json({ message: "Le crédit doit être actif pour générer un échéancier" });
+      }
+
+      // Vérifier si des échéances existent déjà
+      const existing = await storage.getEcheancesByCredit(creditId);
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "Un échéancier existe déjà pour ce crédit" });
+      }
+
+      // Génération de l'échéancier
+      const startDate = new Date(credit.dateDebut || Date.now());
+      const amount = Number(credit.montant); // Principal
+      const rate = Number(credit.taux) / 100; // Taux en % (ex: 10 => 0.10)
+      const duration = credit.duree; // Nombre d'échéances
+      
+      // Calcul montant total avec intérêts (Intérêt simple pour l'instant, à adapter selon règles métier)
+      // Formule simple: Total = Principal * (1 + Taux)
+      // Mensualité = Total / Durée
+      const totalAmount = amount * (1 + rate);
+      const installmentAmount = totalAmount / duration;
+      const interestTotal = totalAmount - amount;
+      const interestPerInstallment = interestTotal / duration;
+      const capitalPerInstallment = amount / duration;
+
+      const schedule: any[] = [];
+      let currentDate = new Date(startDate);
+
+      for (let i = 1; i <= duration; i++) {
+        // Avancer la date selon la fréquence
+        // Par défaut on suppose MENSUEL si non précisé ou standard
+        // (Simplification: utiliser date-fns ou logique simple)
+        if (credit.echeance === FrequenceRemboursement.WEEKLY) {
+          currentDate.setDate(currentDate.getDate() + 7);
+        } else if (credit.echeance === FrequenceRemboursement.BI_MONTHLY) {
+          currentDate.setDate(currentDate.getDate() + 15);
+        } else if (credit.echeance === FrequenceRemboursement.DAILY) {
+            currentDate.setDate(currentDate.getDate() + 1);
+        } else {
+          // MENSUEL par défaut
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+
+        schedule.push({
+          creditId,
+          numeroEcheance: i,
+          dateEcheance: new Date(currentDate),
+          montantCapital: capitalPerInstallment.toFixed(2),
+          montantInteret: interestPerInstallment.toFixed(2),
+          montantTotal: installmentAmount.toFixed(2),
+          montantPaye: "0",
+          statut: "UPCOMING", // Using string literal matching enum
+        });
+      }
+
+      const created = await storage.createEcheances(schedule);
+      res.json(addSnakeCaseAliasesDeep(created));
+
+    } catch (error: any) {
+      logger.error({ err: error }, "Error generating schedule");
+      res.status(500).json({ message: "Erreur lors de la génération de l'échéancier" });
+    }
+  });
+
+
   // Aggregation endpoint for dashboard badges
   app.get("/api/demandes-credit/counts", requireAuth, requireAgenceAccess(), async (req, res) => {
       try {
@@ -1030,7 +1117,7 @@ export function registerFinanceRoutes(app: Express) {
       // Validation coherence frequence/duree
       if (data.frequenceRemboursement && data.dureeValeur && data.dureeUnite) {
         const resultatValidation = validerCoherenceFrequenceDuree(
-          data.frequenceRemboursement as FrequenceRemboursement,
+          data.frequenceRemboursement as FrequenceRemboursementType,
           Number(data.dureeValeur),
           data.dureeUnite as DureeUnite
         );
@@ -1044,7 +1131,7 @@ export function registerFinanceRoutes(app: Express) {
 
         // Calculer automatiquement le nombre d'echeances
         data.nombreEcheances = calculerNombreEcheances(
-          data.frequenceRemboursement as FrequenceRemboursement,
+          data.frequenceRemboursement as FrequenceRemboursementType,
           Number(data.dureeValeur),
           data.dureeUnite as DureeUnite
         );
@@ -2060,8 +2147,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(updatedEnquete));
   });
 
-  // Remboursements (roles: admin, chef, caisse, credit)
-  // Now using atomic ledger flow
+  // Remboursements avec allocation FIFO automatique
   app.post("/api/remboursements", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REMBOURSEMENT), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
@@ -2076,39 +2162,44 @@ export function registerFinanceRoutes(app: Express) {
           }
         }
         
-        // Use atomic ledger function
-        const { remboursement, mouvement } = await storage.createRemboursementWithLedger({
+        // Import de la nouvelle fonction avec allocation FIFO
+        const { createRemboursementWithAllocation } = await import("../storage/finance-enhanced");
+        
+        // Utiliser la nouvelle fonction avec allocation automatique
+        const result = await createRemboursementWithAllocation({
           creditId: data.creditId,
           montant: data.montant,
           methodePaiement: data.methodePaiement || 'Espèces',
           sessionCaisseId,
           observations: data.observations,
           idempotencyKey: data.idempotencyKey,
+          allocationOptions: data.allocationOptions || {
+            strategy: 'FIFO',
+            applyToFutureInstallments: true,
+            createCreditBalance: true
+          }
         }, user?.id);
         
-        // WebSocket notifications are now handled by outbox worker
-        // But we still broadcast dashboard update for backward compatibility
+        // Les notifications WebSocket sont maintenant gérées dans createRemboursementWithAllocation
+        // mais on garde la compatibilité pour le dashboard
         const wsInstance = getWsInstance();
         const userAgence = user?.agence;
 
         if (wsInstance && userAgence) {
             wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
-            
-            // Activité en temps réel
-            wsInstance.broadcastToAgency(userAgence, {
-              type: "LIVE_ACTIVITY",
-              payload: {
-                action: `Remboursement: ${Number(data.montant).toLocaleString()} FCFA`,
-                user: user?.nom || 'Système',
-                type: 'payment',
-                timestamp: new Date().toISOString()
-              }
-            });
         }
 
-        res.json(addSnakeCaseAliasesDeep({ ...remboursement, mouvement_id: mouvement.id }));
+        // Retourner la réponse enrichie avec les allocations
+        res.json(addSnakeCaseAliasesDeep({
+          ...result.remboursement,
+          mouvement_id: result.mouvement.id,
+          allocations: result.allocationResult.allocations,
+          overpayment_amount: result.allocationResult.overpaymentAmount,
+          total_allocated: result.allocationResult.totalAllocated,
+          credit_balance: result.allocationResult.creditBalance
+        }));
       } catch (error: any) {
-        logger.error({ err: error }, 'Error creating remboursement');
+        logger.error({ err: error }, 'Error creating remboursement with allocation');
         res.status(400).json({ message: error.message || 'Erreur lors du remboursement' });
       }
   });
@@ -2116,6 +2207,71 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/credits/:id/remboursements", requireAuth, async (req, res) => {
       const rembs = await storage.getRemboursementsByCredit(req.params.id);
       res.json(addSnakeCaseAliasesDeep(rembs));
+  });
+
+  // Récupérer les allocations d'un remboursement
+  app.get("/api/remboursements/:id/allocations", requireAuth, async (req, res) => {
+      try {
+        const { getRepaymentAllocations } = await import("../services/repayment-allocation-service");
+        const allocations = await getRepaymentAllocations(req.params.id);
+        res.json(addSnakeCaseAliasesDeep(allocations));
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error fetching repayment allocations');
+        res.status(500).json({ message: error.message || 'Erreur lors de la récupération des allocations' });
+      }
+  });
+
+  // Extourner un remboursement et ses allocations
+  app.post("/api/remboursements/:id/reverse", requireAuth, attachAbility, requireAbility(Actions.REVERSE, Subjects.REMBOURSEMENT), async (req, res) => {
+      try {
+        const { reason } = req.body;
+        const user = req.session.user;
+
+        if (!reason || reason.trim().length < 5) {
+          return res.status(400).json({ message: 'Une raison valide est requise pour l\'extourne (min. 5 caractères)' });
+        }
+
+        const { reverseRemboursement } = await import("../storage/finance-enhanced");
+        const result = await reverseRemboursement(req.params.id, reason, user?.id);
+
+        if (!result.success) {
+          return res.status(400).json({ message: result.message });
+        }
+
+        // Log audit
+        await logAudit(
+          req,
+          "REMBOURSEMENT_REVERSED",
+          "remboursement",
+          req.params.id,
+          { reason },
+          "success",
+          "high"
+        );
+
+        res.json(addSnakeCaseAliasesDeep(result));
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error reversing repayment');
+        res.status(500).json({ message: error.message || 'Erreur lors de l\'extourne du remboursement' });
+      }
+  });
+
+  // Marquer manuellement les échéances en retard (pour tests/admin)
+  app.post("/api/admin/mark-late-installments", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SYSTEM), async (req, res) => {
+      try {
+        const { markLateInstallments } = await import("../services/repayment-allocation-service");
+        const result = await markLateInstallments();
+        
+        res.json({
+          success: true,
+          message: `${result.markedCount} échéance(s) marquée(s) en retard`,
+          markedCount: result.markedCount,
+          affectedCredits: result.creditIds.length
+        });
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error marking late installments');
+        res.status(500).json({ message: error.message || 'Erreur lors du marquage des échéances en retard' });
+      }
   });
 
   // ============================================================================

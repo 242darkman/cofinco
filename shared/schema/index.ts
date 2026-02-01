@@ -15,6 +15,7 @@ export * from "./transferts";
 export * from "./hr";
 export * from "./accounting";
 export * from "./treasury";
+export * from "./remboursement-allocations";
 export * from "./agences";
 export * from "./caisse-agent";
 export * from "./coffres-forts";
