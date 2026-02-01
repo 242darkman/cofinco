@@ -655,7 +655,7 @@ export default function AdminTontinesGestion() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <FormField
               label="Nom du groupe"
               name="nom"
@@ -669,6 +669,7 @@ export default function AdminTontinesGestion() {
               value={formData.frequence}
               onChange={(e) => setFormData({ ...formData, frequence: e.target.value })}
               options={[
+                { value: 'Journalier', label: 'Journalier' },
                 { value: 'Hebdomadaire', label: 'Hebdomadaire' },
                 { value: 'Bimensuel', label: 'Bimensuel' },
                 { value: 'Mensuel', label: 'Mensuel' },
@@ -698,6 +699,7 @@ export default function AdminTontinesGestion() {
               value={formData.frais_pourcentage}
               onChange={(e) => setFormData({ ...formData, frais_pourcentage: e.target.value })}
               placeholder="2"
+              helperText={<span className="text-[10px]">Pourcentage retenu par la plateforme sur chaque bénéficiaire.</span>}
             />
             <FormField
               label="Date de début"

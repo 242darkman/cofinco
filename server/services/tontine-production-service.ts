@@ -33,8 +33,18 @@ import {
   TontinePayoutMethod,
   TontineTurnAuditActionType,
   TontineFrequency,
-} from "@shared/schema";
-import { users, clients, comptes } from "@shared/schema";
+} from "@shared/schema/tontines";
+import {
+  users,
+} from "@shared/schema/auth";
+import {
+  clients,
+} from "@shared/schema/clients";
+import {
+  mouvementsFinanciers,
+  comptes,
+} from "@shared/schema/finance";
+import { coffresForts } from "@shared/schema/coffres-forts";
 import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 import { eq, and, sql, desc, asc, gte, lte, or, isNull, ne } from "drizzle-orm";
 import { executeWithLedger, type SensMouvement } from "./ledger";
@@ -1054,6 +1064,73 @@ export async function approveDistribution(params: {
       //   ...
       // });
       // paymentIntentId = paymentResult.id;
+    }
+
+    // ========================================================================
+    // HANDLE EXIT FEES (Platform Revenue)
+    // ========================================================================
+    if (finalStatus === TontineDistributionRequestStatus.SUCCESS && feesDeducted > 0) {
+      // 1. Find the Agency's Safe (Coffre)
+      // We look for a safe owned by this agency. 
+      // Ideally should be "Caisse Principale" or similar, here we take the first active one.
+      const [agencySafe] = await tx
+        .select()
+        .from(coffresForts)
+        .where(and(
+          eq(coffresForts.ownerId, agenceId),
+          eq(coffresForts.statut, "ACTIVE")
+        ))
+        .limit(1);
+
+      if (agencySafe) {
+        // 2. Create Fee Movement (Tontine -> Coffre)
+        await executeWithLedger(
+          "TONTINE",
+          {
+            tontineId: request.tontineId,
+            sens: "DEBIT" as SensMouvement, // Money leaves Tontine
+            montant: feesDeducted.toString(),
+            typePaiement: "COMMISSION",
+            methodePaiement: "CASH", // Internal transfer implies cash/liquidity move
+            agenceId,
+            idempotencyKey: `tontine-fee-${request.id}`,
+            metadata: { 
+              description: `Frais de sortie tontine - Tour`,
+              targetCoffreId: agencySafe.id 
+            },
+            requiresGlPosting: true, // IMPORTANT: Trigger Accounting
+          },
+          async (txInner, mouvement) => {
+            // Debit Tontine
+            await txInner
+              .update(tontines)
+              .set({
+                solde: sql`${tontines.solde}::numeric - ${feesDeducted}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(tontines.id, request.tontineId));
+
+            // Credit Agency Safe
+            await txInner
+              .update(coffresForts)
+              .set({
+                solde: sql`${coffresForts.solde}::numeric + ${feesDeducted}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(coffresForts.id, agencySafe.id));
+
+            return { result: mouvement };
+          }
+        );
+      } else {
+         // Fallback: Just debit Tontine if no safe found? 
+         // Or throw error? For now, we log warning and don't transfer to safe, 
+         // but we MUST debit the Tontine to balance the "feesDeducted" from the calculation.
+         // Actually, if we don't have a safe, where does the money go? 
+         // Ideally it should go to a generic "Revenue Account".
+         // For safety, we'll throw if no safe is found to ensure configuration is correct.
+         throw new Error(`Aucun coffre-fort actif trouvé pour l'agence ${agenceId} afin de recevoir les frais.`);
+      }
     }
 
     // Update turn status
