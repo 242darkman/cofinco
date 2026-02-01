@@ -316,16 +316,16 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Versement caisse vers coffre-fort',
     priority: 100,
   },
-  // --- Approvisionnement externe du coffre (Banque, Capital) ---
+  // --- Approvisionnement externe du coffre (Capital/Apports) ---
   {
     code: 'SAFE_SUPPLY',
     name: 'Approvisionnement Externe Coffre',
-    description: 'Approvisionnement coffre depuis source externe (Banque, Capital)',
+    description: 'Approvisionnement coffre depuis apport en capital',
     sourceType: 'MOUVEMENT',
     eventType: 'SAFE_SUPPLY',
     journalCode: 'OD',
     debitAccount: '531',   // Coffre-fort (reçoit les fonds)
-    creditAccount: '512',  // Banque (source des fonds)
+    creditAccount: '101',  // Capital social (apport en capital)
     descriptionTemplate: 'Approvisionnement externe coffre-fort',
     priority: 100,
   },
