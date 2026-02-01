@@ -400,6 +400,7 @@ export class OperationService {
         id: agentsTerrain.id,
         nom: users.nom,
         prenom: users.prenom,
+        photoProfile: users.photoProfile,
       })
       .from(agentsTerrain)
       .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
@@ -409,7 +410,8 @@ export class OperationService {
     const agent = agentData ? {
       ...agentData,
       nom: agentData.nom || "",
-      prenom: agentData.prenom || ""
+      prenom: agentData.prenom || "",
+      photoProfile: agentData.photoProfile || null,
     } : undefined;
 
     let client = null;
@@ -602,6 +604,7 @@ export class OperationService {
             id: agentsTerrain.id,
             nom: users.nom,
             prenom: users.prenom,
+            photoProfile: users.photoProfile,
           })
           .from(agentsTerrain)
           .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
@@ -611,7 +614,8 @@ export class OperationService {
         const agent = agentData ? {
           ...agentData,
           nom: agentData.nom || "",
-          prenom: agentData.prenom || ""
+          prenom: agentData.prenom || "",
+          photoProfile: agentData.photoProfile || null,
         } : undefined;
 
         let client = null;

@@ -34,10 +34,35 @@ import { SystemRole, normalizeRole } from '@shared/types/roles';
 import SecureValidationModal from './SecureValidationModal';
 import { StatutOperationTerrain } from '@shared/enum/status-constants';
 import type { OperationTerrainWithRelations, OperationTerrainMetadata } from '@shared/schema';
+import { resolveStorageUrl } from '@/lib/format';
 
 // Helper: Format money
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('fr-FR').format(amount);
+};
+
+// Agent Avatar Component with error handling
+const AgentAvatar = ({ photoUrl, nom, prenom }: { photoUrl?: string | null; nom: string; prenom?: string }) => {
+  const [hasError, setHasError] = React.useState(false);
+  const resolvedUrl = photoUrl ? resolveStorageUrl(photoUrl) : null;
+  const initials = `${nom.charAt(0)}${prenom?.charAt(0) || ''}`;
+
+  if (!resolvedUrl || hasError) {
+    return (
+      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0">
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={resolvedUrl}
+      alt={`${nom} ${prenom || ''}`}
+      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0 border-2 border-emerald-500"
+      onError={() => setHasError(true)}
+    />
+  );
 };
 
 // Modal Component
@@ -70,6 +95,7 @@ interface AgentGroup {
   agentId: string;
   agentName: string;
   agentPrenom: string;
+  agentAvatar?: string | null;
   operations: OperationTerrainWithRelations[];
   totalAmount: number;
 }
@@ -109,9 +135,11 @@ function AgentGroupCard({
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           {/* Agent Info */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0">
-              {group.agentName.charAt(0)}{group.agentPrenom?.charAt(0) || ''}
-            </div>
+            <AgentAvatar
+              photoUrl={group.agentAvatar}
+              nom={group.agentName}
+              prenom={group.agentPrenom}
+            />
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base truncate">
                 {group.agentName} {group.agentPrenom}
@@ -146,8 +174,7 @@ function AgentGroupCard({
               ) : (
                 <CheckCheck size={14} className="mr-1" />
               )}
-              <span className="hidden xs:inline">Tout valider</span>
-              <span className="xs:hidden">Valider</span>
+              Tout valider
             </Button>
 
             <button
@@ -367,6 +394,7 @@ export default function AgentValidations() {
           agentId,
           agentName: op.agent?.nom || 'Inconnu',
           agentPrenom: op.agent?.prenom || '',
+          agentAvatar: (op.agent as any)?.photoProfile || null,
           operations: [op],
           totalAmount: parseFloat(op.montant),
         });
@@ -574,7 +602,7 @@ export default function AgentValidations() {
               <CreditCard size={18} className="text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-semibold">Moyenne</p>
+              <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-semibold">Moy. / Opération</p>
               <p className="text-base sm:text-xl font-bold text-amber-600 dark:text-amber-400">
                 {formatMoney(totalPending > 0 ? totalAmount / totalPending : 0)}
                 <span className="text-[10px] font-normal ml-1">FCFA</span>
