@@ -24,8 +24,11 @@ import {
   approvalService,
 } from "../services/caisse-agent";
 import { idempotencyMiddleware } from "../middleware/idempotency";
-import { requireAuth } from "../auth";
+import { requireAuth, comparePasswords } from "../auth";
 import { SystemRole, normalizeRole } from "@shared/types/roles";
+import { db } from "../db";
+import { users } from "@shared/schema/auth";
+import { eq } from "drizzle-orm";
 
 export const caisseAgentRouter = Router();
 
@@ -173,16 +176,35 @@ caisseAgentRouter.post(
 
 /**
  * POST /api/caisse-agent/operations-terrain/bulk-approve
+ * Approuve plusieurs opérations avec vérification du mot de passe
  */
 caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
   try {
-    const { operationIds } = req.body;
+    const { operationIds, password } = req.body;
+    const userId = (req as any).user?.id;
+
     if (!Array.isArray(operationIds) || operationIds.length === 0) {
       return res.status(400).json({ error: "Liste d'IDs invalide" });
     }
+
+    // Vérifier le mot de passe de l'utilisateur
+    if (!password) {
+      return res.status(400).json({ error: "Mot de passe requis pour la validation" });
+    }
+
+    const [user] = await db.select({ password: users.password }).from(users).where(eq(users.id, userId));
+    if (!user?.password) {
+      return res.status(401).json({ error: "Utilisateur non trouvé" });
+    }
+
+    const passwordValid = await comparePasswords(password, user.password);
+    if (!passwordValid) {
+      return res.status(401).json({ error: "Mot de passe incorrect" });
+    }
+
     const result = await approvalService.approveOperationsBulk({
       operationIds,
-      approvedBy: (req as any).user!.id,
+      approvedBy: userId,
       ipAddress: req.ip,
       userAgent: req.headers["user-agent"],
     });
@@ -195,7 +217,7 @@ caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
 
 /**
  * POST /api/caisse-agent/operations-terrain/:id/approve
- * Approuve une opération et poste les écritures
+ * Approuve une opération avec vérification du mot de passe
  */
 caisseAgentRouter.post(
   "/operations-terrain/:id/approve",
@@ -203,6 +225,7 @@ caisseAgentRouter.post(
   async (req, res) => {
     try {
       const operationId = req.params.id;
+      const { password } = req.body;
       const userId = (req as any).user?.id;
       const userRole = (req as any).user?.role;
 
@@ -218,6 +241,21 @@ caisseAgentRouter.post(
           error: "Permission refusée",
           code: "FORBIDDEN",
         });
+      }
+
+      // Vérifier le mot de passe de l'utilisateur
+      if (!password) {
+        return res.status(400).json({ error: "Mot de passe requis pour la validation" });
+      }
+
+      const [user] = await db.select({ password: users.password }).from(users).where(eq(users.id, userId));
+      if (!user?.password) {
+        return res.status(401).json({ error: "Utilisateur non trouvé" });
+      }
+
+      const passwordValid = await comparePasswords(password, user.password);
+      if (!passwordValid) {
+        return res.status(401).json({ error: "Mot de passe incorrect" });
       }
 
       const result = await approvalService.approveOperation({

@@ -114,7 +114,7 @@ export default function SecureValidationModal({
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-300 flex items-center gap-2">
                 <Lock size={14} className="text-slate-500" />
-                Mot de passe Superviseur
+                Votre mot de passe
               </label>
               <div className="relative">
                 <input

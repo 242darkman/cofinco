@@ -2619,20 +2619,23 @@ export const caisseAgentApi = {
     request<OperationTerrainWithRelations>(`/caisse-agent/operations-terrain/${operationId}`),
 
   /**
-   * Approuver une opération terrain (superviseur/chef d'agence)
+   * Approuver une opération terrain (superviseur/chef d'agence/admin)
+   * Nécessite le mot de passe de l'utilisateur pour confirmation
    */
-  approveOperation: (operationId: string) =>
+  approveOperation: (operationId: string, password: string) =>
     request<OperationTerrainWithRelations>(`/caisse-agent/operations-terrain/${operationId}/approve`, {
       method: 'POST',
+      body: JSON.stringify({ password }),
     }),
 
   /**
    * Approuver plusieurs opérations terrain en une fois
+   * Nécessite le mot de passe de l'utilisateur pour confirmation
    */
-  bulkApproveOperations: (operationIds: string[]) =>
+  bulkApproveOperations: (operationIds: string[], password: string) =>
     request<{ success: boolean; results: any[] }>('/caisse-agent/operations-terrain/bulk-approve', {
       method: 'POST',
-      body: JSON.stringify({ operationIds }),
+      body: JSON.stringify({ operationIds, password }),
     }),
 
   /**

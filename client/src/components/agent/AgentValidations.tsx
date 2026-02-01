@@ -435,7 +435,7 @@ export default function AgentValidations() {
     setSecureModalOpen(true);
   };
 
-  // Confirm approval after password
+  // Confirm approval after password verification
   const handleSecureApprovalConfirm = async (password: string) => {
     if (pendingApprovalIds.length === 0) throw new Error('No pending operations');
 
@@ -444,13 +444,13 @@ export default function AgentValidations() {
 
     try {
       if (pendingApprovalIds.length === 1) {
-        await caisseAgentApi.approveOperation(pendingApprovalIds[0]);
+        await caisseAgentApi.approveOperation(pendingApprovalIds[0], password);
         toast({
           title: t('succes'),
           description: 'Opération validée avec succès.',
         });
       } else {
-        const result = await caisseAgentApi.bulkApproveOperations(pendingApprovalIds);
+        const result = await caisseAgentApi.bulkApproveOperations(pendingApprovalIds, password);
         if (result.success) {
           toast({
             title: t('succes'),
