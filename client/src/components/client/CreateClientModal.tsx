@@ -37,6 +37,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
     // Step 3
     profession: '', 
     secteurId: '', // Type Marche ID
+    typeRevenu: 'Mensuel',
     revenu: '', 
     segment: 'Standard',
     agenceId: '',
@@ -118,7 +119,9 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
       
       profession: formData.profession,
       typeMarcheId: formData.secteurId,
-      revenuMensuel: formData.revenu,
+      typeRevenu: formData.typeRevenu,
+      revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenu : undefined,
+      revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenu : undefined,
       segment: formData.segment,
       
       agenceId: formData.agenceId || user?.agenceId, // Fallback to user agency if not admin
@@ -223,7 +226,38 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                    {typesMarches.map(t => <option key={t.id} value={t.id}>{t.nom}</option>)}
                 </Select>
 
-                <Input label="Revenu Mensuel (Est.)" type="number" placeholder="0" suffix="FCFA" value={formData.revenu} onChange={e => updatedField('revenu', e.target.value)} />
+                <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-4">
+                  <div className="w-full">
+                     <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">Fréquence Revenu</label>
+                     <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 h-11 sm:h-12 relative">
+                        {['Mensuel', 'Journalier'].map((type) => {
+                           const isActive = formData.typeRevenu === type;
+                           return (
+                             <button
+                               key={type}
+                               onClick={() => updatedField('typeRevenu', type)}
+                               className={`flex-1 rounded-lg text-xs font-bold flex items-center justify-center transition-all duration-300 ${
+                                 isActive 
+                                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+                                   : 'text-slate-400 hover:text-white'
+                               }`}
+                               type="button"
+                             >
+                               {type}
+                             </button>
+                           );
+                        })}
+                     </div>
+                  </div>
+                  <Input 
+                    label={`Revenu ${formData.typeRevenu} (Est.)`} 
+                    type="number" 
+                    placeholder="0" 
+                    suffix="FCFA" 
+                    value={formData.revenu} 
+                    onChange={e => updatedField('revenu', e.target.value)} 
+                  />
+                </div>
                 <Select label="Segment Client" value={formData.segment} onChange={e => updatedField('segment', e.target.value)}>
                    <option value="Standard">Standard</option>
                    <option value="Premium">Premium</option>
