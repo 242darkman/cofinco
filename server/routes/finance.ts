@@ -23,6 +23,7 @@ import {
 } from "@shared/schema";
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "../services/accounting-posting-service";
 import { getComptesByClient, DecaissementInsufficientFundsError } from "../storage/finance";
 import { isCoffreCaisseError } from "../services/coffre/coffre-errors";
 // State Machine errors for proper error handling
@@ -3530,6 +3531,36 @@ export function registerFinanceRoutes(app: Express) {
             createdBy: user.id
           });
 
+          // GL Posting for coffre debit
+          if (refundDataLocked.agenceId) {
+            try {
+              await postGlForMouvement(tx, coffreMouvement, refundDataLocked.agenceId, user.id, {
+                refundId: refundDataLocked.id,
+                type: 'REFUND_SOURCE',
+              });
+            } catch (error) {
+              if (error instanceof AccountingRuleNotFoundError) {
+                logger.warn({ mouvementId: coffreMouvement.id, error: (error as Error).message }, "No GL rule for refund coffre debit");
+              } else {
+                throw error;
+              }
+            }
+
+            // GL Posting for client account credit
+            try {
+              await postGlForMouvement(tx, mouvement, refundDataLocked.agenceId, user.id, {
+                refundId: refundDataLocked.id,
+                type: 'REFUND_PAYMENT',
+              });
+            } catch (error) {
+              if (error instanceof AccountingRuleNotFoundError) {
+                logger.warn({ mouvementId: mouvement.id, error: (error as Error).message }, "No GL rule for refund deposit");
+              } else {
+                throw error;
+              }
+            }
+          }
+
           paymentRefString = `VIREMENT-${mouvement.reference}`;
 
           // Update Refund Status to PAID
@@ -3642,6 +3673,23 @@ export function registerFinanceRoutes(app: Express) {
           const paymentRefString = paymentMethod === 'MOBILE_MONEY'
              ? `MOMO-${op.reference}`
              : `CASH-${op.reference}`;
+
+          // GL Posting
+          if (refundData.agenceId) {
+            try {
+              await postGlForMouvement(tx, mouvement, refundData.agenceId, user.id, {
+                refundId: refundData.id,
+                operationId: op.id,
+                type: 'REFUND_CAISSE_PAYMENT',
+              });
+            } catch (error) {
+              if (error instanceof AccountingRuleNotFoundError) {
+                logger.warn({ mouvementId: mouvement.id, error: (error as Error).message }, "No GL rule for caisse refund");
+              } else {
+                throw error;
+              }
+            }
+          }
 
           // 5. Update refund to PAID
           await tx.update(creditRefundRequests).set({

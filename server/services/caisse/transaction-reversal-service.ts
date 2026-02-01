@@ -17,6 +17,7 @@ import {
   generateReference,
   emitBalanceUpdates,
 } from "../ledger";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
 import { dispatchDomainEvent } from "../notifications/domain-events/event-registry";
 import type { MouvementFinancier } from "@shared/schema/finance";
 import { createLogger } from "../../lib/logger";
@@ -287,6 +288,31 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
 
     // 4h. Create outbox event for real-time updates
     await createMouvementEvents(tx, reversalMvt);
+
+    // 4i. Post to General Ledger
+    if (originalMouvement!.agenceId) {
+      try {
+        await postGlForMouvement(tx, reversalMvt, originalMouvement!.agenceId, userId, {
+          reversalOf: originalMouvement!.id,
+          reversalReason: reason,
+        });
+        logger.info({ mouvementId: reversalMvt.id }, "GL posting successful for reversal");
+      } catch (error) {
+        if (error instanceof AccountingRuleNotFoundError) {
+          logger.warn(
+            { mouvementId: reversalMvt.id, error: error.message },
+            "No accounting rule for reversal - skipping GL posting"
+          );
+          // Mark as SKIPPED instead of failing the whole transaction
+          await tx
+            .update(mouvementsFinanciers)
+            .set({ glPostingStatus: "SKIPPED", glPostingError: error.message })
+            .where(eq(mouvementsFinanciers.id, reversalMvt.id));
+        } else {
+          throw error;
+        }
+      }
+    }
 
     // Reload the original to return updated version
     const [updatedOriginal] = await tx

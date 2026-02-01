@@ -76,6 +76,7 @@ const RECONCILIATION_THRESHOLDS = {
 };
 
 // Préfixes de comptes GL de liquidité (classe 5 OHADA)
+// NOTE: Le compte 571 est obsolète - migration 0063 a tout transféré vers 521
 const GL_ACCOUNT_PREFIXES = {
   CAISSE_GUICHET: ["521"], // Caisse centrale et guichets
   COFFRE_CENTRAL: ["531"], // Coffres-forts

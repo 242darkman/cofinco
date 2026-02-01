@@ -226,11 +226,18 @@ const PLAN_COMPTABLE_DATA = [
 
   // Classe 5: Trésorerie (Critique pour microfinance)
   { num: '512', label: 'Banque', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
-  { num: '521', label: 'Caisse', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '521', label: 'Caisse centrale', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '5211', label: 'Caisse centrale siège', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '5212', label: 'Caisse centrale agences', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '531', label: 'Coffre-fort central', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
-  { num: '532', label: 'Coffre-fort agence', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
-  { num: '571', label: 'Caisse principale', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
-  { num: '572', label: 'Caisses annexes', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '5311', label: 'Coffre-fort siège', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '5312', label: 'Coffre-fort agences', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '532', label: 'Coffre-fort annexe', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  // NOTE: Compte 571 obsolète - utiliser 521 (Caisse centrale) à la place
+  // { num: '571', label: '[LEGACY] Caisse principale', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  // { num: '572', label: '[LEGACY] Caisses annexes', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '573', label: 'Caisse agents terrain', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '5731', label: 'Caisse agents terrain - Collecte', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '581', label: 'Virements internes', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '581000', label: 'Compte de liaison général', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '585', label: 'Virements Mobile Money', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
@@ -274,6 +281,7 @@ const JOURNAUX_DATA = [
   { code: 'ACHAT', intitule: 'Journal d\'Achats', typeJournal: 'Achats' },
   { code: 'VENTE', intitule: 'Journal de Ventes', typeJournal: 'Ventes' },
   { code: 'OD', intitule: 'Opérations Diverses', typeJournal: 'Opérations Diverses' },
+  { code: 'VRT', intitule: 'Virements Internes', typeJournal: 'Transferts' },
   { code: 'MMTN', intitule: 'Mobile Money MTN', typeJournal: 'Mobile Money' },
   { code: 'MAIR', intitule: 'Mobile Money Airtel', typeJournal: 'Mobile Money' },
   { code: 'CRED', intitule: 'Journal des Crédits', typeJournal: 'Crédits' },
@@ -410,7 +418,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'DEPOSIT_SAVINGS',
     paymentMethod: 'CASH',
     journalCode: 'CAI',
-    debitAccount: '571',   // Caisse siège
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '4112', // Dépôts clients - Comptes épargne
     descriptionTemplate: 'Dépôt espèces épargne - {clientName}',
     priority: 10,
@@ -453,7 +461,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'DEPOSIT_CURRENT',
     paymentMethod: 'CASH',
     journalCode: 'CAI',
-    debitAccount: '571',   // Caisse siège
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '4111', // Dépôts clients - Comptes courants
     descriptionTemplate: 'Dépôt espèces courant - {clientName}',
     priority: 10,
@@ -496,7 +504,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'DEPOSIT_BLOCKED',
     paymentMethod: 'CASH',
     journalCode: 'CAI',
-    debitAccount: '571',   // Caisse siège
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '4113', // Dépôts clients - Comptes bloqués
     descriptionTemplate: 'Dépôt espèces bloqué - {clientName}',
     priority: 10,
@@ -540,7 +548,7 @@ const ACCOUNTING_RULES_DATA = [
     paymentMethod: 'CASH',
     journalCode: 'CAI',
     debitAccount: '4112',  // Dépôts clients - Comptes épargne
-    creditAccount: '571',  // Caisse siège
+    creditAccount: '521',  // Caisse centrale
     descriptionTemplate: 'Retrait espèces épargne - {clientName}',
     priority: 10,
   },
@@ -583,7 +591,7 @@ const ACCOUNTING_RULES_DATA = [
     paymentMethod: 'CASH',
     journalCode: 'CAI',
     debitAccount: '4111',  // Dépôts clients - Comptes courants
-    creditAccount: '571',  // Caisse siège
+    creditAccount: '521',  // Caisse centrale
     descriptionTemplate: 'Retrait espèces courant - {clientName}',
     priority: 10,
   },
@@ -626,7 +634,7 @@ const ACCOUNTING_RULES_DATA = [
     paymentMethod: 'CASH',
     journalCode: 'CAI',
     debitAccount: '4113',  // Dépôts clients - Comptes bloqués
-    creditAccount: '571',  // Caisse siège
+    creditAccount: '521',  // Caisse centrale
     descriptionTemplate: 'Retrait espèces bloqué - {clientName}',
     priority: 10,
   },
@@ -673,7 +681,7 @@ const ACCOUNTING_RULES_DATA = [
     paymentMethod: 'CASH',
     journalCode: 'CRD',
     debitAccount: '2711',  // Prêts - Principal
-    creditAccount: '571',  // Caisse
+    creditAccount: '521',  // Caisse centrale
     descriptionTemplate: 'Décaissement crédit #{creditNumber} - {clientName}',
     priority: 10,
   },
@@ -728,7 +736,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CREDIT_REPAYMENT',
     paymentMethod: 'CASH',
     journalCode: 'CAI',
-    debitAccount: '571',   // Caisse
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '2711', // Prêts - Principal
     descriptionTemplate: 'Remboursement principal crédit #{creditNumber} - {clientName}',
     priority: 20,
@@ -771,7 +779,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CREDIT_REPAYMENT_INTEREST',
     paymentMethod: 'CASH',
     journalCode: 'CAI',
-    debitAccount: '571',   // Caisse
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '7071', // Intérêts sur prêts
     descriptionTemplate: 'Remboursement intérêts crédit #{creditNumber} - {clientName}',
     priority: 20,
@@ -786,7 +794,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CREDIT_REPAYMENT_PENALTY',
     paymentMethod: 'CASH',
     journalCode: 'CAI',
-    debitAccount: '571',   // Caisse
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '7073', // Pénalités de retard
     descriptionTemplate: 'Remboursement pénalités crédit #{creditNumber} - {clientName}',
     priority: 20,
@@ -800,7 +808,7 @@ const ACCOUNTING_RULES_DATA = [
     sourceType: 'MOUVEMENT',
     eventType: 'CREDIT_FEE',
     journalCode: 'CRD',
-    debitAccount: '571',   // Caisse
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '7072', // Frais de dossier
     descriptionTemplate: 'Frais de dossier crédit #{creditNumber}',
     priority: 10,
@@ -818,7 +826,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'TONTINE_CONTRIBUTION',
     paymentMethod: 'CASH',
     journalCode: 'TON',
-    debitAccount: '571',   // Caisse
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '4191', // Fonds tontine - Cotisations
     descriptionTemplate: 'Cotisation tontine {tontineName} - {clientName}',
     priority: 10,
@@ -860,7 +868,7 @@ const ACCOUNTING_RULES_DATA = [
     paymentMethod: 'CASH',
     journalCode: 'TON',
     debitAccount: '4191',  // Fonds tontine - Cotisations
-    creditAccount: '571',  // Caisse
+    creditAccount: '521',  // Caisse centrale
     descriptionTemplate: 'Distribution tontine {tontineName} - {clientName}',
     priority: 10,
   },
@@ -899,7 +907,7 @@ const ACCOUNTING_RULES_DATA = [
     sourceType: 'MOUVEMENT',
     eventType: 'TONTINE_PENALTY',
     journalCode: 'TON',
-    debitAccount: '571',   // Caisse
+    debitAccount: '521',   // Caisse centrale
     creditAccount: '4192', // Fonds tontine - Pénalités
     descriptionTemplate: 'Pénalité tontine {tontineName} - {clientName}',
     priority: 10,
@@ -935,6 +943,164 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '6272',  // Commissions Mobile Money
     creditAccount: '5782', // Mobile Money Airtel
     descriptionTemplate: 'Commission Airtel Money',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // OPÉRATIONS AGENT TERRAIN
+  // ============================================================================
+
+  // Collecte par agent terrain (encaissement client)
+  {
+    code: 'AGENT_COLLECT_CASH',
+    name: 'Collecte espèces agent terrain',
+    description: 'Encaissement par agent terrain sur le terrain',
+    sourceType: 'MOUVEMENT',
+    eventType: 'COLLECT_CASH',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '573',   // Caisse agent terrain
+    creditAccount: '4191', // Fonds tontine ou clients
+    descriptionTemplate: 'Collecte agent terrain',
+    priority: 10,
+  },
+
+  // Remise agent (versement de la collecte à la caisse agence)
+  {
+    code: 'AGENT_SETTLEMENT_CASH',
+    name: 'Remise espèces agent terrain',
+    description: 'Remise de collecte par agent terrain vers caisse agence',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SETTLEMENT_CASH',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '521',   // Caisse centrale
+    creditAccount: '573',  // Caisse agent terrain
+    descriptionTemplate: 'Remise agent terrain vers caisse',
+    priority: 10,
+  },
+
+  // Restitution coffre (annulation ouverture session)
+  {
+    code: 'RESTITUTION',
+    name: 'Restitution fonds au coffre',
+    description: 'Restitution des fonds au coffre après annulation',
+    sourceType: 'MOUVEMENT',
+    eventType: 'RESTITUTION',
+    journalCode: 'OD',
+    debitAccount: '531',   // Coffre-fort
+    creditAccount: '521',  // Caisse centrale
+    descriptionTemplate: 'Restitution fonds au coffre',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // RÈGLES ADDITIONNELLES POUR TRAÇABILITÉ GL COMPLÈTE
+  // ============================================================================
+
+  // Frais d'engagement crédit (engagement fees)
+  {
+    code: 'ENGAGEMENT_FEE_CASH',
+    name: 'Frais d\'engagement crédit',
+    description: 'Frais d\'engagement pour ouverture de crédit',
+    sourceType: 'MOUVEMENT',
+    eventType: 'ENGAGEMENT_FEE',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '521',   // Caisse centrale
+    creditAccount: '708100', // Produits des services - Frais d'engagement
+    descriptionTemplate: 'Frais d\'engagement crédit - {clientName}',
+    priority: 10,
+  },
+
+  // Dépôt initial ouverture compte
+  {
+    code: 'INITIAL_DEPOSIT_CASH',
+    name: 'Dépôt initial ouverture compte',
+    description: 'Dépôt initial pour ouverture de compte épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'INITIAL_DEPOSIT',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '521',   // Caisse centrale
+    creditAccount: '4112', // Dépôts clients - Comptes épargne
+    descriptionTemplate: 'Dépôt initial ouverture compte - {clientName}',
+    priority: 10,
+  },
+
+  // Virement interne entre comptes client
+  {
+    code: 'INTERNAL_TRANSFER',
+    name: 'Virement interne',
+    description: 'Virement entre comptes du même client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'INTERNAL_TRANSFER',
+    journalCode: 'OD',
+    debitAccount: '4111',  // Dépôts clients - Comptes courants (source)
+    creditAccount: '4112', // Dépôts clients - Comptes épargne (destination)
+    descriptionTemplate: 'Virement interne - {clientName}',
+    priority: 10,
+  },
+
+  // Transfert sortant du coffre
+  {
+    code: 'TRANSFER_OUT',
+    name: 'Transfert sortant coffre',
+    description: 'Transfert de fonds sortant du coffre',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TRANSFER_OUT',
+    journalCode: 'VRT',
+    debitAccount: '581',   // Virements internes (transit)
+    creditAccount: '531',  // Coffre-fort
+    descriptionTemplate: 'Transfert sortant coffre',
+    priority: 10,
+  },
+
+  // Dépôt système (automatique) - utilise compte transit, pas caisse physique
+  {
+    code: 'DEP_SYSTEM_CURRENT',
+    name: 'Dépôt système compte courant',
+    description: 'Dépôt système (écriture comptable, pas de mouvement physique de caisse)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'DEPOSIT_CURRENT',
+    journalCode: 'OD',
+    debitAccount: '581',   // Virements internes (transit) - pas de caisse physique
+    creditAccount: '4111', // Dépôts clients - Comptes courants
+    descriptionTemplate: 'Dépôt système - {clientName}',
+    priority: 5,  // Priorité basse car c'est un fallback
+  },
+
+  // ============================================================================
+  // TRANSFERTS INTER-SESSIONS CAISSE
+  // ============================================================================
+
+  // Transfert entrant (caisse reçoit des fonds)
+  {
+    code: 'TRANSFER_IN',
+    name: 'Transfert entrant caisse',
+    description: 'Réception de fonds depuis une autre caisse',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TRANSFER_IN',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'VRT',
+    debitAccount: '521',   // Caisse reçoit
+    creditAccount: '581',  // Transit
+    descriptionTemplate: 'Transfert reçu de caisse',
+    priority: 10,
+  },
+
+  // Transfert sortant session (vers autre caisse)
+  {
+    code: 'TRANSFER_OUT_SESSION',
+    name: 'Transfert sortant session caisse',
+    description: 'Transfert de fonds vers une autre caisse',
+    sourceType: 'MOUVEMENT',
+    eventType: 'TRANSFER_OUT',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'VRT',
+    debitAccount: '581',   // Transit
+    creditAccount: '521',  // Caisse émet
+    descriptionTemplate: 'Transfert émis vers caisse',
     priority: 10,
   },
 ];

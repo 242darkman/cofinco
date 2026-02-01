@@ -1815,6 +1815,7 @@ import {
   type SensMouvement,
   type MouvementFinancier
 } from "../services/ledger";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "../services/accounting-posting-service";
 import {
   assertCoffreCanDebit,
   assertCoffreCanCredit,
@@ -3374,6 +3375,22 @@ export async function validateTransfertWithLedger(
       nouveauSoldeSession: soldeSource
     });
 
+    // GL posting for source mouvement
+    if (sessionSource.agenceId) {
+      try {
+        await postGlForMouvement(tx, mouvementSource, sessionSource.agenceId, userId, {
+          transfertId: transfert.id,
+          direction: "OUT",
+        });
+      } catch (error) {
+        if (error instanceof AccountingRuleNotFoundError) {
+          logger.warn({ mouvementId: mouvementSource.id, error: error.message }, "No GL rule for transfer OUT");
+        } else {
+          throw error;
+        }
+      }
+    }
+
     // 4. Process DEST (CREDIT / IN)
     const refDest = `TRF-IN-${transfert.reference}`;
     const mouvementDest = await createMouvementFinancier(tx, {
@@ -3403,9 +3420,25 @@ export async function validateTransfertWithLedger(
       createdBy: userId
     });
 
-    await createMouvementEvents(tx, mouvementDest, { 
-       nouveauSoldeSession: soldeDest 
+    await createMouvementEvents(tx, mouvementDest, {
+       nouveauSoldeSession: soldeDest
     });
+
+    // GL posting for dest mouvement
+    if (sessionDest.agenceId) {
+      try {
+        await postGlForMouvement(tx, mouvementDest, sessionDest.agenceId, userId, {
+          transfertId: transfert.id,
+          direction: "IN",
+        });
+      } catch (error) {
+        if (error instanceof AccountingRuleNotFoundError) {
+          logger.warn({ mouvementId: mouvementDest.id, error: error.message }, "No GL rule for transfer IN");
+        } else {
+          throw error;
+        }
+      }
+    }
 
     // 5. Update Transfer Status
     const [updatedTransfert] = await tx.update(caisseTransferts)
