@@ -2897,7 +2897,7 @@ export async function processLoanCashPayout(data: {
             creditId: data.creditId,
             sessionCaisseId: data.sessionCaisseId,
             methodePaiement: "CASH",
-            typePaiement: "LOAN_DISBURSEMENT",
+            typePaiement: "CREDIT_DISBURSEMENT",
             agenceId: credit.agenceId,
             referenceExterne: data.paymentReference || `LOAN-${credit.numeroCredit}`,
             metadata: {

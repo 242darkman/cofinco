@@ -198,6 +198,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '22', label: 'Terrains', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '23', label: 'Bâtiments', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '24', label: 'Matériel', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '2711', label: 'Prêts - Principal', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '28', label: 'Amortissements', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
 
   // Classe 3: Stocks
@@ -264,6 +265,8 @@ const PLAN_COMPTABLE_DATA = [
   { num: '706', label: 'Services vendus', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '706100', label: 'Intérêts sur crédits', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '706200', label: 'Intérêts sur découverts', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '7071', label: 'Intérêts sur prêts', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '7073', label: 'Pénalités de retard', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708', label: 'Produits accessoires', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708100', label: 'Frais de dossier crédit', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708200', label: 'Frais de tenue de compte', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
@@ -284,7 +287,7 @@ const JOURNAUX_DATA = [
   { code: 'VRT', intitule: 'Virements Internes', typeJournal: 'Transferts' },
   { code: 'MMTN', intitule: 'Mobile Money MTN', typeJournal: 'Mobile Money' },
   { code: 'MAIR', intitule: 'Mobile Money Airtel', typeJournal: 'Mobile Money' },
-  { code: 'CRED', intitule: 'Journal des Crédits', typeJournal: 'Crédits' },
+  { code: 'CRD', intitule: 'Journal des Crédits', typeJournal: 'Crédits' },
   { code: 'EPGN', intitule: 'Journal Épargne', typeJournal: 'Épargne' },
 ];
 
