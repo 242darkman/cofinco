@@ -75,6 +75,37 @@ const DENOMINATIONS = [
   { value: 100, label: '100' },
 ];
 
+// Configuration for dynamic info card based on operation type
+type InfoCardKind = 'balance' | 'tontine_due' | 'loan_due' | 'withdrawable' | 'disbursement' | 'tontine_payout';
+
+interface InfoCardConfig {
+  kind: InfoCardKind;
+  title: string;
+}
+
+interface InfoCardData {
+  title: string;
+  amount: number | null;
+  subtitle?: string;
+  loading?: boolean;
+}
+
+const OPERATION_INFO_CONFIG: Record<string, Record<string, InfoCardConfig>> = {
+  depot: {
+    'Compte Courant': { kind: 'balance', title: 'Solde du compte courant' },
+    'Compte Épargne': { kind: 'balance', title: 'Solde du compte épargne' },
+    'Compte Bloqué': { kind: 'balance', title: 'Solde du compte bloqué' },
+    'Cotisation Tontine': { kind: 'tontine_due', title: 'Cotisation à payer' },
+    'Remboursement Crédit': { kind: 'loan_due', title: 'Prochain paiement' },
+  },
+  retrait: {
+    'Retrait Compte Courant': { kind: 'withdrawable', title: 'Solde disponible' },
+    'Retrait Épargne': { kind: 'withdrawable', title: 'Solde disponible' },
+    'Décaissement Crédit': { kind: 'disbursement', title: 'Montant à décaisser' },
+    'Distribution Tontine': { kind: 'tontine_payout', title: 'Montant à récupérer' },
+  },
+};
+
 export default function CaisseEspeces({ sessionId, onTransactionComplete }: CaisseEspecesProps) {
   const user = authService.getCurrentUser();
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,6 +139,10 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   // Billetage State
   const [showBilletage, setShowBilletage] = useState(false);
   const [billetage, setBilletage] = useState<Record<number, number>>({});
+
+  // Dynamic Info Card State
+  const [infoCardData, setInfoCardData] = useState<InfoCardData | null>(null);
+
 
   const toggleBilletage = useCallback(() => setShowBilletage(!showBilletage), [showBilletage]);
 
@@ -254,6 +289,135 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     }
     return undefined;
   }, [comptesClient]);
+
+  // Fetch dynamic info card data based on selected operation type
+  const fetchInfoCardData = useCallback(async () => {
+    const opType = typeOperation === 'Dépôt' ? 'depot' : 'retrait';
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    
+    if (!subType || !selectedClient) {
+      setInfoCardData(null);
+      return;
+    }
+    
+    const config = OPERATION_INFO_CONFIG[opType]?.[subType];
+    if (!config) {
+      setInfoCardData(null);
+      return;
+    }
+    
+    setInfoCardData({ title: config.title, amount: null, loading: true });
+    
+    try {
+      let amount: number | null = null;
+      let subtitle: string | undefined;
+      
+      switch (config.kind) {
+        case 'balance':
+        case 'withdrawable': {
+          // Find matching account from already-loaded comptesClient
+          const targetType = subType.includes('Courant') ? TypeCompte.CURRENT
+            : subType.includes('Épargne') ? TypeCompte.SAVINGS
+            : TypeCompte.BLOCKED;
+          const compte = comptesClient.find((c: any) => (c.type_compte || c.typeCompte) === targetType);
+          amount = compte ? parseFloat(compte.soldeCourant || compte.solde_courant || '0') : null;
+          if (compte) {
+            subtitle = `Compte ${compte.numeroCompte || compte.numero_compte || ''}`;
+          }
+          break;
+        }
+        
+        case 'tontine_due': {
+          // Use selected tontine's cotisation amount
+          if (tontineSelectionnee) {
+            amount = parseFloat(tontineSelectionnee.montantCotisation || tontineSelectionnee.montant_cotisation || '0');
+            subtitle = tontineSelectionnee.nom;
+          } else if (tontinesActives.length > 0) {
+            // Show first active tontine's amount as hint
+            const firstTontine = tontinesActives[0];
+            amount = parseFloat(firstTontine.montantCotisation || firstTontine.montant_cotisation || '0');
+            subtitle = `${tontinesActives.length} tontine(s) active(s)`;
+          }
+          break;
+        }
+        
+        case 'loan_due': {
+          // Use already-loaded prochaineEcheance
+          if (prochaineEcheance) {
+            amount = parseFloat(prochaineEcheance.montant_total || prochaineEcheance.montantTotal || '0');
+            const dateEcheance = prochaineEcheance.date_echeance || prochaineEcheance.dateEcheance;
+            if (dateEcheance) {
+              subtitle = `Échéance du ${new Date(dateEcheance).toLocaleDateString('fr-FR')}`;
+            }
+          } else if (creditSelectionne) {
+            subtitle = 'Aucune échéance en attente';
+          } else if (creditsActifs.length > 0) {
+            subtitle = `${creditsActifs.length} crédit(s) actif(s)`;
+          }
+          break;
+        }
+        
+        case 'disbursement': {
+          // Fetch pending disbursements for this client
+          try {
+            const response = await fetch('/api/credits/pending-disbursements', { credentials: 'include' });
+            if (response.ok) {
+              const data = await response.json();
+              const pending = data?.data?.find((d: any) => 
+                (d.clientId === selectedClient.id || d.client_id === selectedClient.id) ||
+                (d.client?.id === selectedClient.id)
+              );
+              if (pending) {
+                amount = parseFloat(pending.montant || '0');
+                subtitle = `Crédit ${pending.numeroCredit || pending.numero_credit || ''}`;
+              } else {
+                subtitle = 'Aucun décaissement en attente';
+              }
+            }
+          } catch (err) {
+            console.error('Erreur chargement décaissements en attente:', err);
+            subtitle = 'Erreur de chargement';
+          }
+          break;
+        }
+        
+        case 'tontine_payout': {
+          // Find approved distribution for this client from active tontines
+          for (const tontine of tontinesActives) {
+            try {
+              const requests = await tontineApi.getDistributionRequests(tontine.id, { status: 'APPROVED' });
+              const forClient = requests.find((r: any) => 
+                r.beneficiaryClientId === selectedClient.id || 
+                r.beneficiary_client_id === selectedClient.id
+              );
+              if (forClient) {
+                amount = parseFloat(forClient.amountApproved || forClient.amount_approved || forClient.amount || '0');
+                subtitle = tontine.nom;
+                break;
+              }
+            } catch (err) {
+              console.error('Erreur chargement distributions:', err);
+            }
+          }
+          if (amount === null) {
+            subtitle = 'Aucune distribution approuvée';
+          }
+          break;
+        }
+      }
+      
+      setInfoCardData({ title: config.title, amount, subtitle, loading: false });
+    } catch (error) {
+      console.error('Error fetching info card data:', error);
+      setInfoCardData({ title: config.title, amount: null, loading: false });
+    }
+  }, [typeOperation, typeDepot, typeRetrait, selectedClient, comptesClient, tontinesActives, tontineSelectionnee, prochaineEcheance, creditSelectionne, creditsActifs]);
+
+  // Trigger info card data fetch when operation type changes
+  useEffect(() => {
+    fetchInfoCardData();
+  }, [fetchInfoCardData]);
+
 
   // Préparer l'opération avec validation
   const preparerOperation = useCallback(async () => {
@@ -567,16 +731,34 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                         />
                     )}
 
-                    {/* Recent Activity Mini-Summary */}
-                    <div className="grid grid-cols-2 gap-2 w-full mt-auto">
-                        <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
-                            <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Dernière Op.</p>
-                            <p className="font-mono text-white text-xs font-bold">-</p>
+                    {/* Dynamic Info Card - Shows contextual balance/due amount based on selected operation */}
+                    <div className="grid grid-cols-1 gap-2 w-full mt-auto">
+                      {infoCardData ? (
+                        <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
+                          <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+                            {infoCardData.title}
+                          </p>
+                          {infoCardData.loading ? (
+                            <Loader className="w-4 h-4 animate-spin mx-auto text-emerald-400" />
+                          ) : (
+                            <>
+                              <p className="font-mono text-white text-sm font-bold">
+                                {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
+                              </p>
+                              {infoCardData.subtitle && (
+                                <p className="text-[9px] text-slate-600 mt-0.5 truncate">{infoCardData.subtitle}</p>
+                              )}
+                            </>
+                          )}
                         </div>
-                        <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
-                            <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Solde Cash</p>
-                            <p className="font-mono text-white text-xs font-bold">-</p>
+                      ) : (
+                        <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
+                          <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+                            Info Compte
+                          </p>
+                          <p className="font-mono text-slate-600 text-xs">Sélectionnez une opération</p>
                         </div>
+                      )}
                     </div>
                 </Card>
             )}

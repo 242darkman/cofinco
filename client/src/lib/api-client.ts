@@ -671,7 +671,7 @@ export function extractInsufficientFundsData(error: unknown): InsufficientFundsE
 export const creditApi = {
   getAll: async (params?: { clientId?: string; statut?: string; includeEcheances?: boolean }) => {
     const queryParams = new URLSearchParams();
-    if (params?.clientId) queryParams.append('client_id', params.clientId);
+    if (params?.clientId) queryParams.append('clientId', params.clientId);
     if (params?.statut) queryParams.append('statut', params.statut);
     if (params?.includeEcheances) queryParams.append('include_echeances', 'true');
     const query = queryParams.toString();
