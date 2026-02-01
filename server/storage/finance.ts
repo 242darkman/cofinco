@@ -837,7 +837,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         telephone: user?.telephone,
         email: user?.email,
         agence: agence?.nom,
-        photoProfile: user?.photoProfile
+        photoProfile: user?.photoProfile, // Keep original
+        photoUrl: user?.photoProfile, // Alias for frontend compatibility (Epargnes.tsx expects photoUrl)
       } : null
       };
     });
