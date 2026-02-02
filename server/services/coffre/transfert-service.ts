@@ -343,7 +343,11 @@ export class TransfertCoffreService {
     page: number;
     limit: number;
   }) {
-    const conditions = [eq(transfertsCoffreCaisse.agenceId, params.agenceId)];
+    const conditions = [
+      eq(transfertsCoffreCaisse.agenceId, params.agenceId),
+      // Exclude opening fund transfers - they are handled separately via getPendingOpeningRequests
+      eq(transfertsCoffreCaisse.isOpeningFund, false)
+    ];
 
     if (params.statut) {
       conditions.push(eq(transfertsCoffreCaisse.statut, params.statut as any));
@@ -417,6 +421,8 @@ export class TransfertCoffreService {
   }) {
     const conditions = [
       eq(transfertsCoffreCaisse.caisseId, params.caisseId),
+      // Exclude opening fund transfers - they are handled by the opening workflow
+      eq(transfertsCoffreCaisse.isOpeningFund, false)
     ];
 
     if (params.statut) {

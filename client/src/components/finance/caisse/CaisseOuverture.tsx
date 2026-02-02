@@ -68,6 +68,27 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
   const [loading, setLoading] = useState(false);
   const [loadingCaisses, setLoadingCaisses] = useState(true);
 
+  // Update step when pendingSession changes (e.g., from REQUESTING_FUNDS to FUNDS_DISPATCHED)
+  useEffect(() => {
+    if (!pendingSession) return;
+
+    // If we're in waiting step and status changed to FUNDS_DISPATCHED, move to confirm
+    if (step === 'waiting' && pendingSession.statut === 'FUNDS_DISPATCHED') {
+      setStep('confirm');
+      setSession(pendingSession);
+    }
+    // If pendingSession appears while we're on auth step, jump to appropriate step
+    else if (step === 'auth') {
+      if (pendingSession.statut === 'REQUESTING_FUNDS') {
+        setStep('waiting');
+        setSession(pendingSession);
+      } else if (pendingSession.statut === 'FUNDS_DISPATCHED') {
+        setStep('confirm');
+        setSession(pendingSession);
+      }
+    }
+  }, [pendingSession, step]);
+
   const [caisses, setCaisses] = useState<Caisse[]>([]);
   const [selectedCaisseId, setSelectedCaisseId] = useState<string>('');
 

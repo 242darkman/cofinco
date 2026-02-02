@@ -32,6 +32,7 @@ import { SupervisionSession } from './shared/SupervisionConfirmModal';
 import { isAdminRole } from '@shared/types/roles';
 
 import { useSessionTimeout } from '../../../hooks/finance/useSessionTimeout';
+import { usePendingSessionSync } from '../../../hooks/finance/usePendingSessionSync';
 import CaisseAuditLog from './CaisseAuditLog';
 import WeightVerificationPanel from './WeightVerificationPanel';
 import CaisseAccessControl from './CaisseAccessControl';
@@ -143,19 +144,21 @@ export default function CaisseDashboard({
     }
   });
 
-  // Query for pending sessions (REQUESTING_FUNDS or FUNDS_DISPATCHED)
+  // Hybrid sync for pending sessions (WebSocket + Polling)
   const {
-    data: pendingSession,
+    pendingSession,
     isLoading: loadingPendingSession,
-    refetch: refetchPendingSession
-  } = useQuery({
-    queryKey: ['session-caisse', 'pending'],
-    queryFn: async () => {
-      const data = await sessionCaisseApi.getPending();
-      return data as SessionCaisse | null;
-    },
-    // Only check for pending if we don't have an active session
-    enabled: !sessionActive && !supervisedSession
+    refetch: refetchPendingSession,
+    isWebSocketConnected
+  } = usePendingSessionSync({
+    enabled: !sessionActive && !supervisedSession,
+    onStatusChange: (prevStatus, newStatus) => {
+      // Handle status transitions
+      if (prevStatus === 'REQUESTING_FUNDS' && newStatus === 'FUNDS_DISPATCHED') {
+        // Auto-open modal for fund confirmation
+        setShowOuverture(true);
+      }
+    }
   });
 
   // Query for user's assigned caisses with available balance (when no session is active)
@@ -741,7 +744,7 @@ export default function CaisseDashboard({
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 rounded-full border border-amber-500/20 text-[10px] font-black text-amber-500 uppercase tracking-widest">
                        <Timer size={12} className="animate-spin" style={{ animationDuration: '3s' }} />
-                       Statut: Transmission Sécurisée
+                       {isWebSocketConnected ? 'Temps Réel Actif' : 'Vérification Active'}
                     </div>
                   </div>
                   <div className="flex flex-col gap-3 items-center w-full max-w-xs">
