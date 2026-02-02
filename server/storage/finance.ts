@@ -1279,7 +1279,11 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     .where(and(
       inArray(operationsCaisse.sessionId, sessionIds),
       gte(operationsCaisse.createdAt, today),
-      isNull(operationsCaisse.deletedAt)
+      isNull(operationsCaisse.deletedAt),
+      // Exclure les opérations annulées
+      isNull(operationsCaisse.annulledAt),
+      // Inclure seulement les opérations avec statut POSTED (finalisées)
+      eq(operationsCaisse.statut, StatutTransaction.POSTED)
     ))
     .orderBy(desc(operationsCaisse.createdAt));
 
