@@ -22,6 +22,8 @@ import {
   handleTransferValidated,
   handleTransferRejected,
   handleTransferExecuted,
+  handleTransferCancelled,
+  handleTransferReversed,
   handleScheduledTransferExecuted,
   handleScheduledTransferFailed,
   handleHrLeaveRequested,
@@ -46,6 +48,8 @@ import {
   handleHrSanctionCreated,
   handleHrSanctionNotified,
   handleHrSanctionFinalized,
+  handleCreditInstallmentLate,
+  handleSystemJobFailed,
 } from "./event-handlers";
 
 // ============================================================================
