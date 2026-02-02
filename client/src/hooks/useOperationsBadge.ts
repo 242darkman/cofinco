@@ -6,7 +6,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useWebSocket } from './useWebSocket';
 import { caisseAgentApi } from '@/lib/api-client';
 
 export interface OperationsBadgeData {
@@ -22,16 +21,12 @@ export function useOperationsBadge() {
     isLoading: true
   });
   
-  const { socket, isConnected } = useWebSocket();
-
   // Load initial count
   const loadPendingCount = useCallback(async () => {
     try {
       const response = await caisseAgentApi.listOperations({ statut: 'SUBMITTED' });
-      // Backend returns { operations: [...], total } or array directly
-      const count = Array.isArray(response)
-        ? response.length
-        : (response.total || response.operations?.length || response.data?.length || 0);
+      // Backend returns { data: [...], total } structure
+      const count = response.total || response.data?.length || 0;
 
       setBadgeData({
         pendingCount: count,
@@ -49,54 +44,15 @@ export function useOperationsBadge() {
     loadPendingCount();
   }, [loadPendingCount]);
 
-  // WebSocket listener for real-time updates
-  useEffect(() => {
-    if (!socket || !isConnected) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        // Listen for operation events
-        if (data.type === 'OPERATION_TERRAIN_CREATED' || 
-            data.type === 'OPERATION_CREATED' ||
-            data.aggregate === 'operations-terrain') {
-          // Increment count for new submissions
-          if (data.payload?.statut === 'SUBMITTED' || data.action === 'SUBMITTED') {
-            setBadgeData(prev => ({
-              ...prev,
-              pendingCount: prev.pendingCount + 1,
-              lastUpdated: new Date()
-            }));
-          }
-        }
-        
-        // Decrement on approval/rejection
-        if (data.type === 'OPERATION_TERRAIN_APPROVED' || 
-            data.type === 'OPERATION_TERRAIN_REJECTED' ||
-            data.action === 'APPROVED' ||
-            data.action === 'REJECTED') {
-          setBadgeData(prev => ({
-            ...prev,
-            pendingCount: Math.max(0, prev.pendingCount - 1),
-            lastUpdated: new Date()
-          }));
-        }
-      } catch (e) {
-        // Ignore non-JSON messages
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-    return () => socket.removeEventListener('message', handleMessage);
-  }, [socket, isConnected]);
-
   // Listen for custom DOM events (fallback for non-WS updates)
   useEffect(() => {
     const handleOperationUpdate = (event: CustomEvent) => {
       const { type, count } = event.detail || {};
-      
-      if (type === 'OPERATION_TERRAIN_APPROVED' || type === 'OPERATION_TERRAIN_REJECTED') {
+
+      // Decrement count when operation is no longer pending (approved, rejected, or settled)
+      if (type === 'OPERATION_TERRAIN_APPROVED' ||
+          type === 'OPERATION_TERRAIN_REJECTED' ||
+          type === 'OPERATION_TERRAIN_SETTLED') {
         setBadgeData(prev => ({
           ...prev,
           pendingCount: Math.max(0, prev.pendingCount - 1),
