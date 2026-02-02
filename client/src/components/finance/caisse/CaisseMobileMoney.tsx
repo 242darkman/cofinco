@@ -482,29 +482,9 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
   };
 
   return (
-    <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30">
-      {/* Sandbox Banner */}
-      {sandboxInfo?.isSandbox && (
-        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
-          <AlertCircle size={14} className="text-yellow-400" />
-          <div className="flex-1">
-            <p className="text-xs text-yellow-400 font-bold">Mode Sandbox MTN MoMo</p>
-            <p className="text-[10px] text-yellow-400/70">
-              Utilisez les numéros de test : {sandboxInfo.testNumbers?.SUCCESS_IMMEDIATE} (succès immédiat) ou {sandboxInfo.testNumbers?.SUCCESS_DELAYED} (succès après 30s)
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Success Modal */}
-      <UniversalPaymentSuccessModal
-        isOpen={showSuccessModal}
-        onClose={handleCloseSuccess}
-        term="Terminer"
-        data={receiptData}
-      />
-
-      {/* Payment Status Modal */}
+    <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30 overflow-hidden">
+      {/* Modals */}
+      <UniversalPaymentSuccessModal isOpen={showSuccessModal} onClose={handleCloseSuccess} term="Terminer" data={receiptData} />
       <PaymentStatusModal
         isOpen={showPaymentStatusModal}
         onClose={handleCancelPayment}
@@ -516,295 +496,8 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
         providerTxnId={paymentIntent?.providerTxnId}
         errorMessage={paymentIntent?.errorMessage}
         onRetry={handleRetryPayment}
-        onViewDetails={() => {
-          setShowPaymentStatusModal(false);
-          // Could open detail modal here
-        }}
+        onViewDetails={() => setShowPaymentStatusModal(false)}
       />
-
-      <div className="w-full h-full p-2">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
-          
-          {/* LEFT COL: Search & Client Summary */}
-          <div className="lg:col-span-4 flex flex-col gap-3 h-full">
-             {/* Search Section */}
-             <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 h-4 w-4" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
-                    placeholder="Rechercher client..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-4 text-sm text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                    autoFocus
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                     <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded border border-slate-700">ENTER</span>
-                  </div>
-                </div>
-             </Card>
-
-             {/* Client Result / Empty State */}
-             <div className="flex-1 min-h-0">
-               {selectedClient ? (
-                 <Card className="bg-slate-800/50 border border-slate-700/50 h-full p-6 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-300">
-                    <div className="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-2xl mb-4 shadow-xl">
-                      {selectedClient.nom.charAt(0)}{selectedClient.prenom.charAt(0)}
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-1">
-                      {selectedClient.nom} {selectedClient.prenom}
-                    </h3>
-                    <p className="text-slate-400 font-mono mb-6">{selectedClient.telephone || selectedClient.phone}</p>
-                    
-                    <div className="w-full mt-auto space-y-2">
-                        {infoCardData ? (
-                            <div className={`p-3 rounded-lg border text-center transition-all duration-300 ${
-                                infoCardData.amount !== null && infoCardData.amount > 0 
-                                ? 'bg-purple-900/20 border-purple-500/30' 
-                                : 'bg-slate-900/50 border-slate-800'
-                            }`}>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 line-clamp-1">
-                                    {infoCardData.title}
-                                </p>
-                                {infoLoading ? (
-                                    <Loader2 className="w-3 h-3 animate-spin mx-auto text-emerald-400" />
-                                ) : (
-                                    <>
-                                        <p className={`font-mono text-base font-bold ${
-                                            infoCardData.amount !== null ? 'text-white' : 'text-slate-600'
-                                        }`}>
-                                            {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
-                                        </p>
-                                        {infoCardData.subtitle && (
-                                            <p className="text-[9px] text-slate-500 mt-0.5 line-clamp-1">{infoCardData.subtitle}</p>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        ) : (
-                             <div className="grid grid-cols-2 gap-2">
-                                <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Dépôt</p>
-                                   <p className="font-mono text-emerald-400 font-bold">-</p>
-                                </div>
-                                 <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Retrait</p>
-                                   <p className="font-mono text-rose-400 font-bold">-</p>
-                                </div>
-                             </div>
-                        )}
-                    </div>
-                 </Card>
-               ) : (
-                 <div className="h-full rounded-2xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-4 p-8">
-                    <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center">
-                        <Search size={24} className="opacity-50" />
-                    </div>
-                    <p className="text-sm font-medium">Recherchez un client pour commencer</p>
-                 </div>
-               )}
-             </div>
-          </div>
-
-          {/* RIGHT COL: Operation Cockpit */}
-          <div className="lg:col-span-8 h-full flex flex-col">
-             <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative">
-                {!selectedClient && (
-                    <div className="absolute inset-0 z-10 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center">
-                        <p className="text-slate-500 font-medium bg-slate-900 px-4 py-2 rounded-full border border-slate-800 shadow-xl">
-                            Sélectionnez un client à gauche
-                        </p>
-                    </div>
-                )}
-                
-                {/* 1. Header & Provider Selector */}
-                <div className="p-6 border-b border-slate-800 bg-slate-950/30">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                Transaction Mobile
-                            </h2>
-                            <p className="text-xs text-slate-500">Sélectionnez le réseau et le type</p>
-                        </div>
-                        {/* Provider Toggle */}
-                        <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
-                            {providers.map(p => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => setProvider(p.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold transition-all ${
-                                        provider === p.id 
-                                        ? `bg-white text-slate-900 shadow-sm` 
-                                        : 'text-slate-500 hover:text-slate-300'
-                                    }`}
-                                >
-                                    <img src={p.logo} className="w-4 h-4 object-contain" alt="" />
-                                    {p.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                     {/* Type Selector (Segmented) */}
-                     <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                         {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
-                             <button
-                                 key={type}
-                                 onClick={() => {
-                                      setTypeOperation(type);
-                                      setTypeDepot(null);
-                                      setTypeRetrait(null);
-                                 }}
-                                 className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold transition-all ${
-                                     typeOperation === type
-                                     ? type === 'Dépôt' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'bg-rose-500 text-white shadow-lg shadow-rose-900/20'
-                                     : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                                 }`}
-                             >
-                                 {type === 'Dépôt' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                                 {type}
-                             </button>
-                         ))}
-                     </div>
-                </div>
-
-                {/* 2. Main Form Area */}
-                <div className="flex-1 p-6 overflow-y-auto space-y-6">
-                    {/* SubType Pills */}
-                    {typeOperation && (
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-wider text-slate-500 font-bold ml-1">Destination / Source</label>
-                            <div className="flex flex-wrap gap-2">
-                                {(typeOperation === 'Dépôt'
-                                    ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
-                                    : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
-                                ).map((subType: any) => (
-                                    <button
-                                        key={subType}
-                                        onClick={() => {
-                                            if (typeOperation === 'Dépôt') {
-                                                setTypeDepot(subType);
-                                            } else {
-                                                setTypeRetrait(subType);
-                                            }
-                                            // Reset amount when switching types to ensure clean state
-                                            // or to allow auto-fill to take over if applicable
-                                            setMontant('');
-                                        }}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                                            (typeOperation === 'Dépôt' ? typeDepot : typeRetrait) === subType
-                                            ? 'bg-slate-800 text-white border-slate-600 shadow-sm'
-                                            : 'bg-transparent border-slate-800 text-slate-500 hover:border-slate-700'
-                                        }`}
-                                    >
-                                        {subType.replace('Retrait ', '')}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Inputs Row */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-slate-500 font-medium">Numéro Mobile</label>
-                            <div className="relative">
-                                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                <input
-                                    type="tel"
-                                    value={phoneNumber}
-                                    onChange={(e) => setPhoneNumber(e.target.value)}
-                                    className={`w-full bg-slate-950 border rounded-xl py-3 pl-9 pr-3 text-sm text-white focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none font-mono ${
-                                      phoneValidation?.warning ? 'border-yellow-500/50' : 'border-slate-800'
-                                    }`}
-                                    placeholder="06..."
-                                />
-                            </div>
-                            {phoneValidation?.warning && (
-                              <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[10px] text-yellow-400 space-y-1">
-                                <p className="font-bold flex items-center gap-1">
-                                  <AlertCircle size={10} />
-                                  Mode Sandbox
-                                </p>
-                                <p className="text-yellow-400/80">{phoneValidation.warning}</p>
-                                {phoneValidation.suggestion && (
-                                  <p className="text-yellow-300 font-mono">{phoneValidation.suggestion}</p>
-                                )}
-                                {phoneValidation.behavior && (
-                                  <p className="text-emerald-400 font-mono text-[9px]">
-                                    ✓ Test: {phoneValidation.behavior.expectedStatus}
-                                    {phoneValidation.behavior.expectedDelay && ` après ${phoneValidation.behavior.expectedDelay / 1000}s`}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                        </div>
-                         <div className="space-y-1.5">
-                            <label className="text-xs text-slate-500 font-medium">Montant (FCFA)</label>
-                            <div className="relative">
-                                <input
-                                    type="number"
-                                    value={montant}
-                                    onChange={(e) => setMontant(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-4 pr-12 text-sm text-white font-bold focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none font-mono"
-                                    placeholder="0"
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold">FCFA</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Info Box */}
-                    {typeOperation && (
-                        <div className={`p-4 rounded-xl border flex gap-3 ${
-                             typeOperation === 'Dépôt' 
-                             ? 'bg-emerald-500/5 border-emerald-500/10' 
-                             : 'bg-rose-500/5 border-rose-500/10'
-                        }`}>
-                           <AlertCircle size={16} className={typeOperation === 'Dépôt' ? 'text-emerald-500' : 'text-rose-500'} />
-                           <div className="space-y-1">
-                               <p className={`text-xs font-bold ${typeOperation === 'Dépôt' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                   Confirmation Requise
-                               </p>
-                               <p className="text-[10px] text-slate-400 leading-relaxed">
-                                  {typeOperation === 'Dépôt'
-                                    ? `Une demande de paiement de ${montant || '0'} FCFA sera envoyée au ${phoneNumber || '...'}. Le client devra valider avec son code PIN ${provider}.`
-                                    : `Vous allez initier un transfert de ${montant || '0'} FCFA vers le ${phoneNumber || '...'}. Assurez-vous d'avoir vérifié l'identité du bénéficiaire.`}
-                               </p>
-                           </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer Actions */}
-                <div className="p-4 border-t border-slate-800 bg-slate-950/50 mt-auto">
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={loading || !montant || parseFloat(montant) <= 0 || !phoneNumber || !(typeOperation === 'Dépôt' ? typeDepot : typeRetrait)}
-                      className={`w-full h-12 rounded-xl font-bold shadow-lg transition-all ${
-                        typeOperation === 'Dépôt'
-                          ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
-                          : 'bg-rose-600 hover:bg-rose-500 shadow-rose-500/20'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {loading ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <div className="flex items-center justify-center gap-2">
-                           <span className="uppercase tracking-wide">{typeOperation === 'Dépôt' ? 'Lancer la Collecte' : 'Confirmer l\'Envoi'}</span>
-                           <ArrowRight size={16} />
-                        </div>
-                      )}
-                    </Button>
-                </div>
-             </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* Account Holder Presence Modal (for withdrawals) */}
       {showPresenceModal && selectedClient && (
         <AccountHolderPresenceModal
           isOpen={showPresenceModal}
@@ -817,6 +510,238 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
           isLoading={loading}
         />
       )}
+
+      {/* Sandbox Banner - Compact */}
+      {sandboxInfo?.isSandbox && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-3 py-1.5 flex items-center gap-2 shrink-0">
+          <AlertCircle size={12} className="text-yellow-400 shrink-0" />
+          <p className="text-[10px] text-yellow-400">
+            <span className="font-bold">Sandbox:</span> Test avec {sandboxInfo.testNumbers?.SUCCESS_IMMEDIATE} (immédiat) ou {sandboxInfo.testNumbers?.SUCCESS_DELAYED} (30s)
+          </p>
+        </div>
+      )}
+
+      {/* Main Content - Single Row Layout */}
+      <div className="flex-1 min-h-0 p-3">
+        <div className="h-full grid grid-cols-12 gap-3">
+
+          {/* LEFT: Client Search & Info (Compact) */}
+          <div className="col-span-3 flex flex-col gap-2 h-full">
+            {/* Search */}
+            <div className="relative shrink-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 h-3.5 w-3.5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
+                placeholder="Client..."
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg py-2 pl-8 pr-14 text-sm text-white focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                autoFocus
+              />
+              <button
+                onClick={rechercherClient}
+                disabled={loading || !searchTerm.trim()}
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-2 py-1 rounded font-bold transition-colors"
+              >
+                {loading ? <Loader2 size={10} className="animate-spin" /> : 'OK'}
+              </button>
+            </div>
+
+            {/* Client Card */}
+            {selectedClient ? (
+              <Card className="flex-1 bg-slate-800/50 border-slate-700/50 p-3 flex flex-col">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                    {selectedClient.nom.charAt(0)}{selectedClient.prenom.charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-bold text-white truncate">{selectedClient.nom} {selectedClient.prenom}</h3>
+                    <p className="text-xs text-slate-400 font-mono">{selectedClient.telephone || selectedClient.phone}</p>
+                  </div>
+                </div>
+
+                {/* Info dynamique */}
+                {infoCardData && (
+                  <div className={`p-2.5 rounded-lg border text-center mt-auto ${
+                    infoCardData.amount !== null && infoCardData.amount > 0
+                    ? 'bg-purple-900/20 border-purple-500/30'
+                    : 'bg-slate-900/50 border-slate-800'
+                  }`}>
+                    <p className="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5 truncate">{infoCardData.title}</p>
+                    {infoLoading ? (
+                      <Loader2 className="w-3 h-3 animate-spin mx-auto text-cyan-400" />
+                    ) : (
+                      <p className={`font-mono text-sm font-bold ${infoCardData.amount !== null ? 'text-white' : 'text-slate-600'}`}>
+                        {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
+                      </p>
+                    )}
+                    {infoCardData.subtitle && <p className="text-[8px] text-slate-500 truncate">{infoCardData.subtitle}</p>}
+                  </div>
+                )}
+              </Card>
+            ) : (
+              <div className="flex-1 rounded-xl border-2 border-dashed border-slate-800 flex items-center justify-center">
+                <p className="text-xs text-slate-600">Recherchez un client</p>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT: Transaction Form (Full Width) */}
+          <div className="col-span-9 h-full">
+            <Card className="h-full bg-slate-900/80 border-slate-800 p-0 flex flex-col overflow-hidden relative">
+              {!selectedClient && (
+                <div className="absolute inset-0 z-10 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center">
+                  <p className="text-slate-500 text-xs bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">← Sélectionnez un client</p>
+                </div>
+              )}
+
+              {/* Header Row: Provider + Type */}
+              <div className="p-3 border-b border-slate-800 bg-slate-950/30 shrink-0">
+                <div className="flex items-center gap-4">
+                  {/* Provider Toggle */}
+                  <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                    {providers.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => setProvider(p.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                          provider === p.id ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        <img src={p.logo} className="w-4 h-4 object-contain" alt="" />
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Type Selector */}
+                  <div className="flex-1 grid grid-cols-2 gap-0.5 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                    {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
+                      <button
+                        key={type}
+                        onClick={() => { setTypeOperation(type); setTypeDepot(null); setTypeRetrait(null); setMontant(''); }}
+                        className={`flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all ${
+                          typeOperation === type
+                          ? type === 'Dépôt' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                          : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {type === 'Dépôt' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Content */}
+              <div className="flex-1 p-3 flex flex-col gap-3 overflow-y-auto">
+                {/* SubType Pills */}
+                {typeOperation && (
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1.5 block">Destination</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(typeOperation === 'Dépôt'
+                        ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
+                        : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
+                      ).map((subType: any) => (
+                        <button
+                          key={subType}
+                          onClick={() => {
+                            if (typeOperation === 'Dépôt') setTypeDepot(subType);
+                            else setTypeRetrait(subType);
+                            setMontant('');
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all ${
+                            (typeOperation === 'Dépôt' ? typeDepot : typeRetrait) === subType
+                            ? 'bg-slate-700 text-white border-slate-600'
+                            : 'bg-transparent border-slate-800 text-slate-500 hover:border-slate-700'
+                          }`}
+                        >
+                          {subType.replace('Retrait ', '')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Inputs */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-medium mb-1 block">Numéro Mobile</label>
+                    <div className="relative">
+                      <Phone size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className={`w-full bg-slate-950 border rounded-lg py-2 pl-8 pr-3 text-sm text-white focus:ring-1 focus:ring-cyan-500/50 outline-none font-mono ${
+                          phoneValidation?.warning ? 'border-yellow-500/50' : 'border-slate-800'
+                        }`}
+                        placeholder="+242..."
+                      />
+                    </div>
+                    {phoneValidation?.warning && (
+                      <div className="mt-1.5 p-1.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] text-yellow-400">
+                        <span className="font-bold">Sandbox:</span> {phoneValidation.warning}
+                        {phoneValidation.suggestion && <span className="block font-mono text-yellow-300">{phoneValidation.suggestion}</span>}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-medium mb-1 block">Montant</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={montant}
+                        onChange={(e) => setMontant(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 pl-3 pr-14 text-sm text-white font-bold focus:ring-1 focus:ring-cyan-500/50 outline-none font-mono"
+                        placeholder="0"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-500 font-bold">FCFA</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Confirmation Info - Compact */}
+                {typeOperation && montant && parseFloat(montant) > 0 && (
+                  <div className={`p-2.5 rounded-lg border flex items-start gap-2 ${
+                    typeOperation === 'Dépôt' ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'
+                  }`}>
+                    <AlertCircle size={14} className={`shrink-0 mt-0.5 ${typeOperation === 'Dépôt' ? 'text-emerald-500' : 'text-rose-500'}`} />
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {typeOperation === 'Dépôt'
+                        ? `Collecte de ${formatMoney(parseFloat(montant))} sur ${phoneNumber || '...'}. Validation PIN ${provider} requise.`
+                        : `Envoi de ${formatMoney(parseFloat(montant))} vers ${phoneNumber || '...'}. Vérifiez l'identité du bénéficiaire.`}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Action */}
+              <div className="p-3 border-t border-slate-800 bg-slate-950/50 shrink-0">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={loading || !montant || parseFloat(montant) <= 0 || !phoneNumber || !(typeOperation === 'Dépôt' ? typeDepot : typeRetrait)}
+                  className={`w-full h-11 rounded-lg font-bold text-sm transition-all ${
+                    typeOperation === 'Dépôt' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {loading ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      {typeOperation === 'Dépôt' ? 'LANCER LA COLLECTE' : "CONFIRMER L'ENVOI"}
+                      <ArrowRight size={16} />
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
