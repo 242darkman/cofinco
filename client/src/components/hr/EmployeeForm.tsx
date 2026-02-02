@@ -383,6 +383,11 @@ export default function EmployeeForm({
       setSelectedJobPositionId(null);
     } else {
       // En mode édition, charger les valeurs existantes depuis initialData
+      // IMPORTANT: Réinitialiser les états de création pour éviter la contamination de données
+      setSelectedUserId(null);
+      setSelectedUser(null);
+      setUnlinkedUsers([]); // Vider la liste des users non liés
+
       setAgenceId(initialData.agenceId || '');
       setModeCalculPaie(initialData.modeCalculPaie || 'MONTHLY');
       // Charger le département et le poste existants
@@ -531,7 +536,14 @@ export default function EmployeeForm({
   }, [isOpen, editingEmploye]);
 
   // Quand un user est sélectionné, mettre à jour les champs d'identité ET l'agence
+  // IMPORTANT: Ce useEffect ne doit s'exécuter qu'en mode CRÉATION pour éviter d'écraser
+  // les données de l'employé en mode édition
   useEffect(() => {
+    // Ignorer en mode édition - les données de l'employé doivent rester intactes
+    if (editingEmploye) {
+      return;
+    }
+
     if (selectedUserId) {
       const user = unlinkedUsers.find(u => u.id === selectedUserId);
       if (user) {
@@ -561,9 +573,7 @@ export default function EmployeeForm({
     } else {
       setSelectedUser(null);
       // Reset agence quand aucun user n'est sélectionné
-      if (!editingEmploye) {
-        setAgenceId('');
-      }
+      setAgenceId('');
     }
   }, [selectedUserId, unlinkedUsers, editingEmploye]);
 
