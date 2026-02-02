@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, AlertTriangle, Settings } from 'lucide-react';
+import { Save, Settings } from 'lucide-react';
 import { Card, Button, FormField, LoadingSpinner } from '../ui';
 import { systemSettingsApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
@@ -88,19 +88,6 @@ export default function AdminCreditSettings() {
             >
                 Enregistrer les modifications
             </Button>
-         </div>
-      </Card>
-      
-      <Card className="bg-amber-500/5 border-amber-500/20">
-         <div className="flex gap-3">
-            <AlertTriangle className="text-amber-500 shrink-0" size={20} />
-            <div>
-               <h4 className="font-bold text-amber-500">Zone Dangereuse</h4>
-               <p className="text-sm text-slate-400 mt-1">
-                 La modification de ces paramètres affectera tous les nouveaux crédits. 
-                 Les crédits existants ne seront pas modifiés.
-               </p>
-            </div>
          </div>
       </Card>
     </div>

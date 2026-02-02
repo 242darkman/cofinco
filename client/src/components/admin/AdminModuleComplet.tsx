@@ -25,7 +25,6 @@ import AdminGestionProfils from './AdminGestionProfils';
 import AdminDashboard from './AdminDashboard';
 import AdminActivityLogs from './AdminActivityLogs';
 import AdminSessionsManager from './AdminSessionsManager';
-import AdminSystemSettings from './AdminSystemSettings';
 import AdminMaintenanceMode from './AdminMaintenanceMode';
 import AdminTontinesGestion from './AdminTontinesGestion';
 import AdminGestionAgences from './AdminGestionAgences';
@@ -357,7 +356,6 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'credits' && <AdminCreditsGestion />}
                   {activeTab === 'codes' && <AdminCaisseAccessCodes onClose={() => setActiveTab('dashboard')} />}
                   {activeTab === 'maintenance' && <AdminMaintenanceMode />}
-                  {activeTab === 'settings' && <AdminSystemSettings />}
                   {activeTab === 'notifications' && (
                     <NotificationsSection />
                   )}

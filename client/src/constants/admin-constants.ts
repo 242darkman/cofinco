@@ -39,7 +39,6 @@ export const ADMIN_TABS = [
   { id: 'logs', label: 'Logs', icon: 'Activity', permission: 'admin.logs' },
   { id: 'sessions', label: 'Sessions', icon: 'Monitor', permission: 'admin.settings' },
   { id: 'roles', label: 'Gestion des Accès', icon: 'Shield', permission: 'admin.roles' },
-  { id: 'settings', label: 'Paramètres', icon: 'Settings', permission: 'admin.settings' },
   { id: 'maintenance', label: 'Maintenance', icon: 'Power', permission: 'admin.settings' },
   { id: 'caisses', label: 'Caisses', icon: 'Wallet', permission: 'caisse.manage' },
   { id: 'credits', label: 'Crédits', icon: 'CreditCard', permission: 'credits.view' },
