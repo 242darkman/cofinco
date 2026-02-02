@@ -14,6 +14,7 @@
 
 import { db } from "../../db";
 import { sql, eq, and, or, like, sum, max, count, desc } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
   planComptable,
   lignesEcritures,
@@ -25,6 +26,9 @@ import { coffresForts } from "@shared/schema/coffres-forts";
 import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("Treasury:EncaisseService");
+
+// Transaction type alias for cleaner signatures
+type Tx = PgTransaction<any, any, any> | typeof db;
 
 // ============================================================================
 // TYPES
@@ -93,8 +97,11 @@ class EncaisseService {
   /**
    * Calcule l'encaisse disponible depuis le Grand Livre (GL)
    * C'est la SINGLE SOURCE OF TRUTH pour l'encaisse.
+   *
+   * @param agenceId ID de l'agence (ou 'all')
+   * @param tx Transaction optionnelle pour cohérence snapshot
    */
-  async getEncaisseFromGL(agenceId?: string): Promise<EncaisseCanonique> {
+  async getEncaisseFromGL(agenceId?: string, tx: Tx = db): Promise<EncaisseCanonique> {
     const startTime = Date.now();
     const isAllAgences = !agenceId || agenceId === "all";
 
@@ -102,12 +109,12 @@ class EncaisseService {
       // 1. Récupérer les soldes GL par préfixe de compte
       const [caisseSolde, coffreSolde, mmoSolde, banqueSolde, transitSolde, lastEcriture] =
         await Promise.all([
-          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.CAISSE_GUICHET, agenceId),
-          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.COFFRE_CENTRAL, agenceId),
-          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.MOBILE_MONEY, agenceId),
-          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.BANQUE, agenceId),
-          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.TRANSIT, agenceId),
-          this.getLastEcriture(agenceId),
+          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.CAISSE_GUICHET, agenceId, tx),
+          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.COFFRE_CENTRAL, agenceId, tx),
+          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.MOBILE_MONEY, agenceId, tx),
+          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.BANQUE, agenceId, tx),
+          this.getGLBalanceByPrefix(GL_ACCOUNT_PREFIXES.TRANSIT, agenceId, tx),
+          this.getLastEcriture(agenceId, tx),
         ]);
 
       // 2. Calculer le total disponible (exclut transit)
@@ -148,56 +155,69 @@ class EncaisseService {
 
   /**
    * Calcule l'encaisse avec réconciliation (comparaison GL vs Opérationnel)
+   *
+   * IMPORTANT: Utilise une transaction avec isolation REPEATABLE READ pour garantir
+   * que les lectures GL et Opérationnelles voient le même snapshot de la base.
+   * Cela évite les faux positifs dus aux Race Conditions.
    */
   async getEncaisseWithReconciliation(
     agenceId?: string
   ): Promise<EncaisseCanonique> {
-    const [encaisseGL, operationalData] = await Promise.all([
-      this.getEncaisseFromGL(agenceId),
-      this.getOperationalBalances(agenceId),
-    ]);
+    // On force une transaction REPEATABLE READ pour la cohérence snapshot
+    return await db.transaction(async (tx) => {
+      // Si supported par le driver, on peut set l'isolation level
+      // Note: drizzle/node-postgres ne supporte pas toujours explicitement l'API d'isolation
+      // On le fait manuellement en SQL si besoin, mais db.transaction utilise souvent READ COMMITTED.
+      // Pour être sûr, on exécute SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+      await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`);
 
-    // Calcul de l'écart
-    const ecart = operationalData.total - encaisseGL.totalDisponible;
-    const absEcart = Math.abs(ecart);
+      const [encaisseGL, operationalData] = await Promise.all([
+        this.getEncaisseFromGL(agenceId, tx),
+        this.getOperationalBalances(agenceId, tx),
+      ]);
 
-    // Déterminer le statut
-    let status: ReconciliationStatus["status"] = "OK";
-    if (absEcart >= RECONCILIATION_THRESHOLDS.MAJOR) {
-      status = "CRITICAL";
-    } else if (absEcart >= RECONCILIATION_THRESHOLDS.MINOR) {
-      status = "MAJOR";
-    } else if (absEcart >= RECONCILIATION_THRESHOLDS.OK) {
-      status = "MINOR";
-    }
+      // Calcul de l'écart
+      const ecart = operationalData.total - encaisseGL.totalDisponible;
+      const absEcart = Math.abs(ecart);
 
-    encaisseGL.reconciliation = {
-      operationalTotal: operationalData.total,
-      glTotal: encaisseGL.totalDisponible,
-      ecart,
-      status,
-      details: {
-        coffresOperational: operationalData.coffres,
-        caissesOperational: operationalData.caisses,
-        coffresGL: encaisseGL.breakdown.coffreCentral,
-        caissesGL: encaisseGL.breakdown.caisseGuichet,
-      },
-    };
+      // Déterminer le statut
+      let status: ReconciliationStatus["status"] = "OK";
+      if (absEcart >= RECONCILIATION_THRESHOLDS.MAJOR) {
+        status = "CRITICAL";
+      } else if (absEcart >= RECONCILIATION_THRESHOLDS.MINOR) {
+        status = "MAJOR";
+      } else if (absEcart >= RECONCILIATION_THRESHOLDS.OK) {
+        status = "MINOR";
+      }
 
-    if (status !== "OK") {
-      logger.warn(
-        {
-          agenceId,
-          ecart,
-          status,
-          glTotal: encaisseGL.totalDisponible,
-          operationalTotal: operationalData.total,
+      encaisseGL.reconciliation = {
+        operationalTotal: operationalData.total,
+        glTotal: encaisseGL.totalDisponible,
+        ecart,
+        status,
+        details: {
+          coffresOperational: operationalData.coffres,
+          caissesOperational: operationalData.caisses,
+          coffresGL: encaisseGL.breakdown.coffreCentral,
+          caissesGL: encaisseGL.breakdown.caisseGuichet,
         },
-        "Écart de réconciliation détecté"
-      );
-    }
+      };
 
-    return encaisseGL;
+      if (status !== "OK") {
+        logger.warn(
+          {
+            agenceId,
+            ecart,
+            status,
+            glTotal: encaisseGL.totalDisponible,
+            operationalTotal: operationalData.total,
+          },
+          "Écart de réconciliation détecté"
+        );
+      }
+
+      return encaisseGL;
+    });
   }
 
   /**
@@ -206,7 +226,8 @@ class EncaisseService {
    */
   private async getGLBalanceByPrefix(
     prefixes: string[],
-    agenceId?: string
+    agenceId?: string,
+    tx: Tx = db
   ): Promise<number> {
     const isAllAgences = !agenceId || agenceId === "all";
 
@@ -214,7 +235,7 @@ class EncaisseService {
     const prefixConditions = prefixes.map((p) => like(planComptable.numeroCompte, `${p}%`));
 
     // Requête pour sommer les débits et crédits des lignes d'écritures POSTED
-    const result = await db
+    const result = await tx
       .select({
         totalDebit: sql<string>`COALESCE(SUM(CAST(${lignesEcritures.debit} AS DECIMAL)), 0)`,
         totalCredit: sql<string>`COALESCE(SUM(CAST(${lignesEcritures.credit} AS DECIMAL)), 0)`,
@@ -244,11 +265,12 @@ class EncaisseService {
    * Récupère la dernière écriture postée (pour metadata)
    */
   private async getLastEcriture(
-    agenceId?: string
+    agenceId?: string,
+    tx: Tx = db
   ): Promise<{ id: string; createdAt: string } | null> {
     const isAllAgences = !agenceId || agenceId === "all";
 
-    const result = await db
+    const result = await tx
       .select({
         id: ecritures.id,
         createdAt: ecritures.createdAt,
@@ -276,12 +298,13 @@ class EncaisseService {
    * Ces données NE SONT PAS la source de vérité, uniquement pour comparaison.
    */
   private async getOperationalBalances(
-    agenceId?: string
+    agenceId?: string,
+    tx: Tx = db
   ): Promise<{ coffres: number; caisses: number; total: number }> {
     const isAllAgences = !agenceId || agenceId === "all";
 
     // 1. Total Coffres
-    const coffresResult = await db
+    const coffresResult = await tx
       .select({
         total: sum(coffresForts.solde),
       })
@@ -289,7 +312,7 @@ class EncaisseService {
       .where(isAllAgences ? undefined : eq(coffresForts.ownerId, agenceId));
 
     // 2. Total Caisses via sessions
-    const caissesResult = await db.execute(sql`
+    const caissesResult = await tx.execute(sql`
       SELECT COALESCE(SUM(solde_reel), 0) as total FROM (
         SELECT DISTINCT ON (c.id)
           COALESCE(

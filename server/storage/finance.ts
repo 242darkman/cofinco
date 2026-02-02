@@ -2893,7 +2893,7 @@ export async function processLoanCashPayout(data: {
         "CAISSE",
         {
             montant: credit.montant,
-            sens: "DEBIT", // Money leaving the coffre
+            sens: "DEBIT", // Money leaving the caisse
             clientId: credit.clientId,
             creditId: data.creditId,
             sessionCaisseId: data.sessionCaisseId,
@@ -2903,27 +2903,20 @@ export async function processLoanCashPayout(data: {
             referenceExterne: data.paymentReference || `LOAN-${credit.numeroCredit}`,
             metadata: {
                 description: `Décaissement prêt ${credit.numeroCredit} - ${clientWithUser?.user?.nom || ''} ${clientWithUser?.user?.prenom || ''}`,
-                coffreId,
+                coffreId, // Kept for reference but not operationally debited
                 coffreCode: targetCoffre.code,
                 channel: 'CASH'
             }
         },
         async (tx, mouvement) => {
-            // Guard: acquire lock + verify balance + solde minimum + plafond journalier
-            const { soldeBefore } = await assertCoffreCanDebit(
-                tx, coffreId, montant,
-                { userId, operationType: "LOAN_DISBURSEMENT" }
-            );
+            // Guard: Check if session has enough funds
+            const sessionSolde = parseFloat(session.montantFermetureTheorique || "0");
+            if (sessionSolde < montant) {
+                throw new Error(`Fonds insuffisants en caisse. Solde: ${sessionSolde}, Requis: ${montant}`);
+            }
 
-            // Debit the Coffre atomically (SQL-native)
-            const { solde: newSoldeCoffre } = await updateCoffreBalance(tx, coffreId, -montant);
-
-            // Update session theoretical balance
-            const sessionSoldeTheorique = parseFloat(session.montantFermetureTheorique || "0");
-            const newSessionSolde = sessionSoldeTheorique - montant;
-            await tx.update(sessionsCaisse)
-                .set({ montantFermetureTheorique: newSessionSolde.toString(), updatedAt: new Date() })
-                .where(eq(sessionsCaisse.id, data.sessionCaisseId));
+            // Debit the Session (and physical Caisse) atomically
+            const newSessionSolde = await updateSessionSolde(tx, data.sessionCaisseId, -montant);
 
             // Create caisse operation record
             await tx.insert(operationsCaisse).values({
@@ -2954,29 +2947,12 @@ export async function processLoanCashPayout(data: {
             return {
                 result: updatedCredit,
                 additionalEventData: {
-                    nouveauSoldeCoffre: newSoldeCoffre
+                    nouveauSoldeSession: newSessionSolde
                 }
             };
         },
         userId
     ).then(async ({ result, mouvement }) => {
-        // Broadcast coffre balance update for real-time UI
-        try {
-            const previousBalance = parseFloat(targetCoffre.solde || "0");
-            balanceService.broadcastBalanceUpdate({
-                entityType: 'coffre',
-                entityId: coffreId,
-                agenceId: credit.agenceId!,
-                newBalance: previousBalance - montant,
-                previousBalance,
-                mouvementRef: mouvement.reference || mouvement.id,
-                sourceModule: 'CAISSE',
-                typePaiement: 'LOAN_DISBURSEMENT',
-            });
-        } catch (e) {
-            logger.error({ err: e }, 'Error broadcasting caisse coffre disbursement');
-        }
-
         // Generate repayment schedule (echeancier)
         let echeances: any[] = [];
         try {
