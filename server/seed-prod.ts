@@ -1142,6 +1142,32 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Remise agent terrain vers caisse',
     priority: 10,
   },
+
+  // --- Opérations directes sur coffre (abondement/prélèvement) ---
+  {
+    code: 'ENTREE_COFFRE',
+    name: 'Entrée de fonds au coffre',
+    description: 'Abondement coffre depuis source externe',
+    sourceType: 'MOUVEMENT',
+    eventType: 'ENTREE_COFFRE',
+    journalCode: 'OD',
+    debitAccount: '531',   // Coffre-fort (reçoit)
+    creditAccount: '401',  // Compte d\'attente (source temporaire)
+    descriptionTemplate: 'Abondement coffre-fort',
+    priority: 100,
+  },
+  {
+    code: 'SORTIE_COFFRE',
+    name: 'Sortie de fonds du coffre',
+    description: 'Prélèvement coffre vers destination externe',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SORTIE_COFFRE',
+    journalCode: 'OD',
+    debitAccount: '401',   // Compte d\'attente (destination temporaire)
+    creditAccount: '531',  // Coffre-fort (envoie)
+    descriptionTemplate: 'Prélèvement coffre-fort',
+    priority: 100,
+  },
 ];
 
 // ============================================================================

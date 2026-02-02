@@ -5,8 +5,12 @@ import {
   comptesLiaison,
   agences,
   configTransfertInterCoffres,
+  mouvementsFinanciers,
 } from "@shared/schema";
 import { StatutCoffre } from "@shared/enum/status-constants";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
+import { v4 as uuidv4 } from "uuid";
+import { logger } from "../../lib/logger";
 
 interface ServiceResult<T = any> {
   success: boolean;
@@ -296,6 +300,7 @@ export class CoffresFortsService {
 
   /**
    * Approvisionne un coffre (ajout de fonds externe)
+   * Crée un mouvement financier et poste automatiquement au Grand Livre
    */
   async approvisionnerCoffre(
     coffreId: string,
@@ -333,17 +338,99 @@ export class CoffresFortsService {
       }
     }
 
-    // Mettre à jour le solde
-    const [updated] = await db
-      .update(coffresForts)
-      .set({
-        solde: sql`${coffresForts.solde} + ${montant}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(coffresForts.id, coffreId))
-      .returning();
+    // Récupérer l'agence du coffre
+    let agenceId: string;
+    if (coffre.ownerType === 'AGENCE') {
+      agenceId = coffre.ownerId;
+    } else {
+      // Coffre de type SIEGE - utiliser l'agence par défaut
+      const [defaultAgence] = await db
+        .select()
+        .from(agences)
+        .limit(1);
+      if (!defaultAgence) {
+        return { success: false, errorCode: "NO_AGENCY", error: "Aucune agence trouvée" };
+      }
+      agenceId = defaultAgence.id;
+    }
 
-    return { success: true, data: updated };
+    // Transaction pour garantir l'atomicité
+    const result = await db.transaction(async (tx) => {
+      // 1. Créer le mouvement financier
+      const mouvementId = uuidv4();
+      const [mouvement] = await tx
+        .insert(mouvementsFinanciers)
+        .values({
+          id: mouvementId,
+          typeMouvement: 'ENTREE_COFFRE',
+          montant: montant.toString(),
+          devise: 'XAF',
+          sens: 'ENTREE',
+          agenceId,
+          coffreId,
+          description: motif,
+          categorie: 'Abondement Coffre',
+          effectuePar: userId,
+          statut: 'COMPLETED',
+        })
+        .returning();
+
+      // 2. Poster au Grand Livre
+      let glPosted = false;
+      try {
+        const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, {
+          operationType: 'ABONDEMENT_COFFRE',
+          coffreId,
+        });
+
+        if (glResult) {
+          logger.info({ mouvementId, numeroPiece: glResult.numeroPiece }, 'GL posted for coffre abondement');
+          glPosted = true;
+        }
+
+        await tx
+          .update(mouvementsFinanciers)
+          .set({ glPostingStatus: "POSTED" })
+          .where(eq(mouvementsFinanciers.id, mouvementId));
+      } catch (glError: unknown) {
+        const message = glError instanceof Error ? glError.message : "Unknown GL error";
+        const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
+
+        logger.warn({ mouvementId, error: message }, `GL ${status.toLowerCase()} for coffre abondement`);
+
+        await tx
+          .update(mouvementsFinanciers)
+          .set({ glPostingStatus: status, glPostingError: message })
+          .where(eq(mouvementsFinanciers.id, mouvementId));
+
+        // Si la règle comptable n'existe pas, on continue (rétrocompatibilité)
+        // Mais on log un warning pour investigation
+        if (!(glError instanceof AccountingRuleNotFoundError)) {
+          logger.error({ mouvementId, error: message }, 'Critical GL posting error for coffre abondement');
+        }
+      }
+
+      // 3. Mettre à jour le solde du coffre
+      const [updated] = await tx
+        .update(coffresForts)
+        .set({
+          solde: sql`${coffresForts.solde} + ${montant}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(coffresForts.id, coffreId))
+        .returning();
+
+      return { coffre: updated, mouvement, glPosted };
+    });
+
+    return {
+      success: true,
+      data: {
+        coffre: result.coffre,
+        mouvement: result.mouvement,
+        glPosted: result.glPosted,
+      }
+    };
   }
 
   /**
