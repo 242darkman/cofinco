@@ -141,9 +141,9 @@ export interface IStorage {
     // Epargne (Comptes Bancaires)
     getCompte(id: string): Promise<Compte | undefined>;
     getComptesByClient(clientId: string): Promise<Compte[]>;
-    getAllComptes(filter?: { agence?: string }): Promise<Compte[]>;
+    getAllComptes(filter?: { agenceId?: string; agence?: string }): Promise<Compte[]>;
     getAllComptesWithClients(
-      filter?: { agence?: string },
+      filter?: { agenceId?: string; agence?: string },
       options?: { search?: string; page?: number; limit?: number; typeCompte?: string; statut?: string }
     ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
     createCompte(compte: InsertCompte): Promise<Compte>;

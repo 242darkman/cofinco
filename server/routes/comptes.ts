@@ -327,11 +327,11 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes",
     requireAuth,
-    requireAgenceAccess(),
+    requireAgenceAccess("agenceId"),
     async (req, res) => {
       try {
-        const agenceFilter = req.agenceFilter as { agence?: string } | null;
-        const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+        const filter = agenceFilter?.agenceId ? { agenceId: agenceFilter.agenceId } : {};
 
         // Parse query parameters
         const options = {
@@ -1394,11 +1394,11 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes-bloques",
     requireAuth,
-    requireAgenceAccess(),
+    requireAgenceAccess("agenceId"),
     async (req, res) => {
       try {
-        const agenceFilter = req.agenceFilter as { agence?: string } | null;
-        const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+        const filter = agenceFilter?.agenceId ? { agenceId: agenceFilter.agenceId } : {};
 
         // Get all blocked accounts
         const result = await storage.getAllComptesWithClients(filter, {
@@ -1819,7 +1819,7 @@ export function registerComptesRoutes(app: Express) {
               continue;
             }
 
-            const montantInitial = Number(compte.depotInitialRequis || 0);
+            const montantInitial = Number(compte.soldeCourant || 0);
             if (montantInitial <= 0) {
               results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Montant initial non défini" });
               continue;

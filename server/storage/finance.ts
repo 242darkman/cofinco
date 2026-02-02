@@ -721,12 +721,25 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     });
   }
   
-  export async function getAllComptes(filter: { agence?: string } = {}): Promise<Compte[]> {
-    if (filter.agence) {
+  export async function getAllComptes(filter: { agenceId?: string; agence?: string } = {}): Promise<Compte[]> {
+    // Determine agency ID to filter by
+    let agenceIdToFilter: string | undefined;
+
+    if (filter.agenceId) {
+      agenceIdToFilter = filter.agenceId;
+    } else if (filter.agence) {
+      // Legacy support: lookup by agency name
+      const agenceResult = await db.select({ id: agences.id }).from(agences).where(eq(agences.nom, filter.agence)).limit(1);
+      if (agenceResult.length > 0) {
+        agenceIdToFilter = agenceResult[0].id;
+      }
+    }
+
+    if (agenceIdToFilter) {
       const results = await db.select({ compte: comptes })
         .from(comptes)
         .innerJoin(clients, eq(comptes.clientId, clients.id))
-        .where(eq(clients.agenceId, filter.agence))
+        .where(eq(clients.agenceId, agenceIdToFilter))
         .orderBy(desc(comptes.createdAt));
       return results.map(r => r.compte);
     }
@@ -739,7 +752,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
    * @param options - Search and pagination options
    */
   export async function getAllComptesWithClients(
-    filter: { agence?: string } = {},
+    filter: { agenceId?: string; agence?: string } = {},
     options: { search?: string; page?: number; limit?: number; typeCompte?: string; statut?: string } = {}
   ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = Math.max(1, options.page || 1);
@@ -749,9 +762,15 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     // Build conditions
     const conditions: any[] = [];
 
-    // Agency filter
-    if (filter.agence && filter.agence !== 'all') {
-      conditions.push(eq(clients.agenceId, filter.agence));
+    // Agency filter - prefer agenceId (UUID) over agence (name)
+    if (filter.agenceId && filter.agenceId !== 'all') {
+      conditions.push(eq(clients.agenceId, filter.agenceId));
+    } else if (filter.agence && filter.agence !== 'all') {
+      // Legacy support: lookup by agency name
+      const agenceResult = await db.select({ id: agences.id }).from(agences).where(eq(agences.nom, filter.agence)).limit(1);
+      if (agenceResult.length > 0) {
+        conditions.push(eq(clients.agenceId, agenceResult[0].id));
+      }
     }
 
     // Type filter
