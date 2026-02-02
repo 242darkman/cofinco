@@ -23,6 +23,8 @@
     "db:clean-dead-letters": "node --env-file=.env --import tsx scripts/clean-dead-letter-jobs.ts",
     "db:clean-dead-letters:force": "node --env-file=.env --import tsx scripts/clean-dead-letter-jobs.ts -- --force",
     "audit:integrity": "node --env-file=.env --import tsx scripts/audit-integrity.ts",
+    "verify:accounting-rules": "node --env-file=.env --import tsx scripts/verify-accounting-rules-completeness.ts",
+    "diagnose:balance": "node --env-file=.env --import tsx scripts/diagnose-balance-issues.ts",
     "test": "vitest"
   },
   "dependencies": {

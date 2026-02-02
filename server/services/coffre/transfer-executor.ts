@@ -16,6 +16,7 @@ import { updateSessionSolde } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { balanceService } from "../balance-service";
 import { createLogger } from "../../lib/logger";
+import { validateAccountingRule, handleGLPostingFailure } from "../accounting-validation";
 
 const logger = createLogger('CoffreTransfer');
 import {
@@ -56,7 +57,28 @@ export async function executeTransfertCoffre(
   ipAddress?: string,
   userAgent?: string
 ): Promise<ExecuteTransferResult> {
-  
+
+  // PRE-VALIDATION: Récupérer le transfert pour valider la règle comptable AVANT la transaction
+  const [transfertPreCheck] = await db
+    .select()
+    .from(transfertsCoffreCaisse)
+    .where(eq(transfertsCoffreCaisse.id, transfertId));
+
+  if (!transfertPreCheck) {
+    throw new Error("TRANSFERT_NOT_FOUND: Transfert introuvable");
+  }
+
+  // Déterminer le type de paiement pour la validation
+  const isCoffreSourcePreCheck = transfertPreCheck.typeTransfert === "COFFRE_VERS_CAISSE";
+  const typePaiementPreCheck = isCoffreSourcePreCheck ? "COFFRE_TO_CAISSE" : "CAISSE_TO_COFFRE";
+
+  // VALIDATION CRITIQUE: Vérifier que la règle comptable existe
+  // En mode STRICT, cette ligne throw si la règle n'existe pas
+  // → L'opération s'arrête ICI avant toute modification de données
+  await validateAccountingRule(typePaiementPreCheck, transfertPreCheck.agenceId);
+
+  logger.info({ transfertId, typePaiement: typePaiementPreCheck }, 'Règle comptable validée - début de la transaction');
+
   return await db.transaction(async (tx) => {
     const [transfert] = await tx
       .select()
@@ -280,6 +302,7 @@ export async function executeTransfertCoffre(
     }
 
     // 9b. GL Posting — one écriture for the whole transfer (via DEBIT mouvement)
+    // CRITIQUE: Le posting GL est obligatoire pour maintenir la cohérence comptable
     if (transfert.agenceId) {
       try {
         const glResult = await postGlForMouvement(tx, mouvementDebit, transfert.agenceId, executorId, {
@@ -288,19 +311,33 @@ export async function executeTransfertCoffre(
           caisseNom: caisse.nom,
           direction: isCoffreSource ? "COFFRE→CAISSE" : "CAISSE→COFFRE",
         });
+
         if (glResult) {
           await tx.update(mouvementsFinanciers)
             .set({ glPostingStatus: "POSTED", glPostingError: null })
             .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+        } else {
+          // GL posting returned false - should not happen if validation passed
+          throw new Error('GL posting returned false despite validation');
         }
+
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Unknown GL error";
-        logger.error({ transfertId, error: message }, 'GL posting failed');
+        logger.error({ transfertId, typePaiement, error: message }, 'GL posting failed');
+
         await tx.update(mouvementsFinanciers)
           .set({ glPostingStatus: "FAILED", glPostingError: message })
           .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
-        // Don't rethrow — coffre transfer should still succeed even if GL posting fails
-        // The FAILED status will be picked up by the coverage report
+
+        // Gestion selon le mode configuré (STRICT ou LENIENT)
+        // En mode STRICT: rethrow → rollback de TOUTE la transaction
+        // En mode LENIENT: continue (comportement legacy)
+        handleGLPostingFailure(error, {
+          transfertId,
+          typePaiement,
+          montant,
+          direction: isCoffreSource ? "COFFRE→CAISSE" : "CAISSE→COFFRE"
+        });
       }
     }
 

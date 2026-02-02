@@ -19,6 +19,7 @@ import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-po
 import { balanceService } from "./balance-service";
 import type { BalanceEntityType } from "@shared/types/balances";
 import { createLogger } from "../lib/logger";
+import { validateAccountingRule, handleGLPostingFailure, isGLStrictMode } from "./accounting-validation";
 
 const logger = createLogger('Ledger');
 
@@ -625,6 +626,33 @@ export async function executeWithLedger<T>(
 
   const requiresGl = mouvementData.requiresGlPosting !== false;
 
+  // PRE-VALIDATION: Vérifier que la règle comptable existe AVANT la transaction
+  // En mode STRICT ou si requiresGl=true, cette validation est critique
+  if (mouvementData.agenceId && mouvementData.typePaiement && (requiresGl || isGLStrictMode())) {
+    try {
+      await validateAccountingRule(mouvementData.typePaiement, mouvementData.agenceId);
+      logger.debug({
+        typePaiement: mouvementData.typePaiement,
+        agenceId: mouvementData.agenceId
+      }, 'Règle comptable validée avant transaction');
+    } catch (error) {
+      // En mode STRICT ou requiresGl=true, bloquer l'opération
+      if (requiresGl || isGLStrictMode()) {
+        logger.error({
+          typePaiement: mouvementData.typePaiement,
+          agenceId: mouvementData.agenceId,
+          error: error instanceof Error ? error.message : 'Unknown'
+        }, 'Validation règle comptable échouée - opération bloquée');
+        throw error;
+      }
+      // Sinon, logger un warning et continuer
+      logger.warn({
+        typePaiement: mouvementData.typePaiement,
+        error: error instanceof Error ? error.message : 'Unknown'
+      }, 'Règle comptable manquante mais non critique');
+    }
+  }
+
   const transactionResult = await db.transaction(async (tx) => {
     // 1. Create mouvement financier (glPostingStatus = 'PENDING')
     const mouvement = await createMouvementFinancier(
@@ -668,14 +696,25 @@ export async function executeWithLedger<T>(
           glPostingError = message;
           logger.warn({ mouvementId: mouvement.id, error: message }, 'GL skipped (no rule, not required)');
         } else {
-          if (requiresGl) {
-            // Critical: GL is required → rollback
-            throw error;
-          }
-          // Non-critical: mark as FAILED
+          // Utiliser le nouveau système de gestion selon GL_POSTING_MODE
           glPostingStatus = "FAILED";
           glPostingError = message;
-          logger.error({ mouvementId: mouvement.id, error: message }, 'GL failed (not required, continuing)');
+
+          if (requiresGl) {
+            // Critical: GL is required → utiliser handleGLPostingFailure
+            // En mode STRICT, cela va rethrow et causer un rollback
+            // En mode LENIENT, cela va logger et continuer
+            logger.error({ mouvementId: mouvement.id, error: message }, 'GL failed (required)');
+            handleGLPostingFailure(error, {
+              mouvementId: mouvement.id,
+              typePaiement: mouvementData.typePaiement,
+              montant: mouvementData.montant,
+              requiresGl
+            });
+          } else {
+            // Non-critical: juste logger
+            logger.warn({ mouvementId: mouvement.id, error: message }, 'GL failed (not required, continuing)');
+          }
         }
       }
     } else {
