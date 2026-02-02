@@ -1479,8 +1479,17 @@ export function registerAuthRoutes(app: Express) {
       const userId = req.params.id;
       const updateData = normalizeUserPayload(req.body);
 
-      // Extract role from payload - it's stored in userRoles, not users table
-      const { role: newRole, ...userUpdateData } = updateData;
+      // Extract role and password from payload - role is stored in userRoles, not users table
+      const { role: newRole, password, ...userUpdateData } = updateData;
+
+      // Hash password if provided
+      if (password && typeof password === 'string' && password.trim()) {
+        userUpdateData.password = await hashPassword(password.trim());
+        logger.info({ userId }, 'User password updated via admin panel');
+      }
+
+      // Always update the updatedAt timestamp
+      userUpdateData.updatedAt = new Date();
 
       // Update user data in users table (exclude role)
       const [updated] = await db.update(users).set(userUpdateData).where(eq(users.id, userId)).returning();

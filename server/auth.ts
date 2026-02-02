@@ -257,6 +257,8 @@ declare module 'express-session' {
       email?: string;
       telephone?: string;
       mustChangePassword?: boolean;
+      statut?: string;
+      photoProfile?: string | null;
     };
     caisseAuthorized?: boolean;
     caisseAuthExpiry?: number;
