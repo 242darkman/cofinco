@@ -14,6 +14,7 @@ import {
   ArrowDownRight,
   Shield,
   AlertTriangle,
+  AlertCircle,
   Settings,
   MoreHorizontal,
   Play,
@@ -88,6 +89,11 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showProvisionModal, setShowProvisionModal] = useState(false);
   const [selectedTransfert, setSelectedTransfert] = useState<any>(null);
+
+  // Cancellation states
+  const [transfertToCancel, setTransfertToCancel] = useState<any>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const transferts = transfertsData?.data || [];
 
@@ -194,6 +200,49 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     } finally {
       setActionLoading(null);
       setConfirmAction(null);
+    }
+  };
+
+  // Handler for cancelling transfers
+  const handleCancelTransfert = async () => {
+    if (!transfertToCancel || !cancelReason.trim()) {
+      toast.error('Veuillez indiquer une raison');
+      return;
+    }
+
+    setIsCancelling(true);
+    try {
+      const canBeCancelled = [StatutTransfertCoffre.REQUESTED, StatutTransfertCoffre.VALIDATED].includes(transfertToCancel.statut);
+      const canBeReversed = transfertToCancel.statut === StatutTransfertCoffre.EXECUTED && !transfertToCancel.verrouille;
+      const canReverseWithin24h = canBeReversed && transfertToCancel.executedAt &&
+        (Date.now() - new Date(transfertToCancel.executedAt).getTime()) / (1000 * 60 * 60) < 24;
+
+      if (canBeCancelled) {
+        // Simple cancellation for REQUESTED or VALIDATED
+        await coffreApi.cancelTransfert(transfertToCancel.id, cancelReason);
+        toast.success('Transfert annulé avec succès');
+      } else if (canReverseWithin24h) {
+        // Cancellation with compensation for EXECUTED
+        await coffreApi.reverseTransfert(transfertToCancel.id, { reason: cancelReason });
+        toast.success('Transfert annulé avec compensation (transfert inversé créé)');
+      } else {
+        toast.error('Ce transfert ne peut pas être annulé');
+        return;
+      }
+
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: coffreKeys.all });
+      queryClient.invalidateQueries({ queryKey: caisseKeys.all });
+      refetch();
+      refetchStats();
+
+      // Close modal and reset state
+      setTransfertToCancel(null);
+      setCancelReason('');
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de l\'annulation');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -493,6 +542,18 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               <span className="hidden sm:inline">En attente</span>
             </span>
           )}
+          {/* Cancel button available to all (backend enforces permissions) */}
+          <Button
+            size="sm"
+            variant="danger"
+            className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); setTransfertToCancel(row); }}
+            disabled={isLoading}
+            title="Annuler ce transfert"
+          >
+            <Ban size={12} className="lg:mr-1" />
+            <span className="hidden lg:inline">Annuler</span>
+          </Button>
         </div>
       );
     }
@@ -524,6 +585,18 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               <span className="hidden sm:inline">En attente</span>
             </span>
           )}
+          {/* Cancel button available to all (backend enforces permissions) */}
+          <Button
+            size="sm"
+            variant="danger"
+            className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); setTransfertToCancel(row); }}
+            disabled={isLoading}
+            title="Annuler ce transfert"
+          >
+            <Ban size={12} className="lg:mr-1" />
+            <span className="hidden lg:inline">Annuler</span>
+          </Button>
         </div>
       );
     }
@@ -894,6 +967,106 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         agenceId={agenceId}
       />
 
+      {/* Cancellation Modal */}
+      {transfertToCancel && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !isCancelling && setTransfertToCancel(null)}
+          />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-500/20 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white text-base mb-1">
+                  Annuler ce transfert ?
+                </h3>
+                <p className="text-sm text-slate-400">
+                  {transfertToCancel.statut === StatutTransfertCoffre.EXECUTED
+                    ? 'Un transfert compensatoire (sens inverse) sera créé automatiquement pour maintenir la traçabilité comptable.'
+                    : 'Cette action annulera définitivement ce transfert.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Transfer details */}
+            <div className="p-3 bg-slate-800/50 rounded-lg space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Montant</span>
+                <span className="font-mono font-bold text-white">
+                  {Number(transfertToCancel.montant).toLocaleString()} FCFA
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Référence</span>
+                <span className="font-mono text-slate-300">{transfertToCancel.reference}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Type</span>
+                <span className="text-slate-300">{getMouvementCoffreLabel(transfertToCancel.typeTransfert)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Statut</span>
+                <Badge variant="warning" value={transfertToCancel.statut} className="text-xs" />
+              </div>
+            </div>
+
+            {/* Reason input */}
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                Raison de l'annulation *
+              </label>
+              <textarea
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 resize-none"
+                placeholder="Expliquez pourquoi vous annulez ce transfert..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={3}
+                disabled={isCancelling}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Minimum 10 caractères requis pour la traçabilité
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1 h-9 text-xs"
+                onClick={() => {
+                  setTransfertToCancel(null);
+                  setCancelReason('');
+                }}
+                disabled={isCancelling}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1 h-9 text-xs cursor-pointer"
+                onClick={handleCancelTransfert}
+                disabled={isCancelling || !cancelReason.trim() || cancelReason.length < 10}
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 size={14} className="mr-1.5 animate-spin" />
+                    Annulation...
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={14} className="mr-1.5" />
+                    Confirmer l'annulation
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Slider détails transfert */}
       {selectedTransfert && (
         <TransfertDetailPanel
@@ -1141,6 +1314,11 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
 
 /** Slider de détails d'un transfert coffre */
 function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose: () => void }) {
+    const queryClient = useQueryClient();
+    const [cancelReason, setCancelReason] = useState('');
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
     const isSortie = transfert.typeTransfert === 'COFFRE_VERS_CAISSE';
     const statusMap: Record<string, { color: string; bg: string; label: string }> = {
         [StatutTransfertCoffre.REQUESTED]: { color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'En attente' },
@@ -1150,6 +1328,45 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
         [StatutTransfertCoffre.CANCELLED]: { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Annulé' },
     };
     const statusVariant = statusMap[transfert.statut as string] || { color: 'text-slate-400', bg: 'bg-slate-500/10', label: transfert.statut };
+
+    // Déterminer si le transfert peut être annulé
+    const canBeCancelled = [StatutTransfertCoffre.REQUESTED, StatutTransfertCoffre.VALIDATED].includes(transfert.statut);
+    const canBeReversed = transfert.statut === StatutTransfertCoffre.EXECUTED && !transfert.verrouille;
+
+    // Vérifier si l'annulation est possible dans les 24h pour les transferts exécutés
+    const canReverseWithin24h = canBeReversed && transfert.executedAt &&
+        (Date.now() - new Date(transfert.executedAt).getTime()) / (1000 * 60 * 60) < 24;
+
+    const handleCancel = async () => {
+        if (!cancelReason.trim()) {
+            toast.error('Veuillez indiquer une raison');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            if (canBeCancelled) {
+                // Annulation simple pour REQUESTED ou VALIDATED
+                await coffreApi.cancelTransfert(transfert.id, cancelReason);
+                toast.success('Transfert annulé avec succès');
+            } else if (canReverseWithin24h) {
+                // Annulation avec compensation pour EXECUTED
+                await coffreApi.reverseTransfert(transfert.id, { reason: cancelReason });
+                toast.success('Transfert annulé avec compensation (transfert inversé créé)');
+            }
+
+            // Rafraîchir les données
+            queryClient.invalidateQueries({ queryKey: coffreKeys.all });
+            queryClient.invalidateQueries({ queryKey: caisseKeys.all });
+
+            setShowCancelModal(false);
+            onClose();
+        } catch (error: any) {
+            toast.error(error.message || 'Erreur lors de l\'annulation');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <>
@@ -1266,7 +1483,19 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                 </div>
 
                 {/* Footer */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900">
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900 space-y-2">
+                    {/* Bouton d'annulation si applicable */}
+                    {(canBeCancelled || canReverseWithin24h) && (
+                        <Button
+                            variant="danger"
+                            className="w-full h-9 text-xs cursor-pointer"
+                            onClick={() => setShowCancelModal(true)}
+                        >
+                            <XCircle size={14} className="mr-1.5" />
+                            {canBeReversed ? 'Annuler avec compensation' : 'Annuler le transfert'}
+                        </Button>
+                    )}
+
                     <Button
                         variant="secondary"
                         className="w-full h-9 text-xs"
@@ -1276,6 +1505,89 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                     </Button>
                 </div>
             </div>
+
+            {/* Modal de confirmation d'annulation */}
+            {showCancelModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isLoading && setShowCancelModal(false)} />
+                    <div className="relative bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-red-500/20 rounded-lg">
+                                <AlertCircle className="w-5 h-5 text-red-400" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-white text-base mb-1">
+                                    Annuler ce transfert ?
+                                </h3>
+                                <p className="text-sm text-slate-400">
+                                    {canBeReversed
+                                        ? 'Un transfert compensatoire (sens inverse) sera créé automatiquement pour maintenir la traçabilité comptable.'
+                                        : 'Cette action annulera définitivement ce transfert.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Informations du transfert */}
+                        <div className="p-3 bg-slate-800/50 rounded-lg space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                                <span className="text-slate-500">Montant</span>
+                                <span className="font-mono font-bold text-white">
+                                    {Number(transfert.montant).toLocaleString()} FCFA
+                                </span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                                <span className="text-slate-500">Référence</span>
+                                <span className="font-mono text-slate-300">{transfert.reference}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                                <span className="text-slate-500">Statut</span>
+                                <span className={statusVariant.color}>{statusVariant.label}</span>
+                            </div>
+                        </div>
+
+                        {/* Champ raison */}
+                        <div className="space-y-2">
+                            <label className="text-xs text-slate-400 font-medium">
+                                Raison de l'annulation {canBeReversed ? '(min. 10 caractères)' : ''}
+                            </label>
+                            <textarea
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                placeholder="Expliquez pourquoi ce transfert doit être annulé..."
+                                className="w-full h-20 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                                disabled={isLoading}
+                            />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                            <Button
+                                variant="secondary"
+                                className="flex-1 h-9 text-xs"
+                                onClick={() => setShowCancelModal(false)}
+                                disabled={isLoading}
+                            >
+                                Fermer
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                className="flex-1 h-9 text-xs"
+                                onClick={handleCancel}
+                                disabled={isLoading || !cancelReason.trim() || (canBeReversed && cancelReason.length < 10)}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 size={14} className="mr-1.5 animate-spin" />
+                                        Annulation...
+                                    </>
+                                ) : (
+                                    'Confirmer l\'annulation'
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

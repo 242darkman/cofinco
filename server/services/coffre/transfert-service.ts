@@ -299,14 +299,22 @@ export class TransfertCoffreService {
       return { success: false, errorCode: "PERMISSION_DENIED", error: "Seul l'initiateur peut annuler" };
     }
 
-    // Vérifier l'état
-    if (transfert.statut !== StatutTransfertCoffre.REQUESTED) {
+    // Vérifier l'état : seuls REQUESTED et VALIDATED peuvent être annulés
+    if (transfert.statut !== StatutTransfertCoffre.REQUESTED && transfert.statut !== StatutTransfertCoffre.VALIDATED) {
+      const statutLabel = transfert.statut === StatutTransfertCoffre.EXECUTED
+        ? "exécuté (utilisez la fonction d'annulation avec compensation)"
+        : transfert.statut === StatutTransfertCoffre.CANCELLED
+        ? "déjà annulé"
+        : transfert.statut;
+
       return {
         success: false,
         errorCode: "INVALID_TRANSITION",
-        error: "Seuls les transferts en statut 'Demandé' peuvent être annulés",
+        error: `Impossible d'annuler ce transfert : il est ${statutLabel}`,
       };
     }
+
+    const statutAvant = transfert.statut;
 
     const [updated] = await db.update(transfertsCoffreCaisse)
       .set({
@@ -320,13 +328,58 @@ export class TransfertCoffreService {
     await db.insert(transfertsCoffreAuditLogs).values({
       transfertId: params.transfertId,
       action: "CANCELLED",
-      statutAvant: StatutTransfertCoffre.REQUESTED,
+      statutAvant,
       statutApres: StatutTransfertCoffre.CANCELLED,
-      details: { reason: params.reason },
+      details: {
+        reason: params.reason,
+        cancelledFromStatus: statutAvant,
+      },
       userId: params.cancelledBy,
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
     });
+
+    // Notification WebSocket en temps réel
+    try {
+      const { getWsInstance } = await import('../../ws-server');
+      const ws = getWsInstance();
+      if (ws && transfert.agenceId) {
+        // Notifier le coffre-fort
+        ws.broadcastToAggregate('coffre', transfert.agenceId, {
+          type: 'REALTIME_EVENT',
+          payload: {
+            aggregateType: 'coffre',
+            aggregateId: transfert.agenceId,
+            event: 'TRANSFER_CANCELLED',
+            transfertId: params.transfertId,
+            reference: transfert.reference,
+          }
+        });
+
+        // Notifier la caisse concernée
+        ws.broadcastToAggregate('caisse', transfert.caisseId, {
+          type: 'CAISSE_UPDATE',
+          payload: {
+            caisseId: transfert.caisseId,
+            type: 'TRANSFER_CANCELLED',
+            transfertId: params.transfertId,
+          }
+        });
+
+        // Activité en temps réel pour toute l'agence
+        ws.broadcastToAgency(transfert.agenceId, {
+          type: 'LIVE_ACTIVITY',
+          payload: {
+            action: `Transfert annulé: ${params.reason}`,
+            type: 'cancellation',
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+    } catch (wsError) {
+      // Log mais ne pas faire échouer l'opération si WS échoue
+      console.error('WebSocket notification failed:', wsError);
+    }
 
     return { success: true, transfert: updated };
   }
