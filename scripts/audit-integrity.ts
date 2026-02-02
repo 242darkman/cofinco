@@ -117,13 +117,13 @@ const AUDIT_TESTS = [
         SELECT
           compte_id,
           SUM(CASE
-            WHEN sens = 'Crédit' THEN montant::numeric
-            WHEN sens = 'Débit' THEN -montant::numeric
+            WHEN sens = 'CREDIT' THEN montant::numeric
+            WHEN sens = 'DEBIT' THEN -montant::numeric
             ELSE 0
           END) as solde_calcule
         FROM mouvements_financiers
         WHERE compte_id IS NOT NULL
-          AND statut = 'Posté'
+          AND statut = 'POSTED'
         GROUP BY compte_id
       )
       SELECT
@@ -173,7 +173,7 @@ const AUDIT_TESTS = [
     query: `
       SELECT id, reference, montant, sens
       FROM mouvements_financiers
-      WHERE sens NOT IN ('Débit', 'Crédit') OR sens IS NULL;
+      WHERE sens NOT IN ('DEBIT', 'CREDIT') OR sens IS NULL;
     `
   },
   {
@@ -258,24 +258,24 @@ const AUDIT_TESTS = [
         SELECT
           session_caisse_id,
           SUM(CASE
-            WHEN sens = 'Crédit' THEN montant::numeric
-            WHEN sens = 'Débit' THEN -montant::numeric
+            WHEN sens = 'CREDIT' THEN montant::numeric
+            WHEN sens = 'DEBIT' THEN -montant::numeric
             ELSE 0
           END) as delta_operations
         FROM mouvements_financiers
         WHERE session_caisse_id IS NOT NULL
-          AND statut = 'Posté'
+          AND statut = 'POSTED'
         GROUP BY session_caisse_id
       )
       SELECT
         sc.id,
-        sc.solde_initial::numeric,
-        sc.solde_theorique::numeric as solde_affiche,
-        sc.solde_initial::numeric + COALESCE(ops.delta_operations, 0) as solde_calcule,
-        sc.solde_theorique::numeric - (sc.solde_initial::numeric + COALESCE(ops.delta_operations, 0)) as ecart
+        sc.montant_ouverture::numeric,
+        sc.montant_fermeture_theorique::numeric as solde_affiche,
+        sc.montant_ouverture::numeric + COALESCE(ops.delta_operations, 0) as solde_calcule,
+        sc.montant_fermeture_theorique::numeric - (sc.montant_ouverture::numeric + COALESCE(ops.delta_operations, 0)) as ecart
       FROM sessions_caisse sc
       LEFT JOIN operations_par_session ops ON sc.id = ops.session_caisse_id
-      WHERE ABS(sc.solde_theorique::numeric - (sc.solde_initial::numeric + COALESCE(ops.delta_operations, 0))) > 0.01;
+      WHERE ABS(sc.montant_fermeture_theorique::numeric - (sc.montant_ouverture::numeric + COALESCE(ops.delta_operations, 0))) > 0.01;
     `
   },
   {
@@ -334,8 +334,8 @@ const AUDIT_TESTS = [
           mf.source_id as credit_id,
           SUM(mf.montant::numeric) as total_rembourse
         FROM mouvements_financiers mf
-        WHERE mf.source_module = 'CREDIT_REMBOURSEMENT'
-          AND mf.statut = 'Posté'
+        WHERE mf.source_module = 'CREDIT'
+          AND mf.statut = 'POSTED'
           AND mf.source_id IS NOT NULL
         GROUP BY mf.source_id
       )

@@ -15,9 +15,13 @@
     "db:seed:force": "node --env-file=.env --import tsx server/seed-prod.ts -- --force",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
     "db:reset:force": "node --env-file=.env --import tsx scripts/db-reset.ts -- --force",
+    "db:reset-financial": "node --env-file=.env --import tsx scripts/reset-financial-data.ts",
+    "db:reset-financial:force": "node --env-file=.env --import tsx scripts/reset-financial-data.ts -- --force",
     "db:validate": "node --env-file=.env --import tsx scripts/validate-seed.ts",
     "db:backfill-gl": "node --env-file=.env --import tsx scripts/backfill-gl-posting-status.ts",
     "db:backfill-gl:dry-run": "node --env-file=.env --import tsx scripts/backfill-gl-posting-status.ts --dry-run",
+    "db:clean-dead-letters": "node --env-file=.env --import tsx scripts/clean-dead-letter-jobs.ts",
+    "db:clean-dead-letters:force": "node --env-file=.env --import tsx scripts/clean-dead-letter-jobs.ts -- --force",
     "audit:integrity": "node --env-file=.env --import tsx scripts/audit-integrity.ts",
     "test": "vitest"
   },
