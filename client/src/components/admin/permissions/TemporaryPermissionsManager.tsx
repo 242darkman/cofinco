@@ -21,9 +21,9 @@ import {
   formatTimeRemaining
 } from '../../../hooks/admin/useTemporaryPermissions';
 import { usePermissions } from '../../../hooks/admin/usePermissions';
-import { SearchInput, Button, Badge } from '../../ui';
-import { FeatureHeader } from '../../ui/FeatureHeader';
+import { Button } from '../../ui';
 import { cn } from '../../../lib/utils';
+import { getRoleBadgeStyle } from '../../../lib/role-utils';
 
 interface TemporaryPermissionsManagerProps {
   users: Array<{
@@ -52,7 +52,7 @@ const getUserFullName = (user: any): string => {
   return fullName || user.username || 'Utilisateur';
 };
 
-// Permission card component
+// Permission card component - Compact
 function TempPermissionCard({
   permission,
   onRevoke,
@@ -67,61 +67,64 @@ function TempPermissionCard({
 
   return (
     <div className={cn(
-      "p-4 border rounded-lg bg-white dark:bg-slate-800",
-      permission.isExpiringSoon && !isExpired && "border-amber-400 bg-amber-50 dark:bg-amber-900/20",
-      isExpired && "border-red-400 bg-red-50 dark:bg-red-900/20 opacity-75"
+      "px-3 py-2.5 border rounded-lg bg-slate-800/50 transition-all",
+      permission.isExpiringSoon && !isExpired && "border-amber-500/30 bg-amber-500/5",
+      isExpired && "border-red-500/30 bg-red-500/5 opacity-60"
     )}>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-4 h-4 text-indigo-500" />
-            <span className="font-medium text-slate-900 dark:text-white truncate">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Shield className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span className="text-xs font-medium text-white truncate">
               {permission.permissionName || permission.permissionCode}
             </span>
           </div>
 
-          <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
-            <div className="flex items-center gap-2">
-              <Users className="w-3 h-3" />
-              <span>Utilisateur ID: {permission.userId.slice(0, 8)}...</span>
+          <div className="text-[10px] text-slate-400 space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-2.5 h-2.5" />
+              <span>ID: {permission.userId.slice(0, 8)}...</span>
             </div>
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-3 h-3" />
-              <span>Accordé par: {permission.granterName}</span>
+            <div className="flex items-center gap-1.5">
+              <UserPlus className="w-2.5 h-2.5" />
+              <span>Par: {permission.granterName}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3 h-3" />
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-2.5 h-2.5" />
               <span>Expire: {formatDate(permission.expiresAt)}</span>
             </div>
           </div>
 
           {permission.reason && (
-            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
-              Raison: {permission.reason}
+            <p className="mt-1.5 text-[10px] text-slate-300 bg-slate-700/50 px-2 py-1 rounded truncate">
+              {permission.reason}
             </p>
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
           {/* Time remaining badge */}
-          <Badge
-            variant={isExpired ? 'danger' : permission.isExpiringSoon ? 'warning' : 'info'}
-            className="flex items-center gap-1"
-            icon={<Timer className="w-3 h-3" />}
-            value={formatTimeRemaining(timeRemaining)}
-          />
+          <div className={cn(
+            "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium",
+            isExpired
+              ? "bg-red-500/10 text-red-400"
+              : permission.isExpiringSoon
+                ? "bg-amber-500/10 text-amber-400"
+                : "bg-indigo-500/10 text-indigo-400"
+          )}>
+            <Timer className="w-3 h-3" />
+            {formatTimeRemaining(timeRemaining)}
+          </div>
 
           {/* Revoke button */}
           {!isExpired && (
-            <Button
-              size="sm"
-              variant="ghost"
+            <button
               onClick={() => onRevoke(permission.id)}
               disabled={isRevoking}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
             >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>
@@ -129,7 +132,7 @@ function TempPermissionCard({
   );
 }
 
-// Grant permission modal
+// Grant permission modal - Compact
 function GrantPermissionModal({
   isOpen,
   onClose,
@@ -205,85 +208,107 @@ function GrantPermissionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-500" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+        {/* Header - Compact */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800/50 shrink-0">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2">
+            <div className="w-6 h-6 bg-indigo-500/10 rounded-lg flex items-center justify-center">
+              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
             Accorder une permission temporaire
           </h2>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-white">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* User selection */}
+        <form onSubmit={handleSubmit} className="p-3 space-y-3 overflow-y-auto flex-1">
+          {/* User selection - Compact */}
           <div>
-            <label className="block text-sm font-medium mb-1">Utilisateur</label>
-            <SearchInput
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Rechercher un utilisateur..."
-              className="mb-2"
-            />
-            <div className="max-h-32 overflow-y-auto border rounded">
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">Utilisateur</label>
+            <div className="relative mb-1.5">
+              <Users className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Rechercher un utilisateur..."
+                className="w-full h-7 pl-7 pr-2 bg-slate-800 border border-slate-700 rounded text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+              />
+            </div>
+            <div className="max-h-24 overflow-y-auto border border-slate-700 rounded-lg bg-slate-800/50">
               {filteredUsers.map(user => (
                 <div
                   key={user.id}
                   onClick={() => setSelectedUserId(user.id)}
                   className={cn(
-                    "px-3 py-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700",
-                    selectedUserId === user.id && "bg-indigo-100 dark:bg-indigo-900"
+                    "px-2.5 py-1.5 cursor-pointer transition-colors border-b border-slate-700/50 last:border-0",
+                    selectedUserId === user.id
+                      ? "bg-indigo-500/20 text-white"
+                      : "hover:bg-slate-700/50 text-slate-300"
                   )}
                 >
-                  <span className="font-medium">{getUserFullName(user)}</span>
-                  {user.role && <Badge variant="neutral" className="ml-2" size="sm" value={user.role} />}
+                  <span className="text-xs font-medium">{getUserFullName(user)}</span>
+                  {user.role && (
+                    <span className={cn(
+                      "ml-2 text-[9px] px-1.5 py-0.5 rounded border",
+                      getRoleBadgeStyle(user.role).classes
+                    )}>
+                      {getRoleBadgeStyle(user.role).label}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Permission selection */}
+          {/* Permission selection - Compact */}
           <div>
-            <label className="block text-sm font-medium mb-1">Permission</label>
-            <SearchInput
-              value={permSearch}
-              onChange={(e) => setPermSearch(e.target.value)}
-              placeholder="Rechercher une permission..."
-              className="mb-2"
-            />
-            <div className="max-h-32 overflow-y-auto border rounded">
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">Permission</label>
+            <div className="relative mb-1.5">
+              <Shield className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+              <input
+                type="text"
+                value={permSearch}
+                onChange={(e) => setPermSearch(e.target.value)}
+                placeholder="Rechercher une permission..."
+                className="w-full h-7 pl-7 pr-2 bg-slate-800 border border-slate-700 rounded text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+              />
+            </div>
+            <div className="max-h-24 overflow-y-auto border border-slate-700 rounded-lg bg-slate-800/50">
               {filteredPermissions.map(perm => (
                 <div
                   key={perm.id}
                   onClick={() => setSelectedPermission(perm.code)}
                   className={cn(
-                    "px-3 py-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700",
-                    selectedPermission === perm.code && "bg-indigo-100 dark:bg-indigo-900"
+                    "px-2.5 py-1.5 cursor-pointer transition-colors border-b border-slate-700/50 last:border-0",
+                    selectedPermission === perm.code
+                      ? "bg-indigo-500/20 text-white"
+                      : "hover:bg-slate-700/50 text-slate-300"
                   )}
                 >
-                  <span className="font-medium">{perm.name}</span>
-                  <span className="text-xs text-slate-500 ml-2">{perm.code}</span>
+                  <span className="text-xs font-medium">{perm.name}</span>
+                  <span className="text-[9px] text-slate-500 ml-1.5 font-mono">{perm.code}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Duration selection */}
+          {/* Duration selection - Compact */}
           <div>
-            <label className="block text-sm font-medium mb-1">Durée</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="block text-[11px] font-medium text-slate-400 mb-1.5">Durée</label>
+            <div className="flex flex-wrap gap-1.5">
               {TEMP_PERMISSION_DURATIONS.map(d => (
                 <button
                   key={d.value}
                   type="button"
                   onClick={() => setDurationPreset(d.value)}
                   className={cn(
-                    "px-3 py-1 text-sm rounded border",
+                    "px-2.5 py-1 text-[10px] font-medium rounded-md border transition-all",
                     durationPreset === d.value
                       ? "bg-indigo-500 text-white border-indigo-500"
-                      : "bg-white dark:bg-slate-700 border-slate-300"
+                      : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-white"
                   )}
                 >
                   {d.label}
@@ -295,48 +320,51 @@ function GrantPermissionModal({
                 type="datetime-local"
                 value={customDate}
                 onChange={e => setCustomDate(e.target.value)}
-                className="mt-2 w-full px-3 py-2 border rounded"
+                className="mt-2 w-full h-8 px-2 bg-slate-800 border border-slate-700 rounded text-xs text-white focus:outline-none focus:border-indigo-500"
                 min={new Date().toISOString().slice(0, 16)}
               />
             )}
           </div>
 
-          {/* Reason */}
+          {/* Reason - Compact */}
           <div>
-            <label className="block text-sm font-medium mb-1">Raison (obligatoire)</label>
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">Raison (obligatoire)</label>
             <textarea
               value={reason}
               onChange={e => setReason(e.target.value)}
               placeholder="Expliquez pourquoi cette permission est nécessaire..."
-              className="w-full px-3 py-2 border rounded min-h-[80px]"
+              className="w-full px-2.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 min-h-[60px] resize-none"
               required
             />
           </div>
 
-          {/* Preview */}
+          {/* Preview - Compact */}
           {selectedUserId && selectedPermission && expiresAt && (
-            <div className="bg-slate-100 dark:bg-slate-700 p-3 rounded">
-              <h4 className="text-sm font-medium mb-1">Aperçu</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Permission <strong>{selectedPermission}</strong> accordée jusqu'au{' '}
-                <strong>{formatDate(expiresAt)}</strong>
+            <div className="bg-indigo-500/10 border border-indigo-500/20 p-2.5 rounded-lg">
+              <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide mb-1">Aperçu</h4>
+              <p className="text-[11px] text-slate-300">
+                Permission <strong className="text-white">{selectedPermission}</strong> accordée jusqu'au{' '}
+                <strong className="text-white">{formatDate(expiresAt)}</strong>
               </p>
             </div>
           )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Annuler
-            </Button>
-            <Button
-              type="submit"
-              disabled={!selectedUserId || !selectedPermission || !expiresAt || !reason || isGranting}
-            >
-              {isGranting ? 'Attribution...' : 'Accorder'}
-            </Button>
-          </div>
         </form>
+
+        {/* Actions - Fixed Footer */}
+        <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-700 bg-slate-800/30 shrink-0">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 px-3 text-xs">
+            Annuler
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={!selectedUserId || !selectedPermission || !expiresAt || !reason || isGranting}
+            className="h-8 px-4 text-xs bg-indigo-600 hover:bg-indigo-500"
+          >
+            {isGranting ? 'Attribution...' : 'Accorder'}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -401,81 +429,95 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
   ).length;
 
   return (
-    <div className="space-y-6">
-      {/* Header with FeatureHeader */}
-      <FeatureHeader
-        featureKey="admin.temp-permissions"
-        title="Permissions Temporaires"
-        subtitle="Gérez les élévations de privilèges temporaires"
-        helpText="Accordez des permissions limitées dans le temps à vos utilisateurs. Les permissions expirent automatiquement à la date définie. Utilisez cette fonction pour des accès ponctuels (remplacement, mission spéciale, etc.) sans modifier les rôles permanents."
-        icon={<Clock className="w-5 h-5" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={refresh}>
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Actualiser
-            </Button>
-            <Button onClick={() => setShowGrantModal(true)}>
-              <UserPlus className="w-4 h-4 mr-1" />
-              Nouvelle permission
-            </Button>
+    <div className="flex flex-col h-full space-y-2">
+      {/* Header - Compact */}
+      <div className="flex items-center justify-between gap-3 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-indigo-500/10 rounded-lg flex items-center justify-center shrink-0">
+            <Clock className="w-3.5 h-3.5 text-indigo-400" />
           </div>
-        }
-      />
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border">
-          <div className="text-2xl font-bold text-indigo-600">{activeCount}</div>
-          <div className="text-sm text-slate-500">Permissions actives</div>
+          <div>
+            <h2 className="text-sm font-bold text-white">Permissions Temporaires</h2>
+            <p className="text-[10px] text-slate-500">Élévations de privilèges limitées dans le temps</p>
+          </div>
         </div>
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border">
-          <div className="text-2xl font-bold text-amber-600">{expiringSoonCount}</div>
-          <div className="text-sm text-slate-500">Expirent bientôt (&lt;1h)</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border">
-          <div className="text-2xl font-bold text-slate-600">{tempPermissions.length}</div>
-          <div className="text-sm text-slate-500">Total</div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={refresh}
+            className="h-7 px-2 flex items-center gap-1.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Actualiser
+          </button>
+          <Button size="sm" onClick={() => setShowGrantModal(true)} className="h-7 px-2.5 text-[10px]">
+            <UserPlus className="w-3 h-3 mr-1" />
+            Nouvelle
+          </Button>
         </div>
       </div>
 
-      {/* Search */}
-      <SearchInput
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        placeholder="Rechercher par permission ou utilisateur..."
-      />
+      {/* Stats - Compact */}
+      <div className="grid grid-cols-3 gap-2 shrink-0">
+        <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+          <div className="text-lg font-bold text-indigo-400">{activeCount}</div>
+          <div className="text-[9px] text-slate-500 uppercase">Actives</div>
+        </div>
+        <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+          <div className="text-lg font-bold text-amber-400">{expiringSoonCount}</div>
+          <div className="text-[9px] text-slate-500 uppercase">Expirent &lt;1h</div>
+        </div>
+        <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+          <div className="text-lg font-bold text-slate-400">{tempPermissions.length}</div>
+          <div className="text-[9px] text-slate-500 uppercase">Total</div>
+        </div>
+      </div>
 
-      {/* Warning for expiring soon */}
+      {/* Search - Compact */}
+      <div className="relative shrink-0">
+        <Shield className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Rechercher par permission ou utilisateur..."
+          className="w-full h-8 pl-8 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+        />
+      </div>
+
+      {/* Warning for expiring soon - Compact */}
       {expiringSoonCount > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-amber-600" />
-          <span className="text-sm text-amber-800 dark:text-amber-200">
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5 flex items-center gap-2 shrink-0">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span className="text-[10px] text-amber-300">
             {expiringSoonCount} permission(s) expire(nt) dans moins d'une heure
           </span>
         </div>
       )}
 
-      {/* Permissions list */}
-      {loading ? (
-        <div className="text-center py-8 text-slate-500">Chargement...</div>
-      ) : filteredPermissions.length === 0 ? (
-        <div className="text-center py-8 text-slate-500">
-          <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>Aucune permission temporaire</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredPermissions.map(perm => (
-            <TempPermissionCard
-              key={perm.id}
-              permission={perm}
-              onRevoke={handleRevoke}
-              isRevoking={revokingId === perm.id}
-            />
-          ))}
-        </div>
-      )}
+      {/* Permissions list - Compact */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-8 text-slate-500">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+          </div>
+        ) : filteredPermissions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+            <Clock className="w-8 h-8 mb-2 opacity-50" />
+            <p className="text-xs">Aucune permission temporaire</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {filteredPermissions.map(perm => (
+              <TempPermissionCard
+                key={perm.id}
+                permission={perm}
+                onRevoke={handleRevoke}
+                isRevoking={revokingId === perm.id}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Grant modal */}
       <GrantPermissionModal
