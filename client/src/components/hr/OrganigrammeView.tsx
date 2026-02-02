@@ -508,6 +508,49 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
     chartRef.current.collapseAll();
   }, []);
 
+  // Helper function to convert image URL to base64 data URL
+  const imageUrlToBase64 = async (url: string): Promise<string | null> => {
+    try {
+      const response = await fetch(url, { credentials: 'include' });
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // Helper function to embed images as base64 in SVG clone
+  const embedImagesInSvg = async (svgClone: SVGSVGElement) => {
+    // Find all elements with background-image style
+    const elementsWithBgImage = svgClone.querySelectorAll('[style*="background-image"]');
+
+    for (const el of Array.from(elementsWithBgImage)) {
+      const htmlEl = el as HTMLElement;
+      const style = htmlEl.getAttribute('style') || '';
+      const match = style.match(/background-image:\s*url\(['"]?([^'")\s]+)['"]?\)/i);
+
+      if (match && match[1]) {
+        const imageUrl = match[1];
+        // Skip if already a data URL
+        if (imageUrl.startsWith('data:')) continue;
+
+        const base64 = await imageUrlToBase64(imageUrl);
+        if (base64) {
+          const newStyle = style.replace(
+            /background-image:\s*url\(['"]?[^'")\s]+['"]?\)/i,
+            `background-image: url('${base64}')`
+          );
+          htmlEl.setAttribute('style', newStyle);
+        }
+      }
+    }
+  };
+
   // Export PNG using SVG serialization and canvas (avoids html2canvas oklab issues)
   const handleExportPNG = useCallback(async () => {
     if (!containerRef.current) return;
@@ -523,6 +566,9 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
 
       // Clone SVG and prepare for export
       const svgClone = svg.cloneNode(true) as SVGSVGElement;
+
+      // Embed all profile images as base64
+      await embedImagesInSvg(svgClone);
 
       // Get SVG dimensions
       const bbox = svg.getBBox();
@@ -628,6 +674,9 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
 
       // Clone SVG and prepare for export
       const svgClone = svg.cloneNode(true) as SVGSVGElement;
+
+      // Embed all profile images as base64
+      await embedImagesInSvg(svgClone);
 
       // Get SVG dimensions
       const bbox = svg.getBBox();
