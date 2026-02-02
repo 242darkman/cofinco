@@ -75,6 +75,8 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
   TRANSFER_VALIDATED: handleTransferValidated,
   TRANSFER_REJECTED: handleTransferRejected,
   TRANSFER_EXECUTED: handleTransferExecuted,
+  TRANSFER_CANCELLED: handleTransferCancelled,
+  TRANSFER_REVERSED: handleTransferReversed,
   SCHEDULED_TRANSFER_EXECUTED: handleScheduledTransferExecuted,
   SCHEDULED_TRANSFER_FAILED: handleScheduledTransferFailed,
   HR_LEAVE_REQUESTED: handleHrLeaveRequested,
@@ -99,6 +101,8 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
   HR_SANCTION_FINALIZED: handleHrSanctionFinalized,
   PROSPECTION_CREATED: handleProspectionCreated,
   PAIEMENT_TERRAIN_VALIDATED: handlePaiementTerrainValidated,
+  CREDIT_INSTALLMENT_LATE: handleCreditInstallmentLate,
+  SYSTEM_JOB_FAILED: handleSystemJobFailed,
 };
 
 const logger = createLogger('DomainEvents');
@@ -143,6 +147,8 @@ const domainEventToWsType: Record<string, string> = {
   TRANSFER_VALIDATED: "CAISSE_UPDATE",
   TRANSFER_REJECTED: "CAISSE_UPDATE",
   TRANSFER_EXECUTED: "CAISSE_UPDATE",
+  TRANSFER_CANCELLED: "CAISSE_UPDATE",
+  TRANSFER_REVERSED: "CAISSE_UPDATE",
   SCHEDULED_TRANSFER_EXECUTED: "CAISSE_UPDATE",
   SCHEDULED_TRANSFER_FAILED: "CAISSE_UPDATE",
 
@@ -163,6 +169,10 @@ const domainEventToWsType: Record<string, string> = {
   // Operations terrain → OPERATIONS_UPDATE
   PROSPECTION_CREATED: "OPERATIONS_UPDATE",
   PAIEMENT_TERRAIN_VALIDATED: "OPERATIONS_UPDATE",
+
+  // System events → SYSTEM_UPDATE
+  CREDIT_INSTALLMENT_LATE: "CREDIT_UPDATE",
+  SYSTEM_JOB_FAILED: "SYSTEM_UPDATE",
 };
 
 function broadcastDomainEvent(event: DomainEvent): void {

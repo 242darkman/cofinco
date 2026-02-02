@@ -18,6 +18,8 @@ export type DomainEventType =
   | "TRANSFER_VALIDATED"
   | "TRANSFER_REJECTED"
   | "TRANSFER_EXECUTED"
+  | "TRANSFER_CANCELLED"
+  | "TRANSFER_REVERSED"
   // Scheduled transfers
   | "SCHEDULED_TRANSFER_EXECUTED"
   | "SCHEDULED_TRANSFER_FAILED"
@@ -248,6 +250,28 @@ export interface TransferExecutedData {
   montant: number;
   agenceId: string;
   executedByUserId: string;
+}
+
+export interface TransferCancelledData {
+  transfertId: string;
+  reference: string;
+  typeTransfert: string;
+  montant: number;
+  agenceId: string;
+  reason: string;
+  cancelledByUserId: string;
+}
+
+export interface TransferReversedData {
+  originalTransfertId: string;
+  originalReference: string;
+  reversalTransfertId: string;
+  reversalReference: string;
+  typeTransfert: string;
+  montant: number;
+  agenceId: string;
+  reversedByUserId: string;
+  reason: string;
 }
 
 export interface ScheduledTransferExecutedData {

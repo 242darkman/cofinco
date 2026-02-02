@@ -504,8 +504,8 @@ export interface IStorage {
     getEmployeByUserId(userId: string): Promise<Employe | undefined>;
     getEmployeWithUser(id: string): Promise<EmployeWithUser | undefined>;
     getAllEmployes(): Promise<Employe[]>;
-    getAllEmployesWithUsers(): Promise<EmployeWithUser[]>;
-    getEmployesByAgence(agenceId: string): Promise<EmployeWithUser[]>;
+    getAllEmployesWithUsers(roleFilter?: string): Promise<EmployeWithUser[]>;
+    getEmployesByAgence(agenceId: string, roleFilter?: string): Promise<EmployeWithUser[]>;
     createEmploye(employe: InsertEmploye): Promise<Employe>;
     createEmployeForUser(userId: string, employeData: Omit<InsertEmploye, 'userId'>, role?: import("@shared/types/roles").SystemRole): Promise<Employe>;
     updateEmploye(id: string, employe: Partial<InsertEmploye>): Promise<Employe | undefined>;

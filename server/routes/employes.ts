@@ -199,16 +199,18 @@ export function registerEmployesRoutes(app: Express) {
 
   // ============================================
   // GET - Liste des employés avec données utilisateur
+  // Params: ?agenceId={uuid}&role={AGENT_TERRAIN|CAISSIER|etc}
   // ============================================
   app.get("/api/employes", requireAuth, async (req, res) => {
     try {
-      const { agenceId } = req.query;
+      const { agenceId, role } = req.query;
+      const roleFilter = typeof role === 'string' ? role : undefined;
 
       let employesList;
       if (agenceId && typeof agenceId === 'string') {
-        employesList = await storage.getEmployesByAgence(agenceId);
+        employesList = await storage.getEmployesByAgence(agenceId, roleFilter);
       } else {
-        employesList = await storage.getAllEmployesWithUsers();
+        employesList = await storage.getAllEmployesWithUsers(roleFilter);
       }
 
       res.json(employesList);

@@ -1,9 +1,10 @@
-import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels, clients, users, userAgences } from "@shared/schema";
+import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels, clients, users, userAgences, userRoles } from "@shared/schema";
 import { type AgentTerrain, type InsertAgentTerrain, type Prospection, type InsertProspection, type VisiteTerrain, type InsertVisiteTerrain, type PaiementTerrain, type InsertPaiementTerrain, type Employe, type InsertEmploye, type PosDevice, type InsertPosDevice, type Notification, type InsertNotification, type OtpValidation, type InsertOtpValidation, type Zone, type InsertZone, type ObjectifMensuel, type InsertObjectifMensuel } from "@shared/schema";
 import { db } from "../db";
 import { notDeleted } from "./query-helpers";
 import { eq, desc, and, or, sql, gte } from "drizzle-orm";
 import { StatutOtp, StatutPaiementTerrain } from "@shared/enum/status-constants";
+import { SystemRole } from "@shared/types/roles";
 
 async function resolveAgentPrimaryAgenceId(agentId: string): Promise<string | undefined> {
   const [row] = await db
@@ -32,7 +33,12 @@ export async function getAgentTerrain(id: string): Promise<any | undefined> {
     .from(agentsTerrain)
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
-    .where(and(eq(agentsTerrain.id, id), notDeleted(agentsTerrain)));
+    .leftJoin(userRoles, eq(users.id, userRoles.userId))
+    .where(and(
+      eq(agentsTerrain.id, id),
+      notDeleted(agentsTerrain),
+      eq(userRoles.role, SystemRole.AGENT_TERRAIN)
+    ));
 
   if (results.length === 0) return undefined;
 
@@ -56,7 +62,11 @@ export async function getAllAgentsTerrain(): Promise<any[]> {
     .from(agentsTerrain)
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
-    .where(notDeleted(agentsTerrain))
+    .leftJoin(userRoles, eq(users.id, userRoles.userId))
+    .where(and(
+      notDeleted(agentsTerrain),
+      eq(userRoles.role, SystemRole.AGENT_TERRAIN)
+    ))
     .orderBy(desc(agentsTerrain.createdAt));
 
   const enrichedAgents = await Promise.all(results.map(async ({ agent, user, agenceId }) => {
@@ -110,10 +120,19 @@ export async function getAgentsTerrainPaginated(
   page: number = 1,
   perPage: number = 25
 ): Promise<{ data: any[]; total: number }> {
+  // Build where conditions with role filter
+  const whereConditions = and(
+    notDeleted(agentsTerrain),
+    eq(userRoles.role, SystemRole.AGENT_TERRAIN)
+  );
+
   const totalResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(agentsTerrain)
-    .where(notDeleted(agentsTerrain));
+    .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .leftJoin(users, eq(employes.userId, users.id))
+    .leftJoin(userRoles, eq(users.id, userRoles.userId))
+    .where(whereConditions);
   const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
 
   const results = await db
@@ -125,7 +144,8 @@ export async function getAgentsTerrainPaginated(
     .from(agentsTerrain)
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
-    .where(notDeleted(agentsTerrain))
+    .leftJoin(userRoles, eq(users.id, userRoles.userId))
+    .where(whereConditions)
     .orderBy(desc(agentsTerrain.createdAt))
     .limit(perPage)
     .offset((page - 1) * perPage);
@@ -547,7 +567,7 @@ export async function getEmploye(id: string): Promise<Employe | undefined> {
 }
 
 export async function getAllEmployes(): Promise<Employe[]> {
-    return db.select().from(employes).where(notDeleted(employes));
+    return db.select().from(employes);
 }
 
 export async function createEmploye(employe: InsertEmploye): Promise<Employe> {

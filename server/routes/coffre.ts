@@ -264,6 +264,22 @@ coffreRouter.post(
         return res.status(400).json(result);
       }
 
+      // Domain event: transfer cancelled
+      const cancelledTransfert = (result as any).transfert;
+      dispatchDomainEvent({
+        type: "TRANSFER_CANCELLED",
+        data: {
+          transfertId: req.params.id,
+          reference: cancelledTransfert?.reference || "",
+          typeTransfert: cancelledTransfert?.typeTransfert || "",
+          montant: Number(cancelledTransfert?.montant || 0),
+          agenceId: cancelledTransfert?.agenceId || "",
+          reason,
+          cancelledByUserId: userId,
+        },
+        timestamp: new Date(),
+      });
+
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ error: e.message });
@@ -356,29 +372,55 @@ coffreRouter.post(
         userAgent: req.get("User-Agent"),
       });
 
-      // 7. Lock the original transfer to prevent further operations
+      // 7. Lock the original transfer and link to reversal
       await db.update(schema.transfertsCoffreCaisse)
-        .set({ verrouille: true, updatedAt: new Date() })
+        .set({
+          verrouille: true,
+          updatedAt: new Date(),
+          // Add reversal metadata for audit trail
+          commentaire: original.commentaire
+            ? `${original.commentaire}\n\n[ANNULÉ] Transfert compensatoire: ${newTransfert.reference} - ${reason}`
+            : `[ANNULÉ] Transfert compensatoire: ${newTransfert.reference} - ${reason}`
+        })
         .where(eq(schema.transfertsCoffreCaisse.id, original.id));
 
+      // 8. Create audit log for original transfer cancellation
+      await db.insert(schema.transfertsCoffreAuditLogs).values({
+        transfertId: original.id,
+        action: "REVERSED",
+        statutAvant: "EXECUTED",
+        statutApres: "EXECUTED_REVERSED",
+        details: {
+          reason,
+          reversalTransfertId: newTransfert.id,
+          reversalReference: newTransfert.reference,
+          reversalMontant: Number(original.montant),
+          reversalDirection: reverseType,
+        },
+        userId,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
       dispatchDomainEvent({
-        type: "TRANSFER_EXECUTED",
+        type: "TRANSFER_REVERSED",
         data: {
-          transfertId: newTransfert.id,
-          reference: newTransfert.reference,
+          originalTransfertId: original.id,
+          originalReference: original.reference,
+          reversalTransfertId: newTransfert.id,
+          reversalReference: newTransfert.reference,
           typeTransfert: reverseType,
           montant: Number(original.montant),
           agenceId: original.agenceId,
-          executedByUserId: userId,
-          isReversal: true,
-          originalTransfertId: original.id,
+          reversedByUserId: userId,
+          reason,
         },
         timestamp: new Date(),
       });
 
       res.json({
         success: true,
-        message: "Transfert annulé avec succès",
+        message: "Transfert annulé avec succès via compensation",
         originalTransfert: original.reference,
         reversalTransfert: newTransfert,
         execResult,

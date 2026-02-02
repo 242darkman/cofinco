@@ -27,6 +27,8 @@ import type {
   TransferValidatedData,
   TransferRejectedData,
   TransferExecutedData,
+  TransferCancelledData,
+  TransferReversedData,
   ScheduledTransferExecutedData,
   ScheduledTransferFailedData,
   AccountCreatedData,
@@ -1054,6 +1056,55 @@ export async function handleTransferExecuted(data: TransferExecutedData) {
   });
 }
 
+export async function handleTransferCancelled(data: TransferCancelledData) {
+  const canceller = await getUserContact(data.cancelledByUserId);
+
+  const payload = {
+    userName: canceller?.name || "Opérateur",
+    amount: data.montant.toLocaleString("fr-FR"),
+    reference: data.reference,
+    typeTransfert: TRANSFER_TYPE_LABELS[data.typeTransfert] || data.typeTransfert,
+    reason: data.reason,
+  };
+
+  await emitNotificationEvent("TRANSFER_CANCELLED", data as any, {
+    smsRecipients: [],
+    emailRecipients: canceller?.email
+      ? [{ email: canceller.email, templateCode: "TRANSFER_CANCELLED", payload, agenceId: data.agenceId }]
+      : [],
+  });
+
+  logNotificationEvent("info", "Domain event: TRANSFER_CANCELLED", {
+    correlationId: `transfer-cancel-${data.transfertId}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleTransferReversed(data: TransferReversedData) {
+  const reverser = await getUserContact(data.reversedByUserId);
+
+  const payload = {
+    userName: reverser?.name || "Opérateur",
+    amount: data.montant.toLocaleString("fr-FR"),
+    originalReference: data.originalReference,
+    reversalReference: data.reversalReference,
+    typeTransfert: TRANSFER_TYPE_LABELS[data.typeTransfert] || data.typeTransfert,
+    reason: data.reason,
+  };
+
+  await emitNotificationEvent("TRANSFER_REVERSED", data as any, {
+    smsRecipients: [],
+    emailRecipients: reverser?.email
+      ? [{ email: reverser.email, templateCode: "TRANSFER_REVERSED", payload, agenceId: data.agenceId }]
+      : [],
+  });
+
+  logNotificationEvent("info", "Domain event: TRANSFER_REVERSED", {
+    correlationId: `transfer-reverse-${data.originalTransfertId}`,
+    status: "DISPATCHED",
+  });
+}
+
 // ============================================================================
 // SCHEDULED TRANSFER EVENT HANDLERS
 // ============================================================================
@@ -1528,5 +1579,25 @@ export async function handlePaiementTerrainValidated(data: PaiementTerrainValida
   logNotificationEvent("info", "Domain event: PAIEMENT_TERRAIN_VALIDATED", {
     correlationId: `paiement-terrain-${data.paiementId}`,
     status: "DISPATCHED",
+  });
+}
+
+// ============================================================================
+// CREDIT INSTALLMENT & SYSTEM EVENT HANDLERS
+// ============================================================================
+
+export async function handleCreditInstallmentLate(data: any) {
+  // TODO: Implement credit installment late notification
+  logNotificationEvent("info", "Domain event: CREDIT_INSTALLMENT_LATE", {
+    correlationId: `credit-late-${data.creditId || 'unknown'}`,
+    status: "SKIPPED",
+  });
+}
+
+export async function handleSystemJobFailed(data: any) {
+  // TODO: Implement system job failure notification
+  logNotificationEvent("error", "Domain event: SYSTEM_JOB_FAILED", {
+    correlationId: `job-fail-${data.jobId || 'unknown'}`,
+    status: "LOGGED",
   });
 }

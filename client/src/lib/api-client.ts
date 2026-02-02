@@ -1647,6 +1647,10 @@ export const coffreApi = {
     method: 'POST',
     body: JSON.stringify({ reason }),
   }),
+  reverseTransfert: (id: string, data: { reason: string }) => request<any>(`/coffre/transferts/${id}/reverse`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
   listTransferts: (params: any) => {
     const queryParams = new URLSearchParams();
     if (params.agenceId) queryParams.append('agenceId', params.agenceId);

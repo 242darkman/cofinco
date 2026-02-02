@@ -204,8 +204,15 @@ export async function getEmployeWithRoles(id: string): Promise<EmployeWithRoles 
 
 /**
  * Récupérer tous les employés avec leurs données utilisateur, rôle principal, poste et département
+ * @param roleFilter - Filtre optionnel par rôle (ex: 'AGENT_TERRAIN')
  */
-export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
+export async function getAllEmployesWithUsers(roleFilter?: string): Promise<EmployeWithUser[]> {
+  // Build where conditions
+  const conditions = [isNull(users.deletedAt)];
+  if (roleFilter && Object.values(SystemRole).includes(roleFilter as SystemRole)) {
+    conditions.push(eq(userRoles.role, roleFilter as SystemRole));
+  }
+
   const result = await db.select({
     employe: employes,
     user: {
@@ -255,7 +262,7 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
   .leftJoin(agences, eq(employes.agenceId, agences.id))
-  .where(isNull(users.deletedAt))
+  .where(and(...conditions))
   .orderBy(desc(users.createdAt));
 
   return result.map(r => ({
@@ -272,8 +279,19 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
 
 /**
  * Récupérer les employés d'une agence avec rôle principal, poste et département
+ * @param agenceId - ID de l'agence
+ * @param roleFilter - Filtre optionnel par rôle (ex: 'AGENT_TERRAIN')
  */
-export async function getEmployesByAgence(agenceId: string): Promise<EmployeWithUser[]> {
+export async function getEmployesByAgence(agenceId: string, roleFilter?: string): Promise<EmployeWithUser[]> {
+  // Build where conditions
+  const conditions = [
+    eq(employes.agenceId, agenceId),
+    isNull(users.deletedAt)
+  ];
+  if (roleFilter && Object.values(SystemRole).includes(roleFilter as SystemRole)) {
+    conditions.push(eq(userRoles.role, roleFilter as SystemRole));
+  }
+
   const result = await db.select({
     employe: employes,
     user: {
@@ -323,10 +341,7 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
   .leftJoin(agences, eq(employes.agenceId, agences.id))
-  .where(and(
-    eq(employes.agenceId, agenceId),
-    isNull(users.deletedAt)
-  ))
+  .where(and(...conditions))
   .orderBy(desc(users.createdAt));
 
   return result.map(r => ({
