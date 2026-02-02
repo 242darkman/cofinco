@@ -1,7 +1,7 @@
 /**
  * Admin Product Rates Management
  * Manage interest rates and fees for account products
- * Admin-only access - Professional no-scroll interface
+ * Compact, responsive design matching app theme
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -11,24 +11,26 @@ import {
   Edit2,
   X,
   Check,
-  AlertTriangle,
   TrendingUp,
   DollarSign,
-  Clock,
-  History,
-  Shield,
   RefreshCw,
   Loader2,
   Info,
+  Shield,
+  Wallet,
+  PiggyBank,
+  Lock,
+  ArrowUpDown,
+  Search,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, Button, Badge } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
-import { toast, handleApiError } from '../../lib/toast';
+import { toast } from '../../lib/toast';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { cn } from '../../lib/utils';
 
 interface ProduitCompte {
   id: string;
@@ -52,19 +54,25 @@ interface ProduitCompte {
   createdAt: string;
 }
 
-interface RateChange {
-  productId: string;
-  field: string;
-  oldValue: number | null;
-  newValue: number | null;
-  changedAt: string;
-  changedBy: string;
-}
-
-const TYPE_COMPTE_LABELS: Record<string, { label: string; color: string }> = {
-  EPARGNE: { label: 'Épargne', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  COURANT: { label: 'Courant', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  BLOQUE: { label: 'Bloqué', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+const TYPE_CONFIG: Record<string, { label: string; badge: string; icon: React.ElementType; gradient: string }> = {
+  EPARGNE: {
+    label: 'Épargne',
+    badge: 'ÉPARGNE',
+    icon: PiggyBank,
+    gradient: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30',
+  },
+  COURANT: {
+    label: 'Courant',
+    badge: 'COURANT',
+    icon: Wallet,
+    gradient: 'from-blue-500/20 to-indigo-500/20 border-blue-500/30',
+  },
+  BLOQUE: {
+    label: 'Bloqué',
+    badge: 'BLOQUÉ',
+    icon: Lock,
+    gradient: 'from-amber-500/20 to-orange-500/20 border-amber-500/30',
+  },
 };
 
 export default function AdminProductRates() {
@@ -74,15 +82,9 @@ export default function AdminProductRates() {
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{
-    tauxInteret: string;
-    fraisOuverture: string;
-    fraisTenue: string;
-    fraisCloture: string;
-    fraisRetrait: string;
-    soldeMinimum: string;
-    plafondDepot: string;
-  }>({
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState({
     tauxInteret: '',
     fraisOuverture: '',
     fraisTenue: '',
@@ -113,19 +115,41 @@ export default function AdminProductRates() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Erreur lors de la mise à jour');
+        throw new Error(err.error || 'Erreur');
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/produits-compte'] });
-      toast.success('Taux mis à jour avec succès');
+      toast.success('Taux mis à jour');
       setEditingId(null);
     },
     onError: (error: Error) => {
       toast.error(error.message);
     },
   });
+
+  // Filtered products
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchesSearch = p.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.code.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType = !filterType || p.typeCompte === filterType;
+      return matchesSearch && matchesType;
+    });
+  }, [products, searchQuery, filterType]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const active = products.filter(p => p.actif);
+    const avgRate = active.reduce((sum, p) => sum + (parseFloat(p.tauxInteret || '0') || 0), 0) / (active.length || 1);
+    return {
+      total: products.length,
+      active: active.length,
+      avgRate: avgRate.toFixed(2),
+      withRates: active.filter(p => p.tauxInteret && parseFloat(p.tauxInteret) > 0).length,
+    };
+  }, [products]);
 
   const startEditing = useCallback((product: ProduitCompte) => {
     setEditingId(product.id);
@@ -142,21 +166,12 @@ export default function AdminProductRates() {
 
   const cancelEditing = useCallback(() => {
     setEditingId(null);
-    setEditValues({
-      tauxInteret: '',
-      fraisOuverture: '',
-      fraisTenue: '',
-      fraisCloture: '',
-      fraisRetrait: '',
-      soldeMinimum: '',
-      plafondDepot: '',
-    });
   }, []);
 
   const saveChanges = useCallback((product: ProduitCompte) => {
     openConfirm({
       title: 'Confirmer les modifications',
-      message: `Voulez-vous vraiment modifier les taux et frais du produit "${product.nom}" ? Cette action sera enregistrée dans l'historique d'audit.`,
+      message: `Modifier les taux du produit "${product.nom}" ?`,
       variant: 'warning',
       confirmText: 'Confirmer',
       onConfirm: () => {
@@ -179,334 +194,300 @@ export default function AdminProductRates() {
     });
   }, [editValues, openConfirm, updateMutation]);
 
-  // Stats
-  const stats = useMemo(() => {
-    const active = products.filter(p => p.actif);
-    const avgRate = active.reduce((sum, p) => sum + (parseFloat(p.tauxInteret || '0') || 0), 0) / (active.length || 1);
-    return {
-      total: products.length,
-      active: active.length,
-      avgRate: avgRate.toFixed(2),
-      withRates: active.filter(p => p.tauxInteret && parseFloat(p.tauxInteret) > 0).length,
-    };
-  }, [products]);
-
   if (!canManageRates) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <Shield size={48} className="mx-auto mb-4 text-red-400 opacity-50" />
           <h3 className="text-lg font-semibold text-white mb-2">Accès restreint</h3>
-          <p className="text-slate-400">Vous n'avez pas les permissions nécessaires pour accéder à cette page.</p>
+          <p className="text-slate-400 text-sm">Permission requise</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto overflow-x-hidden">
-      {/* Header - Fixed */}
-      <div className="flex-shrink-0 p-6 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700">
+    <div className="space-y-4">
+      {/* Compact Header with Stats */}
+      <div className="bg-linear-to-r from-indigo-600/90 to-purple-600/90 rounded-xl p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg">
-              <Percent className="text-white" size={24} />
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Percent size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Gestion des Taux</h1>
-              <p className="text-slate-400 text-sm">Configuration des taux d'intérêt et frais des produits</p>
+              <h2 className="text-base font-bold text-white">Gestion des Taux</h2>
+              <p className="text-[11px] text-indigo-100/80">Configuration produits</p>
+            </div>
+          </div>
+
+          {/* Inline Stats */}
+          <div className="hidden sm:flex items-center gap-4">
+            <div className="text-center px-3">
+              <p className="text-lg font-bold text-white">{stats.total}</p>
+              <p className="text-[9px] text-indigo-100/70 uppercase">Produits</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center px-3">
+              <p className="text-lg font-bold text-emerald-300">{stats.active}</p>
+              <p className="text-[9px] text-indigo-100/70 uppercase">Actifs</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center px-3">
+              <p className="text-lg font-bold text-amber-300">{stats.avgRate}%</p>
+              <p className="text-[9px] text-indigo-100/70 uppercase">Taux Moy.</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center px-3">
+              <p className="text-lg font-bold text-cyan-300">{stats.withRates}</p>
+              <p className="text-[9px] text-indigo-100/70 uppercase">Avec Taux</p>
             </div>
           </div>
 
           <button
             onClick={() => refetch()}
             disabled={isLoading}
-            className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
+            className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
           >
-            <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={16} className={cn("text-white", isLoading && "animate-spin")} />
           </button>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mt-6">
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Produits</p>
-                <p className="text-2xl font-bold text-white mt-1">{stats.total}</p>
-              </div>
-              <div className="p-2.5 bg-blue-500/10 rounded-lg">
-                <DollarSign size={20} className="text-blue-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Actifs</p>
-                <p className="text-2xl font-bold text-emerald-400 mt-1">{stats.active}</p>
-              </div>
-              <div className="p-2.5 bg-emerald-500/10 rounded-lg">
-                <Check size={20} className="text-emerald-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Taux moyen</p>
-                <p className="text-2xl font-bold text-amber-400 mt-1">{stats.avgRate}%</p>
-              </div>
-              <div className="p-2.5 bg-amber-500/10 rounded-lg">
-                <TrendingUp size={20} className="text-amber-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Avec taux</p>
-                <p className="text-2xl font-bold text-purple-400 mt-1">{stats.withRates}</p>
-              </div>
-              <div className="p-2.5 bg-purple-500/10 rounded-lg">
-                <Percent size={20} className="text-purple-400" />
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Products Grid - Scrollable */}
-      <div className="flex-1 overflow-auto p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="animate-spin text-indigo-400" size={40} />
-          </div>
-        ) : products.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Info size={48} className="mx-auto mb-4 text-slate-500" />
-              <p className="text-slate-400">Aucun produit configuré</p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-            {products.map((product) => {
-              const isEditing = editingId === product.id;
-              const typeInfo = TYPE_COMPTE_LABELS[product.typeCompte] || { label: product.typeCompte, color: 'bg-slate-500/20 text-slate-400' };
+      {/* Toolbar: Search + Type Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher un produit..."
+            className="w-full h-9 pl-9 pr-3 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
+          />
+        </div>
 
-              return (
-                <div
-                  key={product.id}
-                  className={`bg-slate-800/80 backdrop-blur border rounded-xl transition-all ${
-                    isEditing ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-700 hover:border-slate-600'
-                  }`}
-                >
-                  {/* Product Header */}
-                  <div className="p-4 border-b border-slate-700/50">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-white">{product.nom}</h3>
-                          {!product.actif && (
-                            <span className="px-1.5 py-0.5 text-[10px] bg-red-500/20 text-red-400 rounded border border-red-500/30">
-                              Inactif
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 font-mono">{product.code}</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFilterType(null)}
+            className={cn(
+              "h-9 px-3 text-[11px] font-medium rounded-lg border transition-colors",
+              !filterType
+                ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-400"
+                : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white"
+            )}
+          >
+            Tous
+          </button>
+          {Object.entries(TYPE_CONFIG).map(([type, config]) => (
+            <button
+              key={type}
+              onClick={() => setFilterType(filterType === type ? null : type)}
+              className={cn(
+                "h-9 px-3 text-[11px] font-medium rounded-lg border transition-colors flex items-center gap-1.5",
+                filterType === type
+                  ? `bg-linear-to-r ${config.gradient}`
+                  : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white"
+              )}
+            >
+              <config.icon size={12} />
+              {config.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Products Grid */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="animate-spin text-indigo-400" size={32} />
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+          <Info size={32} className="mb-2 opacity-50" />
+          <p className="text-sm">Aucun produit trouvé</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {filteredProducts.map((product) => {
+            const isEditing = editingId === product.id;
+            const config = TYPE_CONFIG[product.typeCompte] || TYPE_CONFIG.COURANT;
+            const TypeIcon = config.icon;
+
+            return (
+              <div
+                key={product.id}
+                className={cn(
+                  "bg-slate-900/50 border rounded-xl overflow-hidden transition-all",
+                  isEditing
+                    ? "border-indigo-500 ring-1 ring-indigo-500/30"
+                    : "border-slate-800 hover:border-slate-700"
+                )}
+              >
+                {/* Product Header - Compact */}
+                <div className={cn("p-3 bg-linear-to-r border-b border-slate-800", config.gradient)}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1.5 bg-white/10 rounded-lg shrink-0">
+                        <TypeIcon size={14} className="text-white" />
                       </div>
-                      <span className={`px-2 py-0.5 text-xs rounded-full border ${typeInfo.color}`}>
-                        {typeInfo.label}
-                      </span>
+                      <div className="min-w-0 flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-white truncate">{product.nom}</h3>
+                        {!product.actif && (
+                          <span className="px-1.5 py-0.5 text-[8px] bg-red-500/30 text-red-300 rounded">
+                            INACTIF
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <span className="px-2 py-0.5 text-[9px] font-bold bg-black/20 text-white/80 rounded">
+                      {config.badge}
+                    </span>
                   </div>
+                </div>
 
-                  {/* Rates & Fees */}
-                  <div className="p-4 space-y-4">
-                    {/* Interest Rate */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <Percent size={14} />
-                        <span className="text-sm">Taux d'intérêt</span>
-                      </div>
-                      {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={editValues.tauxInteret}
-                            onChange={(e) => setEditValues({ ...editValues, tauxInteret: e.target.value })}
-                            className="w-20 px-2 py-1 text-right text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
-                            placeholder="0.00"
-                          />
-                          <span className="text-slate-400 text-sm">%</span>
-                        </div>
-                      ) : (
-                        <span className="font-semibold text-white">
-                          {product.tauxInteret ? `${parseFloat(product.tauxInteret).toFixed(2)}%` : '-'}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Fees Grid */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-slate-700/30 rounded-lg p-2.5">
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Ouverture</p>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            value={editValues.fraisOuverture}
-                            onChange={(e) => setEditValues({ ...editValues, fraisOuverture: e.target.value })}
-                            className="w-full px-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
-                            placeholder="0"
-                          />
-                        ) : (
-                          <p className="text-white font-medium text-sm">
-                            {product.frais?.ouverture?.toLocaleString() || '-'} FCFA
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="bg-slate-700/30 rounded-lg p-2.5">
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Tenue mensuelle</p>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            value={editValues.fraisTenue}
-                            onChange={(e) => setEditValues({ ...editValues, fraisTenue: e.target.value })}
-                            className="w-full px-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
-                            placeholder="0"
-                          />
-                        ) : (
-                          <p className="text-white font-medium text-sm">
-                            {product.frais?.tenue?.toLocaleString() || '-'} FCFA
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="bg-slate-700/30 rounded-lg p-2.5">
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Retrait</p>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            value={editValues.fraisRetrait}
-                            onChange={(e) => setEditValues({ ...editValues, fraisRetrait: e.target.value })}
-                            className="w-full px-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
-                            placeholder="0"
-                          />
-                        ) : (
-                          <p className="text-white font-medium text-sm">
-                            {product.frais?.retrait?.toLocaleString() || '-'} FCFA
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="bg-slate-700/30 rounded-lg p-2.5">
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Clôture</p>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            value={editValues.fraisCloture}
-                            onChange={(e) => setEditValues({ ...editValues, fraisCloture: e.target.value })}
-                            className="w-full px-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
-                            placeholder="0"
-                          />
-                        ) : (
-                          <p className="text-white font-medium text-sm">
-                            {product.frais?.cloture?.toLocaleString() || '-'} FCFA
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Rules */}
-                    <div className="pt-3 border-t border-slate-700/50">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Solde minimum</p>
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editValues.soldeMinimum}
-                              onChange={(e) => setEditValues({ ...editValues, soldeMinimum: e.target.value })}
-                              className="w-full px-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
-                              placeholder="0"
-                            />
-                          ) : (
-                            <p className="text-slate-300 text-sm">
-                              {product.regles?.soldeMinimum?.toLocaleString() || '-'} FCFA
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Plafond dépôt</p>
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editValues.plafondDepot}
-                              onChange={(e) => setEditValues({ ...editValues, plafondDepot: e.target.value })}
-                              className="w-full px-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
-                              placeholder="0"
-                            />
-                          ) : (
-                            <p className="text-slate-300 text-sm">
-                              {product.regles?.plafondDepot?.toLocaleString() || 'Illimité'}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="px-4 py-3 bg-slate-900/50 border-t border-slate-700/50 flex items-center justify-between">
-                    <p className="text-[10px] text-slate-500">
-                      Créé le {format(new Date(product.createdAt), 'dd/MM/yyyy', { locale: fr })}
-                    </p>
-
+                {/* Rate Display - Prominent */}
+                <div className="px-3 py-2.5 bg-slate-800/30 border-b border-slate-800/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                      <Percent size={10} />
+                      Taux d'intérêt
+                    </span>
                     {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={cancelEditing}
-                          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
-                        >
-                          <X size={16} />
-                        </button>
-                        <button
-                          onClick={() => saveChanges(product)}
-                          disabled={updateMutation.isPending}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50"
-                        >
-                          {updateMutation.isPending ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Save size={14} />
-                          )}
-                          Enregistrer
-                        </button>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editValues.tauxInteret}
+                          onChange={(e) => setEditValues({ ...editValues, tauxInteret: e.target.value })}
+                          className="w-16 px-2 py-0.5 text-right text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
+                        />
+                        <span className="text-slate-400 text-xs">%</span>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => startEditing(product)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg text-sm transition"
-                      >
-                        <Edit2 size={14} />
-                        Modifier
-                      </button>
+                      <span className={cn(
+                        "text-lg font-bold",
+                        product.tauxInteret && parseFloat(product.tauxInteret) > 0
+                          ? "text-emerald-400"
+                          : "text-slate-500"
+                      )}>
+                        {product.tauxInteret ? `${parseFloat(product.tauxInteret).toFixed(2)}%` : '0.00%'}
+                      </span>
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
-      {/* Confirm Dialog */}
+                {/* Fees Grid - Compact */}
+                <div className="p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <FeeField
+                      label="Ouverture"
+                      value={product.frais?.ouverture}
+                      editValue={editValues.fraisOuverture}
+                      isEditing={isEditing}
+                      onChange={(v) => setEditValues({ ...editValues, fraisOuverture: v })}
+                    />
+                    <FeeField
+                      label="Tenue/mois"
+                      value={product.frais?.tenue}
+                      editValue={editValues.fraisTenue}
+                      isEditing={isEditing}
+                      onChange={(v) => setEditValues({ ...editValues, fraisTenue: v })}
+                    />
+                    <FeeField
+                      label="Retrait"
+                      value={product.frais?.retrait}
+                      editValue={editValues.fraisRetrait}
+                      isEditing={isEditing}
+                      onChange={(v) => setEditValues({ ...editValues, fraisRetrait: v })}
+                    />
+                    <FeeField
+                      label="Clôture"
+                      value={product.frais?.cloture}
+                      editValue={editValues.fraisCloture}
+                      isEditing={isEditing}
+                      onChange={(v) => setEditValues({ ...editValues, fraisCloture: v })}
+                    />
+                  </div>
+
+                  {/* Rules - Inline */}
+                  <div className="mt-2 pt-2 border-t border-slate-800/50 grid grid-cols-2 gap-2">
+                    <div className="text-[10px]">
+                      <span className="text-slate-500">Min: </span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editValues.soldeMinimum}
+                          onChange={(e) => setEditValues({ ...editValues, soldeMinimum: e.target.value })}
+                          className="w-16 px-1 py-0.5 bg-slate-700 border border-slate-600 rounded text-white text-[10px]"
+                        />
+                      ) : (
+                        <span className="text-slate-300">
+                          {product.regles?.soldeMinimum?.toLocaleString() || '-'} F
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px]">
+                      <span className="text-slate-500">Plafond: </span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editValues.plafondDepot}
+                          onChange={(e) => setEditValues({ ...editValues, plafondDepot: e.target.value })}
+                          className="w-16 px-1 py-0.5 bg-slate-700 border border-slate-600 rounded text-white text-[10px]"
+                        />
+                      ) : (
+                        <span className="text-slate-300">
+                          {product.regles?.plafondDepot?.toLocaleString() || '∞'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions Footer */}
+                <div className="px-3 py-2 bg-slate-900/50 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-[9px] text-slate-600">
+                    {format(new Date(product.createdAt), 'dd/MM/yy', { locale: fr })}
+                  </span>
+
+                  {isEditing ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={cancelEditing}
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                      >
+                        <X size={14} />
+                      </button>
+                      <button
+                        onClick={() => saveChanges(product)}
+                        disabled={updateMutation.isPending}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-medium transition disabled:opacity-50"
+                      >
+                        {updateMutation.isPending ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Save size={12} />
+                        )}
+                        Sauver
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => startEditing(product)}
+                      className="flex items-center gap-1 px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded text-[11px] transition"
+                    >
+                      <Edit2 size={12} />
+                      Modifier
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <ConfirmDialog
         isOpen={confirmState.isOpen}
         onClose={closeConfirm}
@@ -516,6 +497,40 @@ export default function AdminProductRates() {
         variant={confirmState.variant}
         confirmText={confirmState.confirmText}
       />
+    </div>
+  );
+}
+
+// Compact Fee Field Component
+function FeeField({
+  label,
+  value,
+  editValue,
+  isEditing,
+  onChange,
+}: {
+  label: string;
+  value?: number;
+  editValue: string;
+  isEditing: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="bg-slate-800/40 rounded-lg px-2.5 py-2">
+      <p className="text-[9px] text-slate-500 uppercase tracking-wide mb-0.5">{label}</p>
+      {isEditing ? (
+        <input
+          type="number"
+          value={editValue}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
+          placeholder="0"
+        />
+      ) : (
+        <p className="text-xs font-medium text-white">
+          {value?.toLocaleString() || '-'} <span className="text-slate-500 text-[10px]">F</span>
+        </p>
+      )}
     </div>
   );
 }
