@@ -261,6 +261,7 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "COMPTE_TRANSFERE_AGENCE",
   // Caisse Agent events
   "CAISSE_AGENT_SOLDE_CHANGE",
+  "OPERATION_TERRAIN_CREATED",
   "OPERATION_TERRAIN_SUBMITTED",
   "OPERATION_TERRAIN_APPROVED",
   "OPERATION_TERRAIN_REJECTED",

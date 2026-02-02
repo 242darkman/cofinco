@@ -1106,6 +1106,42 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Transfert émis vers caisse',
     priority: 10,
   },
+
+  // ============================================================================
+  // OPÉRATIONS AGENT TERRAIN - WORKFLOW PENDING_SETTLEMENT
+  // ============================================================================
+
+  // Collecte agent terrain en attente de REMISE (ne touche pas comptes clients)
+  {
+    code: 'AGENT_COLLECT_PENDING',
+    name: 'Collecte agent terrain (en attente remise)',
+    description: 'Encaissement par agent terrain - en attente de remise',
+    sourceType: 'MOUVEMENT',
+    eventType: 'MISC_COLLECTION',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '573',   // Caisse agent terrain (reçoit cash)
+    creditAccount: '581',  // Virements internes (transit/suspens)
+    descriptionTemplate: 'Collecte agent terrain en attente remise',
+    priority: 10,
+  },
+
+  // Transfert agent → caisse agence (combiné en une seule écriture GL)
+  // Note: Le mouvement de sortie agent (MISC_DISBURSEMENT) n'a pas de règle GL
+  // car il est compensé par le mouvement d'entrée caisse ci-dessous
+  {
+    code: 'AGENT_REMISE_TRANSFER',
+    name: 'Transfert remise agent vers caisse',
+    description: 'Transfert physique de cash de l\'agent vers caisse agence',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CASH_TRANSFER',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '521',   // Caisse centrale (reçoit cash)
+    creditAccount: '573',  // Caisse agent terrain (donne cash)
+    descriptionTemplate: 'Remise agent terrain vers caisse',
+    priority: 10,
+  },
 ];
 
 // ============================================================================

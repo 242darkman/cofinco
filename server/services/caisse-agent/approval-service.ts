@@ -283,6 +283,7 @@ export class ApprovalService {
         reference: refCaisseAgent,
         agentId: operation.agentId,
         clientId: operation.clientId,
+        typePaiement: "MISC_COLLECTION" as any, // Type pour matching des règles comptables
         sourceModule: "CAISSE_AGENT" as any,
         sourceTable: "operations_terrain",
         sourceId: operation.id,
@@ -726,6 +727,7 @@ export class ApprovalService {
         methodePaiement: "CASH",
         reference: refCaisseAgent,
         agentId: operation.agentId,
+        typePaiement: "MISC_DISBURSEMENT" as any, // Type pour matching des règles comptables
         sourceModule: "CAISSE_AGENT" as any,
         sourceTable: "operations_terrain",
         sourceId: operation.id,
@@ -765,6 +767,7 @@ export class ApprovalService {
         methodePaiement: "CASH",
         reference: refCaisse,
         agentId: operation.agentId,
+        typePaiement: "CASH_TRANSFER" as any, // Type spécifique pour réception remise agent
         sourceModule: "CAISSE",
         sourceTable: "operations_terrain",
         sourceId: operation.id,

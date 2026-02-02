@@ -155,7 +155,7 @@ export class OperationService {
 
       // 7. Broadcast event for real-time updates (badge, list)
       await tx.insert(evenementsOutbox).values({
-        type: "OPERATION_TERRAIN_CREATED" as any,
+        type: "OPERATION_TERRAIN_CREATED",
         aggregateType: "operation_terrain",
         aggregateId: operation.id,
         payload: {
@@ -285,7 +285,7 @@ export class OperationService {
 
       // 8. Broadcast event for real-time updates (badge, list)
       await tx.insert(evenementsOutbox).values({
-        type: "OPERATION_TERRAIN_CREATED" as any,
+        type: "OPERATION_TERRAIN_CREATED",
         aggregateType: "operation_terrain",
         aggregateId: operation.id,
         payload: {
