@@ -208,6 +208,11 @@ async function handleMtnWebhook(req: Request, res: Response) {
     result: "success",
   };
 
+  // DEBUG LOGS
+  console.log(">>> [DEBUG] MTN WEBHOOK RECEIVED");
+  console.log("HEADERS:", JSON.stringify(req.headers, null, 2));
+  console.log("BODY:", JSON.stringify(req.body, null, 2));
+
   try {
     const signature = (req.headers["x-callback-signature"] as string) || "";
     const headers = req.headers as Record<string, string>;
@@ -350,6 +355,81 @@ paymentsRouter.post("/payout", async (req, res) => {
       error: "Erreur lors de l'initiation du payout",
       message: error instanceof Error ? error.message : "Erreur inconnue",
     });
+  }
+});
+
+/**
+ * GET /api/payments/sandbox-info
+ * Obtenir les informations de configuration sandbox
+ */
+paymentsRouter.get("/sandbox-info", async (req, res) => {
+  try {
+    if (!req.session?.user?.id) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
+
+    // Import dynamique pour éviter les dépendances circulaires
+    const { loadMtnConfigFromEnv } = await import("../services/mobile-money/providers/mtn/mtn-config");
+    const { getSandboxHelpMessage, MTN_SANDBOX_TEST_NUMBERS } = await import("../services/mobile-money/providers/mtn/mtn-sandbox-helpers");
+
+    const config = loadMtnConfigFromEnv();
+
+    res.json({
+      environment: config.environment,
+      isSandbox: config.environment === "sandbox",
+      testNumbers: config.environment === "sandbox" ? MTN_SANDBOX_TEST_NUMBERS : undefined,
+      helpMessage: getSandboxHelpMessage(config.environment),
+      currency: config.currency,
+      targetEnvironment: config.targetEnvironment
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Sandbox info error');
+    res.status(500).json({ error: "Erreur lors de la récupération des informations sandbox" });
+  }
+});
+
+/**
+ * POST /api/payments/validate-phone
+ * Valider un numéro de téléphone en sandbox
+ */
+paymentsRouter.post("/validate-phone", async (req, res) => {
+  try {
+    if (!req.session?.user?.id) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
+
+    const { phone, provider } = req.body;
+
+    if (!phone || !provider) {
+      return res.status(400).json({ error: "Numéro et provider requis" });
+    }
+
+    if (provider === "MTN") {
+      const { loadMtnConfigFromEnv } = await import("../services/mobile-money/providers/mtn/mtn-config");
+      const { validateSandboxPhoneNumber, getMtnSandboxBehavior } = await import("../services/mobile-money/providers/mtn/mtn-sandbox-helpers");
+
+      const config = loadMtnConfigFromEnv();
+
+      if (config.environment === "sandbox") {
+        const validation = validateSandboxPhoneNumber(phone);
+        const behavior = getMtnSandboxBehavior(phone);
+
+        return res.json({
+          ...validation,
+          behavior: behavior.isTestNumber ? {
+            expectedStatus: behavior.expectedStatus,
+            expectedDelay: behavior.expectedDelay,
+            reason: behavior.reason
+          } : undefined
+        });
+      }
+    }
+
+    // En production ou pour Airtel, pas de validation spécifique
+    res.json({ isValid: true });
+  } catch (error) {
+    logger.error({ err: error }, 'Phone validation error');
+    res.status(500).json({ error: "Erreur lors de la validation du numéro" });
   }
 });
 

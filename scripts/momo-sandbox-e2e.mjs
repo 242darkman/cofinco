@@ -369,6 +369,8 @@ async function main() {
     console.log("");
     console.log("  Sauvegardez ces valeurs dans .env pour les reutiliser.");
   } else {
+    console.log("  > Variables MTN_MOMO_API_USER_ID et MTN_MOMO_API_KEY detectees.");
+    console.log("  > Provisionnement saute (utilisation des credentials existants).");
     resultLine("Statut:", "Credentials existants (env)", "green");
     kv("API User ID:", userId);
     kv("API Key:", apiKey.slice(0, 8) + "****");

@@ -30,6 +30,12 @@ import {
   maskMtnConfig,
   type MtnProviderConfig,
 } from "./mtn-config";
+import {
+  validateSandboxPhoneNumber,
+  getSandboxTimeout,
+  getMtnSandboxBehavior,
+  getSandboxHelpMessage
+} from "./mtn-sandbox-helpers";
 import { createLogger } from "../../../../lib/logger";
 
 const logger = createLogger('MtnProvider');
@@ -113,7 +119,19 @@ export class MtnProvider implements IMobileMoneyProvider {
    * MTN envoie une demande de paiement sur le téléphone du client
    */
   async collect(request: CollectRequest): Promise<CollectResponse> {
-    const { amount, phone, externalRef, description } = request;
+    const { amount, phone, externalRef, description, callbackUrl } = request;
+
+    // Valider le numéro en sandbox
+    if (this.config.environment === "sandbox") {
+      const validation = validateSandboxPhoneNumber(phone);
+      if (validation.warning) {
+        logger.warn({
+          phone: phone.slice(-4),
+          warning: validation.warning,
+          suggestion: validation.suggestion
+        }, 'Sandbox phone number warning');
+      }
+    }
 
     // Générer le X-Reference-Id (UUID unique pour cette transaction)
     const referenceId = MtnAuthService.generateReferenceId();
@@ -137,12 +155,24 @@ export class MtnProvider implements IMobileMoneyProvider {
       payeeNote: `Collection ${externalRef}`,
     };
 
+    // Use config callbackUrl (source of truth) or fallback to request
+    const finalCallbackUrl = this.config.callbackUrl || callbackUrl;
+
+    // Log sandbox behavior if applicable
+    const sandboxBehavior = getMtnSandboxBehavior(phone);
+
     logger.info({
       referenceId,
       externalRef,
       amount,
       currency: this.config.currency,
       phoneLastDigits: phone.slice(-4),
+      callbackUrl: finalCallbackUrl,
+      environment: this.config.environment,
+      ...(sandboxBehavior.isTestNumber && {
+        sandboxExpectedStatus: sandboxBehavior.expectedStatus,
+        sandboxExpectedDelay: sandboxBehavior.expectedDelay
+      })
     }, 'Initiating collection');
 
     try {
@@ -155,7 +185,7 @@ export class MtnProvider implements IMobileMoneyProvider {
           "X-Reference-Id": referenceId,
           "X-Target-Environment": this.config.targetEnvironment,
           "Ocp-Apim-Subscription-Key": this.config.subscriptionKeys.collection,
-          ...(this.config.callbackUrl && { "X-Callback-Url": this.config.callbackUrl }),
+          ...(finalCallbackUrl && { "X-Callback-Url": finalCallbackUrl }),
         }
       );
 
@@ -207,6 +237,18 @@ export class MtnProvider implements IMobileMoneyProvider {
   async payout(request: PayoutRequest): Promise<PayoutResponse> {
     const { amount, phone, externalRef, description } = request;
 
+    // Valider le numéro en sandbox
+    if (this.config.environment === "sandbox") {
+      const validation = validateSandboxPhoneNumber(phone);
+      if (validation.warning) {
+        logger.warn({
+          phone: phone.slice(-4),
+          warning: validation.warning,
+          suggestion: validation.suggestion
+        }, 'Sandbox phone number warning');
+      }
+    }
+
     // Générer le X-Reference-Id
     const referenceId = MtnAuthService.generateReferenceId();
 
@@ -229,12 +271,20 @@ export class MtnProvider implements IMobileMoneyProvider {
       payeeNote: `Transfer ${externalRef}`,
     };
 
+    // Log sandbox behavior if applicable
+    const sandboxBehavior = getMtnSandboxBehavior(phone);
+
     logger.info({
       referenceId,
       externalRef,
       amount,
       currency: this.config.currency,
       phoneLastDigits: phone.slice(-4),
+      environment: this.config.environment,
+      ...(sandboxBehavior.isTestNumber && {
+        sandboxExpectedStatus: sandboxBehavior.expectedStatus,
+        sandboxExpectedDelay: sandboxBehavior.expectedDelay
+      })
     }, 'Initiating disbursement');
 
     try {
@@ -669,6 +719,8 @@ export class MtnProvider implements IMobileMoneyProvider {
   invalidateAuthCache(): void {
     this.authService.invalidateAllTokens();
   }
+
+
 }
 
 export default MtnProvider;

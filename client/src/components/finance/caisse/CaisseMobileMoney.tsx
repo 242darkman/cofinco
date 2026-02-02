@@ -103,6 +103,18 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
   const [showPresenceModal, setShowPresenceModal] = useState(false);
 
+  // Sandbox configuration
+  const [sandboxInfo, setSandboxInfo] = useState<{
+    isSandbox: boolean;
+    testNumbers?: Record<string, string>;
+    helpMessage?: string;
+  } | null>(null);
+  const [phoneValidation, setPhoneValidation] = useState<{
+    warning?: string;
+    suggestion?: string;
+    behavior?: { expectedStatus: string; expectedDelay?: number };
+  } | null>(null);
+
   // Data caching for dynamic info
   const [creditsActifs, setCreditsActifs] = useState<any[]>([]);
   const [tontinesActives, setTontinesActives] = useState<any[]>([]);
@@ -163,6 +175,22 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
     loadSecurityConfig();
   }, []);
 
+  // Load sandbox info on mount
+  useEffect(() => {
+    const loadSandboxInfo = async () => {
+      try {
+        const res = await fetch('/api/payments/sandbox-info', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setSandboxInfo(data);
+        }
+      } catch (error) {
+        console.error('Erreur chargement info sandbox:', error);
+      }
+    };
+    loadSandboxInfo();
+  }, []);
+
   // Polling for payment status
   useEffect(() => {
     if (!paymentIntent || !showPaymentStatusModal) return;
@@ -172,9 +200,12 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
 
     const pollInterval = setInterval(async () => {
       try {
+        console.log(`[Polling] Checking status for ${paymentIntent.id}...`); 
         const res = await fetch(`/api/payments/${paymentIntent.id}`, { credentials: 'include' });
+        
         if (res.ok) {
           const intent: PaymentIntent = await res.json();
+          console.log(`[Polling] Status received: ${intent.status}`, intent);
           setPaymentStatus(intent.status);
           setPaymentIntent(intent);
 
@@ -201,6 +232,36 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
       setPhoneNumber(clientPhone);
     }
   }, [selectedClient]);
+
+  // Validate phone number in sandbox
+  useEffect(() => {
+    const validatePhone = async () => {
+      if (!phoneNumber || !sandboxInfo?.isSandbox || provider !== 'MTN') {
+        setPhoneValidation(null);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/payments/validate-phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ phone: phoneNumber, provider })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setPhoneValidation(data);
+        }
+      } catch (error) {
+        console.error('Erreur validation téléphone:', error);
+      }
+    };
+
+    // Debounce validation
+    const timeout = setTimeout(validatePhone, 500);
+    return () => clearTimeout(timeout);
+  }, [phoneNumber, sandboxInfo, provider]);
 
   // Check if operation requires presence verification
   const requiresPresenceVerification = useCallback((opType: string, subType?: string): boolean => {
@@ -300,11 +361,16 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
       const endpoint = isCollection ? '/api/payments/collect' : '/api/payments/payout';
       const paymentType = getPaymentIntentType(typeOperation, subType);
 
+      // Generate idempotency key to prevent duplicate payments
+      const idempotencyKey = crypto.randomUUID();
+
       const payload: any = {
         provider,
         amount: parseFloat(montant),
         phone: phoneNumber,
         clientId: selectedClient.id,
+        agenceId: user?.agenceId,
+        idempotencyKey,
         type: paymentType,
         metadata: {
           sessionId,
@@ -313,9 +379,28 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
         }
       };
 
-      // Add specific IDs based on type
-      // In a real app, you'd select the specific compte/credit/tontine ID
-      // For now we just pass clientId
+      // Add specific IDs based on operation type
+      if (subType === 'Remboursement Crédit' && creditsActifs.length > 0) {
+        payload.creditId = creditsActifs[0].id;
+      }
+
+      if (subType === 'Décaissement Crédit' && creditsActifs.length > 0) {
+        payload.creditId = creditsActifs[0].id;
+      }
+
+      if (subType === 'Cotisation Tontine' && tontinesActives.length > 0) {
+        payload.tontineId = tontinesActives[0].id;
+      }
+
+      if (subType === 'Distribution Tontine' && tontinesActives.length > 0) {
+        payload.tontineId = tontinesActives[0].id;
+      }
+
+      if (comptesClient.length > 0 && !payload.creditId && !payload.tontineId) {
+        // For compte operations (Courant, Épargne, Bloqué), use the first compte
+        // Only add compteId if we haven't already set creditId or tontineId
+        payload.compteId = comptesClient[0].id;
+      }
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -398,6 +483,19 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
 
   return (
     <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30">
+      {/* Sandbox Banner */}
+      {sandboxInfo?.isSandbox && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
+          <AlertCircle size={14} className="text-yellow-400" />
+          <div className="flex-1">
+            <p className="text-xs text-yellow-400 font-bold">Mode Sandbox MTN MoMo</p>
+            <p className="text-[10px] text-yellow-400/70">
+              Utilisez les numéros de test : {sandboxInfo.testNumbers?.SUCCESS_IMMEDIATE} (succès immédiat) ou {sandboxInfo.testNumbers?.SUCCESS_DELAYED} (succès après 30s)
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       <UniversalPaymentSuccessModal
         isOpen={showSuccessModal}
@@ -618,10 +716,30 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                                     type="tel"
                                     value={phoneNumber}
                                     onChange={(e) => setPhoneNumber(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-9 pr-3 text-sm text-white focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none font-mono"
+                                    className={`w-full bg-slate-950 border rounded-xl py-3 pl-9 pr-3 text-sm text-white focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none font-mono ${
+                                      phoneValidation?.warning ? 'border-yellow-500/50' : 'border-slate-800'
+                                    }`}
                                     placeholder="06..."
                                 />
                             </div>
+                            {phoneValidation?.warning && (
+                              <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[10px] text-yellow-400 space-y-1">
+                                <p className="font-bold flex items-center gap-1">
+                                  <AlertCircle size={10} />
+                                  Mode Sandbox
+                                </p>
+                                <p className="text-yellow-400/80">{phoneValidation.warning}</p>
+                                {phoneValidation.suggestion && (
+                                  <p className="text-yellow-300 font-mono">{phoneValidation.suggestion}</p>
+                                )}
+                                {phoneValidation.behavior && (
+                                  <p className="text-emerald-400 font-mono text-[9px]">
+                                    ✓ Test: {phoneValidation.behavior.expectedStatus}
+                                    {phoneValidation.behavior.expectedDelay && ` après ${phoneValidation.behavior.expectedDelay / 1000}s`}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                         </div>
                          <div className="space-y-1.5">
                             <label className="text-xs text-slate-500 font-medium">Montant (FCFA)</label>

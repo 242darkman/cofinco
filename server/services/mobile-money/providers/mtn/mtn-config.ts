@@ -70,6 +70,11 @@ export function loadMtnConfigFromEnv(): MtnProviderConfig {
     throw new Error("[MTN Config] Production requires HTTPS callback URL");
   }
 
+  // Currency et country adaptés selon l'environnement
+  // Sandbox utilise EUR/NL, Production utilise XAF/CG
+  const defaultCurrency = environment === "sandbox" ? "EUR" : "XAF";
+  const defaultCountry = environment === "sandbox" ? "NL" : "CG";
+
   const config: MtnProviderConfig = {
     environment,
     baseUrl,
@@ -98,9 +103,10 @@ export function loadMtnConfigFromEnv(): MtnProviderConfig {
     callbackUrl,
     callbackToken: process.env.MTN_MOMO_CALLBACK_TOKEN,
 
-    // Defaults
-    currency: process.env.MTN_MOMO_CURRENCY || "XAF",
-    country: process.env.MTN_MOMO_COUNTRY || "CG", // Congo
+    // Currency et Country adaptés automatiquement selon environnement
+    // Sandbox: EUR/NL, Production: XAF/CG (sauf override explicite)
+    currency: process.env.MTN_MOMO_CURRENCY || defaultCurrency,
+    country: process.env.MTN_MOMO_COUNTRY || defaultCountry,
     targetEnvironment: process.env.MTN_MOMO_TARGET_ENVIRONMENT || environment,
 
     // Timeouts
@@ -182,9 +188,9 @@ export const DEFAULT_SANDBOX_CONFIG: Partial<MtnProviderConfig> = {
   currency: "EUR", // Sandbox utilise EUR
   country: "NL", // Sandbox simule Netherlands
   targetEnvironment: "sandbox",
-  requestTimeout: 30000,
+  requestTimeout: 30000, // Timeout plus court en sandbox
   tokenRefreshBuffer: 120000,
-  maxRetries: 3,
+  maxRetries: 2, // Moins de retries en sandbox
   retryDelayMs: 1000,
 };
 

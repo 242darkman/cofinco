@@ -89,12 +89,17 @@ class PaymentService {
     // Récupérer le provider
     const providerInstance = providerRegistry.getOrThrow(provider);
 
+    // Récupérer la currency du provider (adapté selon sandbox/production)
+    const providerConfig = (providerInstance as any).config || (providerInstance as any).getConfig?.() || {};
+    const currency = providerConfig.currency || "XAF";
+
     // Créer l'intent avec status CREATED
     const intent = await storage.createPaymentIntent({
       provider,
       type: "COLLECTION",
       status: "CREATED",
       amount: amount.toString(),
+      currency,
       phone,
       clientId,
       compteId,
@@ -112,12 +117,14 @@ class PaymentService {
 
     try {
       // Appeler le provider
-      const callbackUrl = `${CALLBACK_BASE_URL}/api/webhooks/${provider.toLowerCase()}`;
+      // Use provider's configured callback URL (from MTN_MOMO_CALLBACK_URL)
+      // If not configured, fallback to constructing from APP_URL
+      const providerCallbackUrl = providerConfig.callbackUrl || `${CALLBACK_BASE_URL}/api/webhooks/${provider.toLowerCase()}`;
       const response = await providerInstance.collect({
         amount,
         phone,
         externalRef: intent.externalRef,
-        callbackUrl,
+        callbackUrl: providerCallbackUrl,
         description,
       });
 
@@ -127,7 +134,7 @@ class PaymentService {
         status: "PENDING",
         initiatedAt: new Date(),
         expireAt: new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000),
-        callbackUrl,
+        callbackUrl: providerCallbackUrl,
       });
 
       logger.info({ intentId: intent.id, providerRef: response.providerRef }, 'Collection initiated');
@@ -183,12 +190,17 @@ class PaymentService {
     // Récupérer le provider
     const providerInstance = providerRegistry.getOrThrow(provider);
 
+    // Récupérer la currency du provider (adapté selon sandbox/production)
+    const providerConfig = (providerInstance as any).config || (providerInstance as any).getConfig?.() || {};
+    const currency = providerConfig.currency || "XAF";
+
     // Créer l'intent avec status CREATED
     const intent = await storage.createPaymentIntent({
       provider,
       type: "PAYOUT",
       status: "CREATED",
       amount: amount.toString(),
+      currency,
       phone,
       clientId,
       compteId,
@@ -252,6 +264,8 @@ class PaymentService {
 
     // 1. Logger l'événement brut
     const parsedPayload = providerInstance.parseWebhookPayload(payload);
+    console.log(">>> [DEBUG] Parsed Payload:", JSON.stringify(parsedPayload, null, 2));
+
     const event = await storage.createProviderEvent({
       provider,
       eventType: parsedPayload.status || "UNKNOWN",
@@ -265,7 +279,11 @@ class PaymentService {
     logger.info({ provider, eventId: event.id }, 'Webhook received');
 
     // 2. Vérifier la signature
-    if (!providerInstance.verifyWebhook(payload, signature, headers)) {
+    const isValid = providerInstance.verifyWebhook(payload, signature, headers);
+    console.log(`>>> [DEBUG] Webhook Signature Valid: ${isValid}`);
+    console.log(`>>> [DEBUG] Signature headers present:`, JSON.stringify(headers));
+
+    if (!isValid) {
       logger.warn({ provider }, 'Invalid webhook signature');
       await storage.markEventProcessed(event.id, undefined, "INVALID_SIGNATURE");
       return; // Ne pas lever d'erreur, retourner 200 quand même
@@ -283,13 +301,17 @@ class PaymentService {
     }
 
     if (!intent) {
+      console.log(">>> [DEBUG] NO INTENT FOUND for ref:", parsedPayload.providerRef || parsedPayload.externalRef);
       logger.warn({ provider, providerRef: parsedPayload.providerRef }, 'Orphan webhook: no intent found');
       await storage.markEventProcessed(event.id, undefined, "INTENT_NOT_FOUND");
       return;
     }
+    
+    console.log(`>>> [DEBUG] Intent Found: ${intent.id} | Status: ${intent.status}`);
 
     // 4. Vérifier l'idempotence
     if (["SUCCESS", "FAILED", "EXPIRED", "CANCELLED", "REVERSED"].includes(intent.status)) {
+      console.log(">>> [DEBUG] Intent already terminal, skipping.");
       logger.info({ intentId: intent.id, status: intent.status }, 'Intent already in terminal state');
       await storage.markEventProcessed(event.id, intent.id, "ALREADY_PROCESSED");
       return;
@@ -297,6 +319,8 @@ class PaymentService {
 
     // 5. Normaliser le statut
     const normalizedStatus = providerInstance.normalizeStatus(parsedPayload.status);
+    console.log(`>>> [DEBUG] Local Intent Status: ${intent.status} -> New Provider Status: ${parsedPayload.status} (Normalized: ${normalizedStatus})`);
+
 
     // 6. Traiter selon le statut
     if (normalizedStatus === "SUCCESS") {
