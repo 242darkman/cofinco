@@ -25,6 +25,10 @@
     "audit:integrity": "node --env-file=.env --import tsx scripts/audit-integrity.ts",
     "verify:accounting-rules": "node --env-file=.env --import tsx scripts/verify-accounting-rules-completeness.ts",
     "diagnose:balance": "node --env-file=.env --import tsx scripts/diagnose-balance-issues.ts",
+    "monitor:gl": "node --env-file=.env --import tsx scripts/monitor-gl-strict.ts",
+    "monitor:gl:alert": "node --env-file=.env --import tsx scripts/monitor-gl-strict.ts --alert",
+    "cleanup:logs": "node --env-file=.env --import tsx scripts/cleanup-logs.ts",
+    "cleanup:logs:dry-run": "node --env-file=.env --import tsx scripts/cleanup-logs.ts --dry-run",
     "test": "vitest"
   },
   "dependencies": {

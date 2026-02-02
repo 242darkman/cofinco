@@ -5,7 +5,7 @@
 
 import { db } from '../db';
 import { accountingRules } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, isNull } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 
 /**
@@ -16,19 +16,27 @@ export async function validateAccountingRule(
   eventType: string,
   agenceId?: string
 ): Promise<boolean> {
+  // Chercher une règle qui correspond au type d'événement
+  // et qui est soit globale (agenceId IS NULL) soit spécifique à l'agence
+  const whereCondition = agenceId
+    ? and(
+        eq(accountingRules.eventType, eventType),
+        eq(accountingRules.active, true),
+        or(
+          isNull(accountingRules.agenceId),  // Règle globale
+          eq(accountingRules.agenceId, agenceId)  // Règle spécifique à l'agence
+        )
+      )
+    : and(
+        eq(accountingRules.eventType, eventType),
+        eq(accountingRules.active, true),
+        isNull(accountingRules.agenceId)  // Seulement les règles globales
+      );
+
   const rules = await db
     .select()
     .from(accountingRules)
-    .where(
-      and(
-        eq(accountingRules.eventType, eventType),
-        eq(accountingRules.active, true),
-        // Règle globale (agenceId NULL) ou spécifique à l'agence
-        agenceId
-          ? eq(accountingRules.agenceId, agenceId)
-          : eq(accountingRules.agenceId, null)
-      )
-    )
+    .where(whereCondition)
     .limit(1);
 
   const ruleExists = rules.length > 0;
