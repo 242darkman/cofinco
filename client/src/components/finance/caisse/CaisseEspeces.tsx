@@ -12,6 +12,7 @@ import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessMo
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
 import { StatutCredit, TypeCompte, TypeOperationCaisse } from '@shared/enum/status-constants';
+import { useOperationInfo } from './hooks/useOperationInfo';
 
 // Mapping des types UI (français) vers les enums système (EN)
 const mapToOperationEnum = (typeOp: string | null, typeDetaille: string | null): string => {
@@ -75,36 +76,7 @@ const DENOMINATIONS = [
   { value: 100, label: '100' },
 ];
 
-// Configuration for dynamic info card based on operation type
-type InfoCardKind = 'balance' | 'tontine_due' | 'loan_due' | 'withdrawable' | 'disbursement' | 'tontine_payout';
 
-interface InfoCardConfig {
-  kind: InfoCardKind;
-  title: string;
-}
-
-interface InfoCardData {
-  title: string;
-  amount: number | null;
-  subtitle?: string;
-  loading?: boolean;
-}
-
-const OPERATION_INFO_CONFIG: Record<string, Record<string, InfoCardConfig>> = {
-  depot: {
-    'Compte Courant': { kind: 'balance', title: 'Solde du compte courant' },
-    'Compte Épargne': { kind: 'balance', title: 'Solde du compte épargne' },
-    'Compte Bloqué': { kind: 'balance', title: 'Solde du compte bloqué' },
-    'Cotisation Tontine': { kind: 'tontine_due', title: 'Cotisation à payer' },
-    'Remboursement Crédit': { kind: 'loan_due', title: 'Prochain paiement' },
-  },
-  retrait: {
-    'Retrait Compte Courant': { kind: 'withdrawable', title: 'Solde disponible' },
-    'Retrait Épargne': { kind: 'withdrawable', title: 'Solde disponible' },
-    'Décaissement Crédit': { kind: 'disbursement', title: 'Montant à décaisser' },
-    'Distribution Tontine': { kind: 'tontine_payout', title: 'Montant à récupérer' },
-  },
-};
 
 export default function CaisseEspeces({ sessionId, onTransactionComplete }: CaisseEspecesProps) {
   const user = authService.getCurrentUser();
@@ -140,8 +112,24 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [showBilletage, setShowBilletage] = useState(false);
   const [billetage, setBilletage] = useState<Record<number, number>>({});
 
-  // Dynamic Info Card State
-  const [infoCardData, setInfoCardData] = useState<InfoCardData | null>(null);
+  // Dynamic Info via Hook
+  const { infoCardData, suggestedAmount, loading: infoLoading } = useOperationInfo({
+    clientId: selectedClient?.id,
+    typeOperation,
+    subType: typeOperation === 'Dépôt' ? typeDepot : typeRetrait,
+    selectedClient,
+    tontinesActives,
+    creditsActifs,
+    comptesClient
+  });
+
+  // Auto-fill amount when suggested amount changes
+  useEffect(() => {
+    if (suggestedAmount) {
+      setMontant(suggestedAmount);
+      setMontantError(null);
+    }
+  }, [suggestedAmount]);
 
 
   const toggleBilletage = useCallback(() => setShowBilletage(!showBilletage), [showBilletage]);
@@ -290,133 +278,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     return undefined;
   }, [comptesClient]);
 
-  // Fetch dynamic info card data based on selected operation type
-  const fetchInfoCardData = useCallback(async () => {
-    const opType = typeOperation === 'Dépôt' ? 'depot' : 'retrait';
-    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
-    
-    if (!subType || !selectedClient) {
-      setInfoCardData(null);
-      return;
-    }
-    
-    const config = OPERATION_INFO_CONFIG[opType]?.[subType];
-    if (!config) {
-      setInfoCardData(null);
-      return;
-    }
-    
-    setInfoCardData({ title: config.title, amount: null, loading: true });
-    
-    try {
-      let amount: number | null = null;
-      let subtitle: string | undefined;
-      
-      switch (config.kind) {
-        case 'balance':
-        case 'withdrawable': {
-          // Find matching account from already-loaded comptesClient
-          const targetType = subType.includes('Courant') ? TypeCompte.CURRENT
-            : subType.includes('Épargne') ? TypeCompte.SAVINGS
-            : TypeCompte.BLOCKED;
-          const compte = comptesClient.find((c: any) => (c.type_compte || c.typeCompte) === targetType);
-          amount = compte ? parseFloat(compte.soldeCourant || compte.solde_courant || '0') : null;
-          if (compte) {
-            subtitle = `Compte ${compte.numeroCompte || compte.numero_compte || ''}`;
-          }
-          break;
-        }
-        
-        case 'tontine_due': {
-          // Use selected tontine's cotisation amount
-          if (tontineSelectionnee) {
-            amount = parseFloat(tontineSelectionnee.montantCotisation || tontineSelectionnee.montant_cotisation || '0');
-            subtitle = tontineSelectionnee.nom;
-          } else if (tontinesActives.length > 0) {
-            // Show first active tontine's amount as hint
-            const firstTontine = tontinesActives[0];
-            amount = parseFloat(firstTontine.montantCotisation || firstTontine.montant_cotisation || '0');
-            subtitle = `${tontinesActives.length} tontine(s) active(s)`;
-          }
-          break;
-        }
-        
-        case 'loan_due': {
-          // Use already-loaded prochaineEcheance
-          if (prochaineEcheance) {
-            amount = parseFloat(prochaineEcheance.montant_total || prochaineEcheance.montantTotal || '0');
-            const dateEcheance = prochaineEcheance.date_echeance || prochaineEcheance.dateEcheance;
-            if (dateEcheance) {
-              subtitle = `Échéance du ${new Date(dateEcheance).toLocaleDateString('fr-FR')}`;
-            }
-          } else if (creditSelectionne) {
-            subtitle = 'Aucune échéance en attente';
-          } else if (creditsActifs.length > 0) {
-            subtitle = `${creditsActifs.length} crédit(s) actif(s)`;
-          }
-          break;
-        }
-        
-        case 'disbursement': {
-          // Fetch pending disbursements for this client
-          try {
-            const response = await fetch('/api/credits/pending-disbursements', { credentials: 'include' });
-            if (response.ok) {
-              const data = await response.json();
-              const pending = data?.data?.find((d: any) => 
-                (d.clientId === selectedClient.id || d.client_id === selectedClient.id) ||
-                (d.client?.id === selectedClient.id)
-              );
-              if (pending) {
-                amount = parseFloat(pending.montant || '0');
-                subtitle = `Crédit ${pending.numeroCredit || pending.numero_credit || ''}`;
-              } else {
-                subtitle = 'Aucun décaissement en attente';
-              }
-            }
-          } catch (err) {
-            console.error('Erreur chargement décaissements en attente:', err);
-            subtitle = 'Erreur de chargement';
-          }
-          break;
-        }
-        
-        case 'tontine_payout': {
-          // Find approved distribution for this client from active tontines
-          for (const tontine of tontinesActives) {
-            try {
-              const requests = await tontineApi.getDistributionRequests(tontine.id, { status: 'APPROVED' });
-              const forClient = requests.find((r: any) => 
-                r.beneficiaryClientId === selectedClient.id || 
-                r.beneficiary_client_id === selectedClient.id
-              );
-              if (forClient) {
-                amount = parseFloat(forClient.amountApproved || forClient.amount_approved || forClient.amount || '0');
-                subtitle = tontine.nom;
-                break;
-              }
-            } catch (err) {
-              console.error('Erreur chargement distributions:', err);
-            }
-          }
-          if (amount === null) {
-            subtitle = 'Aucune distribution approuvée';
-          }
-          break;
-        }
-      }
-      
-      setInfoCardData({ title: config.title, amount, subtitle, loading: false });
-    } catch (error) {
-      console.error('Error fetching info card data:', error);
-      setInfoCardData({ title: config.title, amount: null, loading: false });
-    }
-  }, [typeOperation, typeDepot, typeRetrait, selectedClient, comptesClient, tontinesActives, tontineSelectionnee, prochaineEcheance, creditSelectionne, creditsActifs]);
 
-  // Trigger info card data fetch when operation type changes
-  useEffect(() => {
-    fetchInfoCardData();
-  }, [fetchInfoCardData]);
 
 
   // Préparer l'opération avec validation
@@ -671,92 +533,84 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30 p-2">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
         
-        {/* LEFT COL: Search & Client Summary (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-3 h-full">
+        {/* LEFT COL: Search & Client Summary (Compact) */}
+        <div className="lg:col-span-3 flex flex-col gap-3 h-full">
             {/* Search Section */}
             <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 rounded-lg bg-emerald-500/10">
-                        <Search className="w-4 h-4 text-emerald-400" aria-hidden="true" />
-                    </div>
-                    <h3 className="font-semibold text-sm text-slate-200">Identifier le client</h3>
-                </div>
-                <div className="space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                    <Search className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
                     <input
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
-                        placeholder="Rechercher (Nom, compte, tel)..."
-                        className="w-full px-3 py-2 text-sm bg-slate-950/50 border border-slate-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-slate-600 text-white shadow-sm hover:border-slate-600"
+                        placeholder="Rechercher client..."
+                        className="flex-1 bg-transparent border-none text-sm text-white focus:ring-0 placeholder:text-slate-600 p-0"
                     />
-                    <Button
-                        onClick={rechercherClient}
-                        disabled={searchLoading || !searchTerm.trim()}
-                        className="w-full py-2 text-xs font-bold tracking-wide"
-                        variant="primary"
-                    >
-                        {searchLoading ? <Loader className="w-4 h-4 animate-spin" /> : 'Rechercher'}
-                    </Button>
                 </div>
             </Card>
 
             {/* Client Profile Card (Only if selected) */}
             {selectedClient && (
-                <Card className="bg-slate-800/50 border border-slate-700/50 flex-1 p-4 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-300">
+                <Card className="bg-slate-800/50 border border-slate-700/50 flex-1 p-3 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-300">
                     <button
                         onClick={reinitialiserFormulaire}
-                        className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition bg-slate-800/50 hover:bg-slate-800 p-1.5 rounded-full backdrop-blur-sm z-20"
+                        className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition"
                     >
-                        <XCircle size={16} />
+                        <XCircle size={14} />
                     </button>
                     
-                    <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20 mb-3">
+                    <div className="w-12 h-12 rounded-full p-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20 mb-2">
                         <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white">
-                            <User size={24} aria-hidden="true" />
+                            <User size={20} aria-hidden="true" />
                         </div>
                     </div>
                     
-                    <h3 className="font-bold text-lg text-white truncate text-center w-full">
+                    <h3 className="font-bold text-sm text-white truncate text-center w-full">
                         {escapeHtml(selectedClient.nom)} {escapeHtml(selectedClient.prenom || '')}
                     </h3>
-                    <p className="text-sm font-medium text-slate-400 mb-4">{escapeHtml(selectedClient.telephone || '')}</p>
+                    <p className="text-xs text-slate-400 mb-2">{escapeHtml(selectedClient.telephone || '')}</p>
                     
                     {selectedClient.numero_compte && (
                         <Badge
                             variant="neutral"
                             size="sm"
-                            className="bg-slate-800 border-slate-700 text-slate-300 text-xs mb-6"
+                            className="bg-slate-800 border-slate-700 text-slate-300 text-[10px] mb-4"
                             value={escapeHtml(selectedClient.numero_compte)}
                         />
                     )}
 
-                    {/* Dynamic Info Card - Shows contextual balance/due amount based on selected operation */}
-                    <div className="grid grid-cols-1 gap-2 w-full mt-auto">
-                      {infoCardData ? (
-                        <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
-                          <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
+                    {/* Dynamic Info Card - Always visible if operation selected, with emphasized amount */}
+                    <div className="w-full mt-auto space-y-2">
+                      {infoCardData && (
+                        <div className={`p-3 rounded-lg border text-center transition-all duration-300 ${
+                            infoCardData.amount !== null && infoCardData.amount > 0 
+                            ? 'bg-purple-900/20 border-purple-500/30' 
+                            : 'bg-slate-900/50 border-slate-800'
+                        }`}>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 line-clamp-1">
                             {infoCardData.title}
                           </p>
-                          {infoCardData.loading ? (
-                            <Loader className="w-4 h-4 animate-spin mx-auto text-emerald-400" />
+                          {infoLoading ? (
+                            <Loader className="w-3 h-3 animate-spin mx-auto text-emerald-400" />
                           ) : (
                             <>
-                              <p className="font-mono text-white text-sm font-bold">
+                              <p className={`font-mono text-base font-bold ${
+                                infoCardData.amount !== null ? 'text-white' : 'text-slate-600'
+                              }`}>
                                 {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
                               </p>
                               {infoCardData.subtitle && (
-                                <p className="text-[9px] text-slate-600 mt-0.5 truncate">{infoCardData.subtitle}</p>
+                                <p className="text-[9px] text-slate-500 mt-0.5 line-clamp-1">{infoCardData.subtitle}</p>
                               )}
                             </>
                           )}
                         </div>
-                      ) : (
-                        <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
-                          <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
-                            Info Compte
-                          </p>
-                          <p className="font-mono text-slate-600 text-xs">Sélectionnez une opération</p>
+                      )}
+                      
+                      {!infoCardData && (
+                        <div className="p-2 rounded bg-slate-900/30 border border-slate-800/50 text-center">
+                            <p className="text-[10px] text-slate-600">Sélectionnez une opération</p>
                         </div>
                       )}
                     </div>
@@ -764,8 +618,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
             )}
         </div>
 
-        {/* RIGHT COL: Operation Cockpit (8 cols) */}
-        <div className="lg:col-span-8 h-full flex flex-col">
+        {/* RIGHT COL: Operation Cockpit (Expanded) */}
+        <div className="lg:col-span-9 h-full flex flex-col">
             {selectedClient ? (
                 <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative animate-in slide-in-from-right-4 duration-300">
                     

@@ -7,10 +7,20 @@ import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import { securityConfigApi, SecurityConfigResponse, clientSearchApi } from '../../../lib/api-client';
+import { 
+  securityConfigApi, 
+  SecurityConfigResponse, 
+  clientSearchApi,
+  creditApi,
+  tontineApi,
+  compteEpargneApi 
+} from '../../../lib/api-client';
 import { toast } from '../../../lib/toast';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
+import { useOperationInfo } from './hooks/useOperationInfo';
+import { StatutCredit } from '@shared/enum/status-constants';
+import { formatMoney } from '../../../lib/format';
 
 interface Client {
   id: string;
@@ -93,6 +103,42 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
   const [showPresenceModal, setShowPresenceModal] = useState(false);
 
+  // Data caching for dynamic info
+  const [creditsActifs, setCreditsActifs] = useState<any[]>([]);
+  const [tontinesActives, setTontinesActives] = useState<any[]>([]);
+  const [comptesClient, setComptesClient] = useState<any[]>([]);
+
+  // Hook for dynamic info
+  const { infoCardData, suggestedAmount, loading: infoLoading } = useOperationInfo({
+    clientId: selectedClient?.id,
+    typeOperation,
+    subType: typeOperation === 'Dépôt' ? typeDepot : typeRetrait,
+    selectedClient,
+    tontinesActives,
+    creditsActifs,
+    comptesClient
+  });
+
+  // Auto-fill amount logic:
+  // 1. If a suggestion exists, use it.
+  // 2. If valid operation but NO suggestion (suggestedAmount is null), reset input 
+  //    (only if we are not in the middle of typing? No, purely on suggestion change implies type switch)
+  useEffect(() => {
+    if (suggestedAmount) {
+      setMontant(suggestedAmount);
+    } else if (suggestedAmount === null && (typeDepot || typeRetrait)) {
+       // If we have a subtype selected but no suggestion comes back (e.g. switching from Credit to Current Account)
+       // We should clear the amount to avoid sticking with the previous pre-filled value.
+       // However, this might conflict if user types fast? 
+       // But suggestedAmount changes only on fetch complete.
+       // To be safe and respect "react accordingly", we accept that switching types clears the amount.
+       // The onClick handler already clears it, but this reinforces it if the hook updates late.
+       // We only clear if it matches the 'cleared' expectation.
+       // Actually, relying on onClick is safer for "user typing". 
+       // Leaving this simple: if there is a suggestion, take it.
+    }
+  }, [suggestedAmount, typeDepot, typeRetrait]);
+
   const providers = [
     { id: 'MTN' as Provider, name: 'MTN MoMo', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', logo: mtnLogo },
     { id: 'AIRTEL' as Provider, name: 'Airtel Money', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/50', logo: airtelLogo }
@@ -172,7 +218,23 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
       const response = await clientSearchApi.search(searchTerm, { page: 1, perPage: 1 });
       const clients = response.data || [];
       if (clients.length > 0) {
-        setSelectedClient(clients[0]);
+        const client = clients[0];
+        setSelectedClient(client);
+        
+        // Fetch related data in parallel
+        try {
+            const [credits, tontines, comptes] = await Promise.all([
+                creditApi.getAll({ clientId: client.id, statut: StatutCredit.ACTIVE }).catch(() => []),
+                tontineApi.getByClient(client.id).catch(() => []),
+                compteEpargneApi.getByClient(client.id).catch(() => [])
+            ]);
+            setCreditsActifs(credits || []);
+            setTontinesActives(tontines || []);
+            setComptesClient(comptes || []);
+        } catch (err) {
+            console.error("Error loading client details", err);
+        }
+
       } else {
         toast.warning('Aucun client trouvé');
       }
@@ -398,15 +460,43 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                     </h3>
                     <p className="text-slate-400 font-mono mb-6">{selectedClient.telephone || selectedClient.phone}</p>
                     
-                    <div className="grid grid-cols-2 gap-2 w-full mt-auto">
-                        <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                           <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Dépôt</p>
-                           <p className="font-mono text-emerald-400 font-bold">-</p>
-                        </div>
-                         <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
-                           <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Retrait</p>
-                           <p className="font-mono text-rose-400 font-bold">-</p>
-                        </div>
+                    <div className="w-full mt-auto space-y-2">
+                        {infoCardData ? (
+                            <div className={`p-3 rounded-lg border text-center transition-all duration-300 ${
+                                infoCardData.amount !== null && infoCardData.amount > 0 
+                                ? 'bg-purple-900/20 border-purple-500/30' 
+                                : 'bg-slate-900/50 border-slate-800'
+                            }`}>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 line-clamp-1">
+                                    {infoCardData.title}
+                                </p>
+                                {infoLoading ? (
+                                    <Loader2 className="w-3 h-3 animate-spin mx-auto text-emerald-400" />
+                                ) : (
+                                    <>
+                                        <p className={`font-mono text-base font-bold ${
+                                            infoCardData.amount !== null ? 'text-white' : 'text-slate-600'
+                                        }`}>
+                                            {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
+                                        </p>
+                                        {infoCardData.subtitle && (
+                                            <p className="text-[9px] text-slate-500 mt-0.5 line-clamp-1">{infoCardData.subtitle}</p>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                             <div className="grid grid-cols-2 gap-2">
+                                <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Dépôt</p>
+                                   <p className="font-mono text-emerald-400 font-bold">-</p>
+                                </div>
+                                 <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Retrait</p>
+                                   <p className="font-mono text-rose-400 font-bold">-</p>
+                                </div>
+                             </div>
+                        )}
                     </div>
                  </Card>
                ) : (
@@ -495,7 +585,16 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                                 ).map((subType: any) => (
                                     <button
                                         key={subType}
-                                        onClick={() => typeOperation === 'Dépôt' ? setTypeDepot(subType) : setTypeRetrait(subType)}
+                                        onClick={() => {
+                                            if (typeOperation === 'Dépôt') {
+                                                setTypeDepot(subType);
+                                            } else {
+                                                setTypeRetrait(subType);
+                                            }
+                                            // Reset amount when switching types to ensure clean state
+                                            // or to allow auto-fill to take over if applicable
+                                            setMontant('');
+                                        }}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                                             (typeOperation === 'Dépôt' ? typeDepot : typeRetrait) === subType
                                             ? 'bg-slate-800 text-white border-slate-600 shadow-sm'
