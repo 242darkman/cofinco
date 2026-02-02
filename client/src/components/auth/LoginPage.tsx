@@ -316,7 +316,13 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
 
             <div className="absolute bottom-6 text-center">
               <p className="text-slate-400 text-sm">&copy; {new Date().getFullYear()} {agenceName}. {t('tousDroitsReserves') || 'Tous droits réservés.'}</p>
-              <p className="text-slate-500 text-xs mt-1">Développé par WESLEY Global Développement & BV Corp</p>
+              <p className="text-slate-500 text-xs mt-1 tracking-wide">
+                Une solution{' '}
+                <a href="https://bvcorp.dev" target="_blank" rel="noopener noreferrer"
+                   className="font-semibold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent hover:from-cyan-300 hover:to-blue-300 transition-all">
+                  BV CORP
+                </a>
+              </p>
             </div>
           </div>
         </div>
@@ -554,7 +560,13 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               <p className="text-slate-400/90 text-xs">
                 © {new Date().getFullYear()} {agenceName}. {t('tousDroitsReserves') || 'Tous droits réservés.'}
               </p>
-              <p className="text-slate-500 text-[11px] mt-1">Développé par WESLEY Global Développement & BV Corp</p>
+              <p className="text-slate-500 text-[11px] mt-1 tracking-wide">
+                Une solution{' '}
+                <a href="https://bvcorp.dev" target="_blank" rel="noopener noreferrer"
+                   className="font-semibold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent hover:from-cyan-300 hover:to-blue-300 transition-all">
+                  BV CORP
+                </a>
+              </p>
             </div>
           </motion.div>
         </div>
