@@ -1054,14 +1054,14 @@ export default function CaisseSupervision({
 
           {/* ===== CLÔTURE TAB ===== */}
           {activeTab === 'cloture' && (
-            <div className="space-y-6 p-2 animate-in slide-in-from-right-4 duration-300">
+            <div className="space-y-3 p-2 animate-in slide-in-from-right-4 duration-300">
               <div className="flex items-center justify-between">
-                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                  <Calendar size={18} className="text-blue-400 sm:size-5" />
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Calendar size={16} className="text-blue-400" />
                   Clôture Journalière
                 </h3>
-                <span className="text-xs text-slate-500">
-                  {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                <span className="text-[11px] text-slate-500">
+                  {new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
               </div>
 
