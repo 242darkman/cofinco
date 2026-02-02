@@ -492,9 +492,6 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                               {t('seSouvenirDeMoi') || 'Se souvenir de moi'}
                             </span>
                           </label>
-                          <span className="text-xs text-slate-500">
-                            30 jours
-                          </span>
                         </div>
                         <div className="text-right">
                           <button
