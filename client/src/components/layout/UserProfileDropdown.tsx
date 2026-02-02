@@ -44,14 +44,7 @@ const MenuItem = React.forwardRef<HTMLButtonElement, MenuItemProps>(
 );
 MenuItem.displayName = 'MenuItem';
 
-// Skeleton loading pour la photo
-const PhotoSkeleton: React.FC<{ size: 'sm' | 'lg' }> = ({ size }) => (
-  <div
-    className={`${size === 'sm' ? 'w-8 h-8' : 'w-12 h-12'} rounded-full bg-slate-700 animate-pulse`}
-  />
-);
-
-// Composant Avatar avec gestion d'erreur et skeleton
+// Composant Avatar avec gestion d'erreur optimisée
 interface AvatarProps {
   photoUrl?: string;
   fullName: string;
@@ -61,32 +54,33 @@ interface AvatarProps {
 }
 
 const Avatar: React.FC<AvatarProps> = ({ photoUrl, fullName, initials, size, className = '' }) => {
-  const [imageState, setImageState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [imageState, setImageState] = useState<'loading' | 'loaded' | 'error'>('loading');
   const imgRef = useRef<HTMLImageElement>(null);
 
   const resolvedUrl = photoUrl ? resolveStorageUrl(photoUrl) : null;
 
-  // Précharger et vérifier l'état de l'image
+  // Vérifier immédiatement si l'image est en cache
   useEffect(() => {
     if (!resolvedUrl) {
-      setImageState('idle');
+      setImageState('error');
       return;
     }
 
-    // Vérifier si l'image est déjà en cache
+    // Créer une image temporaire pour vérifier le cache
     const img = new Image();
     img.src = resolvedUrl;
 
-    if (img.complete && img.naturalWidth > 0) {
-      // Image déjà en cache - afficher immédiatement
+    // Si l'image est déjà complètement chargée (en cache)
+    if (img.complete && img.naturalHeight > 0) {
       setImageState('loaded');
-    } else {
-      // Image pas en cache - afficher skeleton
-      setImageState('loading');
-
-      img.onload = () => setImageState('loaded');
-      img.onerror = () => setImageState('error');
+      return;
     }
+
+    // Sinon, afficher skeleton et attendre le chargement
+    setImageState('loading');
+
+    img.onload = () => setImageState('loaded');
+    img.onerror = () => setImageState('error');
 
     return () => {
       img.onload = null;
@@ -102,29 +96,35 @@ const Avatar: React.FC<AvatarProps> = ({ photoUrl, fullName, initials, size, cla
     ? 'border-2 border-slate-700'
     : 'border-2 border-slate-600';
 
-  // Fallback vers initiales si pas d'URL ou erreur
+  // Initiales (fallback seulement)
+  const initialsElement = (
+    <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
+      {initials}
+    </div>
+  );
+
+  // Pas d'URL ou erreur de chargement - afficher les initiales (fallback)
   if (!resolvedUrl || imageState === 'error') {
+    return initialsElement;
+  }
+
+  // Image chargée - afficher directement
+  if (imageState === 'loaded') {
     return (
-      <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
-        {initials}
-      </div>
+      <img
+        ref={imgRef}
+        src={resolvedUrl}
+        alt={fullName}
+        className={`${sizeClasses} rounded-full object-cover ${borderClasses} ${className}`}
+        onError={() => setImageState('error')}
+        loading="eager"
+      />
     );
   }
 
-  // Skeleton pendant le chargement
-  if (imageState === 'loading' || imageState === 'idle') {
-    return <PhotoSkeleton size={size} />;
-  }
-
-  // Image chargée
+  // En chargement - afficher skeleton minimal
   return (
-    <img
-      ref={imgRef}
-      src={resolvedUrl}
-      alt={fullName}
-      className={`${sizeClasses} rounded-full object-cover ${borderClasses} ${className}`}
-      onError={() => setImageState('error')}
-    />
+    <div className={`${sizeClasses} rounded-full bg-slate-700/50 ${borderClasses} ${className} animate-pulse`} />
   );
 };
 

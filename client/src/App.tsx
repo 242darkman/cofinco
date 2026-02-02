@@ -35,6 +35,21 @@ function App() {
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
   const queryClient = useQueryClient();
 
+  // Précharger l'image de profil pour qu'elle soit en cache
+  const preloadProfilePhoto = useCallback((photoUrl: string | undefined) => {
+    if (!photoUrl) return;
+
+    // Résoudre l'URL complète
+    let resolvedUrl = photoUrl;
+    if (!photoUrl.startsWith('http') && !photoUrl.startsWith('/api/') && !photoUrl.startsWith('data:')) {
+      resolvedUrl = `/api/storage/files/${photoUrl}`;
+    }
+
+    // Précharger l'image
+    const img = new Image();
+    img.src = resolvedUrl;
+  }, []);
+
   // Handler pour la déconnexion automatique (session expirée, 401, etc.)
   const handleSessionExpired = useCallback((reason?: string) => {
     console.log('Session expired, logging out...', reason);
@@ -74,6 +89,8 @@ function App() {
         if (user) {
           setCurrentUser(user);
           setIsAuthenticated(true);
+          // Précharger la photo de profil au démarrage
+          preloadProfilePhoto(user?.photoProfile);
           // Réinitialiser le message d'expiration si connexion réussie
           setSessionExpiredMessage(null);
         }
@@ -85,7 +102,7 @@ function App() {
     };
 
     checkAuth();
-  }, [handleSessionExpired]);
+  }, [handleSessionExpired, preloadProfilePhoto]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -103,6 +120,9 @@ function App() {
     setShowLoadingAfterLogin(true);
     // Réinitialiser le message d'expiration de session
     setSessionExpiredMessage(null);
+
+    // Précharger la photo de profil immédiatement
+    preloadProfilePhoto(user?.photoProfile);
 
     // Afficher le cercle de chargement pendant 1.5 secondes
     setTimeout(() => {
@@ -132,11 +152,13 @@ function App() {
       if (response.ok) {
         const userData = await response.json();
         setCurrentUser(userData);
+        // Précharger la photo de profil mise à jour
+        preloadProfilePhoto(userData?.photoProfile);
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);
     }
-  }, []);
+  }, [preloadProfilePhoto]);
 
   if (isLoading) {
     return (
