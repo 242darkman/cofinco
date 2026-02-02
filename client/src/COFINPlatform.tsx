@@ -1,6 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { FileText, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
+import { useAppNavigation } from './hooks/useAppNavigation';
 
 // ========== LAZY LOADED MODULES (Code Splitting) ==========
 // Each module is loaded only when needed, reducing initial bundle by ~70%
@@ -75,16 +76,16 @@ interface COFINPlatformProps {
 
 export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: COFINPlatformProps) {
   const { language, setLanguage, t } = useLanguage();
-  const [isMobile, setIsMobile] = useState(() => 
+  const { currentModule, currentSubModule, navigateToModule } = useAppNavigation();
+  const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
   );
-  const [sidebarOpen, setSidebarOpen] = useState(() => 
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== 'undefined' ? !window.matchMedia('(max-width: 1023px)').matches : true
   );
-  const [currentModule, setCurrentModule] = useState('dashboard');
-  const [currentSubModule, setCurrentSubModule] = useState<string | undefined>();
   const [moduleData, setModuleData] = useState<any>(null);
   const { permissionsVersion } = usePermissionsContext();
+  const normalizedRole = normalizeRole(currentUser?.role) || SystemRole.CLIENT;
   
   // Security: Check if user still has access to current module
   useEffect(() => {
@@ -94,19 +95,19 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     // We can use getRouteByKey logic here or direct check
     // Ideally we check if canAllAccessRoute(currentModule)
     // For simplicity, we assume module name mapping is handled or we use authService directly if we know the module name
-    // But currentModule is a route key, not necessarily a module name. 
+    // But currentModule is a route key, not necessarily a module name.
     // Let's use ROUTES config to check access.
-    
+
     // Find the route config for currentModule
     const route = getRouteByKey(currentModule);
-    
+
     if (route && !canAccessRoute(route, normalizedRole)) {
        // Access revoked!
        console.warn(`[Security] Access to module ${currentModule} revoked. Redirecting...`);
        showNotification('error', "Votre accès à ce module a été révoqué.");
-       setCurrentModule('dashboard');
+       navigateToModule('dashboard');
     }
-  }, [currentModule, permissionsVersion, currentUser]);
+  }, [currentModule, permissionsVersion, currentUser, normalizedRole, navigateToModule]);
   
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -133,7 +134,6 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   const [showCreditRequestForm, setShowCreditRequestForm] = useState(false);
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [pendingCaissePayment, setPendingCaissePayment] = useState(false);
-  const normalizedRole = normalizeRole(currentUser?.role) || SystemRole.CLIENT;
 
 
 
@@ -154,8 +154,22 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   useEffect(() => {
     const menuItem = PLATFORM_MENU_ITEMS.find(item => item.key === currentModule);
     const moduleName = menuItem ? t(menuItem.labelKey) : t('menuDashboard');
-    setBreadcrumbs([t('accueil'), moduleName]);
-  }, [currentModule, language]);
+
+    // Build breadcrumbs with sub-module if present
+    const crumbs = [t('accueil'), moduleName];
+
+    // Add sub-module to breadcrumb if present
+    if (currentSubModule) {
+      // Format sub-module name for display
+      const subModuleName = currentSubModule
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      crumbs.push(subModuleName);
+    }
+
+    setBreadcrumbs(crumbs);
+  }, [currentModule, currentSubModule, language, t]);
 
   // Check if user must change password
   useEffect(() => {
@@ -173,9 +187,8 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   const handleModuleChange = (moduleName: string, subModuleName?: string, data?: any) => {
     setModuleLoading(true);
     setTimeout(() => {
-      setCurrentModule(moduleName);
-      setCurrentSubModule(subModuleName);
       if (data) setModuleData(data);
+      navigateToModule(moduleName, subModuleName, data);
       setModuleLoading(false);
     }, 300);
   };
@@ -192,21 +205,32 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     return () => window.removeEventListener('navigate-module', handler);
   }, []);
 
+  // Module data update listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.data) {
+        setModuleData(detail.data);
+      }
+    };
+    window.addEventListener('module-data-update', handler);
+    return () => window.removeEventListener('module-data-update', handler);
+  }, []);
+
 
 
   const handleQuickAction = (action: string) => {
     switch (action) {
 
       case 'new-client':
-        setCurrentModule('clients');
-        setCurrentSubModule('new');
+        navigateToModule('clients', 'new');
         break;
 
       case 'new-credit':
         setShowCreditRequestForm(true);
         break;
       case 'new-payment':
-        setCurrentModule('caisse');
+        navigateToModule('caisse');
         setPendingCaissePayment(true);
         break;
       case 'new-report':
@@ -422,9 +446,9 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
           <PlatformHeader
             breadcrumbs={breadcrumbs}
             onGlobalSearch={() => setShowGlobalSearch(!showGlobalSearch)}
-            onMessagesClick={() => setCurrentModule('messages')}
+            onMessagesClick={() => navigateToModule('messages')}
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-            onProfileClick={() => setCurrentModule('profil')}
+            onProfileClick={() => navigateToModule('profil')}
             onSessionsClick={() => setShowSessionsModal(true)}
             onLogout={onLogout}
             user={{
@@ -447,13 +471,13 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             isOpen={showGlobalSearch}
             onClose={() => setShowGlobalSearch(false)}
             onNavigate={(module, itemId, itemType) => {
-              handleModuleChange(module);
-              setShowGlobalSearch(false);
-
               // For other types, pass subModule
-              if (itemId && (itemType === 'credit' || itemType === 'tontine' || itemType === 'agent')) {
-                setCurrentSubModule(`detail-${itemId}`);
-              }
+              const subModule = itemId && (itemType === 'credit' || itemType === 'tontine' || itemType === 'agent')
+                ? `detail-${itemId}`
+                : undefined;
+
+              handleModuleChange(module, subModule);
+              setShowGlobalSearch(false);
             }}
           />
         </Suspense>
