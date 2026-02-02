@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, ChevronDown, ChevronUp, RefreshCw, Shield, Lock } from 'lucide-react';
-import { Card, Button, SelectField, FormField } from '../../ui';
+import { ChevronDown, ChevronUp, RefreshCw, Shield, Lock } from 'lucide-react';
+import { Card } from '../../ui';
 import { formatDate } from '../../../lib/format';
 import { authService } from '../../../lib/auth';
 
@@ -30,6 +30,7 @@ const ACTION_COLORS: Record<string, string> = {
   OPENED: 'bg-green-500/10 text-green-400 border-green-500/20',
   OUVERTURE: 'bg-green-500/10 text-green-400 border-green-500/20',
   DIRECT_OPEN: 'bg-green-500/10 text-green-400 border-green-500/20',
+  'OUVERTURE DIRECTE': 'bg-green-500/10 text-green-400 border-green-500/20',
   CLOSED: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
   FERMETURE: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
   TIMEOUT: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -43,6 +44,9 @@ const ACTION_COLORS: Record<string, string> = {
   HEARTBEAT: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   CLOSING_COUNT: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   CLOSING_VALIDATION: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  CLOSING_INITIATED: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  CLOSING_CANCELLED: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  COUNT_SUBMITTED: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
   SUPERVISOR_TAKEOVER: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   FUNDS_RECEIVED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   FUNDS_SENT: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
@@ -53,6 +57,7 @@ const ACTION_LABELS: Record<string, string> = {
   OPENED: 'Ouverture',
   OUVERTURE: 'Ouverture',
   DIRECT_OPEN: 'Ouverture directe',
+  'OUVERTURE DIRECTE': 'Ouverture directe',
   CLOSED: 'Fermeture',
   FERMETURE: 'Fermeture',
   TIMEOUT: 'Expiration',
@@ -65,18 +70,30 @@ const ACTION_LABELS: Record<string, string> = {
   REQUESTING_FUNDS: 'Demande de fonds',
   // Operations
   HEARTBEAT: 'Signal activité',
-  CLOSING_COUNT: 'Comptage',
-  CLOSING_VALIDATION: 'Validation',
+  CLOSING_COUNT: 'Comptage caisse',
+  CLOSING_VALIDATION: 'Validation fermeture',
+  CLOSING_INITIATED: 'Fermeture initiée',
+  CLOSING_CANCELLED: 'Fermeture annulée',
+  COUNT_SUBMITTED: 'Comptage soumis',
   SUPERVISOR_TAKEOVER: 'Prise de contrôle',
   FUNDS_RECEIVED: 'Fonds reçus',
   FUNDS_SENT: 'Fonds envoyés',
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  // Session states
   OPEN: 'Ouverte',
   OPENED: 'Ouverte',
+  Ouverte: 'Ouverte',
   CLOSED: 'Fermée',
+  Fermée: 'Fermée',
   REQUESTING_FUNDS: 'En attente de fonds',
+  // Closing workflow states
+  CLOSING_COUNT: 'Comptage en cours',
+  CLOSING_VALIDATION: 'En validation',
+  CLOSING_INITIATED: 'Fermeture initiée',
+  CLOSING_CANCELLED: 'Fermeture annulée',
+  // General states
   PENDING: 'En attente',
   APPROVED: 'Approuvée',
   REJECTED: 'Rejetée',
@@ -87,7 +104,7 @@ export default function CaisseAuditLog() {
   const isAdmin = authService.isAdmin();
 
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
-  const [pagination, setPagination] = useState<AuditLogPagination>({ page: 1, perPage: 20, total: 0, totalPages: 0 });
+  const [pagination, setPagination] = useState<AuditLogPagination>({ page: 1, perPage: 8, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -112,7 +129,7 @@ export default function CaisseAuditLog() {
     try {
       const params = new URLSearchParams();
       params.append('page', String(page));
-      params.append('perPage', '20');
+      params.append('perPage', '8');
       if (filterAction) params.append('action', filterAction);
       if (filterDateFrom) params.append('dateFrom', filterDateFrom);
       if (filterDateTo) params.append('dateTo', filterDateTo);
@@ -121,7 +138,7 @@ export default function CaisseAuditLog() {
       if (!res.ok) throw new Error('Erreur chargement audit logs');
       const data = await res.json();
       setLogs(data.data || []);
-      setPagination(data.pagination || { page: 1, perPage: 20, total: 0, totalPages: 0 });
+      setPagination(data.pagination || { page: 1, perPage: 10, total: 0, totalPages: 0 });
     } catch (err) {
       console.error('Erreur fetch audit logs:', err);
     } finally {
@@ -140,60 +157,56 @@ export default function CaisseAuditLog() {
   return (
     <div className="flex flex-col h-full space-y-3">
       {/* Filters */}
-      <Card className="p-3 bg-slate-800/50 border-slate-700/50">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[140px]">
-            <SelectField
-              label="Action"
-              name="action"
+      <Card className="p-4 bg-slate-800/50 border-slate-700/50">
+        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Action</label>
+            <select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
-              options={[
-                { value: '', label: 'Sélectionner...' },
-                { value: 'OPENED', label: 'Ouverture' },
-                { value: 'OUVERTURE', label: 'Ouverture' },
-                { value: 'DIRECT_OPEN', label: 'Ouverture directe' },
-                { value: 'CLOSED', label: 'Fermeture' },
-                { value: 'TIMEOUT', label: 'Expiration' },
-                { value: 'ADMIN_CLOSED', label: 'Fermeture admin' },
-                { value: 'REQUEST_SUBMITTED', label: 'Demande soumise' },
-                { value: 'REQUEST_APPROVED', label: 'Demande approuvée' },
-                { value: 'REQUEST_REJECTED', label: 'Demande rejetée' },
-                { value: 'REQUEST_CANCELLED', label: 'Demande annulée' },
-                { value: 'CLOSING_COUNT', label: 'Comptage' },
-                { value: 'CLOSING_VALIDATION', label: 'Validation' },
-                { value: 'SUPERVISOR_TAKEOVER', label: 'Prise de contrôle' },
-                { value: 'FUNDS_RECEIVED', label: 'Fonds reçus' },
-                { value: 'FUNDS_SENT', label: 'Fonds envoyés' },
-              ]}
-            />
+              className="w-full h-10 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors"
+            >
+              <option value="">Toutes les actions</option>
+              <option value="OUVERTURE DIRECTE">Ouverture directe</option>
+              <option value="FERMETURE">Fermeture</option>
+              <option value="CLOSING_INITIATED">Fermeture initiée</option>
+              <option value="CLOSING_CANCELLED">Fermeture annulée</option>
+              <option value="COUNT_SUBMITTED">Comptage soumis</option>
+              <option value="CLOSING_COUNT">Comptage caisse</option>
+              <option value="CLOSING_VALIDATION">Validation fermeture</option>
+              <option value="REQUEST_SUBMITTED">Demande soumise</option>
+              <option value="REQUEST_APPROVED">Demande approuvée</option>
+              <option value="REQUEST_REJECTED">Demande rejetée</option>
+              <option value="REQUEST_CANCELLED">Demande annulée</option>
+              <option value="SUPERVISOR_TAKEOVER">Prise de contrôle</option>
+              <option value="FUNDS_RECEIVED">Fonds reçus</option>
+              <option value="FUNDS_SENT">Fonds envoyés</option>
+            </select>
           </div>
-          <div className="min-w-[130px]">
-            <FormField
-              label="Du"
-              name="dateFrom"
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Du</label>
+            <input
               type="date"
               value={filterDateFrom}
               onChange={(e) => setFilterDateFrom(e.target.value)}
+              className="h-10 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors"
             />
           </div>
-          <div className="min-w-[130px]">
-            <FormField
-              label="Au"
-              name="dateTo"
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Au</label>
+            <input
               type="date"
               value={filterDateTo}
               onChange={(e) => setFilterDateTo(e.target.value)}
+              className="h-10 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors"
             />
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
+          <button
             onClick={() => fetchLogs()}
-            className="h-9"
+            className="h-10 w-10 flex items-center justify-center bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </Button>
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
       </Card>
 
@@ -278,29 +291,47 @@ export default function CaisseAuditLog() {
         )}
       </div>
 
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="shrink-0 flex items-center justify-between py-2 text-xs text-slate-400">
-          <span>{pagination.total} entrée(s)</span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => fetchLogs(pagination.page - 1)}
-              disabled={pagination.page <= 1}
-              className="px-2 py-1 bg-slate-800 rounded disabled:opacity-30 hover:bg-slate-700 transition"
-            >
-              Préc.
-            </button>
-            <span>{pagination.page} / {pagination.totalPages}</span>
-            <button
-              onClick={() => fetchLogs(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages}
-              className="px-2 py-1 bg-slate-800 rounded disabled:opacity-30 hover:bg-slate-700 transition"
-            >
-              Suiv.
-            </button>
-          </div>
+      {/* Pagination - Always visible */}
+      <div className="shrink-0 flex items-center justify-between py-3 px-1 border-t border-slate-700/50 mt-2">
+        <span className="text-xs text-slate-400">
+          {pagination.total} entrée{pagination.total > 1 ? 's' : ''} au total
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => fetchLogs(1)}
+            disabled={pagination.page <= 1}
+            className="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Première page"
+          >
+            «
+          </button>
+          <button
+            onClick={() => fetchLogs(pagination.page - 1)}
+            disabled={pagination.page <= 1}
+            className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            Préc.
+          </button>
+          <span className="px-3 py-1.5 text-xs text-slate-300 bg-slate-900 rounded-lg min-w-[80px] text-center">
+            {pagination.page} / {pagination.totalPages || 1}
+          </span>
+          <button
+            onClick={() => fetchLogs(pagination.page + 1)}
+            disabled={pagination.page >= pagination.totalPages}
+            className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            Suiv.
+          </button>
+          <button
+            onClick={() => fetchLogs(pagination.totalPages)}
+            disabled={pagination.page >= pagination.totalPages}
+            className="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Dernière page"
+          >
+            »
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
