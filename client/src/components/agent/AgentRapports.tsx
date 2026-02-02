@@ -4,6 +4,7 @@ import { FileText, Download, Calendar, TrendingUp, Users, DollarSign, Activity, 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
+import { toast } from '../../lib/toast';
 
 interface Rapport {
   id: string;
@@ -58,7 +59,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
   const genererRapport = async () => {
     if (!selectedAgent) {
-      alert('Veuillez sélectionner un agent');
+      toast.error('Veuillez sélectionner un agent');
       return;
     }
 
@@ -95,9 +96,9 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
       if (!response.ok) throw new Error('Erreur lors de la création du rapport');
       loadRapports();
-      alert('Rapport généré avec succès');
+      toast.success(`Rapport ${typeRapport.toLowerCase()} généré avec succès`);
     } catch (error: any) {
-      alert('Erreur: ' + error.error);
+      toast.error(error.message || 'Erreur lors de la génération du rapport');
     } finally {
       setLoading(false);
     }

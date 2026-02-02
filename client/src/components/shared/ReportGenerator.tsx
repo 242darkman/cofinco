@@ -1,10 +1,11 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { useReportGenerator } from '../../hooks/useReportGenerator';
+import { useReportGenerator, reportTypes } from '../../hooks/useReportGenerator';
 import { Card, IconButton } from '../ui';
 import ReportTypeSelector from './reporting/ReportTypeSelector';
 import ReportPreview from './reporting/ReportPreview';
 import ReportFilters from './reporting/ReportFilters';
+import { toast } from '../../lib/toast';
 
 interface ReportGeneratorProps {
   onClose?: () => void;
@@ -18,22 +19,36 @@ export default function ReportGenerator({ onClose }: ReportGeneratorProps) {
     getPreviewColumns, getPreviewRow
   } = useReportGenerator();
 
+  const getReportLabel = () => {
+    const type = reportTypes.find(t => t.id === reportType);
+    return type?.label || 'Rapport';
+  };
+
+  const getFormatLabel = () => {
+    switch (format) {
+      case 'csv': return 'CSV';
+      case 'excel': return 'Excel';
+      default: return 'PDF';
+    }
+  };
+
   const handleGenerate = async () => {
     try {
       if (format === 'csv') await generateCSV();
       else if (format === 'excel') await generateExcel();
       else await generatePDF();
-      alert('Rapport généré avec succès !');
+      toast.success(`${getReportLabel()} exporté en ${getFormatLabel()}`);
     } catch (err) {
-      alert('Erreur lors de la génération');
+      toast.error(`Erreur lors de la génération du ${getReportLabel().toLowerCase()}`);
     }
   };
 
   const handlePrint = async () => {
     try {
       await printReport();
+      toast.success(`${getReportLabel()} envoyé à l'impression`);
     } catch (err) {
-      alert('Erreur lors de l\'impression');
+      toast.error("Erreur lors de l'impression");
     }
   };
 
