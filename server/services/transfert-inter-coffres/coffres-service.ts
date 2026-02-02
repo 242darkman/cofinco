@@ -358,20 +358,30 @@ export class CoffresFortsService {
     const result = await db.transaction(async (tx) => {
       // 1. Créer le mouvement financier
       const mouvementId = uuidv4();
+      const refPrefix = `ABD-${Date.now().toString().slice(-8)}`;
+
       const [mouvement] = await tx
         .insert(mouvementsFinanciers)
         .values({
           id: mouvementId,
-          typeMouvement: 'ENTREE_COFFRE',
           montant: montant.toString(),
-          devise: 'XAF',
-          sens: 'ENTREE',
+          sens: 'DEBIT', // Débit du coffre (augmente l'actif)
+          sourceModule: 'COFFRE_OPERATIONS',
+          sourceTable: 'coffres_forts',
+          sourceId: coffreId,
           agenceId,
-          coffreId,
-          description: motif,
-          categorie: 'Abondement Coffre',
-          effectuePar: userId,
-          statut: 'COMPLETED',
+          reference: `${refPrefix}-COFFRE`,
+          idempotencyKey: `${coffreId}-abond-${Date.now()}`,
+          statut: 'POSTED',
+          dateOperation: new Date(),
+          createdBy: userId,
+          metadata: {
+            coffreId,
+            type: 'ENTREE_COFFRE',
+            description: motif,
+            categorie: 'Abondement Coffre',
+            montantAbondement: montant,
+          },
         })
         .returning();
 
@@ -379,6 +389,7 @@ export class CoffresFortsService {
       let glPosted = false;
       try {
         const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, {
+          eventType: 'ENTREE_COFFRE', // Match accounting rule
           operationType: 'ABONDEMENT_COFFRE',
           coffreId,
         });

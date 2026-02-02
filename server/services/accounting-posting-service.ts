@@ -418,11 +418,14 @@ export async function postGlForMouvement(
   }
 
   // 2. Find matching accounting rule — THROWS if none found
+  // eventType can be provided in additionalMetadata, otherwise use typePaiement
+  const eventType = additionalMetadata?.eventType || mouvement.typePaiement || "UNKNOWN";
+
   const rule = await findMatchingRule(
     tx,
     agenceId,
     "MOUVEMENT",
-    mouvement.typePaiement || "UNKNOWN",
+    eventType,
     mouvement.methodePaiement || undefined,
     additionalMetadata?.provider || undefined
   );
