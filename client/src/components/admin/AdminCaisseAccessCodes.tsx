@@ -58,7 +58,8 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
       return { success: false, error: data.error || 'Erreur lors de la génération' };
     }
     // API returns { code, codeId, expiresAt, message }
-    await loadData();
+    // Note: Don't call loadData() here - it triggers setLoading(true) which unmounts
+    // the modal before the code can be displayed. Refresh happens in handleCloseModal.
     return { success: true, code: data.code };
   };
 
