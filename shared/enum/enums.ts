@@ -753,3 +753,17 @@ export const emailProviderTypeEnum = pgEnum("email_provider_type_enum", [
   "RESEND",
   "SENDGRID",
 ]);
+
+// ============================================
+// CAISSE OPENING STRICTNESS (GL Guard)
+// ============================================
+
+/**
+ * Niveau de strictness pour l'ouverture de session caisse
+ * Contrôle la cohérence entre billetage physique et GL
+ */
+export const caisseOpeningStrictnessEnum = pgEnum("caisse_opening_strictness_enum", [
+  "STRICT_BLOCK",              // Bloquer si billetage > GL attendu
+  "WARNING_WITH_JUSTIFICATION", // Permettre avec justification + validation manager
+  "LOG_ONLY",                  // Logging uniquement (dev/legacy)
+]);

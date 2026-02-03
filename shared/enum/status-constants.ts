@@ -2049,3 +2049,42 @@ export function getTypePaiementForCompte(typeCompte: string, isDeposit: boolean)
   const mapping = map[typeCompte] || map.SAVINGS;
   return isDeposit ? mapping.deposit : mapping.withdrawal;
 }
+
+// ============================================
+// CAISSE OPENING STRICTNESS (GL Guard)
+// ============================================
+
+/**
+ * Niveau de strictness pour l'ouverture de session caisse.
+ * Contrôle la cohérence entre billetage physique et GL comptable.
+ *
+ * - STRICT_BLOCK: Production recommandée - bloque si billetage > GL attendu
+ * - WARNING_WITH_JUSTIFICATION: Permet avec justification + validation manager
+ * - LOG_ONLY: Logging uniquement (dev/migration)
+ */
+export const CaisseOpeningStrictness = {
+  STRICT_BLOCK: "STRICT_BLOCK",
+  WARNING_WITH_JUSTIFICATION: "WARNING_WITH_JUSTIFICATION",
+  LOG_ONLY: "LOG_ONLY",
+} as const;
+
+export type CaisseOpeningStrictnessType = (typeof CaisseOpeningStrictness)[keyof typeof CaisseOpeningStrictness];
+
+/** Labels FR pour l'UI */
+export const CAISSE_OPENING_STRICTNESS_LABELS: Record<CaisseOpeningStrictnessType, string> = {
+  [CaisseOpeningStrictness.STRICT_BLOCK]: "Strict (Bloquer)",
+  [CaisseOpeningStrictness.WARNING_WITH_JUSTIFICATION]: "Avertissement + Justification",
+  [CaisseOpeningStrictness.LOG_ONLY]: "Log uniquement",
+};
+
+/** Descriptions détaillées pour l'UI admin */
+export const CAISSE_OPENING_STRICTNESS_DESCRIPTIONS: Record<CaisseOpeningStrictnessType, string> = {
+  [CaisseOpeningStrictness.STRICT_BLOCK]: "Bloque l'ouverture si le billetage déclaré dépasse le solde GL attendu. Nécessite un transfert coffre→caisse préalable.",
+  [CaisseOpeningStrictness.WARNING_WITH_JUSTIFICATION]: "Permet l'ouverture avec écart mais exige une justification écrite et validation manager.",
+  [CaisseOpeningStrictness.LOG_ONLY]: "Enregistre l'écart sans bloquer. Utilisé pour migration/développement.",
+};
+
+/** Options pour les selects UI */
+export const CAISSE_OPENING_STRICTNESS_OPTIONS = Object.entries(CAISSE_OPENING_STRICTNESS_LABELS).map(
+  ([value, label]) => ({ value, label, description: CAISSE_OPENING_STRICTNESS_DESCRIPTIONS[value as CaisseOpeningStrictnessType] })
+);

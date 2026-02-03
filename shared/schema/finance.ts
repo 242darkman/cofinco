@@ -1096,6 +1096,18 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   soldeActuel: numeric("solde_actuel"),
   // ========== FIN HANDOVER ==========
 
+  // ========== GL GUARD - OUVERTURE SECURISEE ==========
+  // Vérification cohérence billetage vs GL à l'ouverture
+  openingGlBalance: numeric("opening_gl_balance"),                  // Solde GL (521xxx) calculé à l'ouverture
+  openingBilletageTotal: numeric("opening_billetage_total"),        // Total billetage déclaré
+  openingEcart: numeric("opening_ecart"),                           // Écart = billetage - GL
+  openingStrictnessApplied: text("opening_strictness_applied"),     // STRICT_BLOCK | WARNING_WITH_JUSTIFICATION | LOG_ONLY
+  hasOpeningDiscrepancy: boolean("has_opening_discrepancy").default(false), // Flag pour filtrage rapide
+  openingDiscrepancyJustification: text("opening_discrepancy_justification"), // Justification si écart (mode WARNING)
+  openingDiscrepancyApprovedBy: uuid("opening_discrepancy_approved_by").references(() => users.id, { onDelete: "set null" }),
+  openingDiscrepancyApprovedAt: timestamp("opening_discrepancy_approved_at"),
+  // ========== FIN GL GUARD ==========
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
@@ -1104,6 +1116,68 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
 export const insertSessionCaisseSchema = createInsertSchema(sessionsCaisse).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertSessionCaisse = z.infer<typeof insertSessionCaisseSchema>;
 export type SessionCaisse = typeof sessionsCaisse.$inferSelect;
+
+// ========== DISCREPANCIES D'OUVERTURE CAISSE (GL GUARD) ==========
+// Table dédiée pour traçabilité complète des écarts d'ouverture
+export const cashOpeningDiscrepancies = pgTable(
+  "cash_opening_discrepancies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Liens
+    sessionId: uuid("session_id").notNull().references(() => sessionsCaisse.id, { onDelete: "cascade" }),
+    agenceId: uuid("agence_id").notNull().references(() => agences.id),
+    caisseId: uuid("caisse_id").notNull().references(() => caisses.id),
+    userId: uuid("user_id").notNull().references(() => users.id), // Caissier qui a ouvert
+
+    // Valeurs financières
+    glBalance: numeric("gl_balance").notNull(),          // Solde GL (521xxx) au moment de l'ouverture
+    billetageTotal: numeric("billetage_total").notNull(), // Total billetage déclaré
+    ecart: numeric("ecart").notNull(),                    // Écart = billetage - GL
+    ecartPercent: numeric("ecart_percent"),               // Écart en pourcentage
+
+    // Mode et décision
+    strictnessMode: text("strictness_mode").notNull(),    // STRICT_BLOCK | WARNING_WITH_JUSTIFICATION | LOG_ONLY
+    action: text("action").notNull(),                     // BLOCKED | APPROVED_WITH_JUSTIFICATION | LOGGED_ONLY
+
+    // Justification (obligatoire si WARNING_WITH_JUSTIFICATION)
+    justification: text("justification"),
+
+    // Approbation (si écart accepté)
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+
+    // Détails billetage pour investigation
+    billetageDetail: json("billetage_detail"),            // Détail par coupure
+
+    // Contexte supplémentaire
+    previousSessionId: uuid("previous_session_id").references(() => sessionsCaisse.id, { onDelete: "set null" }),
+    previousSessionClosedAt: timestamp("previous_session_closed_at"),
+    previousSessionEcart: numeric("previous_session_ecart"), // Écart de la session précédente (corrélation)
+
+    // Audit
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    // Index pour recherche par session
+    idxSession: index("idx_cash_opening_discrepancies_session").on(t.sessionId),
+    // Index pour recherche par agence
+    idxAgence: index("idx_cash_opening_discrepancies_agence").on(t.agenceId),
+    // Index pour recherche par caisse
+    idxCaisse: index("idx_cash_opening_discrepancies_caisse").on(t.caisseId),
+    // Index pour filtrage par action (dashboard)
+    idxAction: index("idx_cash_opening_discrepancies_action").on(t.action),
+    // Index temporel pour rapports
+    idxCreatedAt: index("idx_cash_opening_discrepancies_created").on(t.createdAt),
+  }),
+);
+
+export const insertCashOpeningDiscrepancySchema = createInsertSchema(cashOpeningDiscrepancies).omit({ id: true, createdAt: true });
+export type InsertCashOpeningDiscrepancy = z.infer<typeof insertCashOpeningDiscrepancySchema>;
+export type CashOpeningDiscrepancy = typeof cashOpeningDiscrepancies.$inferSelect;
 
 // Opérations caisse
 export const operationsCaisse = pgTable(

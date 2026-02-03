@@ -119,6 +119,12 @@ type GlobalMessage = {
     | "BALANCE_ALERT" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_ERROR"
 
     // =============================================
+    // GL GUARD - OUVERTURE CAISSE SECURISEE
+    // =============================================
+    | "CAISSE_OPENING_BLOCKED"        // Ouverture bloquée pour écart GL
+    | "CAISSE_OPENING_WITH_ECART"     // Ouverture autorisée avec écart (justifiée ou log only)
+
+    // =============================================
     // MONITORING FINANCIER & ALERTES
     // =============================================
     | "MONITORING_ALERT" | "MONITORING_ALERT_UPDATED" | "MONITORING_ALERT_DISMISSED"

@@ -10,10 +10,10 @@
  */
 
 import { db } from "../../db";
-import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers, clients } from "@shared/schema";
+import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers, clients, cashOpeningDiscrepancies } from "@shared/schema";
 import { eq, and, sql, desc, lt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
 import { ForcedCloseReason, SessionComputedStatus } from "@shared/enums";
-import { StatutTransaction, StatutSessionCaisse } from "@shared/enum/status-constants";
+import { StatutTransaction, StatutSessionCaisse, CaisseOpeningStrictness, type CaisseOpeningStrictnessType } from "@shared/enum/status-constants";
 import {
   getOperationDelta,
   CAISSE_THRESHOLDS,
@@ -22,6 +22,9 @@ import {
 } from "@shared/config/caisse-operations";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { createLogger } from "../../lib/logger";
+import { glBalanceReader } from "../treasury/gl-balance-reader";
+import { getWsInstance } from "../../ws-server";
+import { recordGlGuardEvent } from "../../lib/metrics";
 
 const logger = createLogger('SessionService');
 
@@ -271,13 +274,34 @@ interface OpenSessionParams {
   billetageOuverture: Record<string, number>;
   ipAddress?: string;
   userAgent?: string;
+  // GL Guard parameters
+  strictnessMode?: CaisseOpeningStrictnessType;
+  discrepancyJustification?: string; // Required if strictness is WARNING_WITH_JUSTIFICATION and there's a discrepancy
+  discrepancyApprovedBy?: string; // User who approved the discrepancy (supervisor)
 }
 
 interface OpenSessionResult {
   success: boolean;
   session?: any;
   error?: string;
-  errorCode?: "CAISSE_OCCUPIED" | "USER_HAS_SESSION" | "INVALID_BILLETAGE" | "CAISSE_NOT_FOUND" | "CAISSE_AGENCE_MISMATCH" | "DB_ERROR";
+  errorCode?:
+    | "CAISSE_OCCUPIED"
+    | "USER_HAS_SESSION"
+    | "INVALID_BILLETAGE"
+    | "CAISSE_NOT_FOUND"
+    | "CAISSE_AGENCE_MISMATCH"
+    | "GL_DISCREPANCY_BLOCKED"       // STRICT_BLOCK mode with discrepancy
+    | "GL_DISCREPANCY_NO_JUSTIFICATION" // WARNING mode but no justification provided
+    | "GL_READ_ERROR"                 // Error reading GL balance
+    | "DB_ERROR";
+  // GL Guard info in result
+  glGuardInfo?: {
+    glBalance: number;
+    billetageTotal: number;
+    ecart: number;
+    strictnessApplied: CaisseOpeningStrictnessType;
+    action: "BLOCKED" | "APPROVED_WITH_JUSTIFICATION" | "LOGGED_ONLY";
+  };
 }
 
 /**
@@ -285,10 +309,22 @@ interface OpenSessionResult {
  * - Vérifie qu'aucune session n'est déjà ouverte sur cette caisse
  * - Vérifie que l'utilisateur n'a pas déjà une session ouverte
  * - Valide le billetage côté serveur
+ * - **GL GUARD**: Vérifie la cohérence billetage vs GL (strictness configurable)
  * - Utilise une transaction SERIALIZABLE pour éviter les race conditions
  */
 export async function openSessionAtomic(params: OpenSessionParams): Promise<OpenSessionResult> {
-  const { caissierId, caisseId, agenceId, soldeInitial, billetageOuverture, ipAddress, userAgent } = params;
+  const {
+    caissierId,
+    caisseId,
+    agenceId,
+    soldeInitial,
+    billetageOuverture,
+    ipAddress,
+    userAgent,
+    strictnessMode = CaisseOpeningStrictness.LOG_ONLY, // Default: log only
+    discrepancyJustification,
+    discrepancyApprovedBy,
+  } = params;
 
   // 1. Validation du billetage côté serveur
   const billetageValidation = validateBilletage(billetageOuverture, Number(soldeInitial));
@@ -301,11 +337,112 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
     };
   }
 
-  // 2. Vérification GL avant ouverture (logging uniquement)
+  // 2. Lecture du solde GL pour cette caisse (avant transaction pour ne pas bloquer)
+  const glResult = await glBalanceReader.getGlBalanceForCaisseIsolated(caisseId);
+
+  if (!glResult.success || !glResult.balance) {
+    logger.error({ caisseId, error: glResult.error }, '[GL GUARD] Erreur lecture solde GL');
+    // En mode LOG_ONLY, on continue malgré l'erreur de lecture GL
+    if (strictnessMode !== CaisseOpeningStrictness.LOG_ONLY) {
+      return {
+        success: false,
+        error: `Impossible de lire le solde GL: ${glResult.error}`,
+        errorCode: "GL_READ_ERROR",
+      };
+    }
+  }
+
+  const glBalance = glResult.balance?.glBalance ?? 0;
+  const billetageTotal = billetageValidation.calculatedTotal;
+  const ecartGl = billetageTotal - glBalance;
+  const hasDiscrepancy = Math.abs(ecartGl) > MAX_ECART_THRESHOLD;
+
+  // 3. Application de la logique GL Guard selon le mode de strictness
+  let glGuardAction: "BLOCKED" | "APPROVED_WITH_JUSTIFICATION" | "LOGGED_ONLY" = "LOGGED_ONLY";
+
+  if (hasDiscrepancy) {
+    logger.warn({
+      caisseId,
+      billetageTotal,
+      glBalance,
+      ecart: ecartGl,
+      strictnessMode,
+    }, '[GL GUARD] Écart détecté entre billetage et GL');
+
+    switch (strictnessMode) {
+      case CaisseOpeningStrictness.STRICT_BLOCK:
+        // Mode strict: bloquer l'ouverture
+        // Record metrics
+        recordGlGuardEvent({
+          action: 'BLOCKED',
+          agenceId,
+          strictnessMode,
+          discrepancyAmount: Math.abs(ecartGl),
+        });
+
+        // Broadcast WebSocket event
+        const wsBlocked = getWsInstance();
+        if (wsBlocked) {
+          wsBlocked.broadcast({
+            type: 'CAISSE_OPENING_BLOCKED',
+            payload: {
+              caisseId,
+              agenceId,
+              caissierId,
+              glBalance,
+              billetageTotal,
+              ecart: ecartGl,
+              strictnessMode,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+
+        return {
+          success: false,
+          error: `Écart de ${ecartGl.toLocaleString('fr-FR')} FCFA détecté entre le billetage (${billetageTotal.toLocaleString('fr-FR')}) et le solde GL (${glBalance.toLocaleString('fr-FR')}). L'ouverture est bloquée en mode strict.`,
+          errorCode: "GL_DISCREPANCY_BLOCKED",
+          glGuardInfo: {
+            glBalance,
+            billetageTotal,
+            ecart: ecartGl,
+            strictnessApplied: strictnessMode,
+            action: "BLOCKED",
+          },
+        };
+
+      case CaisseOpeningStrictness.WARNING_WITH_JUSTIFICATION:
+        // Mode warning: exiger une justification
+        if (!discrepancyJustification || discrepancyJustification.trim().length < 10) {
+          return {
+            success: false,
+            error: `Écart de ${ecartGl.toLocaleString('fr-FR')} FCFA détecté. Une justification d'au moins 10 caractères est requise pour continuer.`,
+            errorCode: "GL_DISCREPANCY_NO_JUSTIFICATION",
+            glGuardInfo: {
+              glBalance,
+              billetageTotal,
+              ecart: ecartGl,
+              strictnessApplied: strictnessMode,
+              action: "BLOCKED",
+            },
+          };
+        }
+        glGuardAction = "APPROVED_WITH_JUSTIFICATION";
+        break;
+
+      case CaisseOpeningStrictness.LOG_ONLY:
+      default:
+        // Mode log only: on continue avec log
+        glGuardAction = "LOGGED_ONLY";
+        break;
+    }
+  }
+
+  // 4. Vérification GL avant ouverture (logging global)
   await logGlReconciliationStatus('SESSION_OPEN_PRE', undefined);
 
   try {
-    // 2. Transaction atomique avec niveau d'isolation SERIALIZABLE
+    // 5. Transaction atomique avec niveau d'isolation SERIALIZABLE
     const result = await db.transaction(
       async (tx) => {
         // Vérifier si la caisse est déjà occupée (avec lock implicite via la contrainte unique)
@@ -345,7 +482,19 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
         const timeoutAt = new Date();
         timeoutAt.setHours(timeoutAt.getHours() + DEFAULT_SESSION_TIMEOUT_HOURS);
 
-        // Créer la session avec le solde recalculé côté serveur
+        // Récupérer la session précédente (pour traçabilité)
+        const [previousSession] = await tx
+          .select({
+            id: sessionsCaisse.id,
+            closedAt: sessionsCaisse.closedAt,
+            ecart: sessionsCaisse.ecart,
+          })
+          .from(sessionsCaisse)
+          .where(eq(sessionsCaisse.caisseId, caisseId))
+          .orderBy(desc(sessionsCaisse.closedAt))
+          .limit(1);
+
+        // Créer la session avec le solde recalculé côté serveur + champs GL Guard
         const [newSession] = await tx
           .insert(sessionsCaisse)
           .values({
@@ -358,8 +507,50 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
             openedAt: new Date(),
             lastActivity: new Date(),
             timeoutAt,
+            // GL Guard fields
+            openingGlBalance: glBalance.toString(),
+            openingBilletageTotal: billetageTotal.toString(),
+            openingEcart: ecartGl.toString(),
+            openingStrictnessApplied: strictnessMode,
+            hasOpeningDiscrepancy: hasDiscrepancy,
+            openingDiscrepancyJustification: hasDiscrepancy ? discrepancyJustification : null,
+            openingDiscrepancyApprovedBy: hasDiscrepancy && discrepancyApprovedBy ? discrepancyApprovedBy : null,
+            openingDiscrepancyApprovedAt: hasDiscrepancy && discrepancyApprovedBy ? new Date() : null,
           })
           .returning();
+
+        // Si écart, enregistrer dans la table de traçabilité
+        if (hasDiscrepancy) {
+          await tx.insert(cashOpeningDiscrepancies).values({
+            sessionId: newSession.id,
+            agenceId: sessionAgenceId,
+            caisseId,
+            userId: caissierId,
+            glBalance: glBalance.toString(),
+            billetageTotal: billetageTotal.toString(),
+            ecart: ecartGl.toString(),
+            ecartPercent: glBalance !== 0 ? ((ecartGl / glBalance) * 100).toString() : null,
+            strictnessMode,
+            action: glGuardAction,
+            justification: discrepancyJustification || null,
+            approvedBy: discrepancyApprovedBy || null,
+            approvedAt: discrepancyApprovedBy ? new Date() : null,
+            billetageDetail: billetageOuverture,
+            previousSessionId: previousSession?.id || null,
+            previousSessionClosedAt: previousSession?.closedAt || null,
+            previousSessionEcart: previousSession?.ecart || null,
+            ipAddress: ipAddress || null,
+            userAgent: userAgent || null,
+          });
+
+          logger.warn({
+            sessionId: newSession.id,
+            caisseId,
+            ecart: ecartGl,
+            action: glGuardAction,
+            strictnessMode,
+          }, '[GL GUARD] Écart enregistré dans cash_opening_discrepancies');
+        }
 
         // Log d'audit
         await tx.insert(sessionsCaisseAuditLogs).values({
@@ -375,6 +566,16 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
             validationBilletage: billetageValidation,
             caisseSoldeAvant,
             openingEcart,
+            // GL Guard details
+            glGuard: {
+              glBalance,
+              billetageTotal,
+              ecartGl,
+              strictnessMode,
+              action: glGuardAction,
+              hasDiscrepancy,
+              justification: discrepancyJustification,
+            },
           },
           userId: caissierId,
           ipAddress,
@@ -391,9 +592,47 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
     // Vérification GL après ouverture réussie
     await logGlReconciliationStatus('SESSION_OPEN_POST', result.id);
 
+    // Record metrics and broadcast WebSocket if discrepancy was recorded
+    if (hasDiscrepancy) {
+      recordGlGuardEvent({
+        action: glGuardAction,
+        agenceId,
+        strictnessMode,
+        discrepancyAmount: Math.abs(ecartGl),
+      });
+
+      // Broadcast WebSocket event for discrepancy (not blocked)
+      const ws = getWsInstance();
+      if (ws) {
+        ws.broadcast({
+          type: 'CAISSE_OPENING_WITH_ECART',
+          payload: {
+            sessionId: result.id,
+            caisseId,
+            agenceId,
+            caissierId,
+            glBalance,
+            billetageTotal,
+            ecart: ecartGl,
+            strictnessMode,
+            action: glGuardAction,
+            justification: discrepancyJustification || null,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+    }
+
     return {
       success: true,
       session: result,
+      glGuardInfo: {
+        glBalance,
+        billetageTotal,
+        ecart: ecartGl,
+        strictnessApplied: strictnessMode,
+        action: glGuardAction,
+      },
     };
   } catch (error: any) {
     // Parser les erreurs personnalisées

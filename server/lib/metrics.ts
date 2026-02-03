@@ -120,6 +120,35 @@ export const dbQueryDuration = new Histogram({
 });
 
 // =============================================================================
+// GL GUARD METRICS (Caisse Opening Security)
+// =============================================================================
+
+// Caisse openings blocked due to GL discrepancy
+export const caisseOpeningBlocked = new Counter({
+  name: 'cofinco_caisse_opening_blocked_total',
+  help: 'Number of caisse openings blocked due to GL discrepancy',
+  labelNames: ['agence_id', 'strictness_mode'],
+  registers: [metricsRegistry],
+});
+
+// Caisse openings with discrepancy (not blocked)
+export const caisseOpeningDiscrepancy = new Counter({
+  name: 'cofinco_caisse_opening_discrepancy_total',
+  help: 'Number of caisse openings with GL discrepancy (allowed)',
+  labelNames: ['agence_id', 'strictness_mode', 'action'],
+  registers: [metricsRegistry],
+});
+
+// GL discrepancy amount histogram
+export const glDiscrepancyAmount = new Histogram({
+  name: 'cofinco_gl_discrepancy_amount_fcfa',
+  help: 'GL discrepancy amounts at caisse opening in FCFA',
+  labelNames: ['strictness_mode'],
+  buckets: [1000, 5000, 10000, 50000, 100000, 500000, 1000000],
+  registers: [metricsRegistry],
+});
+
+// =============================================================================
 // CRON JOB METRICS
 // =============================================================================
 
@@ -271,6 +300,33 @@ export function timeDbQuery(operation: string): () => void {
   };
 }
 
+/**
+ * Record GL Guard metrics for caisse opening
+ */
+export function recordGlGuardEvent(params: {
+  action: 'BLOCKED' | 'APPROVED_WITH_JUSTIFICATION' | 'LOGGED_ONLY';
+  agenceId: string;
+  strictnessMode: string;
+  discrepancyAmount: number;
+}): void {
+  const { action, agenceId, strictnessMode, discrepancyAmount } = params;
+
+  if (action === 'BLOCKED') {
+    caisseOpeningBlocked.inc({ agence_id: agenceId, strictness_mode: strictnessMode });
+  } else {
+    caisseOpeningDiscrepancy.inc({
+      agence_id: agenceId,
+      strictness_mode: strictnessMode,
+      action,
+    });
+  }
+
+  // Record discrepancy amount histogram
+  if (discrepancyAmount > 0) {
+    glDiscrepancyAmount.observe({ strictness_mode: strictnessMode }, discrepancyAmount);
+  }
+}
+
 export default {
   metricsRegistry,
   metricsMiddleware,
@@ -280,4 +336,5 @@ export default {
   updateWsConnections,
   updateAlertsCounts,
   timeDbQuery,
+  recordGlGuardEvent,
 };
