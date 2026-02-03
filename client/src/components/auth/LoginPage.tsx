@@ -466,6 +466,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                         autoFocus
                         autoComplete="username"
                         data-testid="input-username"
+                        style={{ backgroundColor: 'white', color: '#0f172a', borderColor: '#cbd5e1' }}
                       />
 
                       <FormField
@@ -480,6 +481,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                         onRightIconClick={() => setShowPassword(!showPassword)}
                         autoComplete="current-password"
                         data-testid="input-password"
+                        style={{ backgroundColor: 'white', color: '#0f172a', borderColor: '#cbd5e1' }}
                       />
 
                       {/* Remember Me Checkbox & Forgot Password */}
