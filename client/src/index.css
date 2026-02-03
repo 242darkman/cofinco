@@ -1231,50 +1231,47 @@ body.modal-open {
 
 /* ==================== MESSAGES SCROLLBAR - Ultra Thin & Elegant ==================== */
 .messages-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.3s ease;
+  scrollbar-width: none; /* Firefox: hide by default */
 }
 
 .messages-scrollbar:hover {
-  scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
 }
 
 .messages-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 3px;
 }
 
 .messages-scrollbar::-webkit-scrollbar-track {
   background: transparent;
-  border-radius: 100px;
 }
 
 .messages-scrollbar::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 100px;
-  transition: background 0.3s ease;
 }
 
 .messages-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.35);
 }
 
 .messages-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.6);
-}
-
-.messages-scrollbar::-webkit-scrollbar-thumb:active {
-  background: rgba(99, 102, 241, 0.8);
+  background: rgba(99, 102, 241, 0.5);
 }
 
 /* Sidebar conversations scrollbar */
 .sidebar-scrollbar {
+  scrollbar-width: none;
+}
+
+.sidebar-scrollbar:hover {
   scrollbar-width: thin;
-  scrollbar-color: rgba(71, 85, 105, 0.3) transparent;
+  scrollbar-color: rgba(71, 85, 105, 0.25) transparent;
 }
 
 .sidebar-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 2px;
 }
 
 .sidebar-scrollbar::-webkit-scrollbar-track {
@@ -1282,8 +1279,12 @@ body.modal-open {
 }
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.3);
+  background: transparent;
   border-radius: 100px;
+}
+
+.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.3);
 }
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
