@@ -143,6 +143,10 @@ class SyncMonitorService {
   // Heartbeat in progress tracking
   private heartbeatInProgress: boolean = false;
 
+  // Throttle for online event (prevent spam when connection flickers)
+  private lastOnlineEventTime: number = 0;
+  private onlineEventThrottleMs: number = 5000; // 5 seconds between online-triggered heartbeats
+
   constructor(config: Partial<SyncMonitorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
 
@@ -319,6 +323,14 @@ class SyncMonitorService {
     this.log('Browser online');
     this.browserOnline = true;
 
+    // Throttle: prevent spam when connection flickers rapidly
+    const now = Date.now();
+    if ((now - this.lastOnlineEventTime) < this.onlineEventThrottleMs) {
+      this.log('Online event throttled (too soon after last online event)');
+      return;
+    }
+    this.lastOnlineEventTime = now;
+
     // Reset tracking
     this.consecutiveFailures = 0;
     this.internalState = 'checking';
@@ -336,10 +348,22 @@ class SyncMonitorService {
     this.setConnectionState('offline', true);
   };
 
+  // Minimum time between any heartbeat calls (prevents spam from multiple sources)
+  private lastHeartbeatSentTime: number = 0;
+  private minHeartbeatIntervalMs: number = 3000; // 3 seconds minimum between heartbeats
+
   private async sendHeartbeat(): Promise<void> {
     // Prevent overlapping heartbeats
     if (this.heartbeatInProgress) {
       this.log('Heartbeat already in progress, skipping');
+      return;
+    }
+
+    // Global throttle: minimum interval between any heartbeat calls
+    const now = Date.now();
+    const timeSinceLastHeartbeat = now - this.lastHeartbeatSentTime;
+    if (this.lastHeartbeatSentTime > 0 && timeSinceLastHeartbeat < this.minHeartbeatIntervalMs) {
+      this.log(`Heartbeat throttled (${timeSinceLastHeartbeat}ms since last, min: ${this.minHeartbeatIntervalMs}ms)`);
       return;
     }
 
@@ -349,7 +373,8 @@ class SyncMonitorService {
     }
 
     this.heartbeatInProgress = true;
-    const startTime = Date.now();
+    this.lastHeartbeatSentTime = now;
+    const startTime = now;
 
     try {
       const controller = new AbortController();
