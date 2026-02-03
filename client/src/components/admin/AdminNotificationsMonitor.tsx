@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Mail, MessageSquare, AlertTriangle, CheckCircle, Clock, XCircle,
   RefreshCw, BarChart3, Send, Inbox, Loader2, ChevronDown, ChevronUp,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
 // ============================================================================
@@ -64,6 +65,12 @@ export default function AdminNotificationsMonitor() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
 
+  // Pagination state
+  const [jobsPage, setJobsPage] = useState(1);
+  const [failedJobsPage, setFailedJobsPage] = useState(1);
+  const JOBS_PER_PAGE = 10;
+  const FAILED_JOBS_PER_PAGE = 5;
+
   const fetchData = useCallback(async () => {
     try {
       const [metricsRes, jobsRes, failedRes, settingsRes] = await Promise.all([
@@ -95,6 +102,25 @@ export default function AdminNotificationsMonitor() {
     const interval = setInterval(fetchData, 15000); // Refresh every 15s
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setJobsPage(1);
+  }, [statusFilter]);
+
+  // Paginated data
+  const paginatedJobs = useMemo(() => {
+    const start = (jobsPage - 1) * JOBS_PER_PAGE;
+    return jobs.slice(start, start + JOBS_PER_PAGE);
+  }, [jobs, jobsPage]);
+
+  const paginatedFailedJobs = useMemo(() => {
+    const start = (failedJobsPage - 1) * FAILED_JOBS_PER_PAGE;
+    return failedJobs.slice(start, start + FAILED_JOBS_PER_PAGE);
+  }, [failedJobs, failedJobsPage]);
+
+  const totalJobsPages = Math.ceil(jobs.length / JOBS_PER_PAGE);
+  const totalFailedJobsPages = Math.ceil(failedJobs.length / FAILED_JOBS_PER_PAGE);
 
   const handleRetryDeadLetter = async () => {
     setRetrying(true);
@@ -142,7 +168,7 @@ export default function AdminNotificationsMonitor() {
   }
 
   return (
-    <div className="space-y-4 p-4 overflow-y-auto max-h-[calc(100vh-12rem)]">
+    <div className="space-y-4">
       {/* Metrics Cards */}
       {metrics && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -280,7 +306,12 @@ export default function AdminNotificationsMonitor() {
       {/* Jobs Table */}
       <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
         <div className="flex items-center justify-between p-3 border-b border-slate-700/50">
-          <h3 className="text-sm font-medium text-slate-300">File d'attente</h3>
+          <h3 className="text-sm font-medium text-slate-300">
+            File d'attente
+            {jobs.length > 0 && (
+              <span className="ml-2 text-xs text-slate-500">({jobs.length})</span>
+            )}
+          </h3>
           <div className="flex items-center gap-2">
             <select
               value={statusFilter}
@@ -318,14 +349,14 @@ export default function AdminNotificationsMonitor() {
               </tr>
             </thead>
             <tbody>
-              {jobs.length === 0 ? (
+              {paginatedJobs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center text-slate-500 py-6">
                     Aucun job trouvé
                   </td>
                 </tr>
               ) : (
-                jobs.map((job) => (
+                paginatedJobs.map((job) => (
                   <tr key={job.id} className="border-b border-slate-800/50 hover:bg-slate-700/20">
                     <td className="p-2">
                       <span className={`inline-flex items-center gap-1 ${
@@ -367,6 +398,56 @@ export default function AdminNotificationsMonitor() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination for Jobs */}
+        {totalJobsPages > 1 && (
+          <div className="flex items-center justify-between p-3 border-t border-slate-700/50">
+            <span className="text-xs text-slate-500">
+              Page {jobsPage} sur {totalJobsPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setJobsPage(p => Math.max(1, p - 1))}
+                disabled={jobsPage === 1}
+                className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              {Array.from({ length: Math.min(5, totalJobsPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalJobsPages <= 5) {
+                  pageNum = i + 1;
+                } else if (jobsPage <= 3) {
+                  pageNum = i + 1;
+                } else if (jobsPage >= totalJobsPages - 2) {
+                  pageNum = totalJobsPages - 4 + i;
+                } else {
+                  pageNum = jobsPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setJobsPage(pageNum)}
+                    className={`w-7 h-7 text-xs rounded ${
+                      jobsPage === pageNum
+                        ? 'bg-indigo-600 text-white'
+                        : 'hover:bg-slate-700/50 text-slate-400'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setJobsPage(p => Math.min(totalJobsPages, p + 1))}
+                disabled={jobsPage === totalJobsPages}
+                className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Failed Jobs Detail */}
@@ -377,7 +458,7 @@ export default function AdminNotificationsMonitor() {
             <h3 className="text-sm font-medium text-red-300">Jobs en erreur ({failedJobs.length})</h3>
           </div>
           <div className="divide-y divide-slate-800/50">
-            {failedJobs.map((job) => (
+            {paginatedFailedJobs.map((job) => (
               <div key={job.id} className="p-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">
@@ -391,6 +472,56 @@ export default function AdminNotificationsMonitor() {
               </div>
             ))}
           </div>
+
+          {/* Pagination for Failed Jobs */}
+          {totalFailedJobsPages > 1 && (
+            <div className="flex items-center justify-between p-3 border-t border-red-900/30">
+              <span className="text-xs text-slate-500">
+                Page {failedJobsPage} sur {totalFailedJobsPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setFailedJobsPage(p => Math.max(1, p - 1))}
+                  disabled={failedJobsPage === 1}
+                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: Math.min(5, totalFailedJobsPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalFailedJobsPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (failedJobsPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (failedJobsPage >= totalFailedJobsPages - 2) {
+                    pageNum = totalFailedJobsPages - 4 + i;
+                  } else {
+                    pageNum = failedJobsPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setFailedJobsPage(pageNum)}
+                      className={`w-7 h-7 text-xs rounded ${
+                        failedJobsPage === pageNum
+                          ? 'bg-red-600 text-white'
+                          : 'hover:bg-slate-700/50 text-slate-400'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setFailedJobsPage(p => Math.min(totalFailedJobsPages, p + 1))}
+                  disabled={failedJobsPage === totalFailedJobsPages}
+                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

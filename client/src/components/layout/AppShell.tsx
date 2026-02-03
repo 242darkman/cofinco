@@ -102,7 +102,7 @@ export default function AppShell({
         {/* Scrollable content area - takes remaining space */}
         <main
           className={[
-            'flex-1 min-h-0 flex flex-col overflow-y-auto overscroll-contain bg-surface',
+            'flex-1 min-h-0 flex flex-col overflow-y-auto overscroll-contain bg-surface pro-scrollbar',
             isMobile && hasBottomNav ? 'pb-20' : ''
           ].join(' ')}
         >
