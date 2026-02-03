@@ -15,7 +15,7 @@ import {
   Clock, Shield, UserPlus, Trash2, RefreshCw,
   AlertTriangle, Timer, Users, X, Calendar,
   History, ChevronLeft, ChevronRight, Filter,
-  CheckCircle2, XCircle, AlertCircle, BarChart3
+  CheckCircle2, XCircle, AlertCircle
 } from 'lucide-react';
 import {
   useTemporaryPermissions,
