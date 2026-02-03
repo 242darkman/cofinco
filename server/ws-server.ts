@@ -81,7 +81,7 @@ type GlobalMessage = {
     // =============================================
     // SYSTÈME & NOTIFICATIONS
     // =============================================
-    | "NOTIFICATION" | "PRESENCE" | "PRESENCE_UPDATE" | "DASHBOARD_UPDATE"
+    | "NOTIFICATION" | "PRESENCE" | "PRESENCE_UPDATE" | "ONLINE_USERS_LIST" | "DASHBOARD_UPDATE"
     | "LIVE_ACTIVITY" | "REALTIME_EVENT"
     | "SUBSCRIBED" | "UNSUBSCRIBED"
 
@@ -365,6 +365,23 @@ export function setupWebSocket(server: Server) {
           }));
         }
       });
+
+      // Send the list of currently online users to the newly connected user
+      // This ensures they have accurate presence info from the start
+      const onlineUserIds: string[] = [];
+      clients.forEach((sockets, onlineUserId) => {
+        if (sockets.length > 0 && onlineUserId !== userId) {
+          onlineUserIds.push(onlineUserId);
+        }
+      });
+
+      if (onlineUserIds.length > 0) {
+        ws.send(JSON.stringify({
+          type: "ONLINE_USERS_LIST",
+          payload: { users: onlineUserIds }
+        }));
+        logger.debug({ userId, onlineCount: onlineUserIds.length }, 'Sent initial online users list');
+      }
     }
 
     ws.on("message", async (message) => {

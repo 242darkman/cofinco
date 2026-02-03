@@ -37,7 +37,7 @@ type MessageType =
   // =============================================
   // SYSTÈME & NOTIFICATIONS
   // =============================================
-  | "NOTIFICATION" | "PRESENCE" | "PRESENCE_UPDATE" | "DASHBOARD_UPDATE"
+  | "NOTIFICATION" | "PRESENCE" | "PRESENCE_UPDATE" | "ONLINE_USERS_LIST" | "DASHBOARD_UPDATE"
   | "LIVE_ACTIVITY" | "REALTIME_EVENT"
   | "SUBSCRIBED" | "UNSUBSCRIBED"
 
@@ -450,6 +450,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           else newSet.delete(userId);
           return newSet;
         });
+        break;
+
+      case "ONLINE_USERS_LIST":
+        // Initial list of online users received on connection
+        // This ensures accurate presence info from the start
+        const { users: initialOnlineUsers } = message.payload;
+        if (Array.isArray(initialOnlineUsers)) {
+          setOnlineUsers(new Set(initialOnlineUsers));
+          console.log(`[WS] Received initial online users list: ${initialOnlineUsers.length} users online`);
+        }
         break;
 
       case "TYPING":
