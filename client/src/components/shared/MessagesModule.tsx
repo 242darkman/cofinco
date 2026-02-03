@@ -366,7 +366,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-y-auto sidebar-scrollbar">
           {loadingConversations && !searchQuery ? (
             <div className="flex justify-center p-8 text-slate-500">
               <Loader2 className="animate-spin" />
@@ -518,7 +518,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scroll-smooth bg-gradient-to-b from-slate-950 to-slate-900"
+              className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scroll-smooth bg-gradient-to-b from-slate-950 to-slate-900 messages-scrollbar"
             >
               {isFetchingNextPage && (
                 <div className="flex justify-center py-2">
