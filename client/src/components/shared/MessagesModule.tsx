@@ -25,6 +25,22 @@ import { resolveStorageUrl } from '../../lib/format';
 import { authService } from '../../lib/auth';
 import { ALLOWED_REACTION_EMOJIS } from '@shared/schema';
 
+// Emojis courants pour la composition de messages
+const MESSAGE_EMOJIS = [
+  // Smileys
+  '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😍', '🥰', '😘', '😗', '😋', '😛', '😜', '🤪', '😝',
+  '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮', '😯', '😲', '😳', '🥺', '😢', '😭',
+  '😤', '😠', '😡', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖',
+  // Gestes
+  '👋', '🤚', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '👍', '👎', '✊',
+  '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '💪',
+  // Coeurs & Symboles
+  '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟',
+  '⭐', '🌟', '✨', '💫', '🔥', '💥', '💯', '✅', '❌', '⚠️', '🎉', '🎊', '🎁', '🏆', '🥇', '🥈', '🥉',
+  // Objets
+  '📱', '💻', '🖥️', '📷', '🔔', '📣', '💬', '💭', '🗨️', '📝', '📋', '📌', '📎', '🔗', '💼', '📁', '📂', '🗂️', '📊', '📈', '📉',
+];
+
 interface MessagesModuleProps {
   initialChatUserId?: string;
   initialChatUserName?: string;
@@ -64,6 +80,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
   const [searchQuery, setSearchQuery] = useState('');
   const [editingMessage, setEditingMessage] = useState<{ id: string; content: string } | null>(null);
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupTitle, setGroupTitle] = useState('');
   const [groupParticipants, setGroupParticipants] = useState<string[]>([]);
@@ -685,27 +702,58 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                   {uploadingFile ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
                 </button>
 
-                <div className="flex-1 bg-slate-950 border border-slate-700 rounded-xl flex items-center px-3 sm:px-4 h-11 sm:h-12 focus-within:border-indigo-500 transition-colors">
-                  <textarea
-                    placeholder="Écrire un message..."
-                    className="w-full bg-transparent border-none outline-none text-white text-sm resize-none py-2.5 max-h-32 placeholder:text-slate-600 custom-scrollbar leading-normal"
-                    rows={1}
-                    value={message}
-                    onChange={handleInputChange}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    style={{ minHeight: '20px' }}
-                  />
-                  <button
-                    onClick={() => setShowReactionsFor(null)}
-                    className="ml-2 text-slate-500 hover:text-yellow-400 transition-colors shrink-0"
-                  >
-                    <Smile size={20} />
-                  </button>
+                <div className="flex-1 relative">
+                  {/* Emoji Picker Panel */}
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full mb-2 left-0 right-0 sm:left-auto sm:right-0 sm:w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-3 z-50">
+                      <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-700">
+                        <span className="text-xs font-medium text-slate-400">Emojis</span>
+                        <button
+                          onClick={() => setShowEmojiPicker(false)}
+                          className="text-slate-500 hover:text-white"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto custom-scrollbar">
+                        {MESSAGE_EMOJIS.map((emoji, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setMessage(prev => prev + emoji);
+                              setShowEmojiPicker(false);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center text-lg hover:bg-slate-800 rounded transition-colors"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-slate-950 border border-slate-700 rounded-xl flex items-center px-3 sm:px-4 h-11 sm:h-12 focus-within:border-indigo-500 transition-colors">
+                    <textarea
+                      placeholder="Écrire un message..."
+                      className="w-full bg-transparent border-none outline-none text-white text-sm resize-none py-2.5 max-h-32 placeholder:text-slate-600 custom-scrollbar leading-normal"
+                      rows={1}
+                      value={message}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      style={{ minHeight: '20px' }}
+                    />
+                    <button
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className={`ml-2 transition-colors shrink-0 ${showEmojiPicker ? 'text-yellow-400' : 'text-slate-500 hover:text-yellow-400'}`}
+                    >
+                      <Smile size={20} />
+                    </button>
+                  </div>
                 </div>
 
                 <button
