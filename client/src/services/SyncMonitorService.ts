@@ -90,8 +90,8 @@ export interface SyncMonitorConfig {
 }
 
 const DEFAULT_CONFIG: SyncMonitorConfig = {
-  heartbeatIntervalMs: 8000,         // 8 seconds between heartbeats (accommodates slow connections)
-  counterUpdateIntervalMs: 1000,     // 1 second for UI counter
+  heartbeatIntervalMs: 15000,        // 15 seconds between heartbeats (safe for slow connections & rate limiting)
+  counterUpdateIntervalMs: 1000,     // 1 second for UI counter (no network request, just UI update)
   latencyTimeoutMs: 20000,           // 20 second timeout (very generous)
 
   // Latency quality thresholds
