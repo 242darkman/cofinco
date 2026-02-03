@@ -8,7 +8,7 @@
  * - Configurer les politiques de rotation
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Key,
@@ -133,13 +133,17 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
       if (!res.ok) throw new Error('Erreur récupération politique');
       return res.json();
     },
-    onSuccess: (data) => {
-      setPolicyDays(data.rotationFrequencyDays);
-      setPolicyMaxUsage(data.maxUsageBeforeRotation);
-      setPolicyNotifyDays(data.notifyDaysBeforeExpiry);
-      setPolicyAutoGenerate(data.autoGenerateOnExpiry);
-    },
   });
+
+  // Synchroniser les états locaux avec les données de politique
+  useEffect(() => {
+    if (policy) {
+      setPolicyDays(policy.rotationFrequencyDays);
+      setPolicyMaxUsage(policy.maxUsageBeforeRotation);
+      setPolicyNotifyDays(policy.notifyDaysBeforeExpiry);
+      setPolicyAutoGenerate(policy.autoGenerateOnExpiry);
+    }
+  }, [policy]);
 
   // Mutation générer code
   const generateMutation = useMutation({

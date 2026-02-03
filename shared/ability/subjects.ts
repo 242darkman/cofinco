@@ -34,6 +34,8 @@ export const Subjects = {
   REGULARISATION: 'regularisation',
   TREASURY: 'treasury',
   ACCOUNTING: 'accounting',
+  BOURSE: 'bourse',
+  LOGE: 'loge',
 
   // Entities (for granular resource-level checks)
   USER: 'User',
@@ -133,6 +135,8 @@ export const MODULE_SUBJECTS = [
   Subjects.REGULARISATION,
   Subjects.TREASURY,
   Subjects.ACCOUNTING,
+  Subjects.BOURSE,
+  Subjects.LOGE,
 ] as const;
 
 // Entity subjects only (for CRUD operations)
@@ -267,6 +271,8 @@ export const SUBJECT_LABELS: Record<Subject, string> = {
   [Subjects.TREASURY]: 'Trésorerie',
   [Subjects.ACCOUNTING]: 'Comptabilité GL',
   [Subjects.SYSTEM]: 'Système',
+  [Subjects.BOURSE]: 'Portefeuille Boursier',
+  [Subjects.LOGE]: 'Stockage Documents',
 };
 
 // Module to Entity mapping (which entities belong to which module)

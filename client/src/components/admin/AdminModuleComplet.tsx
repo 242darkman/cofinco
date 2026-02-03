@@ -367,36 +367,75 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'roles' && (
                     <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden space-y-4">
                       <div className="border-b border-slate-800 pb-2 shrink-0">
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-slate-400 font-medium">Vue :</span>
-                            <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-                              {[
-                                { id: 'roles' as const, label: 'Par Rôle', icon: ShieldCheck },
-                                { id: 'modules' as const, label: 'Vue Globale', icon: LayoutGrid },
-                                { id: 'users' as const, label: 'Exceptions', icon: UserCog },
-                                { id: 'temporary' as const, label: 'Temporaires', icon: Clock },
-                                { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
-                              ].map((tab) => {
-                                const isActive = accessViewMode === tab.id;
-                                return (
-                                  <button
-                                    key={tab.id}
-                                    onClick={() => setAccessViewMode(tab.id)}
-                                    className={`
-                                      flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                                      ${isActive 
-                                        ? 'bg-slate-800 text-white shadow-sm border border-slate-700' 
-                                        : 'text-slate-500 hover:text-slate-300'
-                                      }
-                                    `}
-                                  >
-                                    <tab.icon size={12} />
-                                    <span>{tab.label}</span>
-                                  </button>
-                                );
-                              })}
+                        {(() => {
+                        const viewTabs = [
+                          {
+                            id: 'roles' as const,
+                            label: 'Par Rôle',
+                            icon: ShieldCheck,
+                            description: 'Gérez les permissions attribuées à chaque rôle. Les modifications s\'appliquent à TOUS les utilisateurs ayant ce rôle.'
+                          },
+                          {
+                            id: 'modules' as const,
+                            label: 'Vue Globale',
+                            icon: LayoutGrid,
+                            description: 'Visualisez la matrice complète des permissions par module. Comparez rapidement les droits entre tous les rôles.'
+                          },
+                          {
+                            id: 'users' as const,
+                            label: 'Exceptions',
+                            icon: UserCog,
+                            description: 'Accordez ou retirez des permissions spécifiques à UN utilisateur, indépendamment de son rôle. Idéal pour les cas particuliers.'
+                          },
+                          {
+                            id: 'temporary' as const,
+                            label: 'Temporaires',
+                            icon: Clock,
+                            description: 'Attribuez des permissions à durée limitée. Parfait pour les remplacements, formations ou accès ponctuels.'
+                          },
+                          {
+                            id: 'analytics' as const,
+                            label: 'Analytics',
+                            icon: BarChart3,
+                            description: 'Analysez l\'utilisation des permissions, identifiez les incohérences et optimisez la configuration des accès.'
+                          },
+                        ];
+                        const activeTab = viewTabs.find(t => t.id === accessViewMode);
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-4">
+                              <span className="text-sm text-slate-400 font-medium">Vue :</span>
+                              <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+                                {viewTabs.map((tab) => {
+                                  const isActive = accessViewMode === tab.id;
+                                  return (
+                                    <button
+                                      key={tab.id}
+                                      onClick={() => setAccessViewMode(tab.id)}
+                                      className={`
+                                        flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all
+                                        ${isActive
+                                          ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
+                                          : 'text-slate-500 hover:text-slate-300'
+                                        }
+                                      `}
+                                    >
+                                      <tab.icon size={12} />
+                                      <span>{tab.label}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
-                        </div>
+                            {activeTab && (
+                              <p className="text-xs text-slate-500 pl-12 max-w-2xl">
+                                {activeTab.description}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                       </div>
                       
                       <div className="flex-1 overflow-hidden relative">

@@ -90,6 +90,15 @@ export const Actions = {
   AWARD: 'award',
   ADJUST_POINTS: 'adjust',
   EXPIRE_POINTS: 'expire',
+
+  // Trading
+  TRADE: 'trade',
+
+  // Storage/Files
+  UPLOAD: 'upload',
+
+  // Messages
+  SEND: 'send',
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -163,4 +172,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   [Actions.AWARD]: 'Attribuer (points)',
   [Actions.ADJUST_POINTS]: 'Ajuster (points)',
   [Actions.EXPIRE_POINTS]: 'Expirer (points)',
+  [Actions.TRADE]: 'Trader',
+  [Actions.UPLOAD]: 'Téléverser',
+  [Actions.SEND]: 'Envoyer',
 };

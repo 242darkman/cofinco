@@ -5,7 +5,7 @@ import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { authService } from '../../../lib/auth';
 import { api } from '../../../lib/api';
-import { sessionCaisseApi, caisseAccessCodeApi } from '../../../lib/api-client';
+import { sessionCaisseApi, caisseAccessControlApi } from '../../../lib/api-client';
 import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -217,7 +217,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
     setSupervisorLoading(true);
     setSupervisorError('');
     try {
-      const result = await caisseAccessCodeApi.validateCode(
+      const result = await caisseAccessControlApi.validateCode(
         supervisorCode,
         selectedCaisseId || undefined,
         selectedAgenceId || currentUser?.agenceId

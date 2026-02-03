@@ -2308,12 +2308,6 @@ export const caisseAccessCodeApi = {
     body: JSON.stringify(data),
   }),
   deactivate: (codeId: string) => request<{ success: boolean }>(`/caisse/access-codes/${codeId}`, { method: 'DELETE' }),
-  getPermissions: () => request<any[]>('/caisse/code-permissions'),
-  createPermission: (data: any) => request<any>('/caisse/code-permissions', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  revokePermission: (permId: string) => request<any>(`/caisse/code-permissions/${permId}/revoke`, { method: 'POST' }),
 };
 
 // Caisse Access Control API (Operating Hours + Authorizations)

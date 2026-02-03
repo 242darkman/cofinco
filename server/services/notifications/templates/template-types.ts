@@ -143,6 +143,42 @@ export interface HrSanctionFinalizedVars {
 }
 
 // ============================================================================
+// TEMPORARY PERMISSIONS
+// ============================================================================
+
+export interface TempPermissionGrantedVars {
+  userName: string;
+  permissionName: string;
+  permissionCode: string;
+  expiresAt: string;
+  reason: string;
+  grantedBy: string;
+}
+
+export interface TempPermissionExpiringVars {
+  userName: string;
+  permissionName: string;
+  permissionCode: string;
+  expiresAt: string;
+  timeRemaining: string;
+}
+
+export interface TempPermissionExpiredVars {
+  userName: string;
+  permissionName: string;
+  permissionCode: string;
+  expiredAt: string;
+}
+
+export interface TempPermissionRevokedVars {
+  userName: string;
+  permissionName: string;
+  permissionCode: string;
+  revokedBy: string;
+  reason?: string;
+}
+
+// ============================================================================
 // GENERAL
 // ============================================================================
 
@@ -455,4 +491,8 @@ export type TemplateVariables =
   | ReceiptWithdrawalVars
   | HrSanctionCreatedVars
   | HrSanctionNotifiedVars
-  | HrSanctionFinalizedVars;
+  | HrSanctionFinalizedVars
+  | TempPermissionGrantedVars
+  | TempPermissionExpiringVars
+  | TempPermissionExpiredVars
+  | TempPermissionRevokedVars;

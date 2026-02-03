@@ -189,3 +189,186 @@ export function formatTimeRemaining(ms: number): string {
 
   return `${minutes}min`;
 }
+
+// ============================================================================
+// HISTORY TYPES & HOOK
+// ============================================================================
+
+export interface TempPermissionHistoryEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string | null;
+  permissionId: string;
+  permissionCode: string;
+  permissionName: string;
+  moduleName: string | null;
+  grantedBy: string;
+  granterName: string;
+  grantedAt: string;
+  expiresAt: string;
+  reason: string;
+  isActive: boolean;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  revokerName: string | null;
+  revokeReason: string | null;
+  status: 'active' | 'expired' | 'revoked';
+  duration: number;
+}
+
+export interface TempPermissionHistoryStats {
+  totalGranted: number;
+  totalActive: number;
+  totalExpired: number;
+  totalRevoked: number;
+  avgDurationHours: number;
+}
+
+export interface TempPermissionHistoryFilters {
+  userId?: string;
+  permissionCode?: string;
+  status?: 'active' | 'expired' | 'revoked' | 'all';
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function useTemporaryPermissionsHistory(initialFilters?: TempPermissionHistoryFilters) {
+  const [history, setHistory] = useState<TempPermissionHistoryEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<TempPermissionHistoryStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<TempPermissionHistoryFilters>(initialFilters || {
+    status: 'all',
+    limit: 50,
+    offset: 0,
+  });
+
+  const fetchHistory = useCallback(async (customFilters?: TempPermissionHistoryFilters) => {
+    setLoading(true);
+    setError(null);
+
+    const currentFilters = customFilters || filters;
+
+    try {
+      const params = new URLSearchParams();
+      if (currentFilters.userId) params.append('userId', currentFilters.userId);
+      if (currentFilters.permissionCode) params.append('permissionCode', currentFilters.permissionCode);
+      if (currentFilters.status) params.append('status', currentFilters.status);
+      if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
+      if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
+      if (currentFilters.limit) params.append('limit', currentFilters.limit.toString());
+      if (currentFilters.offset) params.append('offset', currentFilters.offset.toString());
+
+      const response = await fetch(`/api/rbac/temp-permissions/history?${params}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la récupération de l\'historique');
+      }
+
+      const data = await response.json();
+      setHistory(data.data || []);
+      setTotal(data.total || 0);
+      setStats(data.stats || null);
+    } catch (err: any) {
+      setError(err.message);
+      console.error('Fetch history error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  // Update filters and refetch
+  const updateFilters = useCallback((newFilters: Partial<TempPermissionHistoryFilters>) => {
+    const updated = { ...filters, ...newFilters };
+    setFilters(updated);
+    fetchHistory(updated);
+  }, [filters, fetchHistory]);
+
+  // Pagination helpers
+  const nextPage = useCallback(() => {
+    updateFilters({ offset: (filters.offset || 0) + (filters.limit || 50) });
+  }, [filters, updateFilters]);
+
+  const prevPage = useCallback(() => {
+    updateFilters({ offset: Math.max(0, (filters.offset || 0) - (filters.limit || 50)) });
+  }, [filters, updateFilters]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  return {
+    history,
+    total,
+    stats,
+    loading,
+    error,
+    filters,
+    updateFilters,
+    refresh: fetchHistory,
+    nextPage,
+    prevPage,
+    hasNextPage: (filters.offset || 0) + history.length < total,
+    hasPrevPage: (filters.offset || 0) > 0,
+    currentPage: Math.floor((filters.offset || 0) / (filters.limit || 50)) + 1,
+    totalPages: Math.ceil(total / (filters.limit || 50)),
+  };
+}
+
+// ============================================================================
+// EXPIRING PERMISSIONS HOOK
+// ============================================================================
+
+export interface ExpiringPermission {
+  id: string;
+  userId: string;
+  userEmail: string | null;
+  userName: string;
+  permissionId: string;
+  permissionCode: string;
+  permissionName: string;
+  expiresAt: string;
+  timeRemaining: number;
+}
+
+export function useExpiringPermissions(thresholdHours: number = 24) {
+  const [permissions, setPermissions] = useState<ExpiringPermission[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await window.fetch(
+        `/api/rbac/temp-permissions/expiring?thresholdHours=${thresholdHours}`,
+        { credentials: 'include' }
+      );
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la récupération');
+      }
+
+      const data = await response.json();
+      setPermissions(data.expiringPermissions || []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [thresholdHours]);
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { permissions, loading, error, refresh: fetch };
+}

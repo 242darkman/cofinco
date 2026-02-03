@@ -1,8 +1,20 @@
 /**
- * Configuration RBAC : Modules accessibles par rôle
+ * Configuration RBAC : Modules et Permissions pour CASL
+ * =====================================================
+ *
+ * Ce fichier définit les modules et permissions de l'application.
+ * Les permissions sont gérées via CASL (buildAbilityForUser) et stockées en BDD.
+ *
+ * IMPORTANT: Ne pas utiliser les fonctions legacy (MODULE_ACCESS, ROLE_PERMISSIONS).
+ * Utiliser uniquement les hooks CASL (useAbility, useCan) côté client
+ * et les middleware CASL (requireAbility) côté serveur.
  */
-import { SystemRole, normalizeRole } from '../types/roles';
+import { SystemRole } from '../types/roles';
 
+/**
+ * Liste des modules de l'application
+ * Utilisée pour le seeding et l'UI admin
+ */
 export const APP_MODULES = [
   'Dashboard',
   'Caisse',
@@ -30,7 +42,6 @@ export const APP_MODULES = [
   'Visites',
   'Prospection',
   'Paiements Agent',
-  // New modules for CASL alignment
   'RBAC',
   'Maintenance',
   'Fidélité',
@@ -41,245 +52,6 @@ export const APP_MODULES = [
 ] as const;
 
 export type AppModule = (typeof APP_MODULES)[number];
-
-export type ModuleAccessConfig = Record<SystemRole, AppModule[]>;
-
-/**
- * Liste des modules par rôle
- * Administrateur : Accès complet
- * Chef d'Agence : Tous modules sauf Paramètres système
- * Comptable : Comptabilité, Rapports, Dashboard
- * Gestionnaire Crédit : Crédits, Clients, Remboursements, Dashboard
- * Superviseur : Supervision équipe, Dashboard
- * agent_caisse : Clients, Comptes, Transactions, Caisse, Dashboard
- * Agent Terrain : Clients, Terrain, Communications, Dashboard
- */
-export const MODULE_ACCESS: ModuleAccessConfig = {
-  [SystemRole.ADMIN]: [
-    'Dashboard',
-    'Clients',
-    'Crédits',
-    'Comptes',
-    'Tontines',
-    'Comptabilité',
-    'Remboursements',
-    'Rapports',
-    'Agent Terrain',
-    'Communications',
-    'Caisse',
-    'CaisseAgent',
-    'RH',
-    'Paramètres',
-    'Administration',
-    'Coffre-Fort',
-    'Incidents',
-    'Visites',
-    'Prospection',
-    'Paiements Agent',
-    'Virements Programmes',
-    // New modules for CASL
-    'RBAC',
-    'Maintenance',
-    'Fidélité',
-    'Régularisation',
-    'Départements',
-    'Employés',
-    'Agences',
-  ],
-  [SystemRole.CHEF_AGENCE]: [
-    'Dashboard',
-    'Clients',
-    'Crédits',
-    'Comptes',
-    'Tontines',
-    'Comptabilité',
-    'Remboursements',
-    'Rapports',
-    'Agent Terrain',
-    'Communications',
-    'Caisse',
-    'CaisseAgent',
-    'Coffre-Fort',
-    'Incidents',
-    'Visites',
-    'Prospection',
-    'Paiements Agent',
-    'RH',
-    'Administration',
-    'Virements Programmes'
-  ],
-  [SystemRole.COMPTABLE]: [
-    'Dashboard',
-    'Comptabilité',
-    'Rapports',
-    'Clients',
-    'Communications',
-    'RH'
-  ],
-  [SystemRole.GESTIONNAIRE_CREDIT]: [
-    'Dashboard',
-    'Clients',
-    'Crédits',
-    'Remboursements',
-    'Rapports',
-    'Communications',
-    'RH'
-  ],
-  [SystemRole.SUPERVISEUR]: [
-    'Dashboard',
-    'Clients',
-    'Agent Terrain',
-    'CaisseAgent',
-    'Rapports',
-    'Communications',
-    'RH'
-  ],
-  [SystemRole.CAISSIER]: [
-    'Dashboard',
-    'Clients',
-    'Comptes',
-    'Caisse',
-    'Communications',
-    'RH',
-    'Virements Programmes'
-  ],
-  [SystemRole.AGENT_TERRAIN]: [
-    'Dashboard',
-    'Clients',
-    'Agent Terrain',
-    'CaisseAgent',
-    'Incidents',
-    'Visites',
-    'Prospection',
-    'Paiements Agent',
-    'Communications',
-    'RH'
-  ],
-  [SystemRole.CLIENT]: []
-};
-
-/**
- * Vérifie si un rôle a accès à un module
- */
-export function canAccessModule(role: string, moduleName: AppModule): boolean {
-  const normalizedRole = normalizeRole(role);
-  if (!normalizedRole) return false;
-  const allowedModules = MODULE_ACCESS[normalizedRole] || [];
-  return allowedModules.includes(moduleName);
-}
-
-/**
- * Obtient la liste des modules accessibles pour un rôle
- */
-export function getAccessibleModules(role: string): AppModule[] {
-  const normalizedRole = normalizeRole(role);
-  if (!normalizedRole) return [];
-  return MODULE_ACCESS[normalizedRole] || [];
-}
-
-/**
- * Configuration des permissions par action et module
- */
-export type PermissionConfig = {
-  [role in SystemRole]: {
-    [module: string]: string[]; // Liste d'actions autorisées
-  };
-};
-
-export const ROLE_PERMISSIONS: PermissionConfig = {
-  [SystemRole.ADMIN]: {
-    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide', 'caisseagent.approve', 'caisseagent.reject', 'supervision.view', 'transfert.init', 'transfert.validate', 'transfert.execute', 'config.view', 'config.edit']
-  },
-  [SystemRole.CHEF_AGENCE]: {
-    'clients': ['view', 'create', 'edit', 'delete'],
-    'credits': ['view', 'create', 'edit', 'approve', 'delete', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide'],
-    'epargnes': ['view', 'create', 'edit'],
-    'tontines': ['view', 'create', 'edit', 'manage'],
-    'comptabilite': ['view'],
-    'rapports': ['view', 'export'],
-    'terrain': ['view', 'manage'],
-    'caisse': ['view', 'manage'],
-    'caisseagent': ['view', 'manage', 'caisseagent.approve', 'caisseagent.reject', 'caisseagent.suspend'],
-    'rh': ['view', 'create', 'edit', 'manage'],
-    'paie': ['view', 'create', 'approve'],
-    'users': ['view', 'create', 'edit'],
-    'admin': ['users', 'logs'], // Gestion utilisateurs + logs, SANS settings/roles
-    'coffre': ['view', 'transfert.init', 'transfert.validate', 'transfert.execute', 'config.view'],
-    'incidents': ['view', 'manage', 'edit'],
-    'visites': ['view'],
-    'prospection': ['view'],
-    'paiements': ['view'],
-    'virements_programmes': ['view', 'edit'],
-    // New modules for CASL
-    'employes': ['view', 'create', 'edit'],
-    'agences': ['view'],
-    'regularisation': ['view', 'create', 'approve'],
-  },
-  [SystemRole.COMPTABLE]: {
-    'clients': ['view'],
-    'credits': ['view'],
-    'epargnes': ['view'],
-    'comptabilite': ['view', 'create', 'edit', 'export'],
-    'rapports': ['view', 'export'],
-    'rh': ['view'], // Pointage uniquement
-    'regularisation': ['view'],
-  },
-  [SystemRole.GESTIONNAIRE_CREDIT]: {
-    'clients': ['view', 'create', 'edit'],
-    'credits': ['view', 'create', 'edit', 'approve', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide'],
-    'remboursements': ['view', 'create'],
-    'rapports': ['view', 'export'],
-    'rh': ['view'] // Pointage uniquement
-  },
-  [SystemRole.SUPERVISEUR]: {
-    'clients': ['view'],
-    'terrain': ['view', 'manage'],
-    'tontines': ['view', 'manage'],
-    'caisseagent': ['view', 'caisseagent.approve', 'caisseagent.reject'],
-    'rapports': ['view'],
-    'rh': ['view'] // Pointage uniquement
-  },
-  [SystemRole.CAISSIER]: {
-    'clients': ['view', 'create'],
-    'epargnes': ['view', 'create', 'edit'],
-    'caisse': ['view', 'create', 'edit'],
-    'remboursements': ['view', 'create'],
-    'virements_programmes': ['view', 'edit'],
-    'rh': ['view'] // Pointage uniquement
-  },
-  [SystemRole.AGENT_TERRAIN]: {
-    'clients': ['view', 'create', 'edit'],
-    'terrain': ['view', 'create'],
-    'prospection': ['view', 'create'],
-    'caisseagent': ['view', 'create'], // Peut créer des opérations, pas les approuver
-    'incidents': ['view', 'create'],
-    'visites': ['view', 'create'],
-    'paiements': ['view', 'create'],
-    'rh': ['view'] // Pointage uniquement
-  },
-  [SystemRole.CLIENT]: {}
-};
-
-/**
- * Vérifie si un rôle a une permission spécifique
- */
-export function hasPermission(role: string, module: string, action: string): boolean {
-  const normalizedRole = normalizeRole(role);
-  if (!normalizedRole) return false;
-  const rolePerms = ROLE_PERMISSIONS[normalizedRole];
-  if (!rolePerms) return false;
-
-  // Check wildcard permissions (admins)
-  if (rolePerms['*']) {
-    return rolePerms['*'].includes(action);
-  }
-
-  // Check module-specific permissions
-  const modulePerms = rolePerms[module.toLowerCase()];
-  if (!modulePerms) return false;
-
-  return modulePerms.includes(action);
-}
 
 /**
  * Metadata des Modules pour le seeding et l'UI
@@ -302,7 +74,8 @@ export const MODULES_DATA: ModuleSeed[] = [
   { name: 'Tontines', description: 'Gestion des tontines', icon: 'UsersRound', category: 'finance', orderIndex: 7 },
   { name: 'Comptabilité', description: 'Module de comptabilité', icon: 'Calculator', category: 'finance', orderIndex: 8 },
   { name: 'Agent Terrain', description: 'Module agent terrain', icon: 'MapPin', category: 'operations', orderIndex: 9 },
-  { name: 'Transferts', description: 'Transferts d\'argent', icon: 'ArrowLeftRight', category: 'operations', orderIndex: 10 },
+  { name: 'CaisseAgent', description: 'Caisse des agents terrain', icon: 'Wallet', category: 'operations', orderIndex: 10 },
+  { name: 'Transferts', description: 'Transferts d\'argent', icon: 'ArrowLeftRight', category: 'operations', orderIndex: 11 },
   { name: 'Rapports', description: 'Génération de rapports', icon: 'BarChart3', category: 'general', orderIndex: 11 },
   { name: 'RH', description: 'Ressources humaines', icon: 'Briefcase', category: 'admin', orderIndex: 12 },
   { name: 'Communications', description: 'Messagerie et communications', icon: 'MessageCircle', category: 'general', orderIndex: 13 },
@@ -347,7 +120,7 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Effectuer des dépôts', code: 'caisse.deposit', description: 'Enregistrer des dépôts' },
     { name: 'Effectuer des retraits', code: 'caisse.withdraw', description: 'Enregistrer des retraits' },
     { name: 'Effectuer des transferts', code: 'caisse.transfer', description: 'Effectuer des transferts' },
-    { name: 'Créer des paiements', code: 'paiements.create', description: 'Effectuer des paiements divers' },
+    { name: 'Effectuer des paiements caisse', code: 'caisse.paiement', description: 'Effectuer des paiements divers depuis la caisse' },
   ],
   'Crédits': [
     { name: 'Voir les crédits', code: 'credits.view', description: 'Accès au module Crédits' },
@@ -396,20 +169,17 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
   ],
   'Agent Terrain': [
     { name: 'Voir le module Agent', code: 'agent.view', description: 'Accès au module Agent Terrain' },
+    { name: 'Créer un agent', code: 'agent.create', description: 'Créer un nouvel agent terrain' },
+    { name: 'Modifier un agent', code: 'agent.edit', description: 'Modifier un agent terrain' },
+    { name: 'Gérer les agents', code: 'agent.manage', description: 'Gérer les agents terrain (supervision)' },
     { name: 'Effectuer des collectes', code: 'agent.collect', description: 'Enregistrer des collectes terrain' },
-    { name: 'Enregistrer des visites', code: 'agent.visit', description: 'Créer des rapports de visite' },
-    { name: 'Gérer agents terrain', code: 'agents_terrain.edit', description: 'Gérer les agents terrain' },
-    { name: 'Voir agents terrain', code: 'agents_terrain.view', description: 'Voir les agents terrain' },
-    { name: 'Créer agents terrain', code: 'agents_terrain.create', description: 'Créer agents terrain' },
-    { name: 'Créer agent terrain', code: 'agent_terrain.create', description: 'Créer agent terrain' },
-    { name: 'Créer agent', code: 'agent.create', description: 'Créer un agent' },
-    { name: 'Gérer agents', code: 'agent.manage', description: 'Gérer les agents' },
-    // Caisse Agent sub-permissions
+  ],
+  'CaisseAgent': [
     { name: 'Voir caisse agent', code: 'caisseagent.view', description: 'Voir les caisses agents' },
-    { name: 'Créer op caisse agent', code: 'caisseagent.create', description: 'Créer opération caisse agent' },
+    { name: 'Créer opération caisse agent', code: 'caisseagent.create', description: 'Créer opération caisse agent' },
     { name: 'Gérer caisse agent', code: 'caisseagent.manage', description: 'Gérer les caisses agents' },
-    { name: 'Approuver op caisse agent', code: 'caisseagent.approve', description: 'Approuver opération caisse agent' },
-    { name: 'Rejeter op caisse agent', code: 'caisseagent.reject', description: 'Rejeter opération caisse agent' },
+    { name: 'Approuver opération caisse agent', code: 'caisseagent.approve', description: 'Approuver opération caisse agent' },
+    { name: 'Rejeter opération caisse agent', code: 'caisseagent.reject', description: 'Rejeter opération caisse agent' },
     { name: 'Suspendre caisse agent', code: 'caisseagent.suspend', description: 'Suspendre une caisse agent' },
   ],
   'Incidents': [
@@ -661,7 +431,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'dashboard.view',
     'clients.view', 'clients.create',
     'epargnes.view', 'epargnes.create', 'epargnes.edit',
-    'caisse.view', 'caisse.create', 'caisse.edit',
+    'caisse.view', 'caisse.create', 'caisse.edit', 'caisse.paiement',
     'remboursements.view', 'remboursements.create',
     'virements_programmes.view', 'virements_programmes.edit',
     'communications.view',
@@ -671,7 +441,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
   [SystemRole.AGENT_TERRAIN]: [
     'dashboard.view',
     'clients.view', 'clients.create', 'clients.edit',
-    'agent.view', 'agent.create',
+    'agent.view', 'agent.collect',
     'prospection.view', 'prospection.create',
     'caisseagent.view', 'caisseagent.create',
     'incidents.view', 'incidents.create',

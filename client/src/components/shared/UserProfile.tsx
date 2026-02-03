@@ -5,6 +5,7 @@ import {
   Lock, Eye, EyeOff, AlertCircle, Info, UserCircle, Camera, Trash2
 } from 'lucide-react';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { useCanAny } from '../../contexts/AbilityContext';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import PasswordChangeModal from './profile/PasswordChangeModal';
 import { authApi } from '../../lib/api-client';
@@ -204,10 +205,10 @@ interface PinFormProps {
 interface CaissePinManagerProps {
   hasPin?: boolean;
   onPinConfigured: () => void;
-  isCashier: boolean; 
+  canAccessCaisse: boolean; // Peut accéder à la caisse (via rôle OU permissions)
 }
 
-function CaissePinManager({ hasPin, onPinConfigured, isCashier }: CaissePinManagerProps) {
+function CaissePinManager({ hasPin, onPinConfigured, canAccessCaisse }: CaissePinManagerProps) {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ currentPassword: '', newPin: '', confirmPin: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -244,11 +245,11 @@ function CaissePinManager({ hasPin, onPinConfigured, isCashier }: CaissePinManag
     }
   }, [formData, onPinConfigured]);
   
-  if (!isCashier) {
+  if (!canAccessCaisse) {
        return (
         <div className="flex items-center gap-2 text-[10px] text-slate-500 bg-slate-900/50 p-2 rounded border border-slate-800">
           <Info size={12} className="shrink-0" />
-          <span>PIN Caisse non requis pour ce rôle.</span>
+          <span>PIN Caisse non requis (aucune permission caisse).</span>
         </div>
        );
   }
@@ -379,6 +380,15 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
     getFullName, getRoleLabel, getInitials,
     canViewSalary, isCashier, reloadProfile
   } = useUserProfile();
+
+  // Vérifier les permissions CASL pour la caisse (en plus du rôle)
+  const hasCaissePermission = useCanAny([
+    { action: 'manage', subject: 'caisse' },
+    { action: 'view', subject: 'caisse' },
+  ]);
+
+  // Un utilisateur peut configurer son PIN s'il a le rôle caissier OU s'il a des permissions caisse
+  const canConfigureCaissePin = isCashier() || hasCaissePermission;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -684,7 +694,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
             <CaissePinManager
                 hasPin={user.hasCaissePin}
                 onPinConfigured={reloadProfile}
-                isCashier={isCashier()}
+                canAccessCaisse={canConfigureCaissePin}
             />
           </div>
         </div>

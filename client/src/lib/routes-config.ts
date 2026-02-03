@@ -1,5 +1,5 @@
 import { lazy, ComponentType } from 'react';
-import { canAccessModule, MODULE_ACCESS, AppModule } from '@shared/config/rbac';
+import type { AppModule } from '@shared/config/rbac';
 import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { authService } from './auth';
 import { Action, Subject, MODULE_TO_SUBJECT, Actions, Subjects } from './casl';
@@ -250,11 +250,7 @@ export const ROUTES: RouteConfig[] = [
 
 /**
  * Vérifie si un utilisateur peut accéder à une route
- * Utilise authService.canAccessModule() qui prend en compte :
- * - Les permissions du rôle (MODULE_ACCESS)
- * - Les permissions personnalisées de l'utilisateur (depuis la BDD)
- *
- * V2: Now also supports CASL ability checks via requiredAbility
+ * Utilise authService.canAccessModule() qui prend en compte les permissions de la BDD (CASL)
  */
 export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
   // Admin a accès à tout
@@ -274,17 +270,13 @@ export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
     return route.requiredRoles.includes(normalizedRole);
   }
 
-  // Vérifier via authService qui combine permissions rôle + custom
+  // Vérifier via authService qui utilise les permissions de l'API (CASL)
   if (route.requiredModule) {
-    // Utiliser authService s'il est initialisé (utilisateur connecté)
     if (authService.isAuthenticated()) {
       return authService.canAccessModule(route.requiredModule);
     }
-    // Fallback sur MODULE_ACCESS statique si pas authentifié
-    const normalizedRole = normalizeRole(userRole);
-    if (!normalizedRole) return false;
-    const allowedModules = MODULE_ACCESS[normalizedRole] || [];
-    return allowedModules.includes(route.requiredModule);
+    // Utilisateur non authentifié - pas d'accès
+    return false;
   }
 
   // Par défaut, accessible à tous (routes publiques comme profil)

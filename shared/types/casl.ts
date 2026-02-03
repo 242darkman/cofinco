@@ -82,6 +82,24 @@ export const Actions = {
   PURGE: 'purge',
   TERMINATE: 'terminate',
   MIGRATE: 'migrate',
+
+  // Loyalty
+  AWARD: 'award',
+  ADJUST: 'adjust',
+  REDEEM: 'redeem',
+  EXPIRE: 'expire',
+
+  // Communications
+  BROADCAST: 'broadcast',
+  ARCHIVE: 'archive',
+  SCHEDULE: 'schedule',
+  SEND: 'send',
+
+  // Storage/Files
+  UPLOAD: 'upload',
+
+  // Trading
+  TRADE: 'trade',
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -113,6 +131,8 @@ export const Subjects = {
   MAINTENANCE: 'maintenance',
   LOYALTY: 'loyalty',
   REGULARISATION: 'regularisation',
+  BOURSE: 'bourse',
+  LOGE: 'loge',
 
   // Entities (for granular resource-level checks)
   USER: 'User',

@@ -1,25 +1,21 @@
-import React, { useState } from 'react';
-import { UserPlus, Ban, Shield, Info } from 'lucide-react';
+import React from 'react';
+import { Ban, Shield, Info, User, Clock } from 'lucide-react';
 import { Card, Button, Badge, EmptyState } from '@/components/ui';
-import GrantPermissionModal from './GrantPermissionModal';
-import { CodePermission, User } from './types';
+import { CaisseAuthorization, User as UserType } from './types';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
 
 interface PermissionDelegationManagerProps {
-  permissions: CodePermission[];
-  users: User[];
+  permissions: CaisseAuthorization[];
+  users: UserType[];
   onRefresh: () => void;
-  onRevoke: (id: string) => Promise<void>;
-  onGrant: (data: any) => Promise<any>;
+  onRevoke: (id: string, reason?: string) => Promise<void>;
+  onGrant?: (data: any) => Promise<any>;
 }
 
-export default function PermissionDelegationManager({ permissions, users, onRefresh, onRevoke, onGrant }: PermissionDelegationManagerProps) {
+export default function PermissionDelegationManager({ permissions, users, onRefresh, onRevoke }: PermissionDelegationManagerProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
-  const canGrantPermissions = hasPermission('permissions', 'create') || hasPermission('admin', 'manage');
   const canRevokePermissions = hasPermission('permissions', 'delete') || hasPermission('admin', 'manage');
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getUserName = (userId: string | null) => {
     if (!userId) return '-';
@@ -32,89 +28,98 @@ export default function PermissionDelegationManager({ permissions, users, onRefr
     return new Date(date).toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
-  const isExpired = (validUntil: string | null) => validUntil ? new Date(validUntil) < new Date() : false;
+  const formatRelativeTime = (date: string) => {
+    const now = new Date();
+    const target = new Date(date);
+    const diffMs = target.getTime() - now.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
-  const getStatusBadge = (perm: CodePermission) => {
-    if (!perm.isActive) return <Badge value="Révoquée" variant="danger" size="sm" />;
-    if (isExpired(perm.validUntil)) return <Badge value="Expirée" variant="warning" size="sm" />;
+    if (diffMs < 0) return 'Expirée';
+    if (diffHours > 24) return `${Math.floor(diffHours / 24)}j ${diffHours % 24}h`;
+    if (diffHours > 0) return `${diffHours}h ${diffMins}m`;
+    return `${diffMins}m`;
+  };
+
+  const isExpired = (expiresAt: string | null) => expiresAt ? new Date(expiresAt) < new Date() : false;
+
+  const getStatusBadge = (auth: CaisseAuthorization) => {
+    if (auth.revokedAt) return <Badge value="Révoquée" variant="danger" size="sm" />;
+    if (isExpired(auth.expiresAt)) return <Badge value="Expirée" variant="warning" size="sm" />;
     return <Badge value="Active" variant="success" size="sm" />;
   };
+
+  // Filter to only show active authorizations (not revoked, not expired)
+  const activeAuthorizations = permissions?.filter(
+    p => !p.revokedAt && !isExpired(p.expiresAt)
+  ) || [];
+
+  const expiredAuthorizations = permissions?.filter(
+    p => !p.revokedAt && isExpired(p.expiresAt)
+  ) || [];
 
   return (
     <Card className="bg-slate-900 border-slate-800 p-0 overflow-hidden">
       {/* Header */}
       <div className="px-3 sm:px-4 py-3 border-b border-slate-800 flex items-center justify-between">
         <div>
-          <h3 className="text-sm sm:text-base font-semibold text-white">Délégations</h3>
+          <h3 className="text-sm sm:text-base font-semibold text-white">Autorisations Actives</h3>
           <p className="text-[10px] sm:text-xs text-slate-500">
-            {permissions?.length || 0} permission{(permissions?.length || 0) !== 1 ? 's' : ''} accordée{(permissions?.length || 0) !== 1 ? 's' : ''}
+            {activeAuthorizations.length} utilisateur{activeAuthorizations.length !== 1 ? 's' : ''} autorisé{activeAuthorizations.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {canGrantPermissions && (
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            variant="success"
-            icon={UserPlus}
-            size="sm"
-          >
-            <span className="hidden sm:inline">Nouvelle</span> Délégation
-          </Button>
-        )}
       </div>
 
       {/* Info Banner - Compact */}
       <div className="px-3 sm:px-4 py-2 bg-blue-500/10 border-b border-blue-500/20 flex items-center gap-2">
         <Info size={14} className="text-blue-400 flex-shrink-0" />
         <p className="text-[10px] sm:text-xs text-blue-300">
-          Les utilisateurs avec une permission active peuvent générer des codes d'accès caisse.
+          Les utilisateurs ci-dessous ont validé un code d'accès et peuvent accéder aux caisses jusqu'à expiration.
         </p>
       </div>
-
-      <GrantPermissionModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        users={users}
-        onGrant={async (data) => {
-          await onGrant(data);
-          onRefresh();
-        }}
-      />
 
       {/* Content */}
       {(!permissions || permissions.length === 0) ? (
         <div className="py-8">
           <EmptyState
             icon={Shield}
-            title="Aucune permission"
-            description="Accordez une délégation pour commencer."
+            title="Aucune autorisation"
+            description="Aucun utilisateur n'a validé de code d'accès récemment."
           />
         </div>
       ) : (
         <div className="divide-y divide-slate-800">
-          {permissions.map((perm) => (
-            <div 
-              key={perm.id} 
+          {/* Active Authorizations */}
+          {activeAuthorizations.map((auth) => (
+            <div
+              key={auth.id}
               className="px-3 sm:px-4 py-3 hover:bg-slate-800/50 transition-colors"
             >
-              {/* Permission Row */}
+              {/* Authorization Row */}
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-emerald-500/20 rounded">
+                    <User size={14} className="text-emerald-400" />
+                  </div>
                   <span className="font-semibold text-white text-sm truncate">
-                    {getUserName(perm.userId)}
+                    {getUserName(auth.userId)}
                   </span>
-                  {getStatusBadge(perm)}
+                  {getStatusBadge(auth)}
                 </div>
-                {perm.isActive && !isExpired(perm.validUntil) && canRevokePermissions && (
+                {!auth.revokedAt && !isExpired(auth.expiresAt) && canRevokePermissions && (
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      if (confirm('Révoquer cette permission ?')) {
-                        onRevoke(perm.id);
+                      const reason = prompt('Raison de la révocation (optionnel):');
+                      if (confirm('Révoquer cette autorisation ?')) {
+                        onRevoke(auth.id, reason || undefined);
                       }
                     }}
                     className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5"
@@ -126,13 +131,47 @@ export default function PermissionDelegationManager({ permissions, users, onRefr
 
               {/* Details */}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-slate-400">
-                <span>Par: <span className="text-slate-300">{getUserName(perm.grantedBy)}</span></span>
-                <span>Agence: <span className="text-slate-300">{perm.agence || 'Toutes'}</span></span>
-                <span>Durée max: <span className="text-slate-300">{perm.maxCodeDurationHours}h</span></span>
-                <span>Expire: <span className="text-slate-300">{formatDate(perm.validUntil)}</span></span>
+                <span className="flex items-center gap-1">
+                  <Clock size={10} />
+                  Expire dans: <span className="text-emerald-400 font-medium">{formatRelativeTime(auth.expiresAt)}</span>
+                </span>
+                <span>Accordée: <span className="text-slate-300">{formatDate(auth.grantedAt)}</span></span>
+                {auth.ipAddress && (
+                  <span>IP: <span className="text-slate-300">{auth.ipAddress}</span></span>
+                )}
               </div>
+              {auth.reason && (
+                <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
+                  {auth.reason}
+                </p>
+              )}
             </div>
           ))}
+
+          {/* Expired Authorizations (collapsed) */}
+          {expiredAuthorizations.length > 0 && (
+            <details className="group">
+              <summary className="px-3 sm:px-4 py-2 bg-slate-800/50 text-slate-400 text-xs cursor-pointer hover:bg-slate-800 list-none flex items-center gap-2">
+                <span className="text-slate-500">▸</span>
+                <span>{expiredAuthorizations.length} autorisation{expiredAuthorizations.length !== 1 ? 's' : ''} expirée{expiredAuthorizations.length !== 1 ? 's' : ''}</span>
+              </summary>
+              {expiredAuthorizations.map((auth) => (
+                <div
+                  key={auth.id}
+                  className="px-3 sm:px-4 py-2 bg-slate-800/30 border-t border-slate-800/50"
+                >
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <User size={12} />
+                    <span>{getUserName(auth.userId)}</span>
+                    <Badge value="Expirée" variant="warning" size="sm" />
+                  </div>
+                  <div className="text-[10px] text-slate-600 mt-1">
+                    Expirée le {formatDate(auth.expiresAt)}
+                  </div>
+                </div>
+              ))}
+            </details>
+          )}
         </div>
       )}
     </Card>

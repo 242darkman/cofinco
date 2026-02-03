@@ -7,16 +7,22 @@
  * - Accorder une nouvelle permission temporaire
  * - Révoquer une permission temporaire
  * - Voir le temps restant avant expiration
+ * - Consulter l'historique complet avec statistiques
  */
 
 import React, { useState, useMemo } from 'react';
 import {
   Clock, Shield, UserPlus, Trash2, RefreshCw,
-  AlertTriangle, Timer, Users, X, Calendar
+  AlertTriangle, Timer, Users, X, Calendar,
+  History, ChevronLeft, ChevronRight, Filter,
+  CheckCircle2, XCircle, AlertCircle, BarChart3
 } from 'lucide-react';
 import {
   useTemporaryPermissions,
+  useTemporaryPermissionsHistory,
   TemporaryPermission,
+  TempPermissionHistoryEntry,
+  TempPermissionHistoryStats,
   TEMP_PERMISSION_DURATIONS,
   formatTimeRemaining
 } from '../../../hooks/admin/useTemporaryPermissions';
@@ -128,6 +134,299 @@ function TempPermissionCard({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Status badge component
+function StatusBadge({ status }: { status: 'active' | 'expired' | 'revoked' }) {
+  const config = {
+    active: { icon: CheckCircle2, label: 'Actif', classes: 'bg-green-500/10 text-green-400 border-green-500/20' },
+    expired: { icon: AlertCircle, label: 'Expiré', classes: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
+    revoked: { icon: XCircle, label: 'Révoqué', classes: 'bg-red-500/10 text-red-400 border-red-500/20' },
+  };
+  const { icon: Icon, label, classes } = config[status];
+
+  return (
+    <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium border", classes)}>
+      <Icon className="w-2.5 h-2.5" />
+      {label}
+    </span>
+  );
+}
+
+// History stats cards
+function HistoryStatsCards({ stats, loading }: { stats: TempPermissionHistoryStats | null; loading: boolean }) {
+  if (loading || !stats) {
+    return (
+      <div className="grid grid-cols-5 gap-2">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg animate-pulse">
+            <div className="h-5 bg-slate-700 rounded w-8 mx-auto mb-1"></div>
+            <div className="h-2 bg-slate-700 rounded w-12 mx-auto"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-5 gap-2">
+      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-indigo-400">{stats.totalGranted}</div>
+        <div className="text-[8px] text-slate-500 uppercase">Total</div>
+      </div>
+      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-green-400">{stats.totalActive}</div>
+        <div className="text-[8px] text-slate-500 uppercase">Actives</div>
+      </div>
+      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-slate-400">{stats.totalExpired}</div>
+        <div className="text-[8px] text-slate-500 uppercase">Expirées</div>
+      </div>
+      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-red-400">{stats.totalRevoked}</div>
+        <div className="text-[8px] text-slate-500 uppercase">Révoquées</div>
+      </div>
+      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-amber-400">{stats.avgDurationHours.toFixed(1)}h</div>
+        <div className="text-[8px] text-slate-500 uppercase">Durée moy.</div>
+      </div>
+    </div>
+  );
+}
+
+// History entry card
+function HistoryEntryCard({ entry }: { entry: TempPermissionHistoryEntry }) {
+  const durationHours = Math.round(entry.duration / (1000 * 60 * 60));
+
+  return (
+    <div className={cn(
+      "px-3 py-2.5 border rounded-lg bg-slate-800/50 transition-all",
+      entry.status === 'active' && "border-green-500/20",
+      entry.status === 'revoked' && "border-red-500/20",
+      entry.status === 'expired' && "border-slate-600"
+    )}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          {/* Permission name and status */}
+          <div className="flex items-center gap-2 mb-1.5">
+            <Shield className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span className="text-xs font-medium text-white truncate">
+              {entry.permissionName || entry.permissionCode}
+            </span>
+            <StatusBadge status={entry.status} />
+          </div>
+
+          {/* User info */}
+          <div className="flex items-center gap-1.5 mb-1">
+            <Users className="w-2.5 h-2.5 text-slate-500" />
+            <span className="text-[10px] text-slate-300 font-medium">{entry.userName}</span>
+            {entry.userEmail && (
+              <span className="text-[9px] text-slate-500">({entry.userEmail})</span>
+            )}
+          </div>
+
+          {/* Grant info */}
+          <div className="text-[10px] text-slate-400 space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <UserPlus className="w-2.5 h-2.5" />
+              <span>Accordé par {entry.granterName} le {formatDate(entry.grantedAt)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-2.5 h-2.5" />
+              <span>Durée: {durationHours}h | Expire(é): {formatDate(entry.expiresAt)}</span>
+            </div>
+            {entry.status === 'revoked' && entry.revokedAt && (
+              <div className="flex items-center gap-1.5 text-red-400">
+                <XCircle className="w-2.5 h-2.5" />
+                <span>Révoqué par {entry.revokerName || 'Système'} le {formatDate(entry.revokedAt)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Reason */}
+          {entry.reason && (
+            <p className="mt-1.5 text-[10px] text-slate-300 bg-slate-700/50 px-2 py-1 rounded truncate">
+              Raison: {entry.reason}
+            </p>
+          )}
+
+          {/* Revoke reason if applicable */}
+          {entry.revokeReason && (
+            <p className="mt-1 text-[10px] text-red-300 bg-red-500/10 px-2 py-1 rounded truncate">
+              Motif révocation: {entry.revokeReason}
+            </p>
+          )}
+        </div>
+
+        {/* Module badge */}
+        {entry.moduleName && (
+          <span className="text-[9px] px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20 shrink-0">
+            {entry.moduleName}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// History filters component
+function HistoryFilters({
+  filters,
+  onFilterChange,
+  permissions
+}: {
+  filters: { status?: string; permissionCode?: string; startDate?: string; endDate?: string };
+  onFilterChange: (newFilters: any) => void;
+  permissions: any[];
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-800/30 rounded-lg border border-slate-700">
+      <Filter className="w-3.5 h-3.5 text-slate-500" />
+
+      {/* Status filter */}
+      <select
+        value={filters.status || 'all'}
+        onChange={(e) => onFilterChange({ status: e.target.value === 'all' ? undefined : e.target.value })}
+        className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500"
+      >
+        <option value="all">Tous les statuts</option>
+        <option value="active">Actives</option>
+        <option value="expired">Expirées</option>
+        <option value="revoked">Révoquées</option>
+      </select>
+
+      {/* Permission filter */}
+      <select
+        value={filters.permissionCode || ''}
+        onChange={(e) => onFilterChange({ permissionCode: e.target.value || undefined })}
+        className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500 max-w-[150px]"
+      >
+        <option value="">Toutes permissions</option>
+        {permissions.slice(0, 50).map(p => (
+          <option key={p.code} value={p.code}>{p.name || p.code}</option>
+        ))}
+      </select>
+
+      {/* Date range */}
+      <div className="flex items-center gap-1">
+        <input
+          type="date"
+          value={filters.startDate || ''}
+          onChange={(e) => onFilterChange({ startDate: e.target.value || undefined })}
+          className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500"
+          placeholder="Du"
+        />
+        <span className="text-slate-500 text-xs">→</span>
+        <input
+          type="date"
+          value={filters.endDate || ''}
+          onChange={(e) => onFilterChange({ endDate: e.target.value || undefined })}
+          className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500"
+          placeholder="Au"
+        />
+      </div>
+
+      {/* Clear filters */}
+      {(filters.status || filters.permissionCode || filters.startDate || filters.endDate) && (
+        <button
+          onClick={() => onFilterChange({ status: 'all', permissionCode: undefined, startDate: undefined, endDate: undefined })}
+          className="h-7 px-2 text-[10px] text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+        >
+          Effacer
+        </button>
+      )}
+    </div>
+  );
+}
+
+// History view component
+function HistoryView({ permissions }: { permissions: any[] }) {
+  const {
+    history,
+    total,
+    stats,
+    loading,
+    filters,
+    updateFilters,
+    refresh,
+    nextPage,
+    prevPage,
+    hasNextPage,
+    hasPrevPage,
+    currentPage,
+    totalPages
+  } = useTemporaryPermissionsHistory();
+
+  return (
+    <div className="flex flex-col h-full space-y-2">
+      {/* Stats */}
+      <HistoryStatsCards stats={stats} loading={loading} />
+
+      {/* Filters */}
+      <HistoryFilters
+        filters={filters}
+        onFilterChange={updateFilters}
+        permissions={permissions}
+      />
+
+      {/* Results info */}
+      <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
+        <span>{total} enregistrement(s) trouvé(s)</span>
+        <button
+          onClick={() => refresh()}
+          className="flex items-center gap-1 hover:text-white transition-colors"
+        >
+          <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
+          Actualiser
+        </button>
+      </div>
+
+      {/* History list */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {loading && history.length === 0 ? (
+          <div className="flex items-center justify-center py-8 text-slate-500">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+          </div>
+        ) : history.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+            <History className="w-8 h-8 mb-2 opacity-50" />
+            <p className="text-xs">Aucun historique trouvé</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {history.map(entry => (
+              <HistoryEntryCard key={entry.id} entry={entry} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-1.5 bg-slate-800/30 rounded-lg border border-slate-700 shrink-0">
+          <button
+            onClick={prevPage}
+            disabled={!hasPrevPage}
+            className="flex items-center gap-1 px-2 py-1 text-[10px] text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-3 h-3" />
+            Précédent
+          </button>
+          <span className="text-[10px] text-slate-500">
+            Page {currentPage} sur {totalPages}
+          </span>
+          <button
+            onClick={nextPage}
+            disabled={!hasNextPage}
+            className="flex items-center gap-1 px-2 py-1 text-[10px] text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Suivant
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -370,12 +669,16 @@ function GrantPermissionModal({
   );
 }
 
+// Tab type
+type TabView = 'active' | 'history';
+
 // Main component
 export default function TemporaryPermissionsManager({ users }: TemporaryPermissionsManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showGrantModal, setShowGrantModal] = useState(false);
   const [isGranting, setIsGranting] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabView>('active');
 
   const { permissions: tempPermissions, loading, refresh, grantPermission, revokePermission } =
     useTemporaryPermissions();
@@ -428,6 +731,12 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
     (p.timeRemaining || 0) > 0 && (p.timeRemaining || 0) < 3600000
   ).length;
 
+  // Tab definitions
+  const tabs = [
+    { id: 'active' as const, label: 'Actives', icon: Clock, count: activeCount },
+    { id: 'history' as const, label: 'Historique', icon: History, count: null },
+  ];
+
   return (
     <div className="flex flex-col h-full space-y-2">
       {/* Header - Compact */}
@@ -442,82 +751,125 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {activeTab === 'active' && (
+            <>
+              <button
+                onClick={refresh}
+                className="h-7 px-2 flex items-center gap-1.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Actualiser
+              </button>
+              <Button size="sm" onClick={() => setShowGrantModal(true)} className="h-7 px-2.5 text-[10px]">
+                <UserPlus className="w-3 h-3 mr-1" />
+                Nouvelle
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-slate-800/50 rounded-lg border border-slate-700 shrink-0">
+        {tabs.map(tab => (
           <button
-            onClick={refresh}
-            className="h-7 px-2 flex items-center gap-1.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors"
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-all",
+              activeTab === tab.id
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+            )}
           >
-            <RefreshCw className="w-3 h-3" />
-            Actualiser
+            <tab.icon className="w-3 h-3" />
+            {tab.label}
+            {tab.count !== null && (
+              <span className={cn(
+                "px-1.5 py-0.5 rounded text-[9px]",
+                activeTab === tab.id
+                  ? "bg-indigo-500/50"
+                  : "bg-slate-700"
+              )}>
+                {tab.count}
+              </span>
+            )}
           </button>
-          <Button size="sm" onClick={() => setShowGrantModal(true)} className="h-7 px-2.5 text-[10px]">
-            <UserPlus className="w-3 h-3 mr-1" />
-            Nouvelle
-          </Button>
-        </div>
+        ))}
       </div>
 
-      {/* Stats - Compact */}
-      <div className="grid grid-cols-3 gap-2 shrink-0">
-        <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-          <div className="text-lg font-bold text-indigo-400">{activeCount}</div>
-          <div className="text-[9px] text-slate-500 uppercase">Actives</div>
-        </div>
-        <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-          <div className="text-lg font-bold text-amber-400">{expiringSoonCount}</div>
-          <div className="text-[9px] text-slate-500 uppercase">Expirent &lt;1h</div>
-        </div>
-        <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-          <div className="text-lg font-bold text-slate-400">{tempPermissions.length}</div>
-          <div className="text-[9px] text-slate-500 uppercase">Total</div>
-        </div>
-      </div>
+      {/* Active view content */}
+      {activeTab === 'active' && (
+        <>
+          {/* Stats - Compact */}
+          <div className="grid grid-cols-3 gap-2 shrink-0">
+            <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-indigo-400">{activeCount}</div>
+              <div className="text-[9px] text-slate-500 uppercase">Actives</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-amber-400">{expiringSoonCount}</div>
+              <div className="text-[9px] text-slate-500 uppercase">Expirent &lt;1h</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-slate-400">{tempPermissions.length}</div>
+              <div className="text-[9px] text-slate-500 uppercase">Total</div>
+            </div>
+          </div>
 
-      {/* Search - Compact */}
-      <div className="relative shrink-0">
-        <Shield className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Rechercher par permission ou utilisateur..."
-          className="w-full h-8 pl-8 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
-        />
-      </div>
+          {/* Search - Compact */}
+          <div className="relative shrink-0">
+            <Shield className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Rechercher par permission ou utilisateur..."
+              className="w-full h-8 pl-8 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+            />
+          </div>
 
-      {/* Warning for expiring soon - Compact */}
-      {expiringSoonCount > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5 flex items-center gap-2 shrink-0">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-          <span className="text-[10px] text-amber-300">
-            {expiringSoonCount} permission(s) expire(nt) dans moins d'une heure
-          </span>
-        </div>
+          {/* Warning for expiring soon - Compact */}
+          {expiringSoonCount > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5 flex items-center gap-2 shrink-0">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[10px] text-amber-300">
+                {expiringSoonCount} permission(s) expire(nt) dans moins d'une heure
+              </span>
+            </div>
+          )}
+
+          {/* Permissions list - Compact */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-8 text-slate-500">
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              </div>
+            ) : filteredPermissions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                <Clock className="w-8 h-8 mb-2 opacity-50" />
+                <p className="text-xs">Aucune permission temporaire</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {filteredPermissions.map(perm => (
+                  <TempPermissionCard
+                    key={perm.id}
+                    permission={perm}
+                    onRevoke={handleRevoke}
+                    isRevoking={revokingId === perm.id}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      {/* Permissions list - Compact */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-8 text-slate-500">
-            <RefreshCw className="w-5 h-5 animate-spin" />
-          </div>
-        ) : filteredPermissions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-500">
-            <Clock className="w-8 h-8 mb-2 opacity-50" />
-            <p className="text-xs">Aucune permission temporaire</p>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {filteredPermissions.map(perm => (
-              <TempPermissionCard
-                key={perm.id}
-                permission={perm}
-                onRevoke={handleRevoke}
-                isRevoking={revokingId === perm.id}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* History view content */}
+      {activeTab === 'history' && (
+        <HistoryView permissions={allPermissions} />
+      )}
 
       {/* Grant modal */}
       <GrantPermissionModal

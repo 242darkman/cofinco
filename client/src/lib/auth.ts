@@ -1,5 +1,5 @@
 import { authApi, AuthUser, setOnUnauthorized, PermissionsData } from './api-client';
-import { canAccessModule as rbacCanAccessModule, hasPermission as rbacHasPermission, ROLE_PERMISSIONS, AppModule, APP_MODULES } from '@shared/config/rbac';
+import type { AppModule } from '@shared/config/rbac';
 import { SystemRole, hasRole as hasSystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 
@@ -54,15 +54,6 @@ const MODULE_TO_PERMISSION_PREFIX: Record<string, string> = {
   'agentterrain': 'agent',             // Agent Terrain → agent.view, agent.collect
   'comptes': 'epargnes',               // Comptes → epargnes.view, epargnes.create
   'administration': 'admin',           // Administration → admin.users, etc.
-};
-
-const APP_MODULE_MAP: Record<string, AppModule> = APP_MODULES.reduce((map, module) => {
-  map[normalizeModuleKey(module)] = module;
-  return map;
-}, {} as Record<string, AppModule>);
-
-const resolveAppModule = (module: string): AppModule | undefined => {
-  return APP_MODULE_MAP[normalizeModuleKey(module)];
 };
 
 class AuthService {
@@ -252,61 +243,6 @@ class AuthService {
   }
 
   /**
-   * Fallback: Charge les permissions depuis rbac-config.ts (statique)
-   */
-  private loadPermissionsFromStaticConfig(role: string) {
-    const normalizedRole = normalizeRole(role);
-    if (!normalizedRole) {
-      this.permissions = [{ module: '*', action: 'view', autorise: true }];
-      this.permissionsMap = { '*': ['view'] };
-      return;
-    }
-
-    const rolePerms = ROLE_PERMISSIONS[normalizedRole];
-
-    if (!rolePerms) {
-      // Rôle inconnu - permissions minimales (lecture seule)
-      this.permissions = [{ module: '*', action: 'view', autorise: true }];
-      this.permissionsMap = { '*': ['view'] };
-      return;
-    }
-
-    // Convertir ROLE_PERMISSIONS en Permission[] et permissionsMap
-    this.permissions = [];
-    this.permissionsMap = {};
-
-    for (const [module, actions] of Object.entries(rolePerms)) {
-      this.permissionsMap[module] = actions as string[];
-      for (const action of actions) {
-        this.permissions.push({
-          module,
-          action,
-          autorise: true
-        });
-      }
-    }
-
-    this.isAdminUser = isAdminRole(normalizedRole);
-    this.permissionsLoaded = true;
-
-    console.group('🔐 Permissions Loaded (Static)');
-    console.log('👤 Role:', normalizedRole);
-    console.log('🔑 IsAdmin:', this.isAdminUser);
-    console.log('📦 Total Modules:', Object.keys(this.permissionsMap).length);
-    console.log('✅ Total Permissions:', this.permissions.length);
-    console.log('📜 Permissions Map:', this.permissionsMap);
-    console.groupEnd();
-  }
-
-  /**
-   * @deprecated Use loadPermissionsFromApi() instead
-   * Kept for backward compatibility
-   */
-  loadPermissions(role: string) {
-    this.loadPermissionsFromStaticConfig(role);
-  }
-
-  /**
    * Déconnexion
    */
   async logout() {
@@ -471,8 +407,7 @@ class AuthService {
 
   /**
    * Vérifie si l'utilisateur a une permission spécifique
-   * Utilise d'abord les permissions chargées depuis l'API (BDD)
-   * Fallback sur la configuration statique si non chargées
+   * Utilise les permissions chargées depuis l'API (BDD via CASL)
    */
   hasPermission(module: string, action: string): boolean {
     if (!this.currentUser) return false;
@@ -480,7 +415,7 @@ class AuthService {
     // Admin has all permissions
     if (this.isAdminUser) return true;
 
-    // Use dynamic permissions if loaded from API
+    // Use permissions from API
     if (this.permissionsLoaded && Object.keys(this.permissionsMap).length > 0) {
       // Check wildcard first
       if (this.permissionsMap['*']?.includes(action)) {
@@ -492,8 +427,9 @@ class AuthService {
       return this.permissionsMap[moduleKey]?.includes(action) || false;
     }
 
-    // Fallback to static config
-    return rbacHasPermission(this.currentUser.role, module, action);
+    // Fail-closed: if permissions not loaded, deny access
+    console.warn('[Auth] Permissions not loaded - denying access');
+    return false;
   }
 
   /**
@@ -506,7 +442,7 @@ class AuthService {
 
   /**
    * Vérifie si l'utilisateur peut accéder à un module
-   * Utilise les permissions chargées dynamiquement ou MODULE_ACCESS de rbac-config.ts
+   * Utilise les permissions chargées depuis l'API (BDD via CASL)
    */
   canAccessModule(module: string): boolean {
     if (!this.currentUser) return false;
@@ -532,12 +468,9 @@ class AuthService {
       return false;
     }
 
-    // Fallback to static config
-    const appModule = resolveAppModule(module);
-    if (!appModule) {
-      return false;
-    }
-    return rbacCanAccessModule(this.currentUser.role, appModule);
+    // Fail-closed: if permissions not loaded, deny access
+    console.warn('[Auth] Permissions not loaded - denying module access');
+    return false;
   }
 
   /**

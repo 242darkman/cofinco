@@ -25,7 +25,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useDashboardStats } from '../../hooks/dashboard/useDashboardStats';
 import { useWebSocketContext } from '../../contexts/WebSocketContext';
 import { useEncaisse } from '../../hooks/treasury/useEncaisse';
-import { hasPermission } from '@shared/config/rbac';
+import { useAbility } from '../../contexts/AbilityContext';
+import { Actions, Subjects, type Action, type Subject } from '../../lib/casl';
 
 import AgencySelector from './AgencySelector';
 import AnalyticsGrid from './AnalyticsGrid';
@@ -41,6 +42,18 @@ interface DashboardProps {
   treasuryThreshold?: number;
 }
 
+// Map module.action to CASL action/subject for permission checks
+const MODULE_ACTION_TO_CASL: Record<string, { action: Action; subject: Subject }> = {
+  'clients.create': { action: Actions.CREATE, subject: Subjects.CLIENT },
+  'clients.view': { action: Actions.VIEW, subject: Subjects.CLIENT },
+  'caisse.create': { action: Actions.CREATE, subject: Subjects.CAISSE },
+  'caisse.view': { action: Actions.VIEW, subject: Subjects.CAISSE },
+  'credits.create': { action: Actions.CREATE, subject: Subjects.CREDIT },
+  'credits.view': { action: Actions.VIEW, subject: Subjects.CREDIT },
+  'tontines.view': { action: Actions.VIEW, subject: Subjects.TONTINE },
+  'tontines.create': { action: Actions.CREATE, subject: Subjects.TONTINE },
+};
+
 export default function Dashboard({
   userRole = 'user',
   userName = 'Utilisateur',
@@ -52,6 +65,7 @@ export default function Dashboard({
   const { selectedAgence, agences, selectAgence, isAdmin } = useAgence();
   const { isConnected } = useWebSocketContext();
   const { stats, loading, refresh } = useDashboardStats(userRole);
+  const ability = useAbility();
 
   // Treasury v2: Single Source of Truth depuis le Grand Livre (GL)
   const { data: encaisse, isLoading: encaisseLoading } = useEncaisse(selectedAgence);
@@ -247,7 +261,11 @@ export default function Dashboard({
           { key: 'tontines', module: 'tontines', action: 'view', icon: Users, label: t('collecteTontine'),
             btnClass: 'bg-purple-600/10 hover:bg-purple-600/20 border-purple-600/20 text-purple-400',
             iconClass: 'bg-purple-500', handler: () => onModuleChange?.('tontines') },
-        ].filter(a => hasPermission(userRole, a.module, a.action));
+        ].filter(a => {
+          const mapping = MODULE_ACTION_TO_CASL[`${a.module}.${a.action}`];
+          if (!mapping) return false;
+          return ability.can(mapping.action, mapping.subject);
+        });
 
         if (actions.length === 0) return null;
 

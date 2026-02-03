@@ -1,46 +1,61 @@
 import React, { useState } from 'react';
-import { Key, RefreshCw, Copy, Check, AlertTriangle, Shield } from 'lucide-react';
+import { Key, Copy, Check, AlertTriangle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import SelectField from '@/components/ui/SelectField';
 import Button from '@/components/ui/Button';
-import { User } from './types';
+import { User, GeneratedCodeResult } from './types';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
-import { getRoleLabel, isAdminRole, normalizeRole } from '@shared/types/roles';
 
 interface GenerateCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
   users: User[];
-  onGenerate: (data: any) => Promise<any>;
+  onGenerate: (data: any) => Promise<GeneratedCodeResult>;
+  generatedCode?: string | null;
 }
 
-export default function GenerateCodeModal({ isOpen, onClose, users, onGenerate }: GenerateCodeModalProps) {
+type CodeType = 'EMERGENCY' | 'DAILY' | 'PERMANENT';
+
+export default function GenerateCodeModal({ isOpen, onClose, users, onGenerate, generatedCode: externalCode }: GenerateCodeModalProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canGenerateCodes = hasPermission('access_codes', 'create') || hasPermission('admin', 'manage');
 
   const [formData, setFormData] = useState({
-    validityHours: 8,
-    assignedTo: '',
-    agence: '',
-    notes: '',
-    maxUses: 1
+    codeType: 'EMERGENCY' as CodeType,
+    expiresInHours: 8,
+    maxUsages: 1,
+    authorizationDurationHours: 4,
+    description: ''
   });
   const [generating, setGenerating] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [internalCode, setInternalCode] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Use external code if provided, otherwise use internal
+  const generatedCode = externalCode ?? internalCode;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGenerating(true);
+    setError(null);
     try {
-      const result = await onGenerate(formData);
+      const result = await onGenerate({
+        codeType: formData.codeType,
+        expiresInHours: formData.expiresInHours,
+        maxUsages: formData.maxUsages,
+        authorizationDurationHours: formData.authorizationDurationHours,
+        description: formData.description || undefined,
+      });
       if (result && result.code) {
-        setGeneratedCode(result.code);
+        setInternalCode(result.code);
+      } else if (result && result.error) {
+        setError(result.error);
       }
-    } catch (error) {
-      console.error('Error generating code:', error);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la génération');
     } finally {
       setGenerating(false);
     }
@@ -53,16 +68,23 @@ export default function GenerateCodeModal({ isOpen, onClose, users, onGenerate }
   };
 
   const handleClose = () => {
-    setGeneratedCode(null);
+    setInternalCode(null);
+    setError(null);
     setFormData({
-      validityHours: 8,
-      assignedTo: '',
-      agence: '',
-      notes: '',
-      maxUses: 1
+      codeType: 'EMERGENCY',
+      expiresInHours: 8,
+      maxUsages: 1,
+      authorizationDurationHours: 4,
+      description: ''
     });
     onClose();
   };
+
+  const codeTypeOptions = [
+    { value: 'EMERGENCY', label: 'Urgence (usage unique)' },
+    { value: 'DAILY', label: 'Journalier (usage quotidien)' },
+    { value: 'PERMANENT', label: 'Permanent (usage illimité)' }
+  ];
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Générer un code d'accès">
@@ -97,66 +119,77 @@ export default function GenerateCodeModal({ isOpen, onClose, users, onGenerate }
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 rounded-lg p-3 text-red-600 dark:text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          <SelectField
+            label="Type de code"
+            name="codeType"
+            value={formData.codeType}
+            onChange={(e) => setFormData({ ...formData, codeType: e.target.value as CodeType })}
+            options={codeTypeOptions}
+          />
+
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Durée de validité (heures)" name="validityHours">
+            <FormField label="Validité du code (heures)" name="expiresInHours">
               <input
                 type="number"
                 min="1"
-                max="24"
-                name="validityHours"
-                value={formData.validityHours}
-                onChange={(e) => setFormData({ ...formData, validityHours: parseInt(e.target.value) || 8 })}
+                max="720"
+                name="expiresInHours"
+                value={formData.expiresInHours}
+                onChange={(e) => setFormData({ ...formData, expiresInHours: parseInt(e.target.value) || 8 })}
                 className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p className="text-xs text-slate-500 mt-1">Durée pendant laquelle le code peut être utilisé</p>
             </FormField>
-            <FormField label="Utilisations Max" name="maxUses">
+
+            <FormField label="Utilisations max" name="maxUsages">
               <input
                 type="number"
                 min="1"
-                name="maxUses"
-                value={formData.maxUses}
-                onChange={(e) => setFormData({ ...formData, maxUses: parseInt(e.target.value) || 1 })}
+                name="maxUsages"
+                value={formData.maxUsages}
+                onChange={(e) => setFormData({ ...formData, maxUsages: parseInt(e.target.value) || 1 })}
                 className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p className="text-xs text-slate-500 mt-1">Nombre de fois que le code peut être validé</p>
             </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <SelectField
-              label="Assigné à (optionnel)"
-              name="assignedTo"
-              value={formData.assignedTo}
-              onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-              options={[
-                { value: '', label: 'Tout le monde' },
-                ...users.filter(u => !isAdminRole(normalizeRole(u.role))).map(user => ({
-                  value: user.id,
-                  label: `${user.nom} (${getRoleLabel(user.role)})`
-                }))
-              ]}
+          <FormField label="Durée d'autorisation (heures)" name="authorizationDurationHours">
+            <input
+              type="number"
+              min="1"
+              max="24"
+              name="authorizationDurationHours"
+              value={formData.authorizationDurationHours}
+              onChange={(e) => setFormData({ ...formData, authorizationDurationHours: parseInt(e.target.value) || 4 })}
+              className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <FormField label="Agence (optionnel)" name="agence">
-              <input
-                  type="text"
-                  name="agence"
-                  value={formData.agence}
-                  onChange={(e) => setFormData({ ...formData, agence: e.target.value })}
-                  placeholder="Toutes les agences"
-                  className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </FormField>
-          </div>
+            <p className="text-xs text-slate-500 mt-1">Durée d'accès à la caisse après validation du code</p>
+          </FormField>
 
-          <FormField label="Notes" name="notes">
+          <FormField label="Description (optionnel)" name="description">
             <input
               type="text"
-              name="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Raison de la génération..."
+              name="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Raison de la génération, agent concerné..."
               className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </FormField>
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
+            <p>
+              Le code généré permettra à l'utilisateur qui le valide d'accéder à la caisse
+              pendant <strong>{formData.authorizationDurationHours}h</strong>.
+            </p>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="ghost" onClick={handleClose}>Annuler</Button>

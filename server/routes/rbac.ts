@@ -1709,4 +1709,72 @@ export function registerRbacRoutes(app: Express) {
       res.status(500).json({ message: error.message || "Erreur lors de la révocation de la permission temporaire" });
     }
   });
+
+  /**
+   * GET /api/rbac/temp-permissions/history
+   * Get complete history of temporary permissions with stats
+   * Protected: requires rbac.manage or admin
+   * Query params: userId, permissionCode, status, startDate, endDate, limit, offset
+   */
+  app.get("/api/rbac/temp-permissions/history", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const {
+        userId,
+        permissionCode,
+        status = 'all',
+        startDate,
+        endDate,
+        limit = '50',
+        offset = '0',
+      } = req.query;
+
+      const { getTemporaryPermissionsHistory } = await import('../services/temporary-permissions-service');
+
+      const result = await getTemporaryPermissionsHistory({
+        userId: userId as string | undefined,
+        permissionCode: permissionCode as string | undefined,
+        status: status as 'active' | 'expired' | 'revoked' | 'all',
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: parseInt(limit as string, 10),
+        offset: parseInt(offset as string, 10),
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error({ err: error }, 'Get temp permissions history error');
+      res.status(500).json({ message: "Erreur lors de la récupération de l'historique" });
+    }
+  });
+
+  /**
+   * GET /api/rbac/temp-permissions/expiring
+   * Get permissions expiring within a threshold
+   * Protected: requires rbac.manage or admin
+   * Query params: thresholdHours (default: 24)
+   */
+  app.get("/api/rbac/temp-permissions/expiring", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { thresholdHours = '24' } = req.query;
+      const thresholdMs = parseInt(thresholdHours as string, 10) * 60 * 60 * 1000;
+
+      const { getExpiringPermissions } = await import('../services/temporary-permissions-service');
+      const expiring = await getExpiringPermissions(thresholdMs);
+
+      res.json({ expiringPermissions: expiring, thresholdHours: parseInt(thresholdHours as string, 10) });
+    } catch (error) {
+      logger.error({ err: error }, 'Get expiring permissions error');
+      res.status(500).json({ message: "Erreur lors de la récupération des permissions expirantes" });
+    }
+  });
 }

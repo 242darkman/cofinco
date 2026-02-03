@@ -4,7 +4,7 @@ import { Card, Button, LoadingSpinner } from '../ui';
 import TabGroup from '@/components/ui/TabGroup';
 import AccessCodeManager from './access-codes/AccessCodeManager';
 import PermissionDelegationManager from './access-codes/PermissionDelegationManager';
-import { SecurityCode, CodePermission, User } from './access-codes/types';
+import { SecurityCode, CaisseAuthorization, User } from './access-codes/types';
 
 interface AdminCaisseAccessCodesProps {
   onClose: () => void;
@@ -13,7 +13,7 @@ interface AdminCaisseAccessCodesProps {
 export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCodesProps) {
   const [activeTab, setActiveTab] = useState('codes');
   const [codes, setCodes] = useState<SecurityCode[]>([]);
-  const [permissions, setPermissions] = useState<CodePermission[]>([]);
+  const [permissions, setPermissions] = useState<CaisseAuthorization[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,14 +24,14 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
   const loadData = async () => {
     setLoading(true);
     try {
-      const [codesRes, permissionsRes, usersRes] = await Promise.all([
+      const [codesRes, authorizationsRes, usersRes] = await Promise.all([
         fetch('/api/caisse/access-codes', { credentials: 'include' }),
-        fetch('/api/caisse/code-permissions', { credentials: 'include' }),
+        fetch('/api/caisse/authorizations', { credentials: 'include' }),
         fetch('/api/users', { credentials: 'include' })
       ]);
 
       if (codesRes.ok) setCodes(await codesRes.json());
-      if (permissionsRes.ok) setPermissions(await permissionsRes.json());
+      if (authorizationsRes.ok) setPermissions(await authorizationsRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
     } catch (err) {
       console.error('Error loading data:', err);
@@ -41,44 +41,41 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
   };
 
   const handleGenerateCode = async (formData: any) => {
-    const res = await fetch('/api/caisse/access-codes', {
+    const res = await fetch('/api/caisse/access-codes/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(formData)
+      body: JSON.stringify({
+        codeType: formData.codeType || 'EMERGENCY',
+        expiresInHours: formData.expiresInHours || 8,
+        maxUsages: formData.maxUsages || 1,
+        authorizationDurationHours: formData.authorizationDurationHours || 4,
+        description: formData.description || undefined,
+      })
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Erreur lors de la génération');
+      return { success: false, error: data.error || 'Erreur lors de la génération' };
     }
+    // Reload data after generation
+    await loadData();
     return data;
   };
 
   const handleRevokeCode = async (codeId: string) => {
-    const res = await fetch(`/api/caisse/access-codes/${codeId}/revoke`, {
-      method: 'POST',
+    const res = await fetch(`/api/caisse/access-codes/${codeId}`, {
+      method: 'DELETE',
       credentials: 'include'
     });
     if (res.ok) await loadData();
   };
 
-  const handleGrantPermission = async (formData: any) => {
-    const res = await fetch('/api/caisse/code-permissions', {
+  const handleRevokePermission = async (permId: string, reason?: string) => {
+    const res = await fetch(`/api/caisse/authorizations/${permId}/revoke`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(formData)
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Erreur');
-    }
-  };
-
-  const handleRevokePermission = async (permId: string) => {
-    const res = await fetch(`/api/caisse/code-permissions/${permId}/revoke`, {
-      method: 'POST',
-      credentials: 'include'
+      body: JSON.stringify({ reason })
     });
     if (res.ok) await loadData();
   };
@@ -113,7 +110,7 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
       <TabGroup
         tabs={[
           { key: 'codes', label: 'Codes', icon: Key },
-          { key: 'permissions', label: 'Délégations', icon: Shield }
+          { key: 'permissions', label: 'Autorisations', icon: Shield }
         ]}
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -144,7 +141,6 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
               users={users}
               onRefresh={loadData}
               onRevoke={handleRevokePermission}
-              onGrant={handleGrantPermission}
             />
           )}
         </>
