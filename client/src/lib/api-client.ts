@@ -407,6 +407,10 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
   /**
+   * Check if current user has a PIN configured (without sending PIN)
+   */
+  checkPinStatus: () => request<{ hasPinConfigured: boolean }>('/auth/pin-status'),
+  /**
    * Validate current session - returns true if valid, false if invalid
    * Used at app boot to check if session is still valid
    */

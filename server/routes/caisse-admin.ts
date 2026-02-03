@@ -15,7 +15,8 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { db } from "../db";
-import { sessionsCaisseAuditLogs, denominationTemplates, caisses, caisseSecurityCodes } from "@shared/schema/finance";
+import { sessionsCaisseAuditLogs, denominationTemplates, caisses } from "@shared/schema/finance";
+import { caisseSecurityCodes } from "@shared/schema/operations";
 import { users } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, count, isNull, or } from "drizzle-orm";
 

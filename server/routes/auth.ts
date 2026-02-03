@@ -1222,6 +1222,21 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // Check if current user has a PIN configured (no PIN required)
+  app.get("/api/auth/pin-status", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const caissePin = await getUserCaissePin(userId);
+
+      return res.json({
+        hasPinConfigured: !!caissePin
+      });
+    } catch (e) {
+      logger.error({ err: e }, 'Error checking PIN status');
+      res.status(500).json({ error: "Erreur de vérification" });
+    }
+  });
+
   app.get("/api/user", requireAuth, async (req, res) => {
     if (!req.session.user) return res.sendStatus(401);
     const user = await storage.getUser(req.session.user.id);

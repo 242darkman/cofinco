@@ -92,12 +92,15 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
   const [pinError, setPinError] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
 
-  // Supervisor code (optional override)
-  const [showSupervisorCode, setShowSupervisorCode] = useState(false);
-  const [supervisorCode, setSupervisorCode] = useState('');
-  const [supervisorValidated, setSupervisorValidated] = useState(false);
-  const [supervisorLoading, setSupervisorLoading] = useState(false);
-  const [supervisorError, setSupervisorError] = useState('');
+  // Dynamic PIN status check
+  const [hasPinConfigured, setHasPinConfigured] = useState<boolean | null>(null);
+  const [checkingPinStatus, setCheckingPinStatus] = useState(false);
+
+  // Code d'accès (requis si pas de PIN)
+  const [accessCode, setAccessCode] = useState('');
+  const [accessCodeValidated, setAccessCodeValidated] = useState(false);
+  const [accessCodeLoading, setAccessCodeLoading] = useState(false);
+  const [accessCodeError, setAccessCodeError] = useState('');
 
   // Mobile Money state
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -170,6 +173,24 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
     }
   };
 
+  // Check PIN status when entering PIN step
+  useEffect(() => {
+    if (step === 'pin' && hasPinConfigured === null) {
+      const checkPinStatus = async () => {
+        setCheckingPinStatus(true);
+        try {
+          const result = await authApi.checkPinStatus();
+          setHasPinConfigured(result.hasPinConfigured);
+        } catch (err) {
+          setHasPinConfigured(false);
+        } finally {
+          setCheckingPinStatus(false);
+        }
+      };
+      checkPinStatus();
+    }
+  }, [step, hasPinConfigured]);
+
   const handleSelectCaisse = (caisse: any) => {
     if (caisse.active_session) {
       // Caisse already open - take control directly
@@ -181,38 +202,41 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
       setSelectedCaisse(caisse);
       setPin('');
       setPinError('');
+      setAccessCode('');
+      setAccessCodeValidated(false);
+      setAccessCodeError('');
       setStep('pin');
     }
   };
 
-  // Validate supervisor override code
-  const handleValidateSupervisorCode = async () => {
-    if (supervisorCode.length < 6) return;
+  // Validate access code
+  const handleValidateAccessCode = async () => {
+    if (accessCode.length < 6) return;
 
-    setSupervisorLoading(true);
-    setSupervisorError('');
+    setAccessCodeLoading(true);
+    setAccessCodeError('');
 
     try {
       const result = await caisseAccessControlApi.validateCode(
-        supervisorCode,
+        accessCode,
         selectedCaisse?.id,
         demande.clients?.agenceId
       );
 
       if (result.success) {
-        setSupervisorValidated(true);
-        toast.success('Code superviseur validé');
+        setAccessCodeValidated(true);
+        toast.success('Code d\'accès validé');
       } else {
-        setSupervisorError(result.error || 'Code invalide');
+        setAccessCodeError(result.error || 'Code invalide');
       }
     } catch (err: any) {
-      setSupervisorError(err.message || 'Erreur de validation');
+      setAccessCodeError(err.message || 'Erreur de validation');
     } finally {
-      setSupervisorLoading(false);
+      setAccessCodeLoading(false);
     }
   };
 
-  // Open caisse with PIN validation
+  // Open caisse with PIN or access code validation
   const handleOpenCaisseWithPin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -221,32 +245,41 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
       return;
     }
 
-    if (!pin || pin.length < 4) {
-      setPinError("Veuillez entrer votre PIN à 6 chiffres");
-      return;
+    // Validation: soit PIN valide, soit code d'accès validé
+    if (!accessCodeValidated) {
+      if (!hasPinConfigured) {
+        setPinError("Veuillez valider un code d'accès pour continuer.");
+        return;
+      }
+      if (!pin || pin.length < 4) {
+        setPinError("Veuillez entrer votre PIN à 6 chiffres");
+        return;
+      }
     }
 
     setPinLoading(true);
     setPinError('');
 
     try {
-      // 1. Verify PIN
-      const pinRes = await fetch('/api/auth/verify-pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ pin })
-      });
+      // 1. Verify PIN (sauf si code d'accès validé)
+      if (!accessCodeValidated) {
+        const pinRes = await fetch('/api/auth/verify-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ pin })
+        });
 
-      const pinData = await pinRes.json();
-      if (!pinRes.ok) {
-        if (pinData?.requirePinSetup) {
-          setPinError('Aucun PIN configuré. Définissez votre PIN dans Paramètres > Sécurité.');
-        } else {
-          setPinError(pinData?.error || 'PIN incorrect');
+        const pinData = await pinRes.json();
+        if (!pinRes.ok) {
+          if (pinData?.requirePinSetup) {
+            setPinError('Aucun PIN configuré. Utilisez un code d\'accès.');
+          } else {
+            setPinError(pinData?.error || 'PIN incorrect');
+          }
+          setPinLoading(false);
+          return;
         }
-        setPinLoading(false);
-        return;
       }
 
       // 2. Open caisse directly (with existing balance if any)
@@ -254,7 +287,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
         caisseId: selectedCaisse.id,
         agenceId: demande.clients?.agenceId,
         observations: `Ouverture pour paiement frais - ${demande.numero_demande}`,
-        ...(supervisorValidated && { supervisorOverride: true }),
+        ...(accessCodeValidated && { supervisorOverride: true }),
       });
 
       // 3. Set session and proceed to payment
@@ -473,94 +506,172 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                   </div>
                 )}
 
-                {/* PIN Input */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Code PIN Agent</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    <input
-                      type="password"
-                      placeholder="••••••"
-                      maxLength={6}
-                      value={pin}
-                      onChange={(e) => { setPin(e.target.value); setPinError(''); }}
-                      autoFocus
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3.5 text-white tracking-[0.5em] font-mono text-xl text-center focus:border-emerald-500 outline-none transition-all placeholder-slate-700"
-                    />
-                    {pin.length === 6 && (
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
-                        <CheckCircle2 size={20} />
-                      </div>
-                    )}
+                {/* Authentification dynamique */}
+                {checkingPinStatus ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                    <span className="ml-2 text-xs text-slate-500">Vérification...</span>
                   </div>
-                  {pinError && (
-                    <p className="text-xs text-red-400 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {pinError}
-                    </p>
-                  )}
-                </div>
+                ) : hasPinConfigured ? (
+                  <>
+                    {/* Utilisateur avec PIN - Afficher champ PIN */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Code PIN Agent</label>
+                        {accessCodeValidated && (
+                          <span className="text-[10px] text-emerald-400 font-medium">Bypass activé</span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <input
+                          type="password"
+                          placeholder={accessCodeValidated ? "Non requis" : "••••••"}
+                          maxLength={6}
+                          value={pin}
+                          onChange={(e) => { setPin(e.target.value); setPinError(''); }}
+                          disabled={accessCodeValidated}
+                          autoFocus
+                          className={`w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3.5 text-white tracking-[0.5em] font-mono text-xl text-center focus:border-emerald-500 outline-none transition-all placeholder-slate-700 ${accessCodeValidated ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        />
+                        {pin.length === 6 && !accessCodeValidated && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                            <CheckCircle2 size={20} />
+                          </div>
+                        )}
+                        {accessCodeValidated && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                            <Shield size={20} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                {/* Supervisor Override Code (optional) */}
-                <div className="border-t border-slate-800 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowSupervisorCode(!showSupervisorCode)}
-                    className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    <KeyRound size={14} />
-                    <span>Code de secours superviseur</span>
-                    <span className="text-[10px]">{showSupervisorCode ? '▲' : '▼'}</span>
-                    {supervisorValidated && (
-                      <span className="ml-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold">
-                        Autorisé
-                      </span>
-                    )}
-                  </button>
-
-                  {showSupervisorCode && (
-                    <div className="mt-3 space-y-2 animate-in slide-in-from-top-2">
+                    {/* Code d'accès (fallback) */}
+                    <div className="border-t border-slate-800 pt-3">
+                      <p className="text-[10px] text-slate-600 mb-2">
+                        Pas accès à votre PIN ? Utilisez un code d'accès.
+                      </p>
                       <div className="relative flex gap-2">
                         <div className="relative flex-1">
-                          <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                          <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                           <input
                             type="text"
-                            placeholder="Code 8 caractères"
+                            placeholder="Code d'accès (8 car.)"
                             maxLength={8}
-                            value={supervisorCode}
+                            value={accessCode}
                             onChange={(e) => {
-                              setSupervisorCode(e.target.value.toUpperCase());
-                              setSupervisorValidated(false);
-                              setSupervisorError('');
+                              setAccessCode(e.target.value.toUpperCase());
+                              setAccessCodeValidated(false);
+                              setAccessCodeError('');
                             }}
-                            disabled={supervisorValidated}
+                            disabled={accessCodeValidated}
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-white font-mono tracking-widest text-sm focus:border-amber-500 outline-none transition-all placeholder-slate-700 disabled:opacity-50"
                           />
                         </div>
                         <button
                           type="button"
-                          onClick={handleValidateSupervisorCode}
-                          disabled={supervisorLoading || supervisorValidated || supervisorCode.length < 6}
+                          onClick={handleValidateAccessCode}
+                          disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
                           className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
                         >
-                          {supervisorLoading ? (
+                          {accessCodeLoading ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : supervisorValidated ? (
+                          ) : accessCodeValidated ? (
                             <CheckCircle size={14} />
                           ) : (
                             'Valider'
                           )}
                         </button>
                       </div>
-                      {supervisorError && (
-                        <p className="text-xs text-red-400 flex items-center gap-1">
+                      {accessCodeError && (
+                        <p className="text-xs text-red-400 flex items-center gap-1 mt-1">
                           <AlertCircle size={12} />
-                          {supervisorError}
+                          {accessCodeError}
                         </p>
                       )}
                     </div>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Utilisateur SANS PIN - Afficher uniquement code d'accès */}
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-2">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-semibold text-amber-300">PIN non configuré</p>
+                          <p className="text-[10px] text-amber-300/70 mt-0.5">
+                            Utilisez un code d'accès pour ouvrir la caisse.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-amber-400 uppercase flex items-center gap-2">
+                        <KeyRound size={14} />
+                        Code d'accès requis
+                      </label>
+                      <div className="relative flex gap-2">
+                        <div className="relative flex-1">
+                          <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
+                          <input
+                            type="text"
+                            placeholder="XXXXXXXX"
+                            maxLength={8}
+                            value={accessCode}
+                            onChange={(e) => {
+                              setAccessCode(e.target.value.toUpperCase());
+                              setAccessCodeValidated(false);
+                              setAccessCodeError('');
+                            }}
+                            disabled={accessCodeValidated}
+                            autoFocus
+                            className={`w-full bg-slate-900 border rounded-xl pl-10 pr-3 py-3 text-white font-mono tracking-[0.3em] text-lg focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder-slate-700 disabled:opacity-50 ${
+                              accessCodeValidated ? 'border-emerald-500' : 'border-amber-500/50 focus:border-amber-500'
+                            }`}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleValidateAccessCode}
+                          disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
+                          className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2"
+                        >
+                          {accessCodeLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : accessCodeValidated ? (
+                            <>
+                              <CheckCircle size={14} />
+                              OK
+                            </>
+                          ) : (
+                            'Valider'
+                          )}
+                        </button>
+                      </div>
+                      {accessCodeError && (
+                        <p className="text-xs text-red-400 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          {accessCodeError}
+                        </p>
+                      )}
+                      {accessCodeValidated && (
+                        <p className="text-xs text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 size={12} />
+                          Code validé - Vous pouvez ouvrir la caisse
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {pinError && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {pinError}
+                  </p>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
@@ -579,7 +690,11 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                     type="submit"
                     variant="primary"
                     size="sm"
-                    disabled={pinLoading || pin.length < 4}
+                    disabled={
+                      pinLoading ||
+                      checkingPinStatus ||
+                      (!accessCodeValidated && (hasPinConfigured ? pin.length < 4 : true))
+                    }
                     isLoading={pinLoading}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-500"
                   >
