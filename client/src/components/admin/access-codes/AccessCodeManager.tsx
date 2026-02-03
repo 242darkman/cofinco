@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Ban, Key, Clock, Hash, Shield } from 'lucide-react';
-import { Card, Button, Badge, EmptyState } from '@/components/ui';
+import { Card, Button, Badge, EmptyState, ConfirmDialog } from '@/components/ui';
 import GenerateCodeModal from './GenerateCodeModal';
 import { SecurityCode, User, GeneratedCodeResult } from './types';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
@@ -21,6 +21,7 @@ export default function AccessCodeManager({ codes, users, onRefresh, onRevoke, o
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [codeToRevoke, setCodeToRevoke] = useState<string | null>(null);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('fr-FR', {
@@ -99,6 +100,22 @@ export default function AccessCodeManager({ codes, users, onRefresh, onRevoke, o
         generatedCode={generatedCode}
       />
 
+      <ConfirmDialog
+        isOpen={!!codeToRevoke}
+        onClose={() => setCodeToRevoke(null)}
+        onConfirm={() => {
+          if (codeToRevoke) {
+            onRevoke(codeToRevoke);
+            setCodeToRevoke(null);
+          }
+        }}
+        title="Révoquer le code"
+        message="Êtes-vous sûr de vouloir révoquer ce code d'accès ? Cette action est irréversible."
+        variant="danger"
+        confirmText="Révoquer"
+        cancelText="Annuler"
+      />
+
       {/* Generated Code Display */}
       {generatedCode && !isModalOpen && (
         <div className="px-3 sm:px-4 py-3 bg-emerald-500/10 border-b border-emerald-500/20">
@@ -157,11 +174,7 @@ export default function AccessCodeManager({ codes, users, onRefresh, onRevoke, o
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => {
-                      if (confirm('Révoquer ce code ?')) {
-                        onRevoke(code.id);
-                      }
-                    }}
+                    onClick={() => setCodeToRevoke(code.id)}
                     className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5"
                   >
                     <Ban size={14} />

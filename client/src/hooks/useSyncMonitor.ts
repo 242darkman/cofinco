@@ -2,6 +2,7 @@
  * useSyncMonitor - React hook for real-time sync status monitoring
  *
  * Provides reactive sync status updates for React components.
+ * Simplified to only two visible states: connected and offline.
  *
  * @example
  * ```tsx
@@ -9,19 +10,17 @@
  *   const {
  *     connectionState,
  *     latency,
+ *     latencyQuality,
  *     pending,
- *     syncedSinceLast,
- *     lastSyncAt,
- *     secondsSinceLastSync,
- *     syncState,
- *     lastError,
+ *     isConnected,
+ *     isOffline,
  *     forceRetry
  *   } = useSyncMonitor();
  *
  *   return (
  *     <div>
  *       <p>Status: {connectionState}</p>
- *       <p>Latency: {latency}ms</p>
+ *       <p>Latency: {latency}ms ({latencyQuality})</p>
  *     </div>
  *   );
  * }
@@ -34,6 +33,7 @@ import {
   type SyncStatus,
   type ConnectionState,
   type SyncState,
+  type LatencyQuality,
   type SyncMonitorConfig
 } from '../services/SyncMonitorService';
 
@@ -45,13 +45,15 @@ export interface UseSyncMonitorReturn extends SyncStatus {
   reportSyncError: (message: string) => Promise<void>;
   updatePendingCount: (count: number) => void;
 
-  // Computed
+  // Computed - simplified (only connected/offline matter now)
   isConnected: boolean;
-  isUnstable: boolean;
   isOffline: boolean;
-  isReconnecting: boolean;
   isSyncing: boolean;
   hasError: boolean;
+
+  // Legacy computed (kept for backward compat, always false now)
+  isUnstable: boolean;
+  isReconnecting: boolean;
 
   // Formatted values
   latencyFormatted: string;
@@ -64,8 +66,9 @@ export interface UseSyncMonitorOptions extends Partial<SyncMonitorConfig> {
 }
 
 const defaultStatus: SyncStatus = {
-  connectionState: 'reconnecting', // Start with reconnecting to avoid scary "offline" on load
+  connectionState: 'connected', // Start optimistically connected
   latency: null,
+  latencyQuality: 'unknown',
   pending: 0,
   syncedSinceLast: 0,
   lastSyncAt: null,
@@ -119,13 +122,15 @@ export function useSyncMonitor(options: UseSyncMonitorOptions = {}): UseSyncMoni
     monitorRef.current.updatePendingCount(count);
   }, []);
 
-  // Computed values
+  // Computed values - simplified
   const isConnected = status.connectionState === 'connected';
-  const isUnstable = status.connectionState === 'unstable';
   const isOffline = status.connectionState === 'offline';
-  const isReconnecting = status.connectionState === 'reconnecting';
   const isSyncing = status.syncState === 'syncing';
   const hasError = status.syncState === 'error' || status.lastError !== null;
+
+  // Legacy computed (always false now - kept for backward compat)
+  const isUnstable = false;
+  const isReconnecting = false;
 
   // Formatted values
   const latencyFormatted = status.latency !== null ? `${status.latency}ms` : '--';
@@ -150,8 +155,8 @@ export function useSyncMonitor(options: UseSyncMonitorOptions = {}): UseSyncMoni
     updatePendingCount,
     // Computed
     isConnected,
-    isUnstable,
     isOffline,
+    isUnstable,
     isReconnecting,
     isSyncing,
     hasError,
@@ -179,56 +184,71 @@ function formatTimeSince(seconds: number): string {
 }
 
 /**
- * Get connection state color for UI
+ * Get connection state color for UI (simplified)
  */
 export function getConnectionStateColor(state: ConnectionState): string {
-  switch (state) {
-    case 'connected':
+  return state === 'connected' ? 'text-green-400' : 'text-red-400';
+}
+
+/**
+ * Get connection state background color for UI (simplified)
+ */
+export function getConnectionStateBgColor(state: ConnectionState): string {
+  return state === 'connected' ? 'bg-green-500' : 'bg-red-500';
+}
+
+/**
+ * Get connection state label in French (simplified)
+ */
+export function getConnectionStateLabel(state: ConnectionState): string {
+  return state === 'connected' ? 'En ligne' : 'Hors ligne';
+}
+
+/**
+ * Get latency quality color for UI
+ */
+export function getLatencyQualityColor(quality: LatencyQuality): string {
+  switch (quality) {
+    case 'good':
       return 'text-green-400';
-    case 'unstable':
+    case 'fair':
       return 'text-yellow-400';
-    case 'offline':
-      return 'text-red-400';
-    case 'reconnecting':
-      return 'text-blue-400';
+    case 'poor':
+      return 'text-orange-400';
     default:
       return 'text-slate-400';
   }
 }
 
 /**
- * Get connection state background color for UI
+ * Get latency quality background color for UI
  */
-export function getConnectionStateBgColor(state: ConnectionState): string {
-  switch (state) {
-    case 'connected':
-      return 'bg-green-500';
-    case 'unstable':
-      return 'bg-yellow-500';
-    case 'offline':
-      return 'bg-red-500';
-    case 'reconnecting':
-      return 'bg-blue-500';
+export function getLatencyQualityBgColor(quality: LatencyQuality): string {
+  switch (quality) {
+    case 'good':
+      return 'bg-green-500/20';
+    case 'fair':
+      return 'bg-yellow-500/20';
+    case 'poor':
+      return 'bg-orange-500/20';
     default:
-      return 'bg-slate-500';
+      return 'bg-slate-500/20';
   }
 }
 
 /**
- * Get connection state label in French
+ * Get latency quality label in French
  */
-export function getConnectionStateLabel(state: ConnectionState): string {
-  switch (state) {
-    case 'connected':
-      return 'Connecté';
-    case 'unstable':
-      return 'Connexion instable';
-    case 'offline':
-      return 'Hors ligne';
-    case 'reconnecting':
-      return 'Reconnexion...';
+export function getLatencyQualityLabel(quality: LatencyQuality): string {
+  switch (quality) {
+    case 'good':
+      return 'Bonne';
+    case 'fair':
+      return 'Moyenne';
+    case 'poor':
+      return 'Lente';
     default:
-      return 'Inconnu';
+      return 'Inconnue';
   }
 }
 

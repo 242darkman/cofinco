@@ -25,7 +25,7 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
     setLoading(true);
     try {
       const [codesRes, authorizationsRes, usersRes] = await Promise.all([
-        fetch('/api/caisse/access-codes', { credentials: 'include' }),
+        fetch('/api/caisses/security-codes', { credentials: 'include' }),
         fetch('/api/caisse/authorizations', { credentials: 'include' }),
         fetch('/api/users', { credentials: 'include' })
       ]);
@@ -41,7 +41,7 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
   };
 
   const handleGenerateCode = async (formData: any) => {
-    const res = await fetch('/api/caisse/access-codes/generate', {
+    const res = await fetch('/api/caisses/security-codes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -54,16 +54,16 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
       })
     });
     const data = await res.json();
-    if (!res.ok || !data.success) {
+    if (!res.ok) {
       return { success: false, error: data.error || 'Erreur lors de la génération' };
     }
-    // Reload data after generation
+    // API returns { code, codeId, expiresAt, message }
     await loadData();
-    return data;
+    return { success: true, code: data.code };
   };
 
   const handleRevokeCode = async (codeId: string) => {
-    const res = await fetch(`/api/caisse/access-codes/${codeId}`, {
+    const res = await fetch(`/api/caisses/security-codes/${codeId}`, {
       method: 'DELETE',
       credentials: 'include'
     });

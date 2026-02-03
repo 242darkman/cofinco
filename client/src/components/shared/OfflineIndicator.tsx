@@ -1,13 +1,12 @@
 /**
- * OfflineIndicator - Real-time Sync Status Panel
+ * OfflineIndicator - Real-time Sync Status Panel (Simplified)
  *
- * Displays comprehensive sync status with:
- * - Connection state (connected/unstable/offline/reconnecting)
- * - Latency measurement in real-time
+ * Displays sync status with:
+ * - Connection state (connected/offline only - stable, no flickering)
+ * - Latency with quality indicator (good/fair/poor via color)
  * - Last sync time with live counter
  * - Pending/synced operations queue
  * - Error display with retry button
- * - Subtle pulse animation when healthy
  */
 
 import { useState, useEffect } from 'react';
@@ -20,12 +19,17 @@ import {
   CheckCircle,
   AlertTriangle,
   X,
-  Activity,
   Clock,
   Zap,
   AlertCircle
 } from 'lucide-react';
-import { useSyncMonitor, getConnectionStateLabel, getConnectionStateBgColor } from '../../hooks/useSyncMonitor';
+import {
+  useSyncMonitor,
+  getConnectionStateLabel,
+  getConnectionStateBgColor,
+  getLatencyQualityColor,
+  getLatencyQualityLabel
+} from '../../hooks/useSyncMonitor';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
@@ -36,19 +40,15 @@ export function OfflineIndicator() {
 
   const {
     connectionState,
-    latency,
+    latencyQuality,
     pending,
     syncedSinceLast,
     lastSyncAt,
-    secondsSinceLastSync,
-    syncState,
-    lastError,
     isConnected,
-    isUnstable,
     isOffline,
-    isReconnecting,
     isSyncing,
     hasError,
+    lastError,
     forceRetry,
     latencyFormatted,
     lastSyncFormatted,
@@ -70,28 +70,15 @@ export function OfflineIndicator() {
 
   const getStatusIcon = () => {
     if (isOffline) return <WifiOff className="h-4 w-4" />;
-    if (isReconnecting) return <RefreshCw className="h-4 w-4 animate-spin" />;
-    if (isUnstable) return <Activity className="h-4 w-4" />;
     if (isSyncing) return <RefreshCw className="h-4 w-4 animate-spin" />;
     return <Wifi className="h-4 w-4" />;
   };
 
   const getStatusText = () => {
     if (isOffline) return t('offlineMode') || 'Hors ligne';
-    if (isReconnecting) return 'Reconnexion...';
-    if (isUnstable) return 'Instable';
     if (isSyncing) return t('syncing') || 'Sync...';
     if (pending > 0) return `${pending} en attente`;
     return t('online') || 'En ligne';
-  };
-
-  const getLatencyColor = () => {
-    if (latency === null) return 'text-slate-400';
-    if (latency < 100) return 'text-green-400';
-    if (latency < 500) return 'text-emerald-400';
-    if (latency < 1000) return 'text-yellow-400';
-    if (latency < 1500) return 'text-orange-400';
-    return 'text-red-400';
   };
 
   const handleRetry = async () => {
@@ -145,90 +132,49 @@ export function OfflineIndicator() {
             </div>
 
             <div className="space-y-4">
-              {/* Connection Status */}
+              {/* Connection Status - Simplified */}
               <div
                 className={`flex items-center gap-3 p-3 rounded-xl border ${
                   isConnected
                     ? 'bg-green-500/10 border-green-500/20'
-                    : isUnstable
-                    ? 'bg-yellow-500/10 border-yellow-500/20'
-                    : isReconnecting
-                    ? 'bg-blue-500/10 border-blue-500/20'
                     : 'bg-red-500/10 border-red-500/20'
                 }`}
               >
                 <div
                   className={`p-2 rounded-full ${
-                    isConnected
-                      ? 'bg-green-500/20'
-                      : isUnstable
-                      ? 'bg-yellow-500/20'
-                      : isReconnecting
-                      ? 'bg-blue-500/20'
-                      : 'bg-red-500/20'
+                    isConnected ? 'bg-green-500/20' : 'bg-red-500/20'
                   }`}
                 >
                   {isOffline ? (
-                    <WifiOff
-                      className={`h-5 w-5 ${
-                        isConnected
-                          ? 'text-green-400'
-                          : isUnstable
-                          ? 'text-yellow-400'
-                          : isReconnecting
-                          ? 'text-blue-400'
-                          : 'text-red-400'
-                      }`}
-                    />
-                  ) : isReconnecting ? (
-                    <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
+                    <WifiOff className="h-5 w-5 text-red-400" />
                   ) : (
-                    <Wifi
-                      className={`h-5 w-5 ${
-                        isConnected
-                          ? 'text-green-400'
-                          : isUnstable
-                          ? 'text-yellow-400'
-                          : 'text-red-400'
-                      }`}
-                    />
+                    <Wifi className="h-5 w-5 text-green-400" />
                   )}
                 </div>
                 <div className="flex-1">
-                  <p
-                    className={`font-bold ${
-                      isConnected
-                        ? 'text-green-400'
-                        : isUnstable
-                        ? 'text-yellow-400'
-                        : isReconnecting
-                        ? 'text-blue-400'
-                        : 'text-red-400'
-                    }`}
-                  >
+                  <p className={`font-bold ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
                     {getConnectionStateLabel(connectionState)}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {isConnected
-                      ? 'Synchronisation active'
-                      : isUnstable
-                      ? 'Connexion dégradée'
-                      : isReconnecting
-                      ? 'Tentative de reconnexion...'
-                      : 'Mode hors-ligne actif'}
+                    {isConnected ? 'Synchronisation active' : 'Mode hors-ligne actif'}
                   </p>
                 </div>
               </div>
 
               {/* Latency & Last Sync */}
               <div className="grid grid-cols-2 gap-3">
-                {/* Latency */}
+                {/* Latency with quality indicator */}
                 <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
                   <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
                     <Zap size={12} />
                     <span>Latence</span>
+                    {latencyQuality !== 'unknown' && (
+                      <span className={`text-[10px] ${getLatencyQualityColor(latencyQuality)}`}>
+                        ({getLatencyQualityLabel(latencyQuality)})
+                      </span>
+                    )}
                   </div>
-                  <p className={`text-lg font-bold ${getLatencyColor()}`}>
+                  <p className={`text-lg font-bold ${getLatencyQualityColor(latencyQuality)}`}>
                     {latencyFormatted}
                   </p>
                 </div>

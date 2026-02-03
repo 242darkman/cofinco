@@ -1,12 +1,11 @@
 /**
- * SyncMonitorService - Real-time Sync Status Monitoring
+ * SyncMonitorService - Real-time Sync Status Monitoring (Simplified & Stable)
  *
  * This service provides:
- * - Heartbeat polling every 1 second
- * - Latency measurement via ping
- * - Connection state management (connected/unstable/offline/reconnecting)
- * - Automatic retry with exponential backoff
- * - Offline queue management
+ * - Heartbeat polling for connection status
+ * - Latency measurement
+ * - Stable connection state (only "connected" or "offline" visible)
+ * - Debounced state changes to prevent flickering
  *
  * @module services/SyncMonitorService
  */
@@ -15,14 +14,22 @@
 // TYPES & INTERFACES
 // ============================================================================
 
-export type ConnectionState = 'connected' | 'unstable' | 'offline' | 'reconnecting';
+// Internal states (for logic)
+type InternalState = 'connected' | 'checking' | 'failing' | 'offline';
+
+// Visible states (for UI) - simplified
+export type ConnectionState = 'connected' | 'offline';
 
 export type SyncState = 'idle' | 'syncing' | 'error';
 
+// Latency quality for visual indicators
+export type LatencyQuality = 'good' | 'fair' | 'poor' | 'unknown';
+
 export interface SyncStatus {
-  // Connection
+  // Connection - simplified to binary
   connectionState: ConnectionState;
-  latency: number | null; // in milliseconds
+  latency: number | null;
+  latencyQuality: LatencyQuality;
 
   // Sync statistics
   pending: number;
@@ -34,7 +41,7 @@ export interface SyncStatus {
   syncState: SyncState;
   lastError: string | null;
 
-  // Heartbeat tracking
+  // Internal tracking (for debugging)
   consecutiveFailures: number;
   lastHeartbeatAt: Date | null;
 
@@ -61,38 +68,43 @@ export type SyncStatusListener = (status: SyncStatus) => void;
 
 export interface SyncMonitorConfig {
   // Timing
-  heartbeatIntervalMs: number;      // Default: 1000 (1 second)
-  pingIntervalMs: number;           // Default: 5000 (5 seconds)
-  counterUpdateIntervalMs: number;  // Default: 1000 (1 second)
+  heartbeatIntervalMs: number;
+  counterUpdateIntervalMs: number;
 
   // Thresholds
-  latencyUnstableThresholdMs: number;  // Default: 1500
-  latencyTimeoutMs: number;            // Default: 3000
+  latencyTimeoutMs: number;
 
-  // Retry
-  maxConsecutiveFailures: number;      // Default: 3 (before offline)
-  unstableThreshold: number;           // Default: 2 (failures before unstable)
+  // Latency quality thresholds
+  latencyGoodMs: number;
+  latencyFairMs: number;
 
-  // Backoff
-  initialRetryDelayMs: number;   // Default: 1000
-  maxRetryDelayMs: number;       // Default: 5000
-  backoffMultiplier: number;     // Default: 2
+  // State change thresholds
+  failuresBeforeOffline: number;
+  successesBeforeOnline: number;
+
+  // Debounce - minimum time before showing state change
+  stateDebounceMs: number;
 
   // Debug
-  enableDebugLogs: boolean;      // Default: false
+  enableDebugLogs: boolean;
 }
 
 const DEFAULT_CONFIG: SyncMonitorConfig = {
-  heartbeatIntervalMs: 5000,        // 5 seconds between heartbeats (was 1s - too aggressive)
-  pingIntervalMs: 10000,            // 10 seconds between pings
-  counterUpdateIntervalMs: 1000,    // 1 second for UI counter
-  latencyUnstableThresholdMs: 5000, // 5 seconds before "unstable" (was 1.5s)
-  latencyTimeoutMs: 10000,          // 10 second timeout (was 3s)
-  maxConsecutiveFailures: 3,        // 3 failures = offline
-  unstableThreshold: 2,             // 2 failures = unstable
-  initialRetryDelayMs: 2000,        // 2 seconds initial retry
-  maxRetryDelayMs: 30000,           // 30 seconds max retry
-  backoffMultiplier: 1.5,           // Gentler backoff
+  heartbeatIntervalMs: 8000,         // 8 seconds between heartbeats (accommodates slow connections)
+  counterUpdateIntervalMs: 1000,     // 1 second for UI counter
+  latencyTimeoutMs: 20000,           // 20 second timeout (very generous)
+
+  // Latency quality thresholds
+  latencyGoodMs: 2000,               // < 2s = good
+  latencyFairMs: 5000,               // < 5s = fair, >= 5s = poor
+
+  // State thresholds
+  failuresBeforeOffline: 3,          // 3 consecutive failures = offline
+  successesBeforeOnline: 1,          // 1 success = back online (fast recovery)
+
+  // Debounce
+  stateDebounceMs: 2000,             // Wait 2 seconds before showing state change
+
   enableDebugLogs: false
 };
 
@@ -107,11 +119,9 @@ class SyncMonitorService {
 
   // Intervals
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-  private pingInterval: ReturnType<typeof setInterval> | null = null;
   private counterInterval: ReturnType<typeof setInterval> | null = null;
 
   // Retry state
-  private currentRetryDelay: number;
   private retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Browser online status
@@ -120,18 +130,27 @@ class SyncMonitorService {
   // Running state
   private isRunning: boolean = false;
 
-  // Hysteresis: require multiple consecutive successes to transition to "connected"
+  // Internal state tracking
+  private internalState: InternalState = 'checking';
+  private consecutiveFailures: number = 0;
   private consecutiveSuccesses: number = 0;
-  private readonly STABLE_THRESHOLD = 2; // Need 2 consecutive successes to be "connected"
+
+  // Debounce tracking
+  private pendingStateChange: ConnectionState | null = null;
+  private stateChangeTimeout: ReturnType<typeof setTimeout> | null = null;
+  private lastStateChangeTime: number = 0;
+
+  // Heartbeat in progress tracking
+  private heartbeatInProgress: boolean = false;
 
   constructor(config: Partial<SyncMonitorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.currentRetryDelay = this.config.initialRetryDelayMs;
 
-    // Start with "reconnecting" state to avoid showing scary "offline" on first load
+    // Start optimistically as "connected" - we'll correct if needed
     this.status = {
-      connectionState: 'reconnecting',
+      connectionState: 'connected',
       latency: null,
+      latencyQuality: 'unknown',
       pending: 0,
       syncedSinceLast: 0,
       lastSyncAt: null,
@@ -148,6 +167,12 @@ class SyncMonitorService {
       window.addEventListener('online', this.handleOnline);
       window.addEventListener('offline', this.handleOffline);
       this.browserOnline = navigator.onLine;
+
+      // If browser is offline at start, set offline immediately
+      if (!this.browserOnline) {
+        this.status.connectionState = 'offline';
+        this.internalState = 'offline';
+      }
     }
   }
 
@@ -155,9 +180,6 @@ class SyncMonitorService {
   // PUBLIC API
   // ============================================================================
 
-  /**
-   * Start monitoring
-   */
   start(): void {
     if (this.isRunning) return;
     this.isRunning = true;
@@ -169,13 +191,9 @@ class SyncMonitorService {
 
     // Start intervals
     this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), this.config.heartbeatIntervalMs);
-    this.pingInterval = setInterval(() => this.measureLatency(), this.config.pingIntervalMs);
     this.counterInterval = setInterval(() => this.updateCounter(), this.config.counterUpdateIntervalMs);
   }
 
-  /**
-   * Stop monitoring
-   */
   stop(): void {
     if (!this.isRunning) return;
     this.isRunning = false;
@@ -183,82 +201,55 @@ class SyncMonitorService {
     this.log('Stopping SyncMonitor');
 
     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-    if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.counterInterval) clearInterval(this.counterInterval);
     if (this.retryTimeout) clearTimeout(this.retryTimeout);
+    if (this.stateChangeTimeout) clearTimeout(this.stateChangeTimeout);
 
     this.heartbeatInterval = null;
-    this.pingInterval = null;
     this.counterInterval = null;
     this.retryTimeout = null;
+    this.stateChangeTimeout = null;
   }
 
-  /**
-   * Subscribe to status updates
-   */
   subscribe(listener: SyncStatusListener): () => void {
     this.listeners.add(listener);
-    // Immediately emit current status
     listener(this.getStatus());
-
-    // Return unsubscribe function
-    return () => {
-      this.listeners.delete(listener);
-    };
+    return () => this.listeners.delete(listener);
   }
 
-  /**
-   * Get current status (immutable copy)
-   */
   getStatus(): SyncStatus {
     return { ...this.status };
   }
 
-  /**
-   * Force a sync retry
-   */
   async forceRetry(): Promise<void> {
     this.log('Force retry requested');
-
-    // Clear error state
     this.updateStatus({ lastError: null, syncState: 'idle' });
 
-    // Reset retry delay
-    this.currentRetryDelay = this.config.initialRetryDelayMs;
+    // Reset failure tracking
+    this.consecutiveFailures = 0;
+    this.consecutiveSuccesses = 0;
 
-    // Notify server
     try {
       await fetch('/api/sync/retry', {
         method: 'POST',
         credentials: 'include'
       });
     } catch {
-      // Ignore errors
+      // Ignore
     }
 
-    // Send heartbeat immediately
     await this.sendHeartbeat();
   }
 
-  /**
-   * Report a sync operation starting
-   */
   async reportSyncStart(): Promise<void> {
     this.updateStatus({ syncState: 'syncing' });
-
     try {
-      await fetch('/api/sync/start', {
-        method: 'POST',
-        credentials: 'include'
-      });
+      await fetch('/api/sync/start', { method: 'POST', credentials: 'include' });
     } catch {
-      // Ignore errors
+      // Ignore
     }
   }
 
-  /**
-   * Report a sync operation completed
-   */
   async reportSyncComplete(syncedCount: number = 0, error: string | null = null): Promise<void> {
     const newState: Partial<SyncStatus> = {
       syncState: error ? 'error' : 'idle',
@@ -281,19 +272,12 @@ class SyncMonitorService {
         body: JSON.stringify({ syncedCount, error })
       });
     } catch {
-      // Ignore errors
+      // Ignore
     }
   }
 
-  /**
-   * Report a sync error
-   */
   async reportSyncError(message: string): Promise<void> {
-    this.updateStatus({
-      syncState: 'error',
-      lastError: message
-    });
-
+    this.updateStatus({ syncState: 'error', lastError: message });
     try {
       await fetch('/api/sync/error', {
         method: 'POST',
@@ -302,37 +286,25 @@ class SyncMonitorService {
         body: JSON.stringify({ message })
       });
     } catch {
-      // Ignore errors
+      // Ignore
     }
   }
 
-  /**
-   * Update pending count (for offline operations)
-   */
   updatePendingCount(count: number): void {
     this.updateStatus({ pending: count });
   }
 
-  /**
-   * Update configuration at runtime
-   */
   updateConfig(newConfig: Partial<SyncMonitorConfig>): void {
     this.config = { ...this.config, ...newConfig };
-
-    // Restart intervals if running
     if (this.isRunning) {
       this.stop();
       this.start();
     }
   }
 
-  /**
-   * Cleanup
-   */
   destroy(): void {
     this.stop();
     this.listeners.clear();
-
     if (typeof window !== 'undefined') {
       window.removeEventListener('online', this.handleOnline);
       window.removeEventListener('offline', this.handleOffline);
@@ -346,25 +318,37 @@ class SyncMonitorService {
   private handleOnline = (): void => {
     this.log('Browser online');
     this.browserOnline = true;
-    this.updateStatus({ connectionState: 'reconnecting' });
+
+    // Reset tracking
+    this.consecutiveFailures = 0;
+    this.internalState = 'checking';
+
+    // Send heartbeat immediately
     this.sendHeartbeat();
   };
 
   private handleOffline = (): void => {
     this.log('Browser offline');
     this.browserOnline = false;
-    this.updateStatus({
-      connectionState: 'offline',
-      latency: null
-    });
+    this.internalState = 'offline';
+
+    // Immediate state change for browser offline (no debounce)
+    this.setConnectionState('offline', true);
   };
 
   private async sendHeartbeat(): Promise<void> {
-    if (!this.browserOnline) {
-      this.updateStatus({ connectionState: 'offline' });
+    // Prevent overlapping heartbeats
+    if (this.heartbeatInProgress) {
+      this.log('Heartbeat already in progress, skipping');
       return;
     }
 
+    if (!this.browserOnline) {
+      this.setConnectionState('offline', true);
+      return;
+    }
+
+    this.heartbeatInProgress = true;
     const startTime = Date.now();
 
     try {
@@ -389,40 +373,26 @@ class SyncMonitorService {
       this.handleHeartbeatSuccess(data, latency);
     } catch (error) {
       this.handleHeartbeatFailure(error);
+    } finally {
+      this.heartbeatInProgress = false;
     }
   }
 
   private handleHeartbeatSuccess(data: HeartbeatResponse, latency: number): void {
     const now = new Date();
-    const previousState = this.status.connectionState;
 
-    // Increment success counter
+    // Update success tracking
     this.consecutiveSuccesses++;
+    this.consecutiveFailures = 0;
+    this.internalState = 'connected';
 
-    // Determine connection state with hysteresis
-    let connectionState: ConnectionState;
+    // Calculate latency quality
+    const latencyQuality = this.getLatencyQuality(latency);
 
-    if (latency > this.config.latencyUnstableThresholdMs) {
-      // High latency = unstable (reset success counter)
-      connectionState = 'unstable';
-      this.consecutiveSuccesses = 0;
-    } else if (previousState === 'connected') {
-      // Already connected, stay connected
-      connectionState = 'connected';
-    } else if (this.consecutiveSuccesses >= this.STABLE_THRESHOLD) {
-      // Enough consecutive successes to transition to connected
-      connectionState = 'connected';
-      this.log('Connection stable after multiple successes');
-    } else {
-      // Not enough successes yet, stay in current state (or use reconnecting)
-      connectionState = previousState === 'offline' ? 'reconnecting' : previousState;
-    }
-
-    const wasOffline = previousState === 'offline' || previousState === 'reconnecting';
-
+    // Update status (always update data, state change is debounced)
     this.updateStatus({
-      connectionState,
       latency,
+      latencyQuality,
       pending: data.pending,
       syncedSinceLast: data.syncedSinceLast,
       lastSyncAt: data.lastSyncAt ? new Date(data.lastSyncAt) : this.status.lastSyncAt,
@@ -433,91 +403,96 @@ class SyncMonitorService {
       serverTime: new Date(data.serverTime)
     });
 
-    // Reset retry delay on success
-    this.currentRetryDelay = this.config.initialRetryDelayMs;
-
-    if (wasOffline && connectionState === 'connected') {
-      this.log('Connection restored');
+    // Set connection state (with debounce for stability)
+    if (this.consecutiveSuccesses >= this.config.successesBeforeOnline) {
+      this.setConnectionState('connected');
     }
+
+    this.log(`Heartbeat OK - latency: ${latency}ms (${latencyQuality})`);
   }
 
   private handleHeartbeatFailure(error: unknown): void {
-    const failures = this.status.consecutiveFailures + 1;
-
-    // Reset success counter on failure
+    this.consecutiveFailures++;
     this.consecutiveSuccesses = 0;
 
-    this.log(`Heartbeat failed (${failures}): ${error}`);
+    this.log(`Heartbeat failed (${this.consecutiveFailures}): ${error}`);
 
-    let connectionState: ConnectionState;
-
-    if (!this.browserOnline) {
-      connectionState = 'offline';
-    } else if (failures >= this.config.maxConsecutiveFailures) {
-      connectionState = 'offline';
-    } else if (failures >= this.config.unstableThreshold) {
-      connectionState = 'unstable';
+    // Update internal state based on failure count
+    if (this.consecutiveFailures >= this.config.failuresBeforeOffline) {
+      this.internalState = 'offline';
+      // Force immediate state change after multiple failures
+      this.setConnectionState('offline', true);
     } else {
-      // Single failure: keep current state if connected, otherwise stay unstable
-      connectionState = this.status.connectionState === 'connected' ? 'connected' : 'unstable';
+      this.internalState = 'failing';
+      // Don't change visible state yet - might recover
     }
 
     this.updateStatus({
-      connectionState,
       latency: null,
-      consecutiveFailures: failures
+      latencyQuality: 'unknown',
+      consecutiveFailures: this.consecutiveFailures
     });
-
-    // Schedule retry with backoff if needed
-    if (failures >= this.config.maxConsecutiveFailures) {
-      this.scheduleRetry();
-    }
   }
 
-  private scheduleRetry(): void {
-    if (this.retryTimeout) {
-      clearTimeout(this.retryTimeout);
-    }
+  private setConnectionState(newState: ConnectionState, immediate: boolean = false): void {
+    const currentState = this.status.connectionState;
 
-    this.updateStatus({ connectionState: 'reconnecting' });
-
-    this.retryTimeout = setTimeout(() => {
-      this.sendHeartbeat();
-    }, this.currentRetryDelay);
-
-    // Increase delay for next retry (exponential backoff)
-    this.currentRetryDelay = Math.min(
-      this.currentRetryDelay * this.config.backoffMultiplier,
-      this.config.maxRetryDelayMs
-    );
-  }
-
-  private async measureLatency(): Promise<void> {
-    if (!this.browserOnline || this.status.connectionState === 'offline') {
+    // No change needed
+    if (currentState === newState) {
+      this.pendingStateChange = null;
+      if (this.stateChangeTimeout) {
+        clearTimeout(this.stateChangeTimeout);
+        this.stateChangeTimeout = null;
+      }
       return;
     }
 
-    const startTime = Date.now();
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.latencyTimeoutMs);
-
-      const response = await fetch('/api/sync/ping', {
-        method: 'POST',
-        credentials: 'include',
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const latency = Date.now() - startTime;
-        this.updateStatus({ latency });
+    // For immediate changes (browser offline, multiple failures)
+    if (immediate) {
+      this.pendingStateChange = null;
+      if (this.stateChangeTimeout) {
+        clearTimeout(this.stateChangeTimeout);
+        this.stateChangeTimeout = null;
       }
-    } catch {
-      // Ignore ping errors - heartbeat handles connection state
+      this.updateStatus({ connectionState: newState });
+      this.lastStateChangeTime = Date.now();
+      this.log(`State changed immediately to: ${newState}`);
+      return;
     }
+
+    // Debounced change
+    if (this.pendingStateChange === newState) {
+      // Already pending this change
+      return;
+    }
+
+    this.pendingStateChange = newState;
+
+    // Clear any existing timeout
+    if (this.stateChangeTimeout) {
+      clearTimeout(this.stateChangeTimeout);
+    }
+
+    // Calculate debounce time - shorter for going online, longer for going offline
+    const debounceTime = newState === 'connected'
+      ? Math.max(500, this.config.stateDebounceMs / 2)  // Faster recovery
+      : this.config.stateDebounceMs;                     // Slower to show offline
+
+    this.stateChangeTimeout = setTimeout(() => {
+      if (this.pendingStateChange === newState) {
+        this.updateStatus({ connectionState: newState });
+        this.lastStateChangeTime = Date.now();
+        this.log(`State changed (debounced) to: ${newState}`);
+      }
+      this.pendingStateChange = null;
+      this.stateChangeTimeout = null;
+    }, debounceTime);
+  }
+
+  private getLatencyQuality(latency: number): LatencyQuality {
+    if (latency < this.config.latencyGoodMs) return 'good';
+    if (latency < this.config.latencyFairMs) return 'fair';
+    return 'poor';
   }
 
   private updateCounter(): void {
@@ -525,7 +500,6 @@ class SyncMonitorService {
       const secondsSinceLastSync = Math.floor(
         (Date.now() - this.status.lastSyncAt.getTime()) / 1000
       );
-
       if (secondsSinceLastSync !== this.status.secondsSinceLastSync) {
         this.updateStatus({ secondsSinceLastSync });
       }
