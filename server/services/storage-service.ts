@@ -316,6 +316,18 @@ export class StorageService {
   }
 
   /**
+   * Get private object stream
+   */
+  static async getPrivateObject(objectKey: string) {
+    const command = new GetObjectCommand({
+      Bucket: PRIVATE_BUCKET,
+      Key: objectKey,
+    });
+
+    return await s3Client.send(command);
+  }
+
+  /**
    * Delete file
    */
   static async deleteFile(objectKey: string, isPublic: boolean = false): Promise<void> {

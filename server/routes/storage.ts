@@ -44,7 +44,8 @@ const upload = multer({
 
 /**
  * GET /api/storage/files/:key(*)
- * Servir les fichiers publics avec cache
+ * Servir les fichiers (publics et privés pour conversations)
+ * Les fichiers privés (misc/conversation/*) nécessitent une authentification
  */
 router.get('/files/:key(*)', async (req, res) => {
   const rawKey = req.params.key;
@@ -63,8 +64,20 @@ router.get('/files/:key(*)', async (req, res) => {
     return res.redirect(key);
   }
 
+  // Déterminer si le fichier est dans le bucket privé ou public
+  // Les fichiers misc (conversations) sont privés
+  const isPrivateFile = key.startsWith('misc/');
+
   try {
-    const result = await StorageService.getPublicObject(key);
+    let result;
+
+    if (isPrivateFile) {
+      // Pour les fichiers privés, utiliser le bucket privé
+      result = await StorageService.getPrivateObject(key);
+    } else {
+      // Pour les fichiers publics
+      result = await StorageService.getPublicObject(key);
+    }
 
     if (!result?.Body) {
       return res.status(404).json({ error: 'File not found' });
@@ -77,8 +90,12 @@ router.get('/files/:key(*)', async (req, res) => {
       res.setHeader('Content-Length', String(result.ContentLength));
     }
 
-    // Cache public pendant 1 heure
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    // Cache: privé pour fichiers privés, public pour fichiers publics
+    if (isPrivateFile) {
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
 
     const body = result.Body as any;
     if (body && typeof body.pipe === 'function') {
@@ -91,7 +108,7 @@ router.get('/files/:key(*)', async (req, res) => {
     if (error?.name === 'NoSuchKey') {
       return res.status(404).json({ error: 'File not found' });
     }
-    logger.error({ err: error }, 'Public file fetch error');
+    logger.error({ err: error, key }, 'File fetch error');
     return res.status(500).json({ error: 'Failed to fetch file' });
   }
 });
