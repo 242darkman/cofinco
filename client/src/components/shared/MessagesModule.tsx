@@ -559,17 +559,18 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                         </div>
                       ) : (
                         <div
-                          className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative`}
+                          className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}
                           onMouseLeave={() => { setMenuOpenFor(null); setShowReactionsFor(null); }}
                         >
-                          {/* Message bubble */}
-                          <div className={`
-                            max-w-[85%] md:max-w-[75%] lg:max-w-[60%] p-3 rounded-2xl text-sm relative shadow-md
-                            ${isMe
-                              ? 'bg-indigo-600 text-white rounded-tr-sm'
-                              : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700'
-                            }
-                          `}>
+                          {/* Message bubble wrapper with relative positioning for actions */}
+                          <div className="relative max-w-[85%] md:max-w-[75%] lg:max-w-[60%]">
+                            <div className={`
+                              p-3 rounded-2xl text-sm shadow-md
+                              ${isMe
+                                ? 'bg-indigo-600 text-white rounded-tr-sm'
+                                : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700'
+                              }
+                            `}>
                             {/* Sender name (groups only) */}
                             {!isMe && activeConv?.type === 'GROUP' && (
                               <p className="text-xs font-bold text-indigo-400 mb-1">
@@ -649,11 +650,12 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                             )}
                           </div>
 
-                          {/* Hover actions */}
-                          <div className={`absolute ${isMe ? 'left-0 -translate-x-full pr-1' : 'right-0 translate-x-full pl-1'} top-0 hidden group-hover:flex items-start gap-0.5`}>
+                          {/* Hover actions - positioned close to the message bubble */}
+                          <div className={`absolute ${isMe ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'} top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-slate-900/90 backdrop-blur-sm rounded-lg px-1 py-0.5 shadow-lg border border-slate-700/50`}>
                             <button
                               onClick={() => setShowReactionsFor(showReactionsFor === msg.id ? null : msg.id)}
-                              className="p-1 text-slate-500 hover:text-yellow-400 rounded transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-yellow-400 rounded transition-colors"
+                              title="Réagir"
                             >
                               <Smile size={14} />
                             </button>
@@ -661,13 +663,15 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                               <>
                                 <button
                                   onClick={() => handleEditMessage(msg)}
-                                  className="p-1 text-slate-500 hover:text-blue-400 rounded transition-colors"
+                                  className="p-1.5 text-slate-400 hover:text-blue-400 rounded transition-colors"
+                                  title="Modifier"
                                 >
                                   <Edit2 size={14} />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteMessage(msg.id)}
-                                  className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors"
+                                  className="p-1.5 text-slate-400 hover:text-red-400 rounded transition-colors"
+                                  title="Supprimer"
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -677,7 +681,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
                           {/* Reactions picker popup */}
                           {showReactionsFor === msg.id && (
-                            <div className={`absolute ${isMe ? 'right-0' : 'left-0'} -top-10 z-50 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1 flex gap-1 shadow-xl`}>
+                            <div className={`absolute ${isMe ? 'right-0' : 'left-0'} -top-12 z-50 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 flex gap-1 shadow-xl`}>
                               {ALLOWED_REACTION_EMOJIS.map((emoji) => {
                                 const existing = msg.reactions.find((r) => r.emoji === emoji);
                                 return (
@@ -692,6 +696,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                               })}
                             </div>
                           )}
+                          </div>
                         </div>
                       )}
                     </div>
