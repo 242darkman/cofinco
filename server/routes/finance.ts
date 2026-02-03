@@ -114,11 +114,11 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Credits
-  app.get("/api/credits", requireAuth, requireAgenceAccess(), async (req, res) => {
-    // req.agenceFilter est injecté par requireAgenceAccess
-    const agenceFilter = req.agenceFilter as { agence?: string } | null;
+  app.get("/api/credits", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
+    // req.agenceFilter est injecté par requireAgenceAccess avec l'agenceId
+    const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
-    const filter: { agence?: string; clientId?: string } = agenceFilter ? { agence: agenceFilter.agence } : {};
+    const filter: { agenceId?: string; clientId?: string } = agenceFilter ? { agenceId: agenceFilter.agenceId } : {};
 
     if (req.query.clientId) {
       filter.clientId = req.query.clientId as string;
@@ -1018,36 +1018,21 @@ export function registerFinanceRoutes(app: Express) {
 
 
   // Aggregation endpoint for dashboard badges
-  app.get("/api/demandes-credit/counts", requireAuth, requireAgenceAccess(), async (req, res) => {
+  app.get("/api/demandes-credit/counts", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
       try {
-        const agenceFilter = req.agenceFilter as { agence?: string } | null;
-        
+        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+
         // Base query - only select status and count
-        const query = db.select({ 
-            status: demandesCredit.statut, 
-            count: count() 
+        const query = db.select({
+            status: demandesCredit.statut,
+            count: count()
         })
         .from(demandesCredit)
         .groupBy(demandesCredit.statut);
 
-        // Apply Agency Filter
-        if (agenceFilter?.agence) {
-             // We need to join with clients to filter by agency if the filter is string-based
-             // However, for performance on counts, if we have agencyId on demandesCredit it is better.
-             // Checking schema... yes, agenceId is on demandesCredit.
-             
-             // First, get the agency ID(s) corresponding to the name filter if needed, 
-             // but requireAgenceAccess middleware (if standard) might just work with storage logic.
-             // To be safe and consistent with "storage" usage pattern but optimized:
-             
-             // If we use pure drizzle here we must replicate filter logic. 
-             // Let's use the explicit relation if possible.
-             
-             const agencesList = await db.select({ id: schema.agences.id }).from(schema.agences).where(eq(schema.agences.nom, agenceFilter.agence));
-             if (agencesList.length > 0) {
-                 const agenceId = agencesList[0].id;
-                 query.where(eq(demandesCredit.agenceId, agenceId));
-             }
+        // Apply Agency Filter - utilise directement l'agenceId (plus sûr)
+        if (agenceFilter?.agenceId) {
+             query.where(eq(demandesCredit.agenceId, agenceFilter.agenceId));
         }
         
         const results = await query;
@@ -1094,13 +1079,13 @@ export function registerFinanceRoutes(app: Express) {
       }
   });
 
-  app.get("/api/demandes-credit", requireAuth, requireAgenceAccess(), async (req, res) => {
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
+  app.get("/api/demandes-credit", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       const includeDeleted = req.query.includeDeleted === 'true';
-      const filter = agenceFilter ? { agence: agenceFilter.agence, includeDeleted } : { includeDeleted };
-      
+      const filter = agenceFilter ? { agenceId: agenceFilter.agenceId, includeDeleted } : { includeDeleted };
+
       const demandes = await storage.getAllDemandes(filter);
-      
+
       res.json(addSnakeCaseAliasesDeep(demandes));
   });
 

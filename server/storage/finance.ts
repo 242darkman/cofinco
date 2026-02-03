@@ -227,7 +227,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
 
   export async function getAllCredits(
-    filter: { agence?: string; clientId?: string } = {},
+    filter: { agence?: string; agenceId?: string; clientId?: string } = {},
     options: { search?: string; page?: number; limit?: number; statut?: string } = {}
   ): Promise<PaginatedCredits> {
     const page = Math.max(1, options.page || 1);
@@ -236,8 +236,18 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     const conditions = [];
 
-    if (filter.agence && filter.agence !== "all") {
-      conditions.push(eq(clients.agenceId, filter.agence));
+    // Utiliser agenceId directement si fourni (plus sûr)
+    if (filter.agenceId && filter.agenceId !== "all") {
+      conditions.push(eq(clients.agenceId, filter.agenceId));
+    } else if (filter.agence && filter.agence !== "all") {
+      // Fallback: rechercher l'agenceId par nom si agence est un nom
+      const [agenceRecord] = await db.select({ id: agences.id })
+        .from(agences)
+        .where(eq(agences.nom, filter.agence))
+        .limit(1);
+      if (agenceRecord) {
+        conditions.push(eq(clients.agenceId, agenceRecord.id));
+      }
     }
 
     if (filter.clientId) {
@@ -446,15 +456,25 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       .orderBy(desc(demandesCredit.createdAt));
   }
   
-  export async function getAllDemandes(filter: { agence?: string, includeDeleted?: boolean } = {}): Promise<DemandeCredit[]> {
+  export async function getAllDemandes(filter: { agence?: string, agenceId?: string, includeDeleted?: boolean } = {}): Promise<DemandeCredit[]> {
     const conditions = [];
 
     if (!filter.includeDeleted) {
         conditions.push(sql`${demandesCredit.deletedAt} IS NULL`);
     }
 
-    if (filter.agence && filter.agence !== "all") {
-      conditions.push(eq(clients.agenceId, filter.agence));
+    // Utiliser agenceId directement si fourni (plus sûr)
+    if (filter.agenceId && filter.agenceId !== "all") {
+      conditions.push(eq(clients.agenceId, filter.agenceId));
+    } else if (filter.agence && filter.agence !== "all") {
+      // Fallback: rechercher l'agenceId par nom
+      const [agenceRecord] = await db.select({ id: agences.id })
+        .from(agences)
+        .where(eq(agences.nom, filter.agence))
+        .limit(1);
+      if (agenceRecord) {
+        conditions.push(eq(clients.agenceId, agenceRecord.id));
+      }
     }
 
     let baseQuery = db.select({
