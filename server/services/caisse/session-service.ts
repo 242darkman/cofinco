@@ -57,6 +57,78 @@ const CRITICAL_INACTIVE_HOURS = CAISSE_THRESHOLDS.INACTIVITE_CRITICAL_HOURS;
 const MAX_ECART_THRESHOLD = CAISSE_THRESHOLDS.MAX_ECART_SANS_ALERTE;
 
 // ============================================================================
+// GL RECONCILIATION GUARD
+// ============================================================================
+
+interface GlReconciliationCheck {
+  operationalBalance: number;
+  glBalance: number;
+  discrepancy: number;
+  isReconciled: boolean;
+}
+
+/**
+ * Vérifie la cohérence entre le solde opérationnel des caisses et le GL (521xxx)
+ * Appelé à l'ouverture/fermeture de session pour détecter les écarts
+ */
+async function checkCaisseGlReconciliation(): Promise<GlReconciliationCheck> {
+  // Solde opérationnel: sessions OUVERTES uniquement
+  const operationalResult = await db.execute(sql`
+    SELECT COALESCE(SUM(
+      COALESCE(CAST(s.montant_fermeture_theorique AS DECIMAL), CAST(s.montant_ouverture AS DECIMAL), 0)
+    ), 0) as total
+    FROM caisses c
+    LEFT JOIN sessions_caisse s ON s.caisse_id = c.id AND s.closed_at IS NULL
+  `);
+  const operationalBalance = parseFloat((operationalResult.rows[0] as any)?.total || '0');
+
+  // Solde GL: comptes 521xxx
+  const glResult = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(CAST(le.debit AS DECIMAL)), 0) -
+      COALESCE(SUM(CAST(le.credit AS DECIMAL)), 0) as solde
+    FROM lignes_ecritures le
+    INNER JOIN plan_comptable pc ON le.compte_id = pc.id
+    INNER JOIN ecritures_comptables e ON le.ecriture_id = e.id
+    WHERE pc.numero_compte LIKE '521%'
+      AND e.statut = 'POSTED'
+  `);
+  const glBalance = parseFloat((glResult.rows[0] as any)?.solde || '0');
+
+  const discrepancy = Math.abs(operationalBalance - glBalance);
+  const isReconciled = discrepancy <= MAX_ECART_THRESHOLD;
+
+  return { operationalBalance, glBalance, discrepancy, isReconciled };
+}
+
+/**
+ * Log et alerte si écart GL détecté à l'ouverture/fermeture de session
+ */
+async function logGlReconciliationStatus(context: string, sessionId?: string): Promise<void> {
+  try {
+    const check = await checkCaisseGlReconciliation();
+
+    if (!check.isReconciled) {
+      logger.warn({
+        context,
+        sessionId,
+        operationalBalance: check.operationalBalance,
+        glBalance: check.glBalance,
+        discrepancy: check.discrepancy,
+      }, '[GL GUARD] Écart détecté entre solde opérationnel et GL des caisses');
+    } else {
+      logger.debug({
+        context,
+        operationalBalance: check.operationalBalance,
+        glBalance: check.glBalance,
+      }, '[GL GUARD] Réconciliation OK');
+    }
+  } catch (error) {
+    logger.error({ error, context }, '[GL GUARD] Erreur lors de la vérification GL');
+  }
+}
+
+// ============================================================================
 // VALIDATION DU BILLETAGE
 // ============================================================================
 
@@ -229,6 +301,9 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
     };
   }
 
+  // 2. Vérification GL avant ouverture (logging uniquement)
+  await logGlReconciliationStatus('SESSION_OPEN_PRE', undefined);
+
   try {
     // 2. Transaction atomique avec niveau d'isolation SERIALIZABLE
     const result = await db.transaction(
@@ -312,6 +387,9 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
         isolationLevel: "serializable",
       }
     );
+
+    // Vérification GL après ouverture réussie
+    await logGlReconciliationStatus('SESSION_OPEN_POST', result.id);
 
     return {
       success: true,
@@ -636,6 +714,9 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
         isolationLevel: "serializable", // Niveau plus strict pour éviter les race conditions
       }
     );
+
+    // Vérification GL après fermeture réussie
+    await logGlReconciliationStatus('SESSION_CLOSE_POST', result.session.id);
 
     return {
       success: true,

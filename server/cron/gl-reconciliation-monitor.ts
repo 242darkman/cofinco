@@ -91,9 +91,11 @@ export async function runGlReconciliationCheck(): Promise<ReconciliationResult> 
     }
 
     // 4. Soldes opérationnels Caisses
+    // IMPORTANT: Seules les sessions OUVERTES comptent comme solde opérationnel
+    // Une session fermée signifie que le cash a été compté et potentiellement retourné au coffre
     const caissesOp = await client.query(`
       SELECT COALESCE(SUM(solde_reel), 0) as total FROM (
-        SELECT DISTINCT ON (c.id)
+        SELECT
           c.id,
           COALESCE(
             CAST(s.montant_fermeture_theorique AS DECIMAL),
@@ -101,8 +103,7 @@ export async function runGlReconciliationCheck(): Promise<ReconciliationResult> 
             0
           ) as solde_reel
         FROM caisses c
-        LEFT JOIN sessions_caisse s ON s.caisse_id = c.id
-        ORDER BY c.id, s.closed_at DESC NULLS FIRST
+        LEFT JOIN sessions_caisse s ON s.caisse_id = c.id AND s.closed_at IS NULL
       ) sub
     `);
 
