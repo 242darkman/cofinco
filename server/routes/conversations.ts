@@ -1614,11 +1614,11 @@ export function registerConversationsRoutes(app: Express): void {
       const authUser = getAuthUser(req);
       const searchPattern = `%${query}%`;
       const searchCondition = sql`(
-        username ILIKE ${searchPattern} OR
-        nom ILIKE ${searchPattern} OR
-        COALESCE(prenom, '') ILIKE ${searchPattern} OR
-        (nom || ' ' || COALESCE(prenom, '')) ILIKE ${searchPattern} OR
-        (COALESCE(prenom, '') || ' ' || nom) ILIKE ${searchPattern}
+        ${users.username} ILIKE ${searchPattern} OR
+        ${users.nom} ILIKE ${searchPattern} OR
+        COALESCE(${users.prenom}, '') ILIKE ${searchPattern} OR
+        (${users.nom} || ' ' || COALESCE(${users.prenom}, '')) ILIKE ${searchPattern} OR
+        (COALESCE(${users.prenom}, '') || ' ' || ${users.nom}) ILIKE ${searchPattern}
       )`;
 
       // Build where conditions based on agenceOnly filter
