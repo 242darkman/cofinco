@@ -1744,15 +1744,25 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     }
 
     // Echéances / Upcoming Payments (Calculated)
-    export async function getUpcomingEcheances(filter: { agence?: string } = {}): Promise<{ client: string; amount: number; date: string; status: string }[]> {
+    export async function getUpcomingEcheances(filter: { agenceId?: string; agence?: string } = {}): Promise<{ client: string; amount: number; date: string; status: string }[]> {
         // 1. Get active credits
         const conditions = [
             eq(credits.statut, StatutCredit.ACTIVE),
             gt(credits.soldeRestant, "0")
         ];
 
-        if (filter.agence) {
-            conditions.push(eq(clients.agenceId, filter.agence));
+        // Utiliser agenceId directement si fourni (plus sûr)
+        if (filter.agenceId) {
+            conditions.push(eq(clients.agenceId, filter.agenceId));
+        } else if (filter.agence) {
+            // Fallback: rechercher l'agenceId par nom
+            const [agenceRecord] = await db.select({ id: agences.id })
+              .from(agences)
+              .where(eq(agences.nom, filter.agence))
+              .limit(1);
+            if (agenceRecord) {
+              conditions.push(eq(clients.agenceId, agenceRecord.id));
+            }
         }
 
         const activeCredits = await db.select({

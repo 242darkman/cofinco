@@ -80,7 +80,7 @@ export async function getTontine(id: string): Promise<any | undefined> {
   return result || undefined;
 }
 
-export async function getAllTontines(filter: { agence?: string } = {}): Promise<any[]> {
+export async function getAllTontines(filter: { agenceId?: string; agence?: string } = {}): Promise<any[]> {
     const baseQuery = db
       .select({
         ...getTableColumns(tontines),
@@ -104,7 +104,22 @@ export async function getAllTontines(filter: { agence?: string } = {}): Promise<
       .groupBy(tontines.id)
       .orderBy(desc(tontines.createdAt));
 
-    if (filter.agence) {
+    // Déterminer l'agenceId à utiliser
+    let agenceIdToFilter: string | undefined;
+    if (filter.agenceId) {
+      agenceIdToFilter = filter.agenceId;
+    } else if (filter.agence) {
+      // Fallback: rechercher l'agenceId par nom
+      const [agenceRecord] = await db.select({ id: agences.id })
+        .from(agences)
+        .where(eq(agences.nom, filter.agence))
+        .limit(1);
+      if (agenceRecord) {
+        agenceIdToFilter = agenceRecord.id;
+      }
+    }
+
+    if (agenceIdToFilter) {
       const results = await db
         .select({
             ...getTableColumns(tontines),
@@ -129,8 +144,7 @@ export async function getAllTontines(filter: { agence?: string } = {}): Promise<
           eq(userAgences.isPrimary, true),
           eq(userAgences.actif, true)
         ))
-        .leftJoin(agences, eq(userAgences.agenceId, agences.id))
-        .where(eq(agences.nom, filter.agence))
+        .where(eq(userAgences.agenceId, agenceIdToFilter))
         .groupBy(tontines.id)
         .orderBy(desc(tontines.createdAt));
 

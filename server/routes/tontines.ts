@@ -26,25 +26,24 @@ import { db } from "../db";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 
 export function registerTontineRoutes(app: Express) {
-  app.get("/api/tontines", requireAuth, requireAgenceAccess(), async (req, res) => {
-      // req.agenceFilter est injecté par requireAgenceAccess
-      // Ex: { agence: "Siège" } ou null (admin)
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
+  app.get("/api/tontines", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
+      // req.agenceFilter est injecté par requireAgenceAccess avec l'agenceId
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
-      // On passe le filtre directement au storage qui l'applique en SQL (jointure gestionnaire)
-      const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+      // On passe le filtre directement au storage qui l'applique en SQL
+      const filter = agenceFilter ? { agenceId: agenceFilter.agenceId } : {};
       const tontines = await storage.getAllTontines(filter);
 
       res.json(addSnakeCaseAliasesDeep(tontines));
   });
 
   // Create tontine (roles: admin, chef, superviseur)
-  app.post("/api/tontines", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/tontines", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), requireAgenceAccess("agenceId"), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertTontineSchema.parse(data);
 
       // Le gestionnaire doit être de la même agence (sauf admin)
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
       if (agenceFilter && parsed.gestionnaireId) {
         // Architecture V3: User n'a plus de champ agence
@@ -67,13 +66,12 @@ export function registerTontineRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(tontine));
   });
 
-  app.get("/api/tontines/:id", requireAuth, requireAgenceAccess(), async (req, res) => {
+  app.get("/api/tontines/:id", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
       // Vérifier accès via gestionnaire
-      // Architecture V3: User n'a plus de champ agence
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       if (agenceFilter && tontine.gestionnaireId) {
         const gestionnaire = await storage.getUser(tontine.gestionnaireId);
         if (!gestionnaire) {

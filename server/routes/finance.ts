@@ -3142,9 +3142,9 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(facture));
   });
   // Caisse Transferts (Treasury)
-  app.get("/api/caisse-transferts", requireAuth, requireAgenceAccess(), async (req, res) => {
-    const agenceFilter = req.agenceFilter as { agence?: string } | null;
-    const transfers = await storage.getCaisseTransferts(agenceFilter?.agence);
+  app.get("/api/caisse-transferts", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
+    const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+    const transfers = await storage.getCaisseTransferts(agenceFilter?.agenceId);
     res.json(addSnakeCaseAliasesDeep(transfers));
   });
 
