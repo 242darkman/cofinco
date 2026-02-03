@@ -20,6 +20,9 @@ export interface SecurityCode {
   createdAt: string;
   active: boolean;
   createdBy?: string;
+  // Assigned user info
+  assignedToUserId?: string | null;
+  assignedUserName?: string | null;
 }
 
 /**

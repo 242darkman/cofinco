@@ -266,6 +266,26 @@ export interface TontineCycleStartedVars {
 }
 
 // ============================================================================
+// ACCESS CODES / CAISSE SECURITY
+// ============================================================================
+
+export interface AccessCodeGeneratedVars {
+  userName: string;
+  code: string;
+  validityHours: string;
+  authorizationHours: string;
+  codeType: string;
+  description?: string;
+}
+
+export interface AccessCodeExpiringVars {
+  userName: string;
+  code: string;
+  expiresAt: string;
+  timeRemaining: string;
+}
+
+// ============================================================================
 // OPERATIONS / SECURITY
 // ============================================================================
 
@@ -495,4 +515,6 @@ export type TemplateVariables =
   | TempPermissionGrantedVars
   | TempPermissionExpiringVars
   | TempPermissionExpiredVars
-  | TempPermissionRevokedVars;
+  | TempPermissionRevokedVars
+  | AccessCodeGeneratedVars
+  | AccessCodeExpiringVars;

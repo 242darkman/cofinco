@@ -39,6 +39,7 @@ export interface GenerateCodeParams {
   maxUsages?: number;
   expiresInHours?: number;
   authorizationDurationHours?: number;
+  assignedToUserId?: string;
 }
 
 export interface GenerateCodeResult {
@@ -134,6 +135,7 @@ export class SecurityCodeRotationService {
       maxUsages,
       expiresInHours,
       authorizationDurationHours = 4,
+      assignedToUserId,
     } = params;
 
     try {
@@ -174,6 +176,7 @@ export class SecurityCodeRotationService {
         authorizationDurationHours,
         createdBy,
         description,
+        agentId: assignedToUserId || null, // User assigned to receive this code
       }).returning();
 
       logger.info({

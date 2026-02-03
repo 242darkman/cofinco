@@ -51,6 +51,8 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
         maxUsages: formData.maxUsages || 1,
         authorizationDurationHours: formData.authorizationDurationHours || 4,
         description: formData.description || undefined,
+        assignedToUserId: formData.assignedToUserId || undefined,
+        sendNotification: formData.sendNotification ?? true,
       })
     });
     const data = await res.json();

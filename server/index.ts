@@ -37,6 +37,7 @@ import { startTreasuryReconciliationCron } from "./cron/treasury-reconciliation"
 import { startLateInstallmentsJob } from "./cron/late-installments-job";
 import { scheduleGlReconciliationMonitoring } from "./cron/gl-reconciliation-monitor";
 import { scheduleAutoFix } from "./cron/gl-auto-fix";
+import { startAccessCodeCleanupCron } from "./cron/access-code-cleanup";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -255,6 +256,7 @@ app.get("/api/health", async (_req, res) => {
   startBalanceReconciliationCron();
   startReconciliationReportCron();
   startTreasuryReconciliationCron();
+  startAccessCodeCleanupCron();
 
   // Start GL Reconciliation Monitoring (hourly check)
   scheduleGlReconciliationMonitoring(60);

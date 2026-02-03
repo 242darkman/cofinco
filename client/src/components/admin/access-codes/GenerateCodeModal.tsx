@@ -1,54 +1,192 @@
-import React, { useState } from 'react';
-import { Key, Copy, Check, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Key, Copy, Check, AlertTriangle, Info, ChevronRight, ChevronLeft,
+  User, Search, Send, Bell, Clock, Hash, Shield, Loader2, X
+} from 'lucide-react';
 import Modal from '@/components/ui/Modal';
-import FormField from '@/components/ui/FormField';
 import SelectField from '@/components/ui/SelectField';
 import Button from '@/components/ui/Button';
-import { User, GeneratedCodeResult } from './types';
+import { GeneratedCodeResult } from './types';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
+import { useQuery } from '@tanstack/react-query';
 
 interface GenerateCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  users: User[];
   onGenerate: (data: any) => Promise<GeneratedCodeResult>;
   generatedCode?: string | null;
 }
 
 type CodeType = 'EMERGENCY' | 'DAILY' | 'PERMANENT';
+type Step = 'type' | 'config' | 'recipient' | 'confirm';
 
-export default function GenerateCodeModal({ isOpen, onClose, users, onGenerate, generatedCode: externalCode }: GenerateCodeModalProps) {
-  // RBAC permissions
+interface UserResult {
+  id: string;
+  nom: string;
+  prenom: string;
+  email?: string;
+  telephone?: string;
+  role?: string;
+  agence?: string;
+  photoProfile?: string;
+}
+
+// Predefined options
+const VALIDITY_OPTIONS = [
+  { value: '1', label: '1 heure' },
+  { value: '2', label: '2 heures' },
+  { value: '4', label: '4 heures' },
+  { value: '8', label: '8 heures' },
+  { value: '12', label: '12 heures' },
+  { value: '24', label: '1 jour' },
+  { value: '48', label: '2 jours' },
+  { value: '72', label: '3 jours' },
+  { value: '168', label: '1 semaine' },
+  { value: '720', label: '30 jours' },
+];
+
+const MAX_USAGES_OPTIONS = [
+  { value: '1', label: '1 fois' },
+  { value: '2', label: '2 fois' },
+  { value: '3', label: '3 fois' },
+  { value: '5', label: '5 fois' },
+  { value: '10', label: '10 fois' },
+  { value: '20', label: '20 fois' },
+  { value: '50', label: '50 fois' },
+];
+
+const AUTH_DURATION_OPTIONS = [
+  { value: '1', label: '1 heure' },
+  { value: '2', label: '2 heures' },
+  { value: '4', label: '4 heures' },
+  { value: '8', label: '8 heures' },
+  { value: '12', label: '12 heures' },
+  { value: '24', label: '24 heures' },
+];
+
+const CODE_TYPE_DEFAULTS: Record<CodeType, { expiresInHours: number; maxUsages: number; authorizationDurationHours: number }> = {
+  EMERGENCY: { expiresInHours: 8, maxUsages: 1, authorizationDurationHours: 4 },
+  DAILY: { expiresInHours: 24, maxUsages: 5, authorizationDurationHours: 8 },
+  PERMANENT: { expiresInHours: 720, maxUsages: 50, authorizationDurationHours: 24 },
+};
+
+const CODE_TYPES: { type: CodeType; icon: string; title: string; subtitle: string; color: string }[] = [
+  {
+    type: 'EMERGENCY',
+    icon: '🚨',
+    title: 'Urgence',
+    subtitle: 'Usage unique, expiration rapide',
+    color: 'red'
+  },
+  {
+    type: 'DAILY',
+    icon: '📅',
+    title: 'Journalier',
+    subtitle: 'Réutilisable sur la journée',
+    color: 'blue'
+  },
+  {
+    type: 'PERMANENT',
+    icon: '🔑',
+    title: 'Permanent',
+    subtitle: 'Longue durée, multi-usage',
+    color: 'purple'
+  },
+];
+
+// Search users hook
+function useSearchUsers(query: string) {
+  return useQuery({
+    queryKey: ['search-users-for-code', query],
+    queryFn: async () => {
+      if (!query || query.length < 2) return [];
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}&limit=10`, {
+        credentials: 'include'
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.users || data || [];
+    },
+    enabled: query.length >= 2,
+    staleTime: 30000,
+  });
+}
+
+export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generatedCode: externalCode }: GenerateCodeModalProps) {
   const { hasPermission } = usePermissions();
   const canGenerateCodes = hasPermission('access_codes', 'create') || hasPermission('admin', 'manage');
 
+  // Steps
+  const [currentStep, setCurrentStep] = useState<Step>('type');
+
+  // Form data
   const [formData, setFormData] = useState({
     codeType: 'EMERGENCY' as CodeType,
     expiresInHours: 8,
     maxUsages: 1,
     authorizationDurationHours: 4,
-    description: ''
+    description: '',
+    assignedToUserId: null as string | null,
+    sendNotification: true,
   });
+
+  // User search
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserResult | null>(null);
+  const { data: searchResults, isLoading: searchLoading } = useSearchUsers(userSearch);
+
+  // State
   const [generating, setGenerating] = useState(false);
   const [internalCode, setInternalCode] = useState<string | null>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use external code if provided, otherwise use internal
   const generatedCode = externalCode ?? internalCode;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Update defaults when code type changes
+  useEffect(() => {
+    const defaults = CODE_TYPE_DEFAULTS[formData.codeType];
+    setFormData(prev => ({
+      ...prev,
+      ...defaults,
+    }));
+  }, [formData.codeType]);
+
+  // Reset on open
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep('type');
+      setFormData({
+        codeType: 'EMERGENCY',
+        expiresInHours: 8,
+        maxUsages: 1,
+        authorizationDurationHours: 4,
+        description: '',
+        assignedToUserId: null,
+        sendNotification: true,
+      });
+      setSelectedUser(null);
+      setUserSearch('');
+      setError(null);
+      setInternalCode(null);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
     setGenerating(true);
     setError(null);
     try {
-      const result = await onGenerate({
+      const dataToSend = {
         codeType: formData.codeType,
         expiresInHours: formData.expiresInHours,
-        maxUsages: formData.maxUsages,
+        maxUsages: formData.codeType === 'PERMANENT' ? null : formData.maxUsages,
         authorizationDurationHours: formData.authorizationDurationHours,
         description: formData.description || undefined,
-      });
+        assignedToUserId: formData.assignedToUserId,
+        sendNotification: formData.sendNotification && !!formData.assignedToUserId,
+      };
+
+      const result = await onGenerate(dataToSend);
       if (result && result.code) {
         setInternalCode(result.code);
       } else if (result && result.error) {
@@ -61,149 +199,462 @@ export default function GenerateCodeModal({ isOpen, onClose, users, onGenerate, 
     }
   };
 
-  const copyToClipboard = async (code: string) => {
-    await navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  const copyToClipboard = async () => {
+    if (!generatedCode) return;
+    await navigator.clipboard.writeText(generatedCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleClose = () => {
-    setInternalCode(null);
-    setError(null);
-    setFormData({
-      codeType: 'EMERGENCY',
-      expiresInHours: 8,
-      maxUsages: 1,
-      authorizationDurationHours: 4,
-      description: ''
-    });
     onClose();
   };
 
-  const codeTypeOptions = [
-    { value: 'EMERGENCY', label: 'Urgence (usage unique)' },
-    { value: 'DAILY', label: 'Journalier (usage quotidien)' },
-    { value: 'PERMANENT', label: 'Permanent (usage illimité)' }
+  const selectUser = (user: UserResult) => {
+    setSelectedUser(user);
+    setFormData(prev => ({ ...prev, assignedToUserId: user.id }));
+    setUserSearch('');
+  };
+
+  const clearSelectedUser = () => {
+    setSelectedUser(null);
+    setFormData(prev => ({ ...prev, assignedToUserId: null }));
+  };
+
+  const nextStep = () => {
+    const steps: Step[] = ['type', 'config', 'recipient', 'confirm'];
+    const idx = steps.indexOf(currentStep);
+    if (idx < steps.length - 1) setCurrentStep(steps[idx + 1]);
+  };
+
+  const prevStep = () => {
+    const steps: Step[] = ['type', 'config', 'recipient', 'confirm'];
+    const idx = steps.indexOf(currentStep);
+    if (idx > 0) setCurrentStep(steps[idx - 1]);
+  };
+
+  // Get labels for summary
+  const getValidityLabel = () => VALIDITY_OPTIONS.find(o => o.value === String(formData.expiresInHours))?.label || `${formData.expiresInHours}h`;
+  const getUsagesLabel = () => formData.codeType === 'PERMANENT' ? 'Illimité' : (MAX_USAGES_OPTIONS.find(o => o.value === String(formData.maxUsages))?.label || `${formData.maxUsages} fois`);
+  const getAuthLabel = () => AUTH_DURATION_OPTIONS.find(o => o.value === String(formData.authorizationDurationHours))?.label || `${formData.authorizationDurationHours}h`;
+
+  // Step indicator
+  const steps: { key: Step; label: string }[] = [
+    { key: 'type', label: 'Type' },
+    { key: 'config', label: 'Configuration' },
+    { key: 'recipient', label: 'Destinataire' },
+    { key: 'confirm', label: 'Confirmation' },
   ];
 
-  return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Générer un code d'accès">
-      {generatedCode ? (
-        <div className="space-y-6">
-          <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 rounded-xl p-6 text-center">
-            <p className="text-green-600 dark:text-green-400 mb-2">Code généré avec succès !</p>
-            <div className="flex items-center justify-center gap-3 my-4">
-              <span className="text-4xl font-mono font-bold text-slate-900 dark:text-white tracking-wider">
+  const currentStepIndex = steps.findIndex(s => s.key === currentStep);
+
+  // Success screen
+  if (generatedCode) {
+    return (
+      <Modal isOpen={isOpen} onClose={handleClose} title="">
+        <div className="text-center py-4">
+          {/* Success animation */}
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center animate-pulse">
+            <Check className="w-10 h-10 text-white" />
+          </div>
+
+          <h2 className="text-xl font-bold text-white mb-2">Code généré avec succès !</h2>
+
+          {selectedUser && (
+            <p className="text-slate-400 text-sm mb-4">
+              {formData.sendNotification ? 'Notification envoyée à ' : 'Assigné à '}
+              <span className="text-white font-medium">{selectedUser.prenom} {selectedUser.nom}</span>
+            </p>
+          )}
+
+          {/* Code display */}
+          <div className="my-6 p-4 bg-slate-800 rounded-xl">
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Code d'accès</p>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-3xl font-mono font-bold text-emerald-400 tracking-[0.3em]">
                 {generatedCode}
               </span>
               <button
-                onClick={() => copyToClipboard(generatedCode)}
-                className="p-2 bg-white/50 hover:bg-white/80 dark:bg-black/20 dark:hover:bg-black/40 rounded-lg transition-colors"
-                title="Copier"
+                onClick={copyToClipboard}
+                className={`p-2 rounded-lg transition-all ${copiedCode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400 hover:text-white'}`}
               >
-                {copiedCode === generatedCode ? (
-                  <Check className="w-6 h-6 text-green-600 dark:text-green-400" />
-                ) : (
-                  <Copy className="w-6 h-6 text-slate-700 dark:text-slate-300" />
-                )}
+                {copiedCode ? <Check size={18} /> : <Copy size={18} />}
               </button>
             </div>
-            <p className="text-amber-600 dark:text-yellow-400 text-sm flex items-center justify-center gap-2">
-              <AlertTriangle size={16} />
-              Ce code ne sera plus affiché. Conservez-le précieusement.
-            </p>
           </div>
-          <div className="flex justify-end">
-             <Button onClick={handleClose} variant="secondary">Fermer</Button>
+
+          {/* Warning */}
+          <div className="flex items-center justify-center gap-2 text-amber-400 text-sm mb-6">
+            <AlertTriangle size={16} />
+            <span>Ce code ne sera plus affiché. Notez-le maintenant.</span>
+          </div>
+
+          {/* Summary cards */}
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            <div className="bg-slate-800/50 rounded-lg p-3">
+              <Clock size={16} className="mx-auto text-slate-500 mb-1" />
+              <p className="text-xs text-slate-500">Validité</p>
+              <p className="text-sm font-medium text-white">{getValidityLabel()}</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-3">
+              <Hash size={16} className="mx-auto text-slate-500 mb-1" />
+              <p className="text-xs text-slate-500">Utilisations</p>
+              <p className="text-sm font-medium text-white">{getUsagesLabel()}</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-3">
+              <Shield size={16} className="mx-auto text-slate-500 mb-1" />
+              <p className="text-xs text-slate-500">Accès</p>
+              <p className="text-sm font-medium text-white">{getAuthLabel()}</p>
+            </div>
+          </div>
+
+          <Button onClick={handleClose} variant="primary" className="w-full">
+            Fermer
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title="Nouveau code d'accès" size="lg">
+      {/* Step indicator */}
+      <div className="flex items-center justify-between mb-6 px-2">
+        {steps.map((step, idx) => (
+          <React.Fragment key={step.key}>
+            <div className="flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                idx < currentStepIndex ? 'bg-emerald-500 text-white' :
+                idx === currentStepIndex ? 'bg-blue-500 text-white' :
+                'bg-slate-700 text-slate-400'
+              }`}>
+                {idx < currentStepIndex ? <Check size={16} /> : idx + 1}
+              </div>
+              <span className={`text-[10px] mt-1 ${idx === currentStepIndex ? 'text-blue-400' : 'text-slate-500'}`}>
+                {step.label}
+              </span>
+            </div>
+            {idx < steps.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-2 ${idx < currentStepIndex ? 'bg-emerald-500' : 'bg-slate-700'}`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Step 1: Type Selection */}
+      {currentStep === 'type' && (
+        <div className="space-y-4">
+          <p className="text-slate-400 text-sm">Sélectionnez le type de code adapté à votre besoin</p>
+
+          <div className="space-y-3">
+            {CODE_TYPES.map(({ type, icon, title, subtitle, color }) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, codeType: type }))}
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-4 ${
+                  formData.codeType === type
+                    ? `border-${color}-500 bg-${color}-500/10`
+                    : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                }`}
+              >
+                <span className="text-3xl">{icon}</span>
+                <div className="flex-1">
+                  <p className={`font-semibold ${formData.codeType === type ? `text-${color}-400` : 'text-white'}`}>
+                    {title}
+                  </p>
+                  <p className="text-sm text-slate-400">{subtitle}</p>
+                </div>
+                {formData.codeType === type && (
+                  <div className={`w-6 h-6 rounded-full bg-${color}-500 flex items-center justify-center`}>
+                    <Check size={14} className="text-white" />
+                  </div>
+                )}
+              </button>
+            ))}
           </div>
         </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 rounded-lg p-3 text-red-600 dark:text-red-400 text-sm">
-              {error}
+      )}
+
+      {/* Step 2: Configuration */}
+      {currentStep === 'config' && (
+        <div className="space-y-4">
+          <p className="text-slate-400 text-sm">Configurez les paramètres du code</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <SelectField
+              label="Validité du code"
+              name="expiresInHours"
+              value={String(formData.expiresInHours)}
+              onChange={(e) => setFormData(prev => ({ ...prev, expiresInHours: parseInt(e.target.value) }))}
+              options={VALIDITY_OPTIONS}
+            />
+
+            {formData.codeType !== 'PERMANENT' && (
+              <SelectField
+                label="Nombre d'utilisations"
+                name="maxUsages"
+                value={String(formData.maxUsages)}
+                onChange={(e) => setFormData(prev => ({ ...prev, maxUsages: parseInt(e.target.value) }))}
+                options={MAX_USAGES_OPTIONS}
+              />
+            )}
+          </div>
+
+          <SelectField
+            label="Durée d'accès après validation"
+            name="authorizationDurationHours"
+            value={String(formData.authorizationDurationHours)}
+            onChange={(e) => setFormData(prev => ({ ...prev, authorizationDurationHours: parseInt(e.target.value) }))}
+            options={AUTH_DURATION_OPTIONS}
+          />
+
+          {/* Info box */}
+          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex gap-3">
+            <Info size={18} className="text-blue-400 shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-300">
+              <p className="font-medium mb-1">Comment ça fonctionne</p>
+              <ul className="text-xs text-blue-300/80 space-y-1">
+                <li>• Le code peut être utilisé pendant <strong>{getValidityLabel()}</strong></li>
+                <li>• Chaque validation donne <strong>{getAuthLabel()}</strong> d'accès à la caisse</li>
+                {formData.codeType !== 'PERMANENT' && (
+                  <li>• Le code peut être validé <strong>{getUsagesLabel()}</strong></li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Recipient */}
+      {currentStep === 'recipient' && (
+        <div className="space-y-4">
+          <p className="text-slate-400 text-sm">Assignez le code à un utilisateur (optionnel)</p>
+
+          {/* Selected user display */}
+          {selectedUser ? (
+            <div className="p-4 bg-slate-800 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                  {selectedUser.prenom?.[0]}{selectedUser.nom?.[0]}
+                </div>
+                <div>
+                  <p className="font-medium text-white">{selectedUser.prenom} {selectedUser.nom}</p>
+                  <p className="text-sm text-slate-400">{selectedUser.role} {selectedUser.agence ? `• ${selectedUser.agence}` : ''}</p>
+                </div>
+              </div>
+              <button
+                onClick={clearSelectedUser}
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Rechercher par nom, email..."
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                />
+                {searchLoading && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 animate-spin" size={18} />
+                )}
+              </div>
+
+              {/* Search results */}
+              {searchResults && searchResults.length > 0 && (
+                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-700 divide-y divide-slate-700">
+                  {searchResults.map((user: UserResult) => (
+                    <button
+                      key={user.id}
+                      onClick={() => selectUser(user)}
+                      className="w-full p-3 flex items-center gap-3 hover:bg-slate-800 transition-colors text-left"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-medium">
+                        {user.prenom?.[0]}{user.nom?.[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{user.prenom} {user.nom}</p>
+                        <p className="text-xs text-slate-400 truncate">{user.email || user.role}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {userSearch.length >= 2 && searchResults?.length === 0 && !searchLoading && (
+                <p className="text-center text-slate-500 py-4">Aucun utilisateur trouvé</p>
+              )}
+            </>
+          )}
+
+          {/* Notification option */}
+          {selectedUser && (
+            <label className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-xl cursor-pointer hover:bg-slate-800 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.sendNotification}
+                onChange={(e) => setFormData(prev => ({ ...prev, sendNotification: e.target.checked }))}
+                className="w-5 h-5 rounded border-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-slate-700"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Bell size={16} className="text-blue-400" />
+                  <span className="font-medium text-white">Envoyer une notification</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Le bénéficiaire recevra le code par notification push
+                </p>
+              </div>
+            </label>
+          )}
+
+          {/* Skip option */}
+          {!selectedUser && (
+            <div className="text-center py-2">
+              <button
+                type="button"
+                onClick={nextStep}
+                className="text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Continuer sans assigner →
+              </button>
             </div>
           )}
 
-          <SelectField
-            label="Type de code"
-            name="codeType"
-            value={formData.codeType}
-            onChange={(e) => setFormData({ ...formData, codeType: e.target.value as CodeType })}
-            options={codeTypeOptions}
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Validité du code (heures)" name="expiresInHours">
-              <input
-                type="number"
-                min="1"
-                max="720"
-                name="expiresInHours"
-                value={formData.expiresInHours}
-                onChange={(e) => setFormData({ ...formData, expiresInHours: parseInt(e.target.value) || 8 })}
-                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-slate-500 mt-1">Durée pendant laquelle le code peut être utilisé</p>
-            </FormField>
-
-            <FormField label="Utilisations max" name="maxUsages">
-              <input
-                type="number"
-                min="1"
-                name="maxUsages"
-                value={formData.maxUsages}
-                onChange={(e) => setFormData({ ...formData, maxUsages: parseInt(e.target.value) || 1 })}
-                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-slate-500 mt-1">Nombre de fois que le code peut être validé</p>
-            </FormField>
-          </div>
-
-          <FormField label="Durée d'autorisation (heures)" name="authorizationDurationHours">
-            <input
-              type="number"
-              min="1"
-              max="24"
-              name="authorizationDurationHours"
-              value={formData.authorizationDurationHours}
-              onChange={(e) => setFormData({ ...formData, authorizationDurationHours: parseInt(e.target.value) || 4 })}
-              className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-slate-500 mt-1">Durée d'accès à la caisse après validation du code</p>
-          </FormField>
-
-          <FormField label="Description (optionnel)" name="description">
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Motif (optionnel)
+            </label>
             <input
               type="text"
-              name="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Raison de la génération, agent concerné..."
-              className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Ex: Clôture mensuelle, Inventaire..."
+              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
             />
-          </FormField>
-
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
-            <p>
-              Le code généré permettra à l'utilisateur qui le valide d'accéder à la caisse
-              pendant <strong>{formData.authorizationDurationHours}h</strong>.
-            </p>
           </div>
+        </div>
+      )}
 
-          <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="ghost" onClick={handleClose}>Annuler</Button>
-            {canGenerateCodes ? (
-              <Button type="submit" variant="primary" icon={Key} isLoading={generating}>
-                Générer le code
-              </Button>
-            ) : (
-              <div className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm">
-                Permission requise
+      {/* Step 4: Confirmation */}
+      {currentStep === 'confirm' && (
+        <div className="space-y-4">
+          <p className="text-slate-400 text-sm">Vérifiez les informations avant de générer le code</p>
+
+          {/* Summary card */}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl overflow-hidden">
+            {/* Type header */}
+            <div className={`p-4 ${
+              formData.codeType === 'EMERGENCY' ? 'bg-red-500/10' :
+              formData.codeType === 'DAILY' ? 'bg-blue-500/10' :
+              'bg-purple-500/10'
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">
+                  {CODE_TYPES.find(t => t.type === formData.codeType)?.icon}
+                </span>
+                <div>
+                  <p className="font-semibold text-white">
+                    Code {CODE_TYPES.find(t => t.type === formData.codeType)?.title}
+                  </p>
+                  {formData.description && (
+                    <p className="text-sm text-slate-400">{formData.description}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Details grid */}
+            <div className="p-4 grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <Clock size={20} className="mx-auto text-slate-500 mb-2" />
+                <p className="text-xs text-slate-500 uppercase">Validité</p>
+                <p className="text-sm font-semibold text-white mt-1">{getValidityLabel()}</p>
+              </div>
+              <div className="text-center">
+                <Hash size={20} className="mx-auto text-slate-500 mb-2" />
+                <p className="text-xs text-slate-500 uppercase">Utilisations</p>
+                <p className="text-sm font-semibold text-white mt-1">{getUsagesLabel()}</p>
+              </div>
+              <div className="text-center">
+                <Shield size={20} className="mx-auto text-slate-500 mb-2" />
+                <p className="text-xs text-slate-500 uppercase">Accès/session</p>
+                <p className="text-sm font-semibold text-white mt-1">{getAuthLabel()}</p>
+              </div>
+            </div>
+
+            {/* Recipient */}
+            {selectedUser && (
+              <div className="px-4 pb-4">
+                <div className="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
+                  <User size={18} className="text-slate-500" />
+                  <div className="flex-1">
+                    <p className="text-sm text-white">{selectedUser.prenom} {selectedUser.nom}</p>
+                    <p className="text-xs text-slate-400">
+                      {formData.sendNotification ? '📲 Notification activée' : 'Sans notification'}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        </form>
+
+          {/* Generate button */}
+          {canGenerateCodes ? (
+            <Button
+              onClick={handleSubmit}
+              variant="primary"
+              icon={generating ? Loader2 : Key}
+              isLoading={generating}
+              className="w-full py-3"
+            >
+              {generating ? 'Génération...' : 'Générer le code'}
+            </Button>
+          ) : (
+            <div className="text-center p-4 bg-amber-500/10 rounded-xl text-amber-400">
+              Permission requise pour générer des codes
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Navigation buttons */}
+      {!generatedCode && (
+        <div className="flex justify-between mt-6 pt-4 border-t border-slate-800">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={currentStep === 'type' ? handleClose : prevStep}
+            icon={currentStep === 'type' ? X : ChevronLeft}
+          >
+            {currentStep === 'type' ? 'Annuler' : 'Retour'}
+          </Button>
+
+          {currentStep !== 'confirm' && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={nextStep}
+            >
+              Suivant
+              <ChevronRight size={16} className="ml-1" />
+            </Button>
+          )}
+        </div>
       )}
     </Modal>
   );

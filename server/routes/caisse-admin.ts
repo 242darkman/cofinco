@@ -15,9 +15,9 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { db } from "../db";
-import { sessionsCaisseAuditLogs, denominationTemplates, caisses } from "@shared/schema/finance";
+import { sessionsCaisseAuditLogs, denominationTemplates, caisses, caisseSecurityCodes } from "@shared/schema/finance";
 import { users } from "@shared/schema";
-import { eq, desc, and, gte, lte, sql, count } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, count, isNull, or } from "drizzle-orm";
 
 export const caisseAdminRouter = Router();
 
@@ -1349,6 +1349,8 @@ const generateCodeSchema = z.object({
   maxUsages: z.number().int().min(1).optional(),
   expiresInHours: z.number().int().min(1).optional(),
   authorizationDurationHours: z.number().int().min(1).max(24).optional(),
+  assignedToUserId: z.string().uuid().optional(),
+  sendNotification: z.boolean().optional(),
 });
 
 const validateCodeSchema = z.object({
@@ -1368,7 +1370,7 @@ const rotationPolicySchema = z.object({
 
 /**
  * GET /api/caisses/security-codes
- * Liste les codes de sécurité actifs pour une agence/caisse
+ * Liste tous les codes de sécurité pour une agence/caisse (actifs et inactifs)
  */
 caisseAdminRouter.get(
   "/security-codes",
@@ -1377,28 +1379,47 @@ caisseAdminRouter.get(
     try {
       const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
       const caisseId = req.query.caisseId as string | undefined;
+      const activeOnly = req.query.activeOnly === 'true';
 
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      // Build conditions
+      const conditions = [];
 
-      const codes = await securityCodeRotationService.getActiveCodes(agenceId, caisseId);
+      if (caisseId) {
+        conditions.push(eq(caisseSecurityCodes.caisseId, caisseId));
+      } else if (agenceId) {
+        conditions.push(eq(caisseSecurityCodes.agenceId, agenceId));
+      }
 
-      // Ne pas exposer le hash du code
-      const safeCodes = codes.map(c => ({
-        id: c.id,
-        codeType: c.codeType,
-        agenceId: c.agenceId,
-        caisseId: c.caisseId,
-        active: c.active,
-        expiresAt: c.expiresAt,
-        maxUsages: c.maxUsages,
-        usageCount: c.usageCount,
-        authorizationDurationHours: c.authorizationDurationHours,
-        description: c.description,
-        createdBy: c.createdBy,
-        createdAt: c.createdAt,
-      }));
+      if (activeOnly) {
+        conditions.push(eq(caisseSecurityCodes.active, true));
+      }
 
-      res.json(safeCodes);
+      // Query with user join
+      const codes = await db
+        .select({
+          id: caisseSecurityCodes.id,
+          codeType: caisseSecurityCodes.codeType,
+          agenceId: caisseSecurityCodes.agenceId,
+          caisseId: caisseSecurityCodes.caisseId,
+          active: caisseSecurityCodes.active,
+          expiresAt: caisseSecurityCodes.expiresAt,
+          maxUsages: caisseSecurityCodes.maxUsages,
+          usageCount: caisseSecurityCodes.usageCount,
+          authorizationDurationHours: caisseSecurityCodes.authorizationDurationHours,
+          description: caisseSecurityCodes.description,
+          createdBy: caisseSecurityCodes.createdBy,
+          createdAt: caisseSecurityCodes.createdAt,
+          assignedToUserId: caisseSecurityCodes.agentId,
+          // Joined user info
+          assignedUserName: sql<string>`CONCAT(${users.prenom}, ' ', ${users.nom})`.as('assignedUserName'),
+        })
+        .from(caisseSecurityCodes)
+        .leftJoin(users, eq(caisseSecurityCodes.agentId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(caisseSecurityCodes.createdAt))
+        .limit(100); // Limiter pour éviter les surcharges
+
+      res.json(codes);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur récupération codes sécurité');
       res.status(500).json({ error: error.message || "Erreur interne" });
@@ -1424,10 +1445,27 @@ caisseAdminRouter.post(
       }
 
       const userId = req.session.user!.id;
+      const userAgenceId = req.session.user!.agenceId;
       const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+
+      // Déterminer l'agenceId cible
+      let targetAgenceId = validation.data.agenceId || userAgenceId;
+
+      // Si un utilisateur est assigné, utiliser son agenceId (sauf si agenceId explicite)
+      if (validation.data.assignedToUserId && !validation.data.agenceId) {
+        const [assignedUser] = await db.select({ agenceId: users.agenceId })
+          .from(users)
+          .where(eq(users.id, validation.data.assignedToUserId))
+          .limit(1);
+
+        if (assignedUser?.agenceId) {
+          targetAgenceId = assignedUser.agenceId;
+        }
+      }
 
       const result = await securityCodeRotationService.generateCode({
         ...validation.data,
+        agenceId: targetAgenceId,
         createdBy: userId,
       });
 

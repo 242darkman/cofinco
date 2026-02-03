@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Ban, Key, Clock, Hash, Shield } from 'lucide-react';
+import { Plus, Ban, Key, Clock, Hash, Shield, User as UserIcon } from 'lucide-react';
 import { Card, Button, Badge, EmptyState, ConfirmDialog } from '@/components/ui';
 import GenerateCodeModal from './GenerateCodeModal';
 import { SecurityCode, User, GeneratedCodeResult } from './types';
@@ -95,7 +95,6 @@ export default function AccessCodeManager({ codes, users, onRefresh, onRevoke, o
       <GenerateCodeModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        users={users}
         onGenerate={handleGenerateCode}
         generatedCode={generatedCode}
       />
@@ -194,6 +193,12 @@ export default function AccessCodeManager({ codes, users, onRefresh, onRevoke, o
                 <span>
                   Durée auth: <span className="text-slate-300">{code.authorizationDurationHours}h</span>
                 </span>
+                {code.assignedUserName && (
+                  <span className="flex items-center gap-1">
+                    <UserIcon size={10} />
+                    Assigné à: <span className="text-emerald-400">{code.assignedUserName}</span>
+                  </span>
+                )}
                 {code.description && (
                   <span className="w-full mt-1">
                     Note: <span className="text-slate-300">{code.description}</span>

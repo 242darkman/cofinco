@@ -4698,10 +4698,96 @@ export function registerFinanceRoutes(app: Express) {
         authorizationDurationHours: data.authorizationDurationHours ?? 4,
         expiresAt,
         description: data.description,
+        assignedToUserId: data.assignedToUserId,
       });
 
       if (!result.success) {
         return res.status(500).json({ error: result.error });
+      }
+
+      // Send notifications to assigned user if requested
+      if (data.sendNotification && data.assignedToUserId && result.code) {
+        try {
+          // Get user info for notifications
+          const [assignedUser] = await db.select({
+            id: schema.users.id,
+            nom: schema.users.nom,
+            prenom: schema.users.prenom,
+            email: schema.users.email,
+            telephone: schema.users.telephone,
+          }).from(schema.users).where(eq(schema.users.id, data.assignedToUserId));
+
+          if (assignedUser) {
+            const validityLabel = data.expiresInHours ? `${data.expiresInHours}h` : '24h';
+            const authLabel = data.authorizationDurationHours ? `${data.authorizationDurationHours}h` : '4h';
+            const userName = `${assignedUser.prenom || ''} ${assignedUser.nom || ''}`.trim();
+            const codeTypeLabels: Record<string, string> = {
+              EMERGENCY: 'Urgence',
+              DAILY: 'Journalier',
+              PERMANENT: 'Permanent',
+            };
+
+            // Send push notification
+            const { sendPushToUser } = await import('../services/push-notification-service');
+            await sendPushToUser(data.assignedToUserId, {
+              title: '🔑 Code d\'accès caisse',
+              body: `Votre code: ${result.code} (valide ${validityLabel})`,
+              data: {
+                type: 'access_code',
+                code: result.code,
+                expiresAt: expiresAt?.toISOString(),
+              },
+            });
+
+            // Send SMS and Email via notification service
+            const { emitNotificationEvent, sendInAppNotification } = await import('../services/notifications/notification-service');
+
+            const notificationPayload = {
+              userName,
+              code: result.code,
+              validityHours: validityLabel,
+              authorizationHours: authLabel,
+              codeType: codeTypeLabels[data.codeType] || data.codeType,
+              description: data.description || '',
+            };
+
+            await emitNotificationEvent(
+              'ACCESS_CODE_GENERATED',
+              { codeId: result.codeId, assignedTo: data.assignedToUserId },
+              {
+                smsRecipients: assignedUser.telephone ? [{
+                  phone: assignedUser.telephone,
+                  templateCode: 'ACCESS_CODE_GENERATED',
+                  payload: notificationPayload,
+                  userId: assignedUser.id,
+                  agenceId,
+                }] : undefined,
+                emailRecipients: assignedUser.email ? [{
+                  email: assignedUser.email,
+                  templateCode: 'ACCESS_CODE_GENERATED',
+                  payload: notificationPayload,
+                  userId: assignedUser.id,
+                  agenceId,
+                }] : undefined,
+                inAppRecipients: [{
+                  userId: assignedUser.id,
+                  type: 'ACCESS_CODE',
+                  titre: '🔑 Code d\'accès caisse',
+                  message: `Code: ${result.code} - Valide ${validityLabel}, donne ${authLabel} d'accès`,
+                  priorite: 'HIGH',
+                  referenceId: result.codeId,
+                  referenceType: 'caisse_security_code',
+                  expiresAt,
+                }],
+              }
+            );
+
+            logger.info({ userId: data.assignedToUserId, channels: ['push', 'sms', 'email', 'in_app'] }, 'Access code notifications sent');
+          }
+        } catch (notifErr) {
+          // Don't fail the request if notification fails
+          logger.warn({ err: notifErr, userId: data.assignedToUserId }, 'Failed to send access code notifications');
+        }
       }
 
       await logAudit(
@@ -4714,6 +4800,8 @@ export function registerFinanceRoutes(app: Express) {
           caisseId: data.caisseId,
           codeType: data.codeType,
           maxUsages: data.maxUsages,
+          assignedToUserId: data.assignedToUserId,
+          notificationSent: !!(data.sendNotification && data.assignedToUserId),
         },
         "success",
         "high"
@@ -4724,6 +4812,7 @@ export function registerFinanceRoutes(app: Express) {
         code: result.code, // Returned only at creation time
         codeId: result.codeId,
         expiresAt,
+        notificationSent: !!(data.sendNotification && data.assignedToUserId),
       }));
     } catch (error: any) {
       logger.error({ err: error }, 'Error generating access code');

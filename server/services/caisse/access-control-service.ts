@@ -57,6 +57,7 @@ interface GenerateCodeParams {
   authorizationDurationHours?: number;
   expiresAt?: Date;
   description?: string;
+  assignedToUserId?: string;
 }
 
 interface GenerateCodeResult {
@@ -379,6 +380,7 @@ export async function generateSecurityCodeForCaisse(params: GenerateCodeParams):
     authorizationDurationHours = 4,
     expiresAt,
     description,
+    assignedToUserId,
   } = params;
 
   // Generate a random 8-character code
@@ -400,6 +402,7 @@ export async function generateSecurityCodeForCaisse(params: GenerateCodeParams):
     expiresAt: codeExpiresAt,
     createdBy,
     description,
+    agentId: assignedToUserId, // Store assigned user in agentId field
     active: true,
   }).returning();
 
@@ -485,6 +488,106 @@ export async function getActiveCodesForAgence(agenceId: string) {
     ));
 }
 
+/**
+ * Cleanup expired security codes
+ * Deactivates codes that have expired or reached max usages
+ * Returns the number of codes cleaned up
+ */
+export async function cleanupExpiredCodes(): Promise<{ deactivated: number; deleted: number }> {
+  const now = new Date();
+  let deactivated = 0;
+  let deleted = 0;
+
+  // Get all active codes that are expired or fully used
+  const expiredCodes = await db
+    .select()
+    .from(caisseSecurityCodes)
+    .where(eq(caisseSecurityCodes.active, true));
+
+  for (const code of expiredCodes) {
+    const isExpired = code.expiresAt && code.expiresAt < now;
+    const isFullyUsed = code.maxUsages !== null && (code.usageCount || 0) >= code.maxUsages;
+
+    if (isExpired || isFullyUsed) {
+      await db.update(caisseSecurityCodes)
+        .set({ active: false })
+        .where(eq(caisseSecurityCodes.id, code.id));
+      deactivated++;
+    }
+  }
+
+  // Optionally delete very old inactive codes (older than 90 days)
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const oldCodes = await db
+    .select({ id: caisseSecurityCodes.id })
+    .from(caisseSecurityCodes)
+    .where(and(
+      eq(caisseSecurityCodes.active, false),
+      sql`${caisseSecurityCodes.createdAt} < ${ninetyDaysAgo}`
+    ));
+
+  if (oldCodes.length > 0) {
+    // First delete related usages
+    for (const code of oldCodes) {
+      await db.delete(caisseCodeUsages).where(eq(caisseCodeUsages.codeId, code.id));
+    }
+    // Then delete the codes
+    const result = await db.delete(caisseSecurityCodes)
+      .where(and(
+        eq(caisseSecurityCodes.active, false),
+        sql`${caisseSecurityCodes.createdAt} < ${ninetyDaysAgo}`
+      ));
+    deleted = oldCodes.length;
+  }
+
+  return { deactivated, deleted };
+}
+
+/**
+ * Cleanup expired user authorizations
+ * Marks expired authorizations and returns count
+ */
+export async function cleanupExpiredAuthorizations(): Promise<number> {
+  const now = new Date();
+
+  // Get count of expired but not-yet-marked authorizations
+  const expired = await db
+    .select({ id: caisseUserAuthorizations.id })
+    .from(caisseUserAuthorizations)
+    .where(and(
+      sql`${caisseUserAuthorizations.expiresAt} < ${now}`,
+      isNull(caisseUserAuthorizations.revokedAt)
+    ));
+
+  // We don't delete them, just let them naturally expire
+  // The checkUserAuthorization function already filters by expiresAt
+  return expired.length;
+}
+
+/**
+ * Get statistics about access codes for an agency
+ */
+export async function getAccessCodeStats(agenceId: string) {
+  const now = new Date();
+
+  const codes = await db
+    .select()
+    .from(caisseSecurityCodes)
+    .where(eq(caisseSecurityCodes.agenceId, agenceId));
+
+  const active = codes.filter(c => c.active && (!c.expiresAt || c.expiresAt > now));
+  const expired = codes.filter(c => c.expiresAt && c.expiresAt < now);
+  const fullyUsed = codes.filter(c => c.maxUsages !== null && (c.usageCount || 0) >= c.maxUsages);
+
+  return {
+    total: codes.length,
+    active: active.length,
+    expired: expired.length,
+    fullyUsed: fullyUsed.length,
+    revoked: codes.filter(c => !c.active).length,
+  };
+}
+
 export const accessControlService = {
   checkCaisseAccess,
   checkUserAuthorization,
@@ -494,4 +597,7 @@ export const accessControlService = {
   deactivateSecurityCode,
   getActiveAuthorizationsForAgence,
   getActiveCodesForAgence,
+  cleanupExpiredCodes,
+  cleanupExpiredAuthorizations,
+  getAccessCodeStats,
 };
