@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MessageSquare, Mail, Edit2, Eye, Save, X, Check, AlertTriangle,
-  Loader2, Search, ToggleLeft, ToggleRight, Code, FileText
+  Loader2, Search, ToggleLeft, ToggleRight, Code, FileText,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Button, Badge, FormField, Modal, TextareaField } from '../../ui';
 import { notificationTemplatesApi, SmsTemplate, EmailTemplate } from '../../../lib/api-client';
@@ -44,6 +45,11 @@ export default function NotificationTemplatesAdmin() {
     actif: true,
   });
 
+  // Pagination state
+  const [smsPage, setSmsPage] = useState(1);
+  const [emailPage, setEmailPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   // Fetch SMS templates
   const { data: smsTemplates = [], isLoading: loadingSms } = useQuery({
     queryKey: ['sms-templates'],
@@ -64,6 +70,30 @@ export default function NotificationTemplatesAdmin() {
     t.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
+
+  // Reset page when search term or tab changes
+  const currentPage = activeTab === 'sms' ? smsPage : emailPage;
+  const setCurrentPage = activeTab === 'sms' ? setSmsPage : setEmailPage;
+
+  // Reset page when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setSmsPage(1);
+    setEmailPage(1);
+  };
+
+  // Reset page when tab changes
+  const handleTabChange = (tab: TemplateType) => {
+    setActiveTab(tab);
+  };
+
+  // Paginated templates
+  const paginatedTemplates = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredTemplates.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredTemplates, currentPage]);
+
+  const totalPages = Math.ceil(filteredTemplates.length / ITEMS_PER_PAGE);
 
   const handleEdit = useCallback((template: SmsTemplate | EmailTemplate) => {
     setEditingTemplate(template);
@@ -163,7 +193,7 @@ export default function NotificationTemplatesAdmin() {
       {/* Tabs */}
       <div className="flex items-center gap-4 border-b border-slate-800">
         <button
-          onClick={() => setActiveTab('sms')}
+          onClick={() => handleTabChange('sms')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
             activeTab === 'sms'
               ? 'text-cyan-400 border-cyan-400'
@@ -174,7 +204,7 @@ export default function NotificationTemplatesAdmin() {
           SMS ({smsTemplates.length})
         </button>
         <button
-          onClick={() => setActiveTab('email')}
+          onClick={() => handleTabChange('email')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
             activeTab === 'email'
               ? 'text-blue-400 border-blue-400'
@@ -193,7 +223,7 @@ export default function NotificationTemplatesAdmin() {
           type="text"
           placeholder="Rechercher par code ou nom..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
         />
       </div>
@@ -210,7 +240,18 @@ export default function NotificationTemplatesAdmin() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredTemplates.map((template) => {
+          {/* Results count */}
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>
+              {filteredTemplates.length} template{filteredTemplates.length > 1 ? 's' : ''}
+              {searchTerm && ` pour "${searchTerm}"`}
+            </span>
+            <span>
+              Affichage {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredTemplates.length)} sur {filteredTemplates.length}
+            </span>
+          </div>
+
+          {paginatedTemplates.map((template) => {
             const placeholders = getPlaceholdersList(template.placeholders);
             const isSms = 'contenu' in template;
 
@@ -303,6 +344,56 @@ export default function NotificationTemplatesAdmin() {
               </div>
             );
           })}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+              <span className="text-xs text-slate-500">
+                Page {currentPage} sur {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-7 h-7 text-xs rounded ${
+                        currentPage === pageNum
+                          ? activeTab === 'sms' ? 'bg-cyan-600 text-white' : 'bg-blue-600 text-white'
+                          : 'hover:bg-slate-700/50 text-slate-400'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
