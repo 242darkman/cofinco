@@ -27,6 +27,7 @@ import {
   userAgences,
   agences,
   userRoles,
+  notifications,
   generateDMKey,
   truncateMessagePreview,
   createDMSchema,
@@ -395,6 +396,72 @@ export function registerConversationsRoutes(app: Express): void {
         return res.status(400).json({ message: "Invalid parameters", errors: error.errors });
       }
       res.status(500).json({ message: "Error fetching conversations" });
+    }
+  });
+
+  /**
+   * GET /api/v2/conversations/unread-count
+   * Retourne le nombre total de messages non lus
+   * IMPORTANT: Cette route DOIT être définie AVANT /api/v2/conversations/:id
+   */
+  app.get("/api/v2/conversations/unread-count", requireAuth, async (req, res) => {
+    try {
+      const authUser = getAuthUser(req);
+      if (!authUser) return res.status(401).json({ message: "Unauthorized" });
+
+      // Récupérer les participations de l'utilisateur avec leur lastReadAt
+      const participations = await db
+        .select({
+          conversationId: conversationParticipants.conversationId,
+          lastReadAt: conversationParticipants.lastReadAt,
+        })
+        .from(conversationParticipants)
+        .where(eq(conversationParticipants.userId, authUser.id));
+
+      if (participations.length === 0) {
+        return res.json({ totalUnread: 0, conversations: [] });
+      }
+
+      // Compter les messages non lus pour chaque conversation
+      const conversationsWithUnread: Array<{ id: string; unreadCount: number }> = [];
+      let totalUnread = 0;
+
+      for (const participation of participations) {
+        // Construire les conditions de requête
+        const conditions = [
+          eq(messagesV2.conversationId, participation.conversationId),
+          ne(messagesV2.senderId, authUser.id),
+          isNull(messagesV2.deletedAt),
+        ];
+
+        // Si lastReadAt existe, ne compter que les messages après cette date
+        if (participation.lastReadAt) {
+          conditions.push(gt(messagesV2.createdAt, participation.lastReadAt));
+        }
+
+        const result = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(messagesV2)
+          .where(and(...conditions));
+
+        const unreadCount = result[0]?.count ?? 0;
+
+        if (unreadCount > 0) {
+          totalUnread += unreadCount;
+          conversationsWithUnread.push({
+            id: participation.conversationId,
+            unreadCount,
+          });
+        }
+      }
+
+      res.json({
+        totalUnread,
+        conversations: conversationsWithUnread,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Error getting unread count');
+      res.status(500).json({ message: "Error getting unread count" });
     }
   });
 
@@ -1221,6 +1288,46 @@ export function registerConversationsRoutes(app: Express): void {
           conversationId,
           message: messageWithSender,
         });
+
+        // Créer des notifications pour tous les participants (sauf l'expéditeur)
+        const otherParticipantIds = participantIds.filter(id => id !== senderId);
+        if (otherParticipantIds.length > 0) {
+          const senderName = sender ? `${sender.nom}${sender.prenom ? ' ' + sender.prenom : ''}` : 'Utilisateur';
+          const preview = sanitizedContent ? sanitizedContent.substring(0, 50) : 'Nouveau message';
+
+          // Créer les notifications en batch
+          const notificationsToCreate = otherParticipantIds.map(userId => ({
+            userId,
+            type: 'message',
+            titre: `Message de ${senderName}`,
+            message: preview + (sanitizedContent && sanitizedContent.length > 50 ? '...' : ''),
+            lien: `/messages?conversation=${conversationId}`,
+            priorite: 'NORMAL',
+            referenceId: conversationId,
+            referenceType: 'conversation',
+          }));
+
+          try {
+            await db.insert(notifications).values(notificationsToCreate);
+
+            // Broadcast notification updates via WebSocket
+            const wsInstance = getWsInstance();
+            if (wsInstance) {
+              for (const participantId of otherParticipantIds) {
+                wsInstance.sendToUser(participantId, {
+                  type: 'NOTIFICATION',
+                  payload: {
+                    action: 'created',
+                    type: 'message',
+                  }
+                });
+              }
+            }
+          } catch (notifError) {
+            // Log but don't fail the request
+            logger.warn({ err: notifError }, 'Failed to create message notifications');
+          }
+        }
 
         res.status(201).json(messageWithSender);
       } catch (error) {

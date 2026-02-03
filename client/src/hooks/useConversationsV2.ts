@@ -476,6 +476,12 @@ export function useMarkAsReadV2() {
       queryClient.invalidateQueries({
         queryKey: ["/api/v2/conversations", conversationId],
       });
+      queryClient.invalidateQueries({ queryKey: ["unread-messages-count"] });
+
+      // Dispatch event for real-time badge update
+      window.dispatchEvent(new CustomEvent('messages-read', {
+        detail: { conversationId }
+      }));
     },
   });
 }

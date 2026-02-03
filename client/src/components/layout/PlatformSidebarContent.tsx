@@ -9,6 +9,7 @@ import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 import { usePermissionsContext } from '../../contexts/PermissionsContext';
 import { isAdminRole } from '@shared/types/roles';
 import { useOperationsBadge } from '../../hooks/useOperationsBadge';
+import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -39,6 +40,9 @@ export default function PlatformSidebarContent({
 
   // Use real-time operations badge hook
   const { pendingCount: pendingValidationsCount } = useOperationsBadge();
+
+  // Unread messages count for badge
+  const { totalUnread: unreadMessagesCount } = useUnreadMessagesCount();
 
   // Fetch Pending Refunds Count (Restitutions Frais)
   const fetchPendingRefundsCount = async () => {
@@ -304,6 +308,12 @@ export default function PlatformSidebarContent({
             {pendingRefundsCount}
           </div>
         )}
+        {/* Real-time Badge for Collapsed Sidebar - Messages */}
+        {!sidebarOpen && route.key === 'messages' && unreadMessagesCount > 0 && (
+          <div className="absolute top-1 right-2 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+            {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+          </div>
+        )}
 
         {sidebarOpen && (
           <>
@@ -318,6 +328,11 @@ export default function PlatformSidebarContent({
             {route.key === 'remboursements' && pendingRefundsCount > 0 && (
               <span className="bg-cyan-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingRefundsCount}
+              </span>
+            )}
+            {route.key === 'messages' && unreadMessagesCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+                {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
               </span>
             )}
             {isDisabled && (

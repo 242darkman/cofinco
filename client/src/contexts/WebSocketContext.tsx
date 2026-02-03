@@ -365,11 +365,20 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "CHAT_MESSAGE_V2": {
         const v2Msg = message.payload;
         queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["unread-messages-count"] });
         if (v2Msg.conversationId) {
           queryClient.invalidateQueries({ queryKey: ["v2", "conversations", v2Msg.conversationId, "messages"] });
         }
+        // Dispatch custom event for real-time badge updates and notification sound
         if (v2Msg.message?.senderId !== user?.id) {
-          toast.info(`Nouveau message reçu`);
+          window.dispatchEvent(new CustomEvent('new-message-received', {
+            detail: {
+              senderId: v2Msg.message?.senderId,
+              senderName: v2Msg.message?.sender?.nom || 'Utilisateur',
+              conversationId: v2Msg.conversationId,
+              preview: v2Msg.message?.content?.substring(0, 50) || 'Nouveau message'
+            }
+          }));
         }
         break;
       }

@@ -7,6 +7,7 @@ import IconButton from '../ui/IconButton';
 import Button from '../ui/Button';
 import ThemeToggle from '../ui/ThemeToggle';
 import UserProfileDropdown from './UserProfileDropdown';
+import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 
 interface PlatformHeaderProps {
   breadcrumbs: string[];
@@ -37,6 +38,7 @@ export default function PlatformHeader({
   user
 }: PlatformHeaderProps) {
   const { t } = useLanguage();
+  const { totalUnread } = useUnreadMessagesCount();
 
   return (
     <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
@@ -102,7 +104,11 @@ export default function PlatformHeader({
               icon={MessageCircle}
               aria-label="Messages"
             />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-status-success rounded-full animate-pulse pointer-events-none"></span>
+            {totalUnread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center pointer-events-none animate-in zoom-in duration-200 ring-2 ring-surface-elevated">
+                {totalUnread > 99 ? '99+' : totalUnread}
+              </span>
+            )}
           </div>
         </div>
 
