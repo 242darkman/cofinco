@@ -55,7 +55,7 @@ export default function AppShell({
   }, [isMobile, sidebarOpen]);
 
   return (
-    <div className="relative min-h-[100svh] w-full bg-surface-base text-content-primary overflow-x-hidden transition-colors duration-300">
+    <div className="relative h-[100svh] w-full bg-surface-base text-content-primary overflow-hidden transition-colors duration-300">
       {/* Mobile overlay */}
       <div
         className={`lg:hidden fixed inset-0 z-40 bg-black/50 dark:bg-black/60 backdrop-blur-[2px] transition-opacity duration-200 ${
@@ -83,36 +83,36 @@ export default function AppShell({
         </div>
       </aside>
 
-      {/* Main content wrapper */}
+      {/* Main content wrapper - uses flex to fill viewport */}
       <div
         className={[
-          'flex min-h-[100svh] flex-col',
+          'flex flex-col h-full',
           'ml-0',
           contentOffset,
           'transition-[margin] duration-300'
         ].join(' ')}
       >
-        {/* Sticky header */}
-        <header className="sticky top-0 z-30 border-b border-edge bg-surface-base/95 backdrop-blur supports-[backdrop-filter]:bg-surface-base/80 transition-colors duration-300">
+        {/* Fixed header */}
+        <header className="shrink-0 z-30 border-b border-edge bg-surface-base/95 backdrop-blur supports-[backdrop-filter]:bg-surface-base/80 transition-colors duration-300">
           <div className="px-4 py-2.5 sm:px-5 sm:py-3 lg:px-6">
             {header}
           </div>
         </header>
 
-        {/* Scroll container */}
+        {/* Scrollable content area - takes remaining space */}
         <main
           className={[
-            'flex-1 min-h-0 overflow-y-auto overscroll-contain bg-surface',
-            isMobile && hasBottomNav ? 'pb-24' : ''
+            'flex-1 min-h-0 flex flex-col overflow-y-auto overscroll-contain bg-surface',
+            isMobile && hasBottomNav ? 'pb-20' : ''
           ].join(' ')}
         >
-          {/* Content padding */}
-          <div className="px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+          {/* Content wrapper */}
+          <div className="flex-1 min-h-0 flex flex-col px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
             {children}
           </div>
 
           {/* Bottom safe-area spacing for iOS */}
-          <div className="h-[env(safe-area-inset-bottom)]" />
+          <div className="shrink-0 h-[env(safe-area-inset-bottom)]" />
         </main>
       </div>
 

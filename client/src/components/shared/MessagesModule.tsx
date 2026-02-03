@@ -338,7 +338,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
   const isSearchMode = searchQuery.length >= 2;
 
   return (
-    <div className="flex h-[calc(100vh-140px)] md:h-[calc(100vh-120px)] bg-slate-950 overflow-hidden text-white font-sans rounded-2xl border border-slate-800 shadow-2xl">
+    <div className="flex flex-1 min-h-0 bg-slate-950 overflow-hidden text-white font-sans rounded-2xl border border-slate-800 shadow-2xl">
 
       {/* 1. SIDEBAR */}
       <div className={`
