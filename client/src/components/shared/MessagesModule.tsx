@@ -669,7 +669,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                   </button>
                 </div>
               )}
-              <div className="flex items-end gap-3 max-w-4xl mx-auto w-full">
+              <div className="flex items-center gap-2 sm:gap-3 max-w-4xl mx-auto w-full">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -680,15 +680,15 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingFile}
-                  className="p-3 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors hidden sm:block disabled:opacity-50"
+                  className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50 shrink-0"
                 >
                   {uploadingFile ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
                 </button>
 
-                <div className="flex-1 bg-slate-950 border border-slate-700 rounded-xl flex items-center px-4 min-h-[48px] focus-within:border-indigo-500 transition-colors">
+                <div className="flex-1 bg-slate-950 border border-slate-700 rounded-xl flex items-center px-3 sm:px-4 h-11 sm:h-12 focus-within:border-indigo-500 transition-colors">
                   <textarea
                     placeholder="Écrire un message..."
-                    className="w-full bg-transparent border-none outline-none text-white text-sm resize-none py-3 max-h-32 placeholder:text-slate-600 custom-scrollbar"
+                    className="w-full bg-transparent border-none outline-none text-white text-sm resize-none py-2.5 max-h-32 placeholder:text-slate-600 custom-scrollbar leading-normal"
                     rows={1}
                     value={message}
                     onChange={handleInputChange}
@@ -698,11 +698,11 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                         handleSendMessage();
                       }
                     }}
-                    style={{ minHeight: '24px' }}
+                    style={{ minHeight: '20px' }}
                   />
                   <button
                     onClick={() => setShowReactionsFor(null)}
-                    className="ml-2 text-slate-500 hover:text-yellow-400 transition-colors hidden sm:block"
+                    className="ml-2 text-slate-500 hover:text-yellow-400 transition-colors shrink-0"
                   >
                     <Smile size={20} />
                   </button>
@@ -711,7 +711,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                 <button
                   onClick={handleSendMessage}
                   disabled={!message.trim() || sending}
-                  className="p-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl shadow-lg shadow-indigo-900/20 transition-transform active:scale-95"
+                  className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl shadow-lg shadow-indigo-900/20 transition-transform active:scale-95 shrink-0"
                 >
                   {sending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
                 </button>
