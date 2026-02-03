@@ -59,8 +59,8 @@ export function OfflineIndicator() {
       </button>
 
       {showDetails && (
-        <div className="absolute right-0 mt-3 z-50 animate-in slide-in-from-top-2 duration-200">
-          <Card className="w-80 shadow-2xl border-slate-700 bg-slate-900/95 backdrop-blur-md">
+        <div className="absolute left-0 mt-3 z-50 animate-in slide-in-from-top-2 duration-200">
+          <Card className="w-72 sm:w-80 shadow-2xl border-slate-700 bg-slate-900/95 backdrop-blur-md">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700">
               <h3 className="font-semibold text-white flex items-center gap-2">
                 {isOnline ? <Cloud className="text-cyan-400" size={18} /> : <CloudOff className="text-slate-400" size={18} />}

@@ -1229,18 +1229,18 @@ body.modal-open {
   }
 }
 
-/* ==================== MESSAGES SCROLLBAR - Ultra Thin & Elegant ==================== */
+/* ==================== MESSAGES SCROLLBAR - Ultra Thin & No Shift ==================== */
 .messages-scrollbar {
-  scrollbar-width: none; /* Firefox: hide by default */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
 .messages-scrollbar:hover {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
+  scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
 }
 
 .messages-scrollbar::-webkit-scrollbar {
-  width: 3px;
+  width: 2px; /* Always same width - no shift */
 }
 
 .messages-scrollbar::-webkit-scrollbar-track {
@@ -1253,11 +1253,7 @@ body.modal-open {
 }
 
 .messages-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.35);
-}
-
-.messages-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.4);
 }
 
 /* Sidebar conversations scrollbar */
