@@ -148,6 +148,7 @@ export const tontineKeys = {
 
 export const dashboardKeys = {
   stats: (role?: string, agenceId?: string) => ['dashboard-stats', role, agenceId] as const,
+  statsLight: (role?: string, agenceId?: string) => ['dashboard-stats-light', role, agenceId] as const,
   balanceHistory: (period: string, agenceId?: string) => ['balance-history', period, agenceId] as const,
   liveActivity: () => ['live-activity'] as const,
 };

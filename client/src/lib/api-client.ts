@@ -2499,6 +2499,8 @@ export const clientExtApi = {
 // Dashboard API
 export const dashboardApi = {
   getStats: () => request<any>('/dashboard/stats'),
+  // Lightweight stats for slow connections (3G) - ~5KB vs ~50KB
+  getStatsLight: () => request<any>('/dashboard/stats-light'),
   getBalanceHistory: (period: string = '30d') => request<any[]>(`/dashboard/balance-history?period=${period}`),
 };
 

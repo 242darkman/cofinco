@@ -52,62 +52,101 @@ export function registerClientRoutes(app: Express) {
 
   // CLIENTS ÉLIGIBLES AU CRÉDIT: Clients actifs avec un compte courant dans l'agence
   // MUST BE REGISTERED BEFORE /:id ROUTE TO AVOID COLLISIONS
+  // OPTIMISÉ: Single SQL query instead of N+1 pattern
   app.get("/api/clients/eligible-credit", requireAuth, requireAgenceIdAccess(), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-      const filter = agenceFilter || {};
-
-      // Récupérer tous les clients de l'agence
-      const allClients = await storage.getAllClients(filter);
-      const activeClients = allClients.filter(c => c.statut === StatutClient.ACTIVE);
-
-      // Pour chaque client, vérifier s'il a un compte courant actif dans l'agence
-      const eligibleClients = [];
-
-      for (const client of activeClients) {
-        const accounts = await getComptesByClient(client.id);
-
-        // Chercher un compte courant actif dans l'agence de la demande
-        const compteCourant = accounts.find((acc: any) => {
-          const isCompteCourant = acc.typeCompte === TypeCompte.CURRENT;
-          const isActif = acc.statut === StatutCompte.ACTIVE ;
-
-          // Vérifier l'agence du compte si un filtre agence est appliqué
-          if (agenceFilter?.agenceId) {
-            return isCompteCourant && isActif && acc.agenceId === agenceFilter.agenceId;
-          }
-          return isCompteCourant && isActif;
-        });
-
-        if (compteCourant) {
-          // 🛑 RÈGLE MICROFINANCE : Pas de crédit actif ni demande en cours
-          const credits = await getCreditsByClient(client.id);
-          const activeStatuts = [StatutCredit.ACTIVE, StatutCredit.LATE] as string[];
-          const hasActiveCredit = credits.some(c => activeStatuts.includes(c.statut));
-
-          const demandes = await getDemandesByClient(client.id);
-          const pendingStatuts = [StatutDemande.PENDING_FEES, StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.APPROVED] as string[];
-          const hasPendingDemand = demandes.some(d => d.statut && pendingStatuts.includes(d.statut));
-
-          if (!hasActiveCredit && !hasPendingDemand) {
-              eligibleClients.push({
-                ...client,
-                compteCourantId: compteCourant.id,
-                compteCourantNumero: compteCourant.numeroCompte,
-                compteCourantSolde: compteCourant.soldeCourant
-              });
-          }
-        }
-      }
-
       const { page, perPage, offset } = parsePagination(req.query);
+
+      // Build agence condition for compte courant
+      const agenceCondition = agenceFilter?.agenceId
+        ? sql`AND co.agence_id = ${agenceFilter.agenceId}`
+        : sql``;
+
+      const clientAgenceCondition = agenceFilter?.agenceId
+        ? sql`AND c.agence_id = ${agenceFilter.agenceId}`
+        : sql``;
+
+      // OPTIMIZED: Single SQL query that filters eligible clients directly
+      // Eligibility rules:
+      // 1. Client must be ACTIVE
+      // 2. Must have an active CURRENT account in the agency
+      // 3. Must NOT have an active credit (ACTIVE or LATE)
+      // 4. Must NOT have a pending demande
+      const results = await db.execute(sql`
+        SELECT
+          c.id,
+          c.agence_id,
+          c.numero_piece,
+          c.profession,
+          c.segment,
+          c.created_at,
+          u.nom,
+          u.prenom,
+          u.email,
+          u.telephone,
+          u.photo_profile,
+          u.statut,
+          a.nom as agence_nom,
+          co.id as compte_courant_id,
+          co.numero_compte as compte_courant_numero,
+          co.solde_courant as compte_courant_solde
+        FROM clients c
+        INNER JOIN users u ON c.user_id = u.id
+        LEFT JOIN agences a ON c.agence_id = a.id
+        -- Join with active current account (ensures client has one)
+        INNER JOIN comptes co ON co.client_id = c.id
+          AND co.type_compte = ${TypeCompte.CURRENT}
+          AND co.statut = ${StatutCompte.ACTIVE}
+          ${agenceCondition}
+        WHERE u.statut = ${StatutClient.ACTIVE}
+          ${clientAgenceCondition}
+          -- Exclude clients with active credits
+          AND NOT EXISTS (
+            SELECT 1 FROM credits cr
+            WHERE cr.client_id = c.id
+              AND cr.statut IN (${StatutCredit.ACTIVE}, ${StatutCredit.LATE})
+          )
+          -- Exclude clients with pending demandes
+          AND NOT EXISTS (
+            SELECT 1 FROM demandes_credit dc
+            WHERE dc.client_id = c.id
+              AND dc.statut IN (${StatutDemande.PENDING_FEES}, ${StatutDemande.READY_FOR_INVESTIGATION}, ${StatutDemande.UNDER_INVESTIGATION}, ${StatutDemande.APPROVED})
+          )
+        ORDER BY u.nom, u.prenom
+        LIMIT 500
+      `);
+
+      // Transform results to match expected format
+      const eligibleClients = results.rows.map((row: any) => ({
+        id: row.id,
+        agenceId: row.agence_id,
+        numeroPiece: row.numero_piece,
+        profession: row.profession,
+        segment: row.segment,
+        createdAt: row.created_at,
+        nom: row.nom,
+        prenom: row.prenom,
+        email: row.email,
+        telephone: row.telephone,
+        photoProfile: row.photo_profile,
+        statut: row.statut,
+        agence_nom: row.agence_nom,
+        compteCourantId: row.compte_courant_id,
+        compteCourantNumero: row.compte_courant_numero,
+        compteCourantSolde: row.compte_courant_solde,
+      }));
+
       const total = eligibleClients.length;
       const paged = eligibleClients.slice(offset, offset + perPage);
+
+      logger.debug({ total }, 'Eligible clients fetched (optimized)');
+
       res.json(
         paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
-          filters: filter,
+          filters: agenceFilter || {},
         })
       );
     } catch (error) {
@@ -141,119 +180,133 @@ export function registerClientRoutes(app: Express) {
     }
   });
 
-  // RECHERCHE : Filtrée par agence
+  // RECHERCHE : Filtrée par agence - OPTIMISÉ avec SQL (évite N+1)
   app.get("/api/clients/search", requireAuth, requireAgenceIdAccess(), async (req, res) => {
     try {
         const query = req.query.q as string;
         if (!query) return res.json([]);
 
         const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-        const filter = agenceFilter || {};
-
-        const clients = await storage.getAllClients(filter);
-        if (clients.length > 0) {
-            logger.debug({ keys: Object.keys(clients[0]), sample: clients[0] }, 'First client debug info');
-        }
-
-        const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-
-        const lowerQ = normalize(query);
-        // Split query into words for multi-term search (e.g., "nzaba joseph" -> ["nzaba", "joseph"])
-        const searchTerms = lowerQ.split(/\s+/).filter(Boolean);
-
-        const filtered = clients.filter(c => {
-            const nom = normalize(c.nom || '');
-            const prenom = normalize(c.prenom || '');
-            const email = (c.email || '').toLowerCase();
-            const telephone = c.telephone || '';
-            
-            if (searchTerms.length > 1) {
-                return searchTerms.every(term =>
-                    nom.includes(term) ||
-                    prenom.includes(term) ||
-                    email.includes(term) ||
-                    telephone.includes(term)
-                );
-            }
-
-            const fullName = `${nom} ${prenom}`;
-            const fullNameReverse = `${prenom} ${nom}`;
-            
-            return (
-                nom.includes(lowerQ) ||
-                prenom.includes(lowerQ) ||
-                fullName.includes(lowerQ) ||
-                fullNameReverse.includes(lowerQ) ||
-                email.includes(lowerQ) ||
-                telephone.includes(query)
-            );
-        });
-        
-        // Calculer l'éligibilité pour les résultats filtrés
-        const enrichedResults = [];
-        for (const client of filtered) {
-            let isEligible = true;
-            let ineligibilityReason = null;
-
-            // 1. Statut Client
-            if (client.statut !== StatutClient.ACTIVE) {
-                isEligible = false;
-                ineligibilityReason = "Client Inactif/Suspendu";
-            }
-
-            if (isEligible) {
-                // 2. Compte Courant
-                const accounts = await getComptesByClient(client.id);
-                const hasCompteCourant = accounts.some(acc =>
-                    acc.typeCompte === TypeCompte.CURRENT &&
-                    (acc.statut === StatutCompte.ACTIVE )
-                );
-                
-                if (!hasCompteCourant) {
-                    isEligible = false;
-                    ineligibilityReason = "Pas de Compte Courant Actif";
-                }
-            }
-
-            if (isEligible) {
-                // 3. Crédit en cours
-                const creditsList = await getCreditsByClient(client.id);
-                const activeCreditStatuts = [StatutCredit.ACTIVE, StatutCredit.LATE] as string[];
-                const activeCredit = creditsList.find(c =>
-                    activeCreditStatuts.includes(c.statut)
-                );
-
-                if (activeCredit) {
-                    isEligible = false;
-                    ineligibilityReason = "Crédit en cours";
-                }
-            }
-
-            if (isEligible) {
-                // 4. Demande en cours
-                const demandes = await getDemandesByClient(client.id);
-                const pendingDemandeStatuts = [StatutDemande.PENDING_FEES, StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.APPROVED] as string[];
-                const pendingDemand = demandes.find(d =>
-                    d.statut && pendingDemandeStatuts.includes(d.statut)
-                );
-
-                if (pendingDemand) {
-                    isEligible = false;
-                    ineligibilityReason = "Dossier déjà en cours";
-                }
-            }
-
-            enrichedResults.push({
-                ...client,
-                isEligible,
-                ineligibilityReason
-            });
-        }
-        
-        logger.debug({ count: enrichedResults.length }, 'Search results found (Enriched)');
         const { page, perPage, offset } = parsePagination(req.query);
+
+        // Normalize query for accent-insensitive search
+        const normalizedQuery = query.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        const searchPattern = `%${normalizedQuery}%`;
+
+        // Build agence condition
+        const agenceCondition = agenceFilter?.agenceId
+          ? sql`AND c.agence_id = ${agenceFilter.agenceId}`
+          : sql``;
+
+        // OPTIMIZED: Single SQL query with eligibility computed via subqueries
+        // This replaces the N+1 pattern (was 3 queries per client)
+        const results = await db.execute(sql`
+          WITH client_search AS (
+            SELECT
+              c.id,
+              c.agence_id,
+              c.numero_piece,
+              c.profession,
+              c.segment,
+              c.statut as client_statut,
+              c.created_at,
+              u.nom,
+              u.prenom,
+              u.email,
+              u.telephone,
+              u.photo_profile,
+              u.statut as user_statut,
+              a.nom as agence_nom
+            FROM clients c
+            LEFT JOIN users u ON c.user_id = u.id
+            LEFT JOIN agences a ON c.agence_id = a.id
+            WHERE (
+              LOWER(UNACCENT(COALESCE(u.nom, ''))) LIKE LOWER(UNACCENT(${searchPattern}))
+              OR LOWER(UNACCENT(COALESCE(u.prenom, ''))) LIKE LOWER(UNACCENT(${searchPattern}))
+              OR LOWER(COALESCE(u.email, '')) LIKE LOWER(${searchPattern})
+              OR u.telephone LIKE ${searchPattern}
+              OR LOWER(UNACCENT(COALESCE(u.nom, '') || ' ' || COALESCE(u.prenom, ''))) LIKE LOWER(UNACCENT(${searchPattern}))
+            )
+            ${agenceCondition}
+            ORDER BY u.nom, u.prenom
+            LIMIT 100
+          ),
+          eligibility AS (
+            SELECT
+              cs.id,
+              -- Check if client is active
+              CASE WHEN cs.user_statut = ${StatutClient.ACTIVE} THEN TRUE ELSE FALSE END as is_active,
+              -- Check if has active current account (EXISTS is faster than COUNT)
+              EXISTS (
+                SELECT 1 FROM comptes co
+                WHERE co.client_id = cs.id
+                  AND co.type_compte = ${TypeCompte.CURRENT}
+                  AND co.statut = ${StatutCompte.ACTIVE}
+              ) as has_compte_courant,
+              -- Check if has active credit
+              EXISTS (
+                SELECT 1 FROM credits cr
+                WHERE cr.client_id = cs.id
+                  AND cr.statut IN (${StatutCredit.ACTIVE}, ${StatutCredit.LATE})
+              ) as has_active_credit,
+              -- Check if has pending demande
+              EXISTS (
+                SELECT 1 FROM demandes_credit dc
+                WHERE dc.client_id = cs.id
+                  AND dc.statut IN (${StatutDemande.PENDING_FEES}, ${StatutDemande.READY_FOR_INVESTIGATION}, ${StatutDemande.UNDER_INVESTIGATION}, ${StatutDemande.APPROVED})
+              ) as has_pending_demande
+            FROM client_search cs
+          )
+          SELECT
+            cs.*,
+            e.is_active,
+            e.has_compte_courant,
+            e.has_active_credit,
+            e.has_pending_demande,
+            CASE
+              WHEN NOT e.is_active THEN FALSE
+              WHEN NOT e.has_compte_courant THEN FALSE
+              WHEN e.has_active_credit THEN FALSE
+              WHEN e.has_pending_demande THEN FALSE
+              ELSE TRUE
+            END as is_eligible,
+            CASE
+              WHEN NOT e.is_active THEN 'Client Inactif/Suspendu'
+              WHEN NOT e.has_compte_courant THEN 'Pas de Compte Courant Actif'
+              WHEN e.has_active_credit THEN 'Crédit en cours'
+              WHEN e.has_pending_demande THEN 'Dossier déjà en cours'
+              ELSE NULL
+            END as ineligibility_reason
+          FROM client_search cs
+          JOIN eligibility e ON cs.id = e.id
+          ORDER BY cs.nom, cs.prenom
+        `);
+
+        // Transform results to match expected format
+        const enrichedResults = results.rows.map((row: any) => ({
+          id: row.id,
+          agenceId: row.agence_id,
+          numeroPiece: row.numero_piece,
+          profession: row.profession,
+          segment: row.segment,
+          statut: row.user_statut,
+          createdAt: row.created_at,
+          nom: row.nom,
+          prenom: row.prenom,
+          email: row.email,
+          telephone: row.telephone,
+          photoProfile: row.photo_profile,
+          agence_nom: row.agence_nom,
+          isEligible: row.is_eligible,
+          ineligibilityReason: row.ineligibility_reason,
+        }));
+
+        // Paginate results
         const total = enrichedResults.length;
         const paged = enrichedResults.slice(offset, offset + perPage);
+
+        logger.debug({ count: total, query: normalizedQuery }, 'Optimized search results');
+
         res.json(
           paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
             path: `${req.baseUrl}${req.path}`,
@@ -262,6 +315,7 @@ export function registerClientRoutes(app: Express) {
           })
         );
     } catch (e) {
+        logger.error({ err: e }, 'Search failed');
         res.status(500).json({ message: "Search failed" });
     }
   });

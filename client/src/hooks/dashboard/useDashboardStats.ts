@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
 import { useAgence } from '../../contexts/AgenceContext';
 import { dashboardApi } from '../../lib/api-client';
 import { dashboardKeys } from '../../lib/query-keys';
@@ -26,8 +27,8 @@ export interface DashboardStats {
     totalAgents: number;
     sessionsOuvertes: number;
     tresorerieDispo: number;
-    encaisse: number; // NEW: Explicit field
-    par30: number;    // NEW: Backend calculated (Value based)
+    encaisse: number;
+    par30: number;
     liquidityRatio: number;
   };
   daily: {
@@ -54,24 +55,154 @@ export interface DashboardStats {
     monthlyCredits: number;
     monthlyGoal: number;
   };
+  // Flag for lightweight data
+  isLightweight?: boolean;
+}
+
+// Lightweight stats interface (from /api/dashboard/stats-light)
+interface LightweightStats {
+  kpis: {
+    totalClients: number;
+    clientsActifs: number;
+    totalCredits: number;
+    creditsEnCours: number;
+    creditsEnRetard: number;
+    encaisse: number;
+    par30: number;
+    liquidite: number;
+    sessionsOuvertes: number;
+  };
+  isLightweight: true;
+  timestamp: string;
+}
+
+/**
+ * Detect slow network connection (3G or worse)
+ * Returns true if connection is slow or unknown (conservative)
+ */
+function isSlowConnection(): boolean {
+  const connection = (navigator as any).connection;
+  if (!connection) return false; // Assume fast if API not available
+
+  const slowTypes = ['slow-2g', '2g', '3g'];
+  const effectiveType = connection.effectiveType;
+
+  // Also check saveData preference
+  if (connection.saveData) return true;
+
+  return slowTypes.includes(effectiveType);
+}
+
+/**
+ * Convert lightweight stats to full stats structure
+ * Fills in missing data with defaults/zeros
+ */
+function lightweightToFullStats(light: LightweightStats): DashboardStats {
+  return {
+    role: 'user',
+    global: {
+      totalClients: light.kpis.totalClients,
+      clientsActifs: light.kpis.clientsActifs,
+      totalCredits: light.kpis.totalCredits,
+      creditsEnCours: light.kpis.creditsEnCours,
+      creditsEnAttente: 0,
+      creditsRetard: light.kpis.creditsEnRetard,
+      montantCreditsTotal: 0,
+      montantDecaisse: 0,
+      montantRecouvre: 0,
+      montantEnAttente: 0,
+      tauxRecouvrement: 0,
+      totalEpargnes: 0,
+      epargneActive: 0,
+      montantEpargneTotal: 0,
+      tontinesActives: 0,
+      totalTontines: 0,
+      agentsActifs: 0,
+      totalAgents: 0,
+      sessionsOuvertes: light.kpis.sessionsOuvertes,
+      tresorerieDispo: light.kpis.encaisse,
+      encaisse: light.kpis.encaisse,
+      par30: light.kpis.par30,
+      liquidityRatio: light.kpis.liquidite,
+    },
+    daily: { nouveauxClients: 0, nouveauxCredits: 0 },
+    weekly: { nouveauxClients: 0, nouveauxCredits: 0 },
+    charts: {
+      monthlyGrowth: [],
+      weeklyActivity: [],
+      productSplit: [],
+      creditStatus: [],
+    },
+    widgets: {
+      recentActivity: [],
+      topClients: [],
+      upcomingPayments: [],
+      alerts: [],
+    },
+    objectives: { monthlyCredits: 0, monthlyGoal: 30 },
+    isLightweight: true,
+  };
 }
 
 export function useDashboardStats(userRole?: string) {
   const { selectedAgence } = useAgence();
-  
-  const { data: stats, isLoading: loading, error, refetch } = useQuery<DashboardStats>({
-    queryKey: dashboardKeys.stats(userRole, selectedAgence?.id),
-    queryFn: () => dashboardApi.getStats(),
-    // Smart Polling Strategy (Performance Optimized)
-    refetchInterval: 30_000, // 30s background polling (mobile-friendly)
-    refetchOnWindowFocus: true, // Auto-refresh when returning to tab
-    staleTime: 10_000, // Don't re-fetch if data is < 10s old
+  const queryClient = useQueryClient();
+
+  // Detect slow connection once
+  const isSlow = useMemo(() => isSlowConnection(), []);
+
+  // On slow connections: fetch lightweight stats first (fast initial load)
+  const { data: lightStats } = useQuery<LightweightStats>({
+    queryKey: dashboardKeys.statsLight(userRole, selectedAgence?.id),
+    queryFn: () => dashboardApi.getStatsLight(),
+    enabled: isSlow, // Only fetch on slow connections
+    staleTime: 60_000, // 1 minute - lightweight can be cached longer
+    gcTime: 5 * 60_000, // 5 minutes
   });
 
+  // Full stats query (always runs, but delayed on slow connections)
+  const { data: fullStats, isLoading: fullLoading, error, refetch } = useQuery<DashboardStats>({
+    queryKey: dashboardKeys.stats(userRole, selectedAgence?.id),
+    queryFn: () => dashboardApi.getStats(),
+    // On slow connections: longer stale time, no polling
+    staleTime: isSlow ? 60_000 : 10_000,
+    refetchInterval: isSlow ? false : 30_000, // Disable polling on 3G
+    refetchOnWindowFocus: !isSlow, // Don't auto-refresh on slow connections
+    // On slow connections with light stats: mark as not essential initially
+    ...(isSlow && lightStats ? { refetchOnMount: false } : {}),
+  });
+
+  // Prefetch full stats in background after lightweight loads
+  useEffect(() => {
+    if (isSlow && lightStats && !fullStats) {
+      // Wait a bit then prefetch full stats in background
+      const timer = setTimeout(() => {
+        queryClient.prefetchQuery({
+          queryKey: dashboardKeys.stats(userRole, selectedAgence?.id),
+          queryFn: () => dashboardApi.getStats(),
+        });
+      }, 2000); // 2s delay to let UI settle first
+
+      return () => clearTimeout(timer);
+    }
+  }, [isSlow, lightStats, fullStats, queryClient, userRole, selectedAgence?.id]);
+
+  // Use lightweight stats as fallback while full stats load
+  const stats = useMemo(() => {
+    if (fullStats) return fullStats;
+    if (lightStats) return lightweightToFullStats(lightStats);
+    return null;
+  }, [fullStats, lightStats]);
+
+  // Loading state: only true if we have neither stats
+  const loading = !stats && fullLoading;
+
   return {
-    stats: stats || null,
+    stats,
     loading,
     error: error ? (error as Error).message : null,
-    refresh: () => refetch()
+    refresh: () => refetch(),
+    isLightweight: stats?.isLightweight ?? false,
+    isSlow,
   };
 }

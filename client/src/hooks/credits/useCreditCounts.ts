@@ -22,12 +22,12 @@ export function useCreditCounts() {
       }
       return res.json();
     },
-    // Refresh every 15 seconds
-    refetchInterval: 15000,
+    // Refresh every 30 seconds (optimized for slow connections - was 15s)
+    refetchInterval: 30000,
     // Update immediately when user focuses the window
     refetchOnWindowFocus: true,
-    // Ensure we fetch immediately on mount even if we have cached data from a while ago
-    staleTime: 0,
+    // Data is considered fresh for 15s to reduce unnecessary requests
+    staleTime: 15000,
     refetchOnMount: true
   });
 

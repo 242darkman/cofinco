@@ -114,7 +114,7 @@ export default function CaisseHandoverPanel({
       if (!res.ok) throw new Error('Erreur');
       return res.json();
     },
-    refetchInterval: 10000, // Refresh toutes les 10s
+    refetchInterval: 30000, // 30s - optimized for slow connections (was 10s)
   });
 
   // Récupérer la liste des caissiers disponibles

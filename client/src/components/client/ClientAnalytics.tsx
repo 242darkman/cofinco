@@ -207,7 +207,8 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
       if (!res.ok) throw new Error('Failed to fetch analytics');
       return res.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 30000, // 30s - optimized for slow connections (was 5s)
+    staleTime: 15000,
   });
 
   // Fetch Period Comparison

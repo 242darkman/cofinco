@@ -238,9 +238,19 @@ export default defineConfig({
             return 'date-utils';
           }
 
-          // PDF/Excel generation
+          // PDF/Excel generation (lazy loaded on export only)
           if (id.includes('jspdf') || id.includes('xlsx') || id.includes('html2canvas')) {
             return 'export-tools';
+          }
+
+          // Face recognition (heavy, rarely used)
+          if (id.includes('@vladmandic/face-api') || id.includes('face-api')) {
+            return 'face-recognition';
+          }
+
+          // Dexie (IndexedDB wrapper - defer loading)
+          if (id.includes('dexie')) {
+            return 'offline-storage';
           }
 
           // Radix UI components

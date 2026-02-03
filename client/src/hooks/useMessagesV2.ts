@@ -108,7 +108,8 @@ export function useConversationsV2() {
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json();
     },
-    refetchInterval: 15000,
+    refetchInterval: 30000, // 30s - optimized for slow connections (was 15s)
+    staleTime: 15000,
     retry: false,
   });
 }

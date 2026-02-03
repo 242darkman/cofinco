@@ -143,13 +143,14 @@ export function TreasurySupervision() {
 
   const ITEMS_PER_PAGE = 12;
 
-  // 1. Global Data Poll (Real-time every 5s)
+  // 1. Global Data Poll - reduced from 5s to 30s for network efficiency
   const { data: _globalStats, isLoading: isGlobalLoading, refetch: refetchGlobal } = useQuery<TreasuryStats>({
     queryKey: ['treasury-supervision', period],
     queryFn: async (): Promise<TreasuryStats> => {
       return (await api.get(`/coffre/supervision?period=${period}`)) as TreasuryStats;
     },
-    refetchInterval: 5000,
+    refetchInterval: 30000, // 30s - optimized for slow connections
+    staleTime: 15000, // Consider data fresh for 15s
     placeholderData: keepPreviousData
   });
   const globalStats = _globalStats as TreasuryStats | undefined;
@@ -267,7 +268,8 @@ export function TreasurySupervision() {
        return (await api.get(`/coffre/supervision?historyFor=${ids}&period=${period}`)) as TreasuryStats;
     },
     enabled: selectedAgencies.length > 0,
-    refetchInterval: 5000
+    refetchInterval: 30000, // 30s - optimized for slow connections
+    staleTime: 15000
   });
 
   // --- Derived State & Helpers ---
