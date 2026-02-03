@@ -1,11 +1,21 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createLogger } from "../lib/logger";
-import { modules, permissions, rolePermissions, userPermissions, userRoles } from "@shared/schema";
+import {
+  modules,
+  permissions,
+  rolePermissions,
+  userPermissions,
+  userRoles,
+  isCriticalPermission,
+  bulkUserPermissionUpdateSchema,
+  toggleUserPermissionSchema,
+  type BulkUserPermissionUpdate,
+} from "@shared/schema";
 
 const logger = createLogger('Routes:RBAC');
 import { SystemRole, getRoleOptions, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { requireAuth } from "../auth";
-import { attachAbility, requireAbility } from "../authorization";
+import { attachAbility, requireAbility, requireAnyAbility } from "../authorization";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
 import { logAudit } from "../audit";
@@ -24,7 +34,30 @@ import {
   buildRbacUpdatePayload,
   getUserIdsWithRole,
 } from "../services/rbac-service";
+import {
+  logRbacChange,
+  logBulkRbacChange,
+  requiresReason,
+  validateReasonForCritical,
+  isReasonRequiredForCritical,
+  isScopedOverridesEnabled,
+  getAuditHistory,
+  explainPermission,
+  getEffectivePermissionsWithSource,
+  type AuditLogContext,
+} from "../services/rbac-audit-service";
 import { Actions, Subjects, type RbacUpdatePayload } from "@shared/ability";
+
+/**
+ * Helper to extract audit context from request
+ */
+function getAuditContext(req: Request): AuditLogContext {
+  return {
+    actorUserId: req.session?.user?.id || req.session?.userId || '',
+    actorIp: req.ip || req.socket?.remoteAddress,
+    actorUserAgent: req.headers['user-agent'],
+  };
+}
 
 /**
  * Broadcast RBAC update event with proper scoping
@@ -1107,161 +1140,218 @@ export function registerRbacRoutes(app: Express) {
    * Get permission overrides for a user - for "Exceptions" UI
    * Protected: requires rbac.view or admin
    */
-  app.get("/api/rbac/users/:userId/overrides", requireAuth, attachAbility, async (req, res) => {
-    try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.VIEW, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
+  app.get("/api/rbac/users/:userId/overrides",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
+        const overrides = await getUserPermissionOverrides(userId);
+        const version = await getRbacVersion();
 
-      const { userId } = req.params;
-      const overrides = await getUserPermissionOverrides(userId);
-      const version = await getRbacVersion();
-
-      res.json({
-        ...overrides,
-        version,
-      });
-    } catch (error: any) {
-      logger.error({ err: error }, 'Get user overrides error');
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ message: error.message });
+        res.json({
+          ...overrides,
+          version,
+        });
+      } catch (error: any) {
+        logger.error({ err: error }, 'Get user overrides error');
+        if (error.message?.includes('not found')) {
+          return res.status(404).json({ message: error.message });
+        }
+        res.status(500).json({ message: "Erreur lors de la récupération des exceptions" });
       }
-      res.status(500).json({ message: "Erreur lors de la récupération des exceptions" });
     }
-  });
+  );
 
   /**
    * PATCH /api/rbac/users/:userId/overrides
    * Toggle a permission override for a user - for "Exceptions" UI toggle
    * Protected: requires rbac.manage or admin
-   * Body: { permissionId: string, granted: boolean | null }
+   * Body: { permissionId?: string, permissionCode?: string, granted: boolean | null, reason?: string }
    * granted=null means remove override (inherit from role)
    */
-  app.patch("/api/rbac/users/:userId/overrides", requireAuth, attachAbility, async (req, res) => {
-    try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
+  app.patch("/api/rbac/users/:userId/overrides",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
+        const { permissionId, granted, permissionCode, reason, scope = 'GLOBAL', agenceId } = req.body;
 
-      const { userId } = req.params;
-      const { permissionId, granted, permissionCode } = req.body;
+        // Resolve permission ID
+        let resolvedPermissionId = permissionId;
+        let resolvedPermissionCode = permissionCode;
 
-      // If permissionCode is provided instead of permissionId, resolve it
-      let resolvedPermissionId = permissionId;
-      if (!resolvedPermissionId && permissionCode) {
-        const [perm] = await db.select().from(permissions).where(eq(permissions.code, permissionCode));
-        if (!perm) {
-          return res.status(404).json({ message: "Permission non trouvée" });
+        if (!resolvedPermissionId && permissionCode) {
+          const [perm] = await db.select().from(permissions).where(eq(permissions.code, permissionCode));
+          if (!perm) {
+            return res.status(404).json({ message: "Permission non trouvée" });
+          }
+          resolvedPermissionId = perm.id;
         }
-        resolvedPermissionId = perm.id;
+
+        if (!resolvedPermissionId) {
+          return res.status(400).json({ message: "permissionId ou permissionCode requis" });
+        }
+
+        // Get permission code for audit
+        const [perm] = await db.select().from(permissions).where(eq(permissions.id, resolvedPermissionId));
+        resolvedPermissionCode = perm?.code || resolvedPermissionCode;
+
+        // Validate reason for critical permissions
+        const reasonRequired = await isReasonRequiredForCritical();
+        if (resolvedPermissionCode) {
+          const validation = validateReasonForCritical(resolvedPermissionCode, reason, reasonRequired);
+          if (!validation.valid) {
+            return res.status(400).json({ message: validation.error, requiresReason: true });
+          }
+        }
+
+        // Get previous value for audit
+        const [existing] = await db.select({ granted: userPermissions.granted })
+          .from(userPermissions)
+          .where(and(
+            eq(userPermissions.userId, userId),
+            eq(userPermissions.permissionId, resolvedPermissionId)
+          ));
+        const oldValue = existing?.granted ?? null;
+
+        // Execute the toggle
+        const result = await toggleUserPermissionOverride(userId, resolvedPermissionId, granted);
+
+        // Log to RBAC audit trail
+        await logRbacChange(getAuditContext(req), {
+          targetUserId: userId,
+          action: 'TOGGLE',
+          permissionId: resolvedPermissionId,
+          permissionCode: resolvedPermissionCode,
+          oldValue,
+          newValue: granted,
+          scope: scope as 'GLOBAL' | 'AGENCE',
+          agenceId,
+          reason,
+        });
+
+        // Log to legacy audit systems
+        await logAudit(
+          req,
+          "TOGGLE_USER_OVERRIDE",
+          "user_permissions",
+          userId,
+          { permissionId: resolvedPermissionId, granted, code: perm?.code, reason },
+          "success",
+          "high"
+        );
+
+        await auditTrailService.logPermissionChange({
+          entityType: 'user',
+          entityId: userId,
+          permissionId: resolvedPermissionId,
+          permissionCode: perm?.code,
+          action: granted === null ? 'REVOKE' : (granted ? 'GRANT' : 'REVOKE'),
+          beforeState: oldValue !== null ? { granted: oldValue } : null,
+          afterState: granted !== null ? { granted } : null,
+          reason,
+        }, req.session.userId!, req);
+
+        // Broadcast to the specific user only
+        await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
+          userId,
+          permissionCode: perm?.code,
+          granted: granted ?? false,
+          source: 'user_permission',
+        }));
+
+        res.json({
+          success: true,
+          version: result.newVersion,
+          permissionId: resolvedPermissionId,
+          permissionCode: resolvedPermissionCode,
+          granted,
+          previousValue: oldValue,
+        });
+      } catch (error: any) {
+        logger.error({ err: error }, 'Toggle user override error');
+        if (error.message?.includes('not found')) {
+          return res.status(404).json({ message: error.message });
+        }
+        res.status(500).json({ message: "Erreur lors de la modification de l'exception" });
       }
-
-      if (!resolvedPermissionId) {
-        return res.status(400).json({ message: "permissionId ou permissionCode requis" });
-      }
-
-      // Get permission code for the event
-      const [perm] = await db.select().from(permissions).where(eq(permissions.id, resolvedPermissionId));
-
-      const result = await toggleUserPermissionOverride(userId, resolvedPermissionId, granted);
-
-      await logAudit(
-        req,
-        "TOGGLE_USER_OVERRIDE",
-        "user_permissions",
-        userId,
-        { permissionId: resolvedPermissionId, granted, code: perm?.code },
-        "success",
-        "high"
-      );
-
-      // Log to permission audit trail
-      await auditTrailService.logPermissionChange({
-        entityType: 'user',
-        entityId: userId,
-        permissionId: resolvedPermissionId,
-        permissionCode: perm?.code,
-        action: granted === null ? 'REVOKE' : (granted ? 'GRANT' : 'REVOKE'),
-        beforeState: null, // Could be improved by fetching before state
-        afterState: granted !== null ? { granted } : null,
-      }, req.session.userId!, req);
-
-      // Broadcast to the specific user only
-      await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
-        userId,
-        permissionCode: perm?.code,
-        granted: granted ?? false,
-        source: 'user_permission',
-      }));
-
-      res.json({
-        success: true,
-        version: result.newVersion,
-        permissionId: resolvedPermissionId,
-        granted,
-      });
-    } catch (error: any) {
-      logger.error({ err: error }, 'Toggle user override error');
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({ message: "Erreur lors de la modification de l'exception" });
     }
-  });
+  );
 
   /**
    * POST /api/rbac/users/:userId/overrides/reset
    * Reset all permission overrides for a user - for "Exceptions" UI reset button
    * Protected: requires rbac.manage or admin
+   * Body (optional): { reason?: string }
    */
-  app.post("/api/rbac/users/:userId/overrides/reset", requireAuth, attachAbility, async (req, res) => {
-    try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
+  app.post("/api/rbac/users/:userId/overrides/reset",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
+        const { reason } = req.body || {};
+
+        const result = await resetUserPermissionOverrides(userId);
+
+        // Log to RBAC audit trail
+        await logRbacChange(getAuditContext(req), {
+          targetUserId: userId,
+          action: 'RESET',
+          reason: reason || 'Reset all user permission overrides',
+          metadata: { deletedCount: result.deleted },
+        });
+
+        // Log to legacy audit systems
+        await logAudit(
+          req,
+          "RESET_USER_OVERRIDES",
+          "user_permissions",
+          userId,
+          { deleted: result.deleted, reason },
+          "success",
+          "high"
+        );
+
+        await auditTrailService.logPermissionChange({
+          entityType: 'user',
+          entityId: userId,
+          action: 'BULK_REVOKE',
+          beforeState: { overridesCount: result.deleted },
+          afterState: null,
+          reason: reason || 'Reset all user permission overrides',
+        }, req.session.userId!, req);
+
+        // Broadcast to the specific user only
+        await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
+          userId,
+        }));
+
+        res.json({
+          success: true,
+          version: result.newVersion,
+          deleted: result.deleted,
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Reset user overrides error');
+        res.status(500).json({ message: "Erreur lors de la réinitialisation des exceptions" });
       }
-
-      const { userId } = req.params;
-
-      const result = await resetUserPermissionOverrides(userId);
-
-      await logAudit(
-        req,
-        "RESET_USER_OVERRIDES",
-        "user_permissions",
-        userId,
-        { deleted: result.deleted },
-        "success",
-        "high"
-      );
-
-      // Log to permission audit trail (single entry for reset)
-      await auditTrailService.logPermissionChange({
-        entityType: 'user',
-        entityId: userId,
-        action: 'BULK_REVOKE',
-        beforeState: { overridesCount: result.deleted },
-        afterState: null,
-        reason: 'Reset all user permission overrides',
-      }, req.session.userId!, req);
-
-      // Broadcast to the specific user only
-      await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
-        userId,
-      }));
-
-      res.json({
-        success: true,
-        version: result.newVersion,
-        deleted: result.deleted,
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'Reset user overrides error');
-      res.status(500).json({ message: "Erreur lors de la réinitialisation des exceptions" });
     }
-  });
+  );
 
   // ============================================
   // BULK OPERATIONS ENDPOINTS
@@ -1269,20 +1359,24 @@ export function registerRbacRoutes(app: Express) {
 
   /**
    * PUT /api/rbac/users/:userId/overrides/bulk
-   * Bulk update permission overrides for a user
+   * Bulk update permission overrides for a user (transactional & idempotent)
    * Protected: requires rbac.manage or admin
-   * Body: { updates: [{ permissionId: string, granted: boolean | null }] }
+   * Body: { scope?: 'GLOBAL'|'AGENCE', agenceId?: string, changes: [{ permissionId?, permissionCode?, granted: boolean|null }], reason?: string }
    * granted=null removes the override (inherit from role)
    */
-  app.put("/api/rbac/users/:userId/overrides/bulk", requireAuth, attachAbility, async (req, res) => {
-    try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
+  app.put("/api/rbac/users/:userId/overrides/bulk",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
 
-      const { userId } = req.params;
-      const { updates } = req.body;
+        // Support both old format (updates) and new format (changes)
+        const updates = req.body.changes || req.body.updates;
 
       if (!Array.isArray(updates) || updates.length === 0) {
         return res.status(400).json({ message: "updates array requis" });
@@ -1386,9 +1480,25 @@ export function registerRbacRoutes(app: Express) {
         "high"
       );
 
-      // Log bulk audit entries
+      // Log bulk audit entries to legacy system
       if (auditEntries.length > 0) {
         await auditTrailService.logBulkPermissionChange(auditEntries, req.session.userId!, req);
+      }
+
+      // Log to new RBAC audit trail
+      const { scope = 'GLOBAL', agenceId, reason } = req.body;
+      const changes = auditEntries.map(e => ({
+        permissionCode: e.permissionCode || '',
+        oldValue: e.beforeState?.granted ?? null,
+        newValue: e.afterState?.granted ?? null,
+      }));
+
+      if (changes.length > 0) {
+        await logBulkRbacChange(getAuditContext(req), userId, changes, {
+          scope: scope as 'GLOBAL' | 'AGENCE',
+          agenceId,
+          reason,
+        });
       }
 
       // Broadcast to the specific user
@@ -1401,6 +1511,7 @@ export function registerRbacRoutes(app: Express) {
         results,
         successCount,
         failureCount,
+        diff: changes,
       });
     } catch (error) {
       logger.error({ err: error }, 'Bulk update user overrides error');
@@ -1677,14 +1788,16 @@ export function registerRbacRoutes(app: Express) {
    * Protected: requires rbac.manage or admin
    * Body: { revokeReason? }
    */
-  app.delete("/api/rbac/temp-permissions/:id", requireAuth, attachAbility, async (req, res) => {
-    try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
-      const { id } = req.params;
+  app.delete("/api/rbac/temp-permissions/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
       const { revokeReason } = req.body || {};
 
       const { revokeTemporaryPermission } = await import('../services/temporary-permissions-service');
@@ -1716,14 +1829,16 @@ export function registerRbacRoutes(app: Express) {
    * Protected: requires rbac.manage or admin
    * Query params: userId, permissionCode, status, startDate, endDate, limit, offset
    */
-  app.get("/api/rbac/temp-permissions/history", requireAuth, attachAbility, async (req, res) => {
-    try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
-      const {
+  app.get("/api/rbac/temp-permissions/history",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const {
         userId,
         permissionCode,
         status = 'all',
@@ -1758,14 +1873,16 @@ export function registerRbacRoutes(app: Express) {
    * Protected: requires rbac.manage or admin
    * Query params: thresholdHours (default: 24)
    */
-  app.get("/api/rbac/temp-permissions/expiring", requireAuth, attachAbility, async (req, res) => {
-    try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
-      const { thresholdHours = '24' } = req.query;
+  app.get("/api/rbac/temp-permissions/expiring",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { thresholdHours = '24' } = req.query;
       const thresholdMs = parseInt(thresholdHours as string, 10) * 60 * 60 * 1000;
 
       const { getExpiringPermissions } = await import('../services/temporary-permissions-service');
@@ -1777,4 +1894,195 @@ export function registerRbacRoutes(app: Express) {
       res.status(500).json({ message: "Erreur lors de la récupération des permissions expirantes" });
     }
   });
+
+  // ============================================
+  // RBAC AUDIT LOG ENDPOINTS
+  // ============================================
+
+  /**
+   * GET /api/rbac/audit
+   * Get RBAC audit history with filters
+   * Protected: requires rbac.manage or admin
+   * Query params: actorUserId, targetUserId, targetRole, action, permissionCode, scope, agenceId, startDate, endDate, limit, offset
+   */
+  app.get("/api/rbac/audit",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const {
+          actorUserId,
+          targetUserId,
+          targetRole,
+          action,
+          permissionCode,
+          scope,
+          agenceId,
+          startDate,
+          endDate,
+          limit = '50',
+          offset = '0',
+        } = req.query;
+
+        const result = await getAuditHistory({
+          actorUserId: actorUserId as string | undefined,
+          targetUserId: targetUserId as string | undefined,
+          targetRole: targetRole as string | undefined,
+          action: action as any,
+          permissionCode: permissionCode as string | undefined,
+          scope: scope as 'GLOBAL' | 'AGENCE' | undefined,
+          agenceId: agenceId as string | undefined,
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          limit: parseInt(limit as string, 10),
+          offset: parseInt(offset as string, 10),
+        });
+
+        res.json(result);
+      } catch (error) {
+        logger.error({ err: error }, 'Get RBAC audit history error');
+        res.status(500).json({ message: "Erreur lors de la récupération de l'historique d'audit" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/rbac/users/:userId/audit
+   * Get RBAC audit history for a specific user (as target)
+   * Protected: requires rbac.view or admin
+   */
+  app.get("/api/rbac/users/:userId/audit",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
+        const { limit = '50', offset = '0' } = req.query;
+
+        const result = await getAuditHistory({
+          targetUserId: userId,
+          limit: parseInt(limit as string, 10),
+          offset: parseInt(offset as string, 10),
+        });
+
+        res.json(result);
+      } catch (error) {
+        logger.error({ err: error }, 'Get user RBAC audit history error');
+        res.status(500).json({ message: "Erreur lors de la récupération de l'historique d'audit" });
+      }
+    }
+  );
+
+  // ============================================
+  // PERMISSION EXPLANATION ENDPOINTS
+  // ============================================
+
+  /**
+   * GET /api/rbac/users/:userId/permissions/effective
+   * Get effective permissions with their source for a user
+   * Protected: requires rbac.view or admin
+   */
+  app.get("/api/rbac/users/:userId/permissions/effective",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
+        const { agenceId } = req.query;
+
+        const permissions = await getEffectivePermissionsWithSource(
+          userId,
+          agenceId as string | undefined
+        );
+
+        const version = await getRbacVersion();
+
+        res.json({
+          userId,
+          agenceId: agenceId || null,
+          version,
+          permissions,
+          totalCount: permissions.length,
+          grantedCount: permissions.filter(p => p.granted).length,
+          deniedCount: permissions.filter(p => !p.granted).length,
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Get effective permissions with source error');
+        res.status(500).json({ message: "Erreur lors de la récupération des permissions effectives" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/rbac/users/:userId/permissions/explain
+   * Explain why a user has or doesn't have a specific permission
+   * Protected: requires rbac.view or admin
+   * Query params: permissionCode (required), agenceId (optional)
+   */
+  app.get("/api/rbac/users/:userId/permissions/explain",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
+        const { permissionCode, agenceId } = req.query;
+
+        if (!permissionCode) {
+          return res.status(400).json({ message: "permissionCode est requis" });
+        }
+
+        const explanation = await explainPermission(
+          userId,
+          permissionCode as string,
+          agenceId as string | undefined
+        );
+
+        res.json(explanation);
+      } catch (error) {
+        logger.error({ err: error }, 'Explain permission error');
+        res.status(500).json({ message: "Erreur lors de l'explication de la permission" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/rbac/permissions/:code/critical
+   * Check if a permission is critical (requires reason for changes)
+   * Protected: requires authentication
+   */
+  app.get("/api/rbac/permissions/:code/critical",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const { code } = req.params;
+        const isCritical = isCriticalPermission(code);
+        const reasonRequired = await isReasonRequiredForCritical();
+
+        res.json({
+          permissionCode: code,
+          isCritical,
+          requiresReason: isCritical && reasonRequired,
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Check critical permission error');
+        res.status(500).json({ message: "Erreur lors de la vérification" });
+      }
+    }
+  );
 }

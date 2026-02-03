@@ -405,3 +405,204 @@ export const grantTempPermissionSchema = z.object({
 export const revokeTempPermissionSchema = z.object({
   revokeReason: z.string().max(500, "Raison trop longue").optional(),
 });
+
+// ============================================
+// Permission Scope Enum (for scoped overrides)
+// ============================================
+
+export const permissionScopeEnum = pgEnum("permission_scope", ["GLOBAL", "AGENCE"]);
+
+export type PermissionScope = "GLOBAL" | "AGENCE";
+
+// ============================================
+// RBAC Audit Log
+// ============================================
+
+export const rbacAuditActionEnum = pgEnum("rbac_audit_action", [
+  "TOGGLE",
+  "BULK_UPDATE",
+  "RESET",
+  "GRANT_TEMPORARY",
+  "REVOKE_TEMPORARY",
+  "EXPIRE_TEMPORARY",
+]);
+
+export type RbacAuditAction =
+  | "TOGGLE"
+  | "BULK_UPDATE"
+  | "RESET"
+  | "GRANT_TEMPORARY"
+  | "REVOKE_TEMPORARY"
+  | "EXPIRE_TEMPORARY";
+
+/**
+ * Table rbacAuditLog - Audit trail complet des modifications RBAC
+ *
+ * Enregistre chaque modification de permission avec:
+ * - Qui a fait l'action (actor)
+ * - Qui subit l'action (target)
+ * - Quelle permission a été modifiée
+ * - L'ancienne et nouvelle valeur
+ * - Le scope (GLOBAL ou AGENCE)
+ * - La raison (obligatoire pour permissions critiques)
+ */
+export const rbacAuditLog = pgTable("rbac_audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+
+  // Actor info
+  actorUserId: uuid("actor_user_id").notNull().references(() => users.id),
+  actorIp: text("actor_ip"),
+  actorUserAgent: text("actor_user_agent"),
+
+  // Target info
+  targetUserId: uuid("target_user_id").references(() => users.id),
+  targetRole: text("target_role"),
+
+  // Action
+  action: rbacAuditActionEnum("action").notNull(),
+
+  // Permission
+  permissionId: uuid("permission_id").references(() => permissions.id),
+  permissionCode: text("permission_code"),
+
+  // Change
+  oldValue: boolean("old_value"),
+  newValue: boolean("new_value"),
+
+  // Scope
+  scope: permissionScopeEnum("scope").notNull().default("GLOBAL"),
+  agenceId: uuid("agence_id"),
+
+  // Reason (required for critical permissions)
+  reason: text("reason"),
+
+  // Metadata
+  metadata: jsonb("metadata").default({}),
+
+  // Version tracking
+  rbacVersionBefore: integer("rbac_version_before"),
+  rbacVersionAfter: integer("rbac_version_after"),
+});
+
+export const insertRbacAuditLogSchema = createInsertSchema(rbacAuditLog).omit({ id: true, createdAt: true });
+export type InsertRbacAuditLog = z.infer<typeof insertRbacAuditLogSchema>;
+export type RbacAuditLog = typeof rbacAuditLog.$inferSelect;
+
+// ============================================
+// System Feature Flags
+// ============================================
+
+/**
+ * Table systemFeatureFlags - Feature flags pour déploiement progressif
+ *
+ * Permet d'activer/désactiver des fonctionnalités de manière contrôlée.
+ * Les flags système (is_system=true) ne peuvent pas être modifiés via l'UI.
+ */
+export const systemFeatureFlags = pgTable("system_feature_flags", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  flagKey: text("flag_key").notNull().unique(),
+  flagValue: boolean("flag_value").notNull().default(false),
+  description: text("description"),
+  isSystem: boolean("is_system").notNull().default(false),
+  enabledAt: timestamp("enabled_at"),
+  enabledBy: uuid("enabled_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemFeatureFlagSchema = createInsertSchema(systemFeatureFlags).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSystemFeatureFlag = z.infer<typeof insertSystemFeatureFlagSchema>;
+export type SystemFeatureFlag = typeof systemFeatureFlags.$inferSelect;
+
+// RBAC Feature Flags constants
+export const RBAC_FEATURE_FLAGS = {
+  SCOPED_OVERRIDES: 'RBAC_SCOPED_OVERRIDES',
+  REQUIRE_REASON_CRITICAL: 'RBAC_REQUIRE_REASON_CRITICAL',
+  AUDIT_LOG_ENABLED: 'RBAC_AUDIT_LOG_ENABLED',
+  SOFT_REVALIDATE: 'RBAC_SOFT_REVALIDATE',
+} as const;
+
+// ============================================
+// Critical Permission Patterns
+// ============================================
+
+/**
+ * Table criticalPermissionPatterns - Patterns de permissions critiques
+ *
+ * Définit les patterns de permissions qui nécessitent une justification
+ * lors de leur modification (ex: paiements.%, coffre.%, admin.%).
+ */
+export const criticalPermissionPatterns = pgTable("critical_permission_patterns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  pattern: text("pattern").notNull().unique(),
+  description: text("description"),
+  requireReason: boolean("require_reason").notNull().default(true),
+  requireSupervisorApproval: boolean("require_supervisor_approval").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCriticalPermissionPatternSchema = createInsertSchema(criticalPermissionPatterns).omit({ id: true, createdAt: true });
+export type InsertCriticalPermissionPattern = z.infer<typeof insertCriticalPermissionPatternSchema>;
+export type CriticalPermissionPattern = typeof criticalPermissionPatterns.$inferSelect;
+
+// Default critical permission patterns
+export const DEFAULT_CRITICAL_PATTERNS = [
+  'paiements.',
+  'coffre.',
+  'admin.',
+  'validation.',
+  'caisse.close',
+  'caisse.admin',
+  'credits.disburse',
+  'rbac.manage',
+] as const;
+
+/**
+ * Check if a permission code is critical (requires reason)
+ */
+export function isCriticalPermission(permissionCode: string): boolean {
+  return DEFAULT_CRITICAL_PATTERNS.some(pattern =>
+    permissionCode.startsWith(pattern) || permissionCode === pattern
+  );
+}
+
+// ============================================
+// Extended User Permissions Schema (with scope)
+// ============================================
+
+// Schéma Zod pour bulk update avec scope
+export const bulkUserPermissionUpdateSchema = z.object({
+  scope: z.enum(['GLOBAL', 'AGENCE']).default('GLOBAL'),
+  agenceId: z.string().uuid().optional().nullable(),
+  changes: z.array(z.object({
+    permissionId: z.string().uuid().optional(),
+    permissionCode: z.string().optional(),
+    granted: z.boolean().nullable(), // null = remove override
+  })).min(1, "Au moins un changement requis"),
+  reason: z.string().max(500).optional(),
+}).refine(
+  data => data.changes.every(c => c.permissionId || c.permissionCode),
+  { message: "Chaque changement doit avoir permissionId ou permissionCode" }
+).refine(
+  data => data.scope === 'GLOBAL' || (data.scope === 'AGENCE' && data.agenceId),
+  { message: "agenceId requis si scope=AGENCE" }
+);
+
+export type BulkUserPermissionUpdate = z.infer<typeof bulkUserPermissionUpdateSchema>;
+
+// Schéma pour toggle avec raison
+export const toggleUserPermissionSchema = z.object({
+  permissionId: z.string().uuid().optional(),
+  permissionCode: z.string().optional(),
+  granted: z.boolean().nullable(), // null = remove override
+  scope: z.enum(['GLOBAL', 'AGENCE']).default('GLOBAL'),
+  agenceId: z.string().uuid().optional().nullable(),
+  reason: z.string().max(500).optional(),
+}).refine(
+  data => data.permissionId || data.permissionCode,
+  { message: "permissionId ou permissionCode requis" }
+).refine(
+  data => data.scope === 'GLOBAL' || (data.scope === 'AGENCE' && data.agenceId),
+  { message: "agenceId requis si scope=AGENCE" }
+);
