@@ -518,7 +518,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth bg-slate-950"
+              className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scroll-smooth bg-gradient-to-b from-slate-950 to-slate-900"
             >
               {isFetchingNextPage && (
                 <div className="flex justify-center py-2">
@@ -540,8 +540,8 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                   return (
                     <div key={msg.id}>
                       {showDate && (
-                        <div className="flex justify-center my-4">
-                          <span className="text-[10px] bg-slate-900 text-slate-500 px-3 py-1 rounded-full border border-slate-800">
+                        <div className="flex justify-center my-3">
+                          <span className="text-[11px] bg-slate-800/60 backdrop-blur-sm text-slate-400 px-4 py-1.5 rounded-full font-medium shadow-sm">
                             {new Date(msg.createdAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                           </span>
                         </div>
@@ -549,106 +549,124 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
                       {isSystem ? (
                         <div className="flex justify-center my-2">
-                          <span className="text-[11px] text-slate-500 italic">{msg.content || 'Action système'}</span>
+                          <span className="text-[11px] text-slate-500 italic bg-slate-800/30 px-3 py-1 rounded-full">{msg.content || 'Action système'}</span>
                         </div>
                       ) : isDeleted ? (
                         <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                          <div className="max-w-[75%] p-3 rounded-2xl text-sm bg-slate-900 border border-slate-800 text-slate-500 italic">
+                          <div className={`max-w-[75%] px-4 py-2.5 rounded-[20px] text-sm text-slate-500 italic ${
+                            isMe
+                              ? 'bg-slate-800/50 rounded-br-[4px]'
+                              : 'bg-slate-800/50 rounded-bl-[4px]'
+                          }`}>
                             Ce message a été supprimé
                           </div>
                         </div>
                       ) : (
                         <div
-                          className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}
+                          className={`flex ${isMe ? 'justify-end' : 'justify-start'} group ${msg.reactions.length > 0 ? 'mb-5' : ''}`}
                           onMouseLeave={() => { setMenuOpenFor(null); setShowReactionsFor(null); }}
                         >
                           {/* Message bubble wrapper with relative positioning for actions */}
                           <div className="relative max-w-[85%] md:max-w-[75%] lg:max-w-[60%]">
+                            {/* iPhone-style chat bubble */}
                             <div className={`
-                              p-3 rounded-2xl text-sm shadow-md
+                              relative px-4 py-2.5 text-[15px] leading-relaxed
                               ${isMe
-                                ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700'
+                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-[20px] rounded-br-[4px]'
+                                : 'bg-slate-700/80 text-slate-100 rounded-[20px] rounded-bl-[4px]'
                               }
                             `}>
-                            {/* Sender name (groups only) */}
-                            {!isMe && activeConv?.type === 'GROUP' && (
-                              <p className="text-xs font-bold text-indigo-400 mb-1">
-                                {msg.sender.prenom ? `${msg.sender.prenom} ${msg.sender.nom}` : msg.sender.nom}
-                              </p>
-                            )}
-
-                            {msg.contentType === 'IMAGE' ? (
-                              <div className="space-y-1">
-                                <img
-                                  src={resolveStorageUrl((msg.metadata as any)?.url || msg.content || '')}
-                                  alt={(msg.metadata as any)?.filename || 'Image'}
-                                  className="max-w-[280px] rounded-lg cursor-pointer"
-                                  onClick={() => window.open(resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''), '_blank')}
-                                />
-                                {(msg.metadata as any)?.filename && (
-                                  <p className={`text-xs ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>{(msg.metadata as any).filename}</p>
-                                )}
-                              </div>
-                            ) : msg.contentType === 'FILE' ? (
-                              <a
-                                href={resolveStorageUrl((msg.metadata as any)?.url || msg.content || '')}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`flex items-center gap-2 p-2 rounded-lg border ${
-                                  isMe ? 'border-indigo-400/30 hover:bg-indigo-500/20' : 'border-slate-600 hover:bg-slate-700'
+                              {/* Bubble tail */}
+                              <svg
+                                className={`absolute bottom-0 w-3 h-3 ${
+                                  isMe
+                                    ? '-right-1.5 text-blue-600'
+                                    : '-left-1.5 text-slate-700/80 -scale-x-100'
                                 }`}
+                                viewBox="0 0 12 12"
+                                fill="currentColor"
                               >
-                                <FileText size={20} className={isMe ? 'text-indigo-200' : 'text-blue-400'} />
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-slate-200'}`}>
-                                    {(msg.metadata as any)?.filename || 'Fichier'}
-                                  </p>
-                                  {(msg.metadata as any)?.size && (
-                                    <p className={`text-xs ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>
-                                      {((msg.metadata as any).size / 1024).toFixed(0)} Ko
-                                    </p>
+                                <path d="M0 0 L12 0 L12 12 Q6 12 0 6 Z" />
+                              </svg>
+
+                              {/* Sender name (groups only) */}
+                              {!isMe && activeConv?.type === 'GROUP' && (
+                                <p className="text-xs font-semibold text-blue-400 mb-1">
+                                  {msg.sender.prenom ? `${msg.sender.prenom} ${msg.sender.nom}` : msg.sender.nom}
+                                </p>
+                              )}
+
+                              {msg.contentType === 'IMAGE' ? (
+                                <div className="space-y-1">
+                                  <img
+                                    src={resolveStorageUrl((msg.metadata as any)?.url || msg.content || '')}
+                                    alt={(msg.metadata as any)?.filename || 'Image'}
+                                    className="max-w-[280px] rounded-xl cursor-pointer"
+                                    onClick={() => window.open(resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''), '_blank')}
+                                  />
+                                  {(msg.metadata as any)?.filename && (
+                                    <p className={`text-xs ${isMe ? 'text-blue-100' : 'text-slate-400'}`}>{(msg.metadata as any).filename}</p>
                                   )}
                                 </div>
-                                <Download size={16} className={isMe ? 'text-indigo-200' : 'text-slate-400'} />
-                              </a>
-                            ) : (
-                              <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                            )}
+                              ) : msg.contentType === 'FILE' ? (
+                                <a
+                                  href={resolveStorageUrl((msg.metadata as any)?.url || msg.content || '')}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`flex items-center gap-3 p-2.5 rounded-xl ${
+                                    isMe
+                                      ? 'bg-blue-400/20 hover:bg-blue-400/30'
+                                      : 'bg-slate-600/50 hover:bg-slate-600/70'
+                                  } transition-colors`}
+                                >
+                                  <div className={`p-2 rounded-lg ${isMe ? 'bg-blue-400/30' : 'bg-slate-500/50'}`}>
+                                    <FileText size={20} className={isMe ? 'text-white' : 'text-blue-400'} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-slate-200'}`}>
+                                      {(msg.metadata as any)?.filename || 'Fichier'}
+                                    </p>
+                                    {(msg.metadata as any)?.size && (
+                                      <p className={`text-xs ${isMe ? 'text-blue-100' : 'text-slate-400'}`}>
+                                        {((msg.metadata as any).size / 1024).toFixed(0)} Ko
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Download size={18} className={isMe ? 'text-blue-100' : 'text-slate-400'} />
+                                </a>
+                              ) : (
+                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                              )}
 
-                            <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>
-                              {msg.editedAt && <span className="italic mr-1">(modifié)</span>}
-                              <span>{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-                              {isMe && (
-                                isMessageRead(msg) ? (
-                                  <CheckCheck size={14} className="text-sky-400" />
-                                ) : (
-                                  <Check size={14} className="text-indigo-300/60" />
-                                )
+                              {/* Time and read status - iPhone style */}
+                              <div className={`flex items-center gap-1.5 justify-end mt-1 text-[11px] ${isMe ? 'text-blue-100/80' : 'text-slate-400'}`}>
+                                {msg.editedAt && <span className="italic">modifié</span>}
+                                <span>{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                {isMe && (
+                                  isMessageRead(msg) ? (
+                                    <CheckCheck size={14} className="text-white" />
+                                  ) : (
+                                    <Check size={14} className="text-blue-200/70" />
+                                  )
+                                )}
+                              </div>
+
+                              {/* Reactions display - positioned below bubble */}
+                              {msg.reactions.length > 0 && (
+                                <div className={`absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex gap-0.5 bg-slate-800 rounded-full px-1.5 py-0.5 shadow-lg border border-slate-700`}>
+                                  {msg.reactions.map((r) => (
+                                    <button
+                                      key={r.emoji}
+                                      onClick={() => handleToggleReaction(msg.id, r.emoji, r.hasReacted)}
+                                      className={`text-sm transition-transform hover:scale-110 ${r.hasReacted ? 'opacity-100' : 'opacity-70'}`}
+                                    >
+                                      {r.emoji}
+                                      {r.count > 1 && <span className="text-[10px] text-slate-400 ml-0.5">{r.count}</span>}
+                                    </button>
+                                  ))}
+                                </div>
                               )}
                             </div>
-
-                            {/* Reactions display */}
-                            {msg.reactions.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1.5 -mb-1">
-                                {msg.reactions.map((r) => (
-                                  <button
-                                    key={r.emoji}
-                                    onClick={() => handleToggleReaction(msg.id, r.emoji, r.hasReacted)}
-                                    className={`px-1.5 py-0.5 rounded-full text-xs flex items-center gap-0.5 border transition-colors
-                                      ${r.hasReacted
-                                        ? 'bg-indigo-500/30 border-indigo-500/50 text-indigo-300'
-                                        : 'bg-slate-700/50 border-slate-600 text-slate-400 hover:bg-slate-700'
-                                      }
-                                    `}
-                                  >
-                                    <span>{r.emoji}</span>
-                                    <span className="text-[10px]">{r.count}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
 
                           {/* Hover actions - positioned close to the message bubble */}
                           <div className={`absolute ${isMe ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'} top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-slate-900/90 backdrop-blur-sm rounded-lg px-1 py-0.5 shadow-lg border border-slate-700/50`}>
