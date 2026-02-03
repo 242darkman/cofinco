@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Search, Send, Paperclip, MoreVertical,
-  ChevronLeft, Smile, CheckCheck, Loader2,
+  ChevronLeft, Smile, Check, CheckCheck, Loader2,
   Edit2, Trash2, X, UsersRound, Plus,
   FileText, Image as ImageIcon, Download
 } from 'lucide-react';
@@ -298,6 +298,26 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
   // Active conversation info
   const activeConv = conversations.find((c) => c.id === selectedConversationId);
+
+  // Helper function to check if a message has been read by the recipient
+  const isMessageRead = (msg: MessageV2): boolean => {
+    if (!activeConv || msg.senderId !== currentUserId) return false;
+
+    if (activeConv.type === 'DM') {
+      // For DM: check if partner's lastReadAt is after message createdAt
+      const partner = activeConv.participants.find((p) => p.id !== currentUserId);
+      if (partner?.lastReadAt) {
+        return new Date(partner.lastReadAt) >= new Date(msg.createdAt);
+      }
+      return false;
+    } else {
+      // For GROUP: check if at least one other participant has read it
+      return activeConv.participants.some(
+        (p) => p.id !== currentUserId && p.lastReadAt && new Date(p.lastReadAt) >= new Date(msg.createdAt)
+      );
+    }
+  };
+
   const getConversationAvatar = (conv: ConversationV2) => {
     if (conv.type === 'DM') {
       const partner = conv.participants.find((p) => p.id !== currentUserId);
@@ -598,7 +618,13 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                             <div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>
                               {msg.editedAt && <span className="italic mr-1">(modifié)</span>}
                               <span>{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-                              {isMe && <CheckCheck size={12} />}
+                              {isMe && (
+                                isMessageRead(msg) ? (
+                                  <CheckCheck size={14} className="text-sky-400" />
+                                ) : (
+                                  <Check size={14} className="text-indigo-300/60" />
+                                )
+                              )}
                             </div>
 
                             {/* Reactions display */}
