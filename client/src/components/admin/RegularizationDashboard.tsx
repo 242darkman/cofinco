@@ -457,14 +457,14 @@ export default function RegularizationDashboard() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-3 sm:space-y-4 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
             Tâches de Régularisation
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             Suivi et résolution des anomalies financières
           </p>
         </div>
@@ -474,20 +474,22 @@ export default function RegularizationDashboard() {
           icon={RefreshCw}
           onClick={() => loadData(false)}
           isLoading={loading}
+          className="self-end sm:self-auto"
         >
-          Actualiser
+          <span className="hidden sm:inline">Actualiser</span>
         </Button>
       </div>
 
       {/* KPI Cards */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
           <StatCard
             title="Tâches ouvertes"
             value={stats.summary.totalOpen}
             icon={AlertTriangle}
             color="danger"
             variant="glass"
+            compact
           />
           <StatCard
             title="Critiques"
@@ -495,13 +497,15 @@ export default function RegularizationDashboard() {
             icon={Zap}
             color="warning"
             variant="glass"
+            compact
           />
           <StatCard
-            title="Montant total écarts"
+            title="Montant écarts"
             value={formatMoney(stats.summary.totalMontantEcart || 0)}
             icon={ArrowUpRight}
             color="primary"
             variant="glass"
+            compact
           />
           <StatCard
             title="Résolues"
@@ -509,13 +513,15 @@ export default function RegularizationDashboard() {
             icon={CheckCircle2}
             color="success"
             variant="glass"
+            compact
           />
         </div>
       )}
 
       {/* Filters Toolbar */}
-      <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 backdrop-blur-sm">
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+      <div className="bg-slate-800/50 p-2 sm:p-3 rounded-xl border border-slate-700 backdrop-blur-sm space-y-2 lg:space-y-0 lg:flex lg:justify-between lg:items-center lg:gap-3">
+        {/* Status Tabs - scrollable on mobile */}
+        <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0 shrink-0">
           <TabGroup
             activeTab={statusFilter}
             onTabChange={setStatusFilter}
@@ -530,12 +536,13 @@ export default function RegularizationDashboard() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+        {/* Filters row */}
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
           <SearchInput
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Rechercher..."
-            className="w-full sm:w-48"
+            className="flex-2 min-w-0"
           />
 
           <SelectField
@@ -545,13 +552,13 @@ export default function RegularizationDashboard() {
             onChange={(e) => setPriorityFilter(e.target.value)}
             placeholder="Priorité"
             options={[
-              { value: 'all', label: 'Toutes priorités' },
+              { value: 'all', label: 'Priorité' },
               { value: 'CRITICAL', label: 'Critique' },
               { value: 'HIGH', label: 'Haute' },
               { value: 'NORMAL', label: 'Normale' },
               { value: 'LOW', label: 'Basse' },
             ]}
-            containerClassName="w-36"
+            containerClassName="flex-1 min-w-0"
           />
 
           <SelectField
@@ -561,25 +568,25 @@ export default function RegularizationDashboard() {
             onChange={(e) => setSourceFilter(e.target.value)}
             placeholder="Source"
             options={[
-              { value: 'all', label: 'Toutes sources' },
+              { value: 'all', label: 'Source' },
               { value: 'coffre', label: 'Inter-coffres' },
               { value: 'coffre-caisse', label: 'Coffre-Caisse' },
             ]}
-            containerClassName="w-40"
+            containerClassName="flex-1 min-w-0"
           />
 
-          <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 cursor-pointer shrink-0">
             <Switch
               checked={assignedToMe}
               onChange={setAssignedToMe}
             />
-            <span className="text-sm text-slate-300">Mes tâches</span>
-          </div>
+            <span className="text-xs sm:text-sm text-slate-300 whitespace-nowrap">Mes tâches</span>
+          </label>
         </div>
       </div>
 
       {/* Data Table */}
-      <div className="bg-surface-base rounded-xl border border-edge overflow-hidden min-h-[400px]">
+      <div className="bg-surface-base rounded-xl border border-edge overflow-hidden min-h-[300px] sm:min-h-[350px]">
         {tasks.length > 0 ? (
           <ResponsiveTable
             data={tasks}
@@ -587,6 +594,7 @@ export default function RegularizationDashboard() {
             loading={loading}
             emptyMessage="Aucun résultat"
             onRowClick={handleRowClick}
+            compact
           />
         ) : (
           <EmptyState
@@ -603,29 +611,33 @@ export default function RegularizationDashboard() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-800/30 rounded-lg">
-          <span className="text-sm text-slate-400">
-            {total} tâche{total > 1 ? 's' : ''} au total
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-3 py-2 bg-slate-800/30 rounded-lg">
+          <span className="text-xs sm:text-sm text-slate-400 order-2 sm:order-1">
+            {total} tâche{total > 1 ? 's' : ''}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 order-1 sm:order-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
+              className="px-2 sm:px-3"
             >
-              Précédent
+              <span className="hidden sm:inline">Précédent</span>
+              <span className="sm:hidden">←</span>
             </Button>
-            <span className="text-sm text-slate-300">
-              Page {page} / {totalPages}
+            <span className="text-xs sm:text-sm text-slate-300 min-w-[60px] sm:min-w-[80px] text-center">
+              {page} / {totalPages}
             </span>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
+              className="px-2 sm:px-3"
             >
-              Suivant
+              <span className="hidden sm:inline">Suivant</span>
+              <span className="sm:hidden">→</span>
             </Button>
           </div>
         </div>
@@ -639,9 +651,9 @@ export default function RegularizationDashboard() {
         size="md"
       >
         {selectedTask && (
-          <div className="space-y-4">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
+          <div className="space-y-3">
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
+              <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                 <Badge value={selectedTask.typeLabel} variant="info" size="sm" />
                 <Badge
                   value={selectedTask.prioriteLabel}
@@ -649,11 +661,11 @@ export default function RegularizationDashboard() {
                   size="sm"
                 />
               </div>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                 {selectedTask.description}
               </p>
               {selectedTask.montantEcart && (
-                <p className="text-sm font-bold text-red-600 dark:text-red-400 mt-2">
+                <p className="text-xs sm:text-sm font-bold text-red-600 dark:text-red-400 mt-1.5">
                   Montant: {formatMoney(selectedTask.montantEcart)}
                 </p>
               )}
@@ -664,27 +676,30 @@ export default function RegularizationDashboard() {
               name="resolution"
               value={resolution}
               onChange={(e) => setResolution(e.target.value)}
-              placeholder="Décrivez les actions effectuées pour résoudre cette anomalie (min. 10 caractères)..."
-              rows={4}
+              placeholder="Décrivez les actions effectuées (min. 10 caractères)..."
+              rows={3}
               required
-              helperText={resolution.length < 10 ? `${10 - resolution.length} caractères restants minimum` : undefined}
+              helperText={resolution.length < 10 ? `${10 - resolution.length} caractères restants` : undefined}
             />
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={() => setResolveModalOpen(false)}
               >
                 Annuler
               </Button>
               <Button
                 variant="primary"
+                size="sm"
                 icon={CheckCircle2}
                 onClick={handleResolve}
                 isLoading={resolving}
                 disabled={resolution.length < 10}
               >
-                Marquer comme résolue
+                <span className="hidden sm:inline">Marquer comme résolue</span>
+                <span className="sm:hidden">Résoudre</span>
               </Button>
             </div>
           </div>
@@ -699,29 +714,31 @@ export default function RegularizationDashboard() {
         size="lg"
       >
         {selectedTask && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge value={selectedTask.typeLabel} variant="info" />
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                  <Badge value={selectedTask.typeLabel} variant="info" size="sm" />
                   <Badge
                     value={selectedTask.statutLabel}
                     variant={getStatusColor(selectedTask.statut)}
+                    size="sm"
                   />
                   <Badge
                     value={selectedTask.prioriteLabel}
                     variant={getPriorityColor(selectedTask.priorite)}
+                    size="sm"
                   />
                 </div>
-                <p className="text-slate-600 dark:text-slate-300">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
                   {selectedTask.description}
                 </p>
               </div>
               {selectedTask.montantEcart && (
-                <div className="text-right">
-                  <span className="text-sm text-slate-500">Montant écart</span>
-                  <p className="text-xl font-bold text-red-600 dark:text-red-400">
+                <div className="text-left sm:text-right bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+                  <span className="text-xs text-slate-500">Montant écart</span>
+                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
                     {formatMoney(selectedTask.montantEcart)}
                   </p>
                 </div>
@@ -729,41 +746,41 @@ export default function RegularizationDashboard() {
             </div>
 
             {/* Details Grid */}
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
               <div>
-                <span className="text-xs text-slate-500 uppercase">ID</span>
-                <p className="text-sm font-mono text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">ID</span>
+                <p className="text-xs sm:text-sm font-mono text-slate-900 dark:text-white truncate">
                   {selectedTask.id.slice(0, 8)}...
                 </p>
               </div>
               <div>
-                <span className="text-xs text-slate-500 uppercase">Source</span>
-                <p className="text-sm text-slate-900 dark:text-white">
-                  {selectedTask.source === 'coffre' ? 'Transferts Inter-coffres' : 'Transferts Coffre-Caisse'}
+                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Source</span>
+                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
+                  {selectedTask.source === 'coffre' ? 'Inter-coffres' : 'Coffre-Caisse'}
                 </p>
               </div>
               <div>
-                <span className="text-xs text-slate-500 uppercase">Créé le</span>
-                <p className="text-sm text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Créé le</span>
+                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
                   {formatDate(selectedTask.createdAt)}
                 </p>
               </div>
               <div>
-                <span className="text-xs text-slate-500 uppercase">Date échéance</span>
-                <p className="text-sm text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Échéance</span>
+                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
                   {selectedTask.dateEcheance ? formatDate(selectedTask.dateEcheance) : '-'}
                 </p>
               </div>
               <div>
-                <span className="text-xs text-slate-500 uppercase">Assigné à</span>
-                <p className="text-sm text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Assigné à</span>
+                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
                   {selectedTask.assignedToName || 'Non assigné'}
                 </p>
               </div>
               {selectedTask.transfertId && (
                 <div>
-                  <span className="text-xs text-slate-500 uppercase">Transfert lié</span>
-                  <p className="text-sm font-mono text-slate-900 dark:text-white">
+                  <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Transfert</span>
+                  <p className="text-xs sm:text-sm font-mono text-slate-900 dark:text-white truncate">
                     {selectedTask.transfertId.slice(0, 8)}...
                   </p>
                 </div>
@@ -772,18 +789,18 @@ export default function RegularizationDashboard() {
 
             {/* Resolution */}
             {selectedTask.resolution && (
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                     Résolution
                   </span>
                 </div>
-                <p className="text-sm text-emerald-800 dark:text-emerald-300">
+                <p className="text-xs sm:text-sm text-emerald-800 dark:text-emerald-300">
                   {selectedTask.resolution}
                 </p>
                 {selectedTask.resolvedAt && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-2">
+                  <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-500 mt-1.5">
                     Résolu le {formatDate(selectedTask.resolvedAt)}
                   </p>
                 )}
@@ -791,8 +808,8 @@ export default function RegularizationDashboard() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <Button variant="ghost" onClick={() => setDetailsModalOpen(false)}>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <Button variant="ghost" size="sm" onClick={() => setDetailsModalOpen(false)}>
                 Fermer
               </Button>
               {selectedTask.statut !== 'RESOLVED' &&
@@ -800,6 +817,7 @@ export default function RegularizationDashboard() {
                 canResolve && (
                   <Button
                     variant="primary"
+                    size="sm"
                     icon={CheckCircle2}
                     onClick={() => {
                       setDetailsModalOpen(false);

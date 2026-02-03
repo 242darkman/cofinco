@@ -102,17 +102,17 @@ export default function AppShell({
         {/* Scrollable content area - takes remaining space */}
         <main
           className={[
-            'flex-1 min-h-0 flex flex-col overflow-y-auto overscroll-contain bg-surface pro-scrollbar',
+            'flex-1 min-h-0 overflow-y-auto overscroll-contain bg-surface pro-scrollbar',
             isMobile && hasBottomNav ? 'pb-20' : ''
           ].join(' ')}
         >
           {/* Content wrapper */}
-          <div className="flex-1 min-h-0 flex flex-col px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+          <div className="px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
             {children}
           </div>
 
           {/* Bottom safe-area spacing for iOS */}
-          <div className="shrink-0 h-[env(safe-area-inset-bottom)]" />
+          <div className="h-[env(safe-area-inset-bottom)]" />
         </main>
       </div>
 
