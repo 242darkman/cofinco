@@ -42,6 +42,7 @@ import { paymentsTestRouter } from "./routes/payments-test";
 import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
 import { registerMonitoringRoutes } from "./routes/monitoring";
+import syncRouter from "./routes/sync";
 
 const logger = createLogger('Routes');
 
@@ -124,6 +125,9 @@ export function registerRoutes(app: Express): Server {
 
   // Financial Monitoring Module (alerts, reconciliation, real-time monitoring)
   registerMonitoringRoutes(app);
+
+  // Sync Heartbeat Module (real-time connection status)
+  app.use("/api/sync", syncRouter);
 
   // External Services
   registerMobileMoneyRoutes(app);
