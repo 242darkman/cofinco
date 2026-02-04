@@ -2224,11 +2224,35 @@ export const healthApi = {
 
 // Admin API
 export const adminApi = {
+  // P1.3: Consolidated dashboard stats endpoint (replaces 3 separate calls)
+  getDashboardStats: () => request<{
+    totalUsers: number;
+    activeUsers: number;
+    inactiveUsers: number;
+    todayLogins: number;
+    todayOperations: number;
+    activeRoles: Record<string, number>;
+    recentActivity: Array<{
+      id: string;
+      user_name: string;
+      action: string;
+      details: string;
+      created_at: string;
+      ip_address?: string;
+    }>;
+    systemHealth: {
+      database: 'healthy' | 'warning' | 'error';
+      security: 'secure' | 'attention';
+      dbResponseTime: number;
+      serverUptime: string;
+      memoryPercent: number;
+    };
+  }>('/admin/dashboard-stats'),
   resetPlatform: (data: any) => request<any>('/admin/reset-platform', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  resetAgence: (agenceId: string, data: { confirmation: string }) => 
+  resetAgence: (agenceId: string, data: { confirmation: string }) =>
     request<any>(`/admin/reset-agence/${agenceId}`, {
       method: 'POST',
       body: JSON.stringify(data),

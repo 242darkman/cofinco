@@ -3,17 +3,34 @@
  *
  * Stratégie intelligente:
  * - WebSocket en priorité pour notifications temps réel
- * - Polling réduit comme backup (30s au lieu de 10s)
- * - Polling augmente à 10s si WebSocket déconnecté
+ * - Polling 30s quand WebSocket connecté
+ * - Backoff exponentiel (10s → 20s → 40s → 80s → 120s) quand WebSocket déconnecté
+ * - Jitter ±20% pour éviter le thundering herd
  * - Refetch immédiat sur événement WebSocket
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWebSocket } from '../useWebSocket';
 import { sessionCaisseApi } from '../../lib/api-client';
 import type { SessionCaisse } from '../../types/finance';
+
+// P2.1: Polling backoff constants
+const POLLING_INTERVALS = {
+  WS_CONNECTED: 30000,        // 30s when WebSocket is active
+  MIN_DISCONNECTED: 10000,    // 10s initial when disconnected
+  MAX_DISCONNECTED: 120000,   // 120s maximum backoff
+  JITTER_FACTOR: 0.2,         // ±20% jitter to prevent thundering herd
+};
+
+/**
+ * Apply jitter to an interval to prevent synchronized requests
+ */
+function applyJitter(interval: number): number {
+  const jitter = interval * POLLING_INTERVALS.JITTER_FACTOR;
+  return interval + (Math.random() * 2 - 1) * jitter;
+}
 
 interface UsePendingSessionSyncOptions {
   enabled: boolean;
@@ -35,7 +52,31 @@ export function usePendingSessionSync(
   const prevStatusRef = useRef<string | null>(null);
   const lastWebSocketUpdateRef = useRef<number>(0);
 
-  // Query avec polling adaptatif
+  // P2.1: Track backoff level for exponential polling when WS is disconnected
+  const [backoffLevel, setBackoffLevel] = useState(0);
+  const wasConnectedRef = useRef(isConnected);
+
+  // Calculate current polling interval with exponential backoff
+  const getPollingInterval = useCallback(() => {
+    if (isConnected) {
+      return POLLING_INTERVALS.WS_CONNECTED;
+    }
+    // Exponential backoff: 10s → 20s → 40s → 80s → 120s (max)
+    const baseInterval = POLLING_INTERVALS.MIN_DISCONNECTED * Math.pow(2, backoffLevel);
+    const clampedInterval = Math.min(baseInterval, POLLING_INTERVALS.MAX_DISCONNECTED);
+    return applyJitter(clampedInterval);
+  }, [isConnected, backoffLevel]);
+
+  // Reset backoff when WebSocket reconnects, increment on failed poll cycles
+  useEffect(() => {
+    if (isConnected && !wasConnectedRef.current) {
+      // WebSocket just reconnected - reset backoff
+      setBackoffLevel(0);
+    }
+    wasConnectedRef.current = isConnected;
+  }, [isConnected]);
+
+  // Query avec polling adaptatif et backoff exponentiel
   const {
     data: pendingSession,
     isLoading,
@@ -44,11 +85,19 @@ export function usePendingSessionSync(
     queryKey: ['session-caisse', 'pending'],
     queryFn: async () => {
       const data = await sessionCaisseApi.getPending();
+
+      // P2.1: Increment backoff level after each poll when WS is disconnected
+      // This progressively reduces polling frequency when offline
+      if (!isConnected) {
+        setBackoffLevel(prev => Math.min(prev + 1, 4)); // Max level 4 = 120s
+      }
+
       return data as SessionCaisse | null;
     },
     enabled,
-    // Polling adaptatif selon état WebSocket
-    refetchInterval: isConnected ? 30000 : 10000, // 30s si WS actif, 10s sinon
+    // P2.1: Polling adaptatif avec backoff exponentiel quand WS déconnecté
+    // Connecté: 30s fixe | Déconnecté: 10s → 20s → 40s → 80s → 120s avec jitter
+    refetchInterval: getPollingInterval(),
     refetchIntervalInBackground: true,
     // Garde les données en cache pendant 5s pour éviter refetch si WS vient de notifier
     staleTime: 5000,

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Activity, Shield, AlertCircle, CheckCircle, Clock, Database, Lock, UserCheck, HardDrive, Zap, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, LoadingSpinner, Button } from '../ui';
-import { userApi, auditApi, healthApi } from '../../lib/api-client';
+import { adminApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
-import { StatutUser } from '@shared/enum/status-constants';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -53,66 +52,19 @@ export default function AdminDashboard() {
   const [rolesPage, setRolesPage] = useState(1);
   const ROLES_PER_PAGE = 5;
 
+  // P1.3: Single API call instead of 3 separate calls (reduces latency)
   const loadDashboardStats = useCallback(async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const [users, auditResponse, healthData] = await Promise.all([
-        userApi.getAll().catch(() => []),
-        auditApi.getAll().catch(() => ({ data: [] })),
-        healthApi.check().catch(() => null)
-      ]);
-      // L'API audit retourne { data: [...], total, page, totalPages }
-      const allLogs = Array.isArray(auditResponse) ? auditResponse : (auditResponse?.data || []);
-
-      // Deduplicate Users for Count
-      const uniqueUsers = Array.from(new Set(users.map((u: any) => u.id)))
-        .map(id => users.find((u: any) => u.id === id));
-
-      const totalUsers = uniqueUsers.length;
-      const activeUsers = uniqueUsers.filter((u: any) => u.statut === StatutUser.ACTIVE).length;
-      const inactiveUsers = totalUsers - activeUsers;
-
-      const activeRoles: Record<string, number> = {};
-      uniqueUsers.forEach((u: any) => {
-        if (u.role) activeRoles[u.role] = (activeRoles[u.role] || 0) + 1;
-      });
-
-      const todayLogs = allLogs.filter((log: any) => new Date(log.createdAt || log.created_at) >= today);
-      const todayLogins = todayLogs.filter((log: any) => log.action === 'LOGIN' || log.action === 'login').length;
-      const todayOperations = todayLogs.length;
-
-      // Ensure details are strings
-      const recentActivity: ActivityLog[] = allLogs.slice(0, 50).map((log: any) => {
-        let detailsStr = '';
-        if (typeof log.details === 'string') {
-           detailsStr = log.details;
-        } else if (typeof log.details === 'object' && log.details !== null) {
-           detailsStr = Object.values(log.details).filter(v => typeof v === 'string' || typeof v === 'number').join(' - ') || JSON.stringify(log.details);
-        }
-
-        return {
-          id: log.id,
-          user_name: log.userName || log.user_name || 'Système',
-          action: String(log.action || 'Action inconnue'),
-          details: detailsStr,
-          created_at: log.createdAt || log.created_at,
-          ip_address: log.ipAddress || log.ip_address
-        };
-      });
-
-      const systemHealth = healthData ? {
-        database: healthData.database?.status || 'healthy',
-        security: healthData.security?.status || 'secure',
-        dbResponseTime: healthData.database?.responseTime || 0,
-        serverUptime: healthData.server?.uptime || '0h 0m',
-        memoryPercent: healthData.server?.memory?.percent || 0
-      } : { database: 'healthy' as const, security: 'secure' as const, dbResponseTime: 0, serverUptime: '0h 0m', memoryPercent: 0 };
-
+      const data = await adminApi.getDashboardStats();
       setStats({
-        totalUsers, activeUsers, inactiveUsers, todayLogins, todayOperations, activeRoles, recentActivity,
-        systemHealth
+        totalUsers: data.totalUsers,
+        activeUsers: data.activeUsers,
+        inactiveUsers: data.inactiveUsers,
+        todayLogins: data.todayLogins,
+        todayOperations: data.todayOperations,
+        activeRoles: data.activeRoles,
+        recentActivity: data.recentActivity,
+        systemHealth: data.systemHealth,
       });
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du chargement des statistiques'));
