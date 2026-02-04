@@ -81,18 +81,18 @@ class NetworkManager {
 
   /**
    * Get current network state
+   * Note: Returns the same reference for useSyncExternalStore compatibility
    */
   getState(): Readonly<NetworkState> {
-    return { ...this.state };
+    return this.state;
   }
 
   /**
    * Subscribe to state changes
+   * Note: Does NOT immediately notify - useSyncExternalStore handles initial state via getSnapshot
    */
   subscribe(listener: NetworkStateListener): () => void {
     this.listeners.add(listener);
-    // Immediately notify with current state
-    listener(this.getState());
     return () => {
       this.listeners.delete(listener);
     };

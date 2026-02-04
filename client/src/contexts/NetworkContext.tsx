@@ -11,11 +11,9 @@ import React, {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { networkManager, NetworkState, NetworkStatus } from '../lib/networkManager';
 import { useServerHealth } from './ServerHealthContext';
-import { connectivityService } from '../lib/connectivityService';
 
 // ============================================================================
 // Types
@@ -51,12 +49,17 @@ interface NetworkProviderProps {
 }
 
 export function NetworkProvider({ children }: NetworkProviderProps) {
-  // Get state from networkManager using useSyncExternalStore for proper React 18 concurrent mode support
-  const networkState = useSyncExternalStore(
-    networkManager.subscribe.bind(networkManager),
-    networkManager.getState.bind(networkManager),
-    networkManager.getState.bind(networkManager) // Server snapshot
-  );
+  // Get state from networkManager using useState + useEffect
+  // (simpler than useSyncExternalStore and avoids reference comparison issues)
+  const [networkState, setNetworkState] = useState<NetworkState>(() => networkManager.getState());
+
+  // Subscribe to networkManager changes
+  useEffect(() => {
+    const unsubscribe = networkManager.subscribe((newState) => {
+      setNetworkState({ ...newState }); // Create new object to trigger re-render
+    });
+    return unsubscribe;
+  }, []);
 
   // Integrate with existing ServerHealthContext
   const { isServerReachable, isChecking, checkHealth: serverCheckHealth } = useServerHealth();
@@ -68,30 +71,46 @@ export function NetworkProvider({ children }: NetworkProviderProps) {
   // Countdown interval ref
   const countdownIntervalRef = useRef<number | null>(null);
 
+  // Track previous server reachable state to avoid loops
+  const prevServerReachableRef = useRef<boolean | null>(null);
+  const hasMountedRef = useRef(false);
+
   // Sync networkManager status with ServerHealthContext
+  // Only react to actual changes in isServerReachable after mount
   useEffect(() => {
-    if (!isServerReachable && networkState.status === 'online') {
-      // ServerHealth says unreachable but networkManager says online
-      // This can happen during initial load or after health check fails
-      if (navigator.onLine) {
-        networkManager.forceStatus('api_down');
-      } else {
-        networkManager.forceStatus('offline');
-      }
-    } else if (isServerReachable && (networkState.status === 'api_down' || networkState.status === 'offline')) {
-      // Server became reachable again
-      networkManager.forceStatus('online');
+    // Skip first render - let networkManager initialize on its own
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      prevServerReachableRef.current = isServerReachable;
+      return;
     }
-  }, [isServerReachable, networkState.status]);
 
-  // Sync with connectivityService
-  useEffect(() => {
-    const unsubscribe = connectivityService.subscribe((isOnline) => {
-      networkManager.updateNavigatorOnline(isOnline);
-    });
+    // Only process if isServerReachable actually changed
+    if (prevServerReachableRef.current === isServerReachable) {
+      return;
+    }
 
-    return unsubscribe;
-  }, []);
+    const prevValue = prevServerReachableRef.current;
+    prevServerReachableRef.current = isServerReachable;
+
+    // Only sync when transitioning between reachable/unreachable
+    if (prevValue !== null) {
+      if (!isServerReachable) {
+        // Server became unreachable
+        if (navigator.onLine) {
+          networkManager.forceStatus('api_down');
+        } else {
+          networkManager.forceStatus('offline');
+        }
+      } else {
+        // Server became reachable again
+        networkManager.forceStatus('online');
+      }
+    }
+  }, [isServerReachable]);
+
+  // Note: networkManager already listens to browser online/offline events internally
+  // No need to sync with connectivityService here (would cause duplicate updates)
 
   // Update lastSyncAt when we get a success
   useEffect(() => {
