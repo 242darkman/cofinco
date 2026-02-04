@@ -157,7 +157,8 @@ export function useDashboardStats(userRole?: string) {
     queryFn: () => dashboardApi.getStatsLight(),
     enabled: isSlow, // Only fetch on slow connections
     staleTime: 60_000, // 1 minute - lightweight can be cached longer
-    gcTime: 5 * 60_000, // 5 minutes
+    // P5.1: Increased gcTime for lightweight stats (small payload, frequently accessed)
+    gcTime: 15 * 60_000, // 15 minutes - keep in memory longer since it's just KPIs
   });
 
   // Full stats query (always runs, but delayed on slow connections)
@@ -166,6 +167,8 @@ export function useDashboardStats(userRole?: string) {
     queryFn: () => dashboardApi.getStats(),
     // P4.4: 30s minimum staleTime for slow connection optimization
     staleTime: isSlow ? 60_000 : 30_000,
+    // P5.1: Explicit gcTime - keep full stats cached for re-visits
+    gcTime: isSlow ? 10 * 60_000 : 5 * 60_000, // 10min on slow, 5min on fast
     refetchInterval: isSlow ? false : 30_000, // Disable polling on 3G
     refetchOnWindowFocus: !isSlow, // Don't auto-refresh on slow connections
     // On slow connections with light stats: mark as not essential initially

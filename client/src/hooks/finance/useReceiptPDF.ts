@@ -35,18 +35,16 @@ export const useReceiptPDF = (options: UseReceiptPDFOptions = {}) => {
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        onclone: (doc) => {
+onclone: (doc) => {
+          // P4.2: Optimized - single DOM pass instead of multiple querySelectorAll('*')
           // --- Helpers ---
-          const hasOkl = (v: string | null | undefined) =>
-            !!v && (v.toLowerCase().includes('oklch(') || v.toLowerCase().includes('oklab('));
+          const OKL_REGEX = /ok(?:lch|lab)\(/i;
+          const hasOkl = (v: string | null | undefined) => !!v && OKL_REGEX.test(v);
 
-          // Remplace toute fonction oklch()/oklab() par une couleur sûre
           const sanitizeColorFunctions = (v: string) =>
-            v
-              .replace(/oklch\([^)]*\)/gi, '#0f172a') // slate-900-ish
-              .replace(/oklab\([^)]*\)/gi, '#0f172a');
+            v.replace(/oklch\([^)]*\)/gi, '#0f172a').replace(/oklab\([^)]*\)/gi, '#0f172a');
 
-          // --- 1) rendre le template visible si masqué hors print ---
+          // --- 1) Rendre le template visible si masqué hors print ---
           const root = doc.querySelector('[data-receipt-root]') as HTMLElement | null;
           if (root) {
             root.style.display = 'block';
@@ -54,78 +52,74 @@ export const useReceiptPDF = (options: UseReceiptPDFOptions = {}) => {
             root.style.opacity = '1';
           }
 
-          // --- 3) Patch des styles inline: style="...oklch(...)" ---
-          doc.querySelectorAll<HTMLElement>('*').forEach((el) => {
+          // --- 2) Remove SVG gradients/filters upfront (single query) ---
+          doc.querySelectorAll('svg linearGradient, svg radialGradient, svg filter').forEach((n) => n.remove());
+
+          // --- 3) Single pass for all elements (merged from 3 separate loops) ---
+          const svgColorAttrs = ['fill', 'stroke', 'stop-color', 'flood-color', 'lighting-color', 'color'];
+          const cssProps = [
+            'color', 'background-color', 'border-top-color', 'border-right-color',
+            'border-bottom-color', 'border-left-color', 'outline-color', 'text-decoration-color',
+          ];
+          const defaultView = doc.defaultView;
+
+          // Use TreeWalker for efficient DOM traversal (faster than querySelectorAll)
+          const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+          let node: Element | null = walker.currentNode as Element;
+
+          while (node) {
+            const el = node as HTMLElement;
+            const isSvgElement = el.namespaceURI === 'http://www.w3.org/2000/svg';
+
+            // Patch inline style attribute
             const styleAttr = el.getAttribute('style');
             if (hasOkl(styleAttr)) {
               el.setAttribute('style', sanitizeColorFunctions(styleAttr!));
             }
-          });
 
-          // --- 4) Patch des attributs SVG qui peuvent contenir oklch/oklab ---
-          // Important: html2canvas plante souvent ici (SVGElementContainer)
-          const svgColorAttrs = [
-            'fill',
-            'stroke',
-            'stop-color',
-            'flood-color',
-            'lighting-color',
-            'color',
-          ] as const;
-
-          doc.querySelectorAll<SVGElement>('svg, svg *').forEach((el) => {
-            for (const a of svgColorAttrs) {
-              const v = el.getAttribute(a);
-              if (hasOkl(v)) el.setAttribute(a, sanitizeColorFunctions(v!));
-            }
-
-            // style="" sur svg nodes aussi
-            const styleAttr = el.getAttribute('style');
-            if (hasOkl(styleAttr)) el.setAttribute('style', sanitizeColorFunctions(styleAttr!));
-          });
-
-          // --- 5) (Optionnel mais très efficace) neutraliser gradients & filters SVG ---
-          doc.querySelectorAll('svg linearGradient, svg radialGradient, svg filter').forEach((n) => n.remove());
-
-          // --- 6) Fallback via computed styles (quand accessible) ---
-          const props = [
-            'color',
-            'background-color',
-            'border-top-color',
-            'border-right-color',
-            'border-bottom-color',
-            'border-left-color',
-            'outline-color',
-            'text-decoration-color',
-          ] as const;
-
-          doc.querySelectorAll<HTMLElement>('*').forEach((node) => {
-            const cs = doc.defaultView?.getComputedStyle(node);
-            if (!cs) return;
-
-            const bgImage = cs.getPropertyValue('background-image');
-            if (bgImage && (hasOkl(bgImage) || bgImage.toLowerCase().includes('gradient'))) {
-              node.style.setProperty('background-image', 'none', 'important');
-              const bgColor = cs.getPropertyValue('background-color');
-              if (!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)') {
-                node.style.setProperty('background-color', '#ffffff', 'important');
+            // SVG-specific: patch color attributes
+            if (isSvgElement) {
+              for (const attr of svgColorAttrs) {
+                const v = el.getAttribute(attr);
+                if (hasOkl(v)) el.setAttribute(attr, sanitizeColorFunctions(v!));
               }
             }
 
-            for (const p of props) {
-              const v = cs.getPropertyValue(p);
-              if (!hasOkl(v)) continue;
+            // Computed styles fallback (only if defaultView available)
+            if (defaultView && el.style) {
+              try {
+                const cs = defaultView.getComputedStyle(el);
 
-              // Fallbacks simples
-              if (p === 'background-color') {
-                node.style.setProperty(p, '#ffffff', 'important');
-              } else if (p === 'color') {
-                node.style.setProperty(p, '#0f172a', 'important');
-              } else {
-                node.style.setProperty(p, '#cbd5e1', 'important'); // slate-300-ish
+                // Handle gradient backgrounds
+                const bgImage = cs.getPropertyValue('background-image');
+                if (bgImage && (hasOkl(bgImage) || bgImage.includes('gradient'))) {
+                  el.style.setProperty('background-image', 'none', 'important');
+                  const bgColor = cs.getPropertyValue('background-color');
+                  if (!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)') {
+                    el.style.setProperty('background-color', '#ffffff', 'important');
+                  }
+                }
+
+                // Fix oklch/oklab colors in computed styles
+                for (const p of cssProps) {
+                  const v = cs.getPropertyValue(p);
+                  if (!hasOkl(v)) continue;
+
+                  if (p === 'background-color') {
+                    el.style.setProperty(p, '#ffffff', 'important');
+                  } else if (p === 'color') {
+                    el.style.setProperty(p, '#0f172a', 'important');
+                  } else {
+                    el.style.setProperty(p, '#cbd5e1', 'important');
+                  }
+                }
+              } catch {
+                // Skip elements that can't be styled
               }
             }
-          });
+
+            node = walker.nextNode() as Element | null;
+          }
         },
       });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { Users, Activity, Shield, AlertCircle, CheckCircle, Clock, Database, Lock, UserCheck, HardDrive, Zap, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, LoadingSpinner, Button } from '../ui';
 import { adminApi } from '../../lib/api-client';
@@ -304,10 +304,11 @@ export default function AdminDashboard() {
 
 // === Helper Components ===
 
-function CompactStatBox({ 
-    icon: Icon, label, value, subValue, color, className = '' 
-}: { 
-    icon: any, label: string, value: number, subValue?: string, color: 'primary' | 'success' | 'warning' | 'neutral', className?: string 
+// P4.1: Memoized to prevent re-renders when parent state changes (pagination, etc.)
+const CompactStatBox = memo(function CompactStatBox({
+    icon: Icon, label, value, subValue, color, className = ''
+}: {
+    icon: any, label: string, value: number, subValue?: string, color: 'primary' | 'success' | 'warning' | 'neutral', className?: string
 }) {
   const colorStyles = {
     primary: 'bg-gradient-to-br from-blue-500/10 to-indigo-500/5 border-blue-500/20 text-blue-100',
@@ -338,9 +339,10 @@ function CompactStatBox({
       </div>
     </div>
   );
-}
+});
 
-function HealthTile({ label, status, value, icon: Icon, alert }: { label: string, status: boolean, value?: string, icon: any, alert?: boolean }) {
+// P4.1: Memoized to prevent re-renders on health/roles state changes
+const HealthTile = memo(function HealthTile({ label, status, value, icon: Icon, alert }: { label: string, status: boolean, value?: string, icon: any, alert?: boolean }) {
     return (
         <div className={`p-2.5 rounded-lg border flex items-center justify-between ${
             alert ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-800/40 border-slate-700/50'
@@ -360,8 +362,8 @@ function HealthTile({ label, status, value, icon: Icon, alert }: { label: string
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse"></div>
             )}
         </div>
-    )
-}
+    );
+});
 
 function HistoryIcon() {
     return (
