@@ -231,4 +231,115 @@ export function SkeletonContributionCard() {
   );
 }
 
+// P2.2: Dashboard skeleton for initial load
+export function SkeletonDashboard() {
+  return (
+    <div className="space-y-6 p-4" role="status" aria-label="Chargement du tableau de bord...">
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonStatCard key={i} />
+        ))}
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+          <Skeleton variant="text" width="40%" height="1rem" className="mb-4" />
+          <Skeleton variant="rounded" width="100%" height={200} />
+        </div>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+          <Skeleton variant="text" width="35%" height="1rem" className="mb-4" />
+          <Skeleton variant="rounded" width="100%" height={200} />
+        </div>
+      </div>
+
+      {/* Recent activity */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+        <Skeleton variant="text" width="30%" height="1rem" className="mb-4" />
+        <SkeletonTable rows={5} columns={5} />
+      </div>
+      <span className="sr-only">Chargement...</span>
+    </div>
+  );
+}
+
+// P2.2: Client list item skeleton
+export function SkeletonClientItem() {
+  return (
+    <div className="flex items-center gap-4 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50" role="status">
+      <SkeletonAvatar size={48} />
+      <div className="flex-1 min-w-0 space-y-2">
+        <Skeleton variant="text" width="50%" height="1rem" />
+        <div className="flex items-center gap-3">
+          <Skeleton variant="text" width={100} height="0.75rem" />
+          <Skeleton variant="rounded" width={60} height={20} />
+        </div>
+      </div>
+      <div className="text-right space-y-1">
+        <Skeleton variant="text" width={80} height="1rem" />
+        <Skeleton variant="text" width={60} height="0.75rem" />
+      </div>
+      <span className="sr-only">Chargement...</span>
+    </div>
+  );
+}
+
+// P2.2: Credit list item skeleton
+export function SkeletonCreditItem() {
+  return (
+    <div className="flex items-center gap-4 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50" role="status">
+      <div className="w-12 h-12 flex items-center justify-center">
+        <Skeleton variant="circular" width={40} height={40} />
+      </div>
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex items-center gap-2">
+          <Skeleton variant="text" width="40%" height="1rem" />
+          <Skeleton variant="rounded" width={70} height={20} />
+        </div>
+        <div className="flex items-center gap-4">
+          <Skeleton variant="text" width={80} height="0.75rem" />
+          <Skeleton variant="text" width={100} height="0.75rem" />
+        </div>
+      </div>
+      <div className="text-right space-y-1">
+        <Skeleton variant="text" width={100} height="1.25rem" />
+        <Skeleton variant="text" width={80} height="0.75rem" />
+      </div>
+      <span className="sr-only">Chargement...</span>
+    </div>
+  );
+}
+
+// P2.2: Stats grid skeleton (for dashboard and analytics)
+export function SkeletonStatsGrid({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="status" aria-label="Chargement des statistiques...">
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonStatCard key={i} />
+      ))}
+      <span className="sr-only">Chargement...</span>
+    </div>
+  );
+}
+
+// P2.2: Form skeleton
+export function SkeletonForm({ fields = 4 }: { fields?: number }) {
+  return (
+    <div className="space-y-4" role="status" aria-label="Chargement du formulaire...">
+      {Array.from({ length: fields }).map((_, i) => (
+        <div key={i} className="space-y-2">
+          <Skeleton variant="text" width="30%" height="0.75rem" />
+          <Skeleton variant="rounded" width="100%" height={40} />
+        </div>
+      ))}
+      <div className="flex justify-end gap-3 pt-4">
+        <Skeleton variant="rounded" width={80} height={36} />
+        <Skeleton variant="rounded" width={100} height={36} />
+      </div>
+      <span className="sr-only">Chargement...</span>
+    </div>
+  );
+}
+
 export default Skeleton;

@@ -31,9 +31,54 @@ export default defineConfig({
         globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
         // Runtime caching strategies
         runtimeCaching: [
-          // API calls - Network first with cache fallback
+          // P2.5: Lightweight stats - StaleWhileRevalidate for instant display on 3G
           {
-            urlPattern: /^\/api\/(?!auth|session).*/i,
+            urlPattern: /^\/api\/dashboard\/stats-light/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'stats-light-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 2 // 2 minutes (short for lightweight data)
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // P2.5: Client list - StaleWhileRevalidate for quick navigation
+          {
+            urlPattern: /^\/api\/clients(\?.*)?$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'clients-cache',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 5 // 5 minutes
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // P2.5: Credits list - StaleWhileRevalidate
+          {
+            urlPattern: /^\/api\/credits(\?.*)?$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'credits-cache',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 5 // 5 minutes
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // API calls - Network first with cache fallback (reduced timeout for 3G)
+          {
+            urlPattern: /^\/api\/(?!auth|session|dashboard\/stats-light).*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
@@ -41,7 +86,7 @@ export default defineConfig({
                 maxEntries: 500,
                 maxAgeSeconds: 60 * 60 * 24 // 24 hours
               },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5, // P2.5: Reduced from 10s to 5s for faster cache fallback
               cacheableResponse: {
                 statuses: [0, 200]
               },
