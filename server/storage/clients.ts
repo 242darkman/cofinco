@@ -211,6 +211,7 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
 
 /**
  * Récupérer les clients paginés avec données utilisateur fusionnées
+ * P5.9: Optimized to exclude heavy 'documents' field from list responses (~1MB → ~150KB)
  */
 export async function getClientsPaginated(
   filter: { agence?: string; agenceId?: string } = {},
@@ -230,9 +231,49 @@ export async function getClientsPaginated(
 
   const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
 
+  // P5.9: Select only needed fields, excluding heavy 'documents' JSONB
   let query = db
     .select({
-      client: clients,
+      // Client fields (excluding documents)
+      id: clients.id,
+      userId: clients.userId,
+      adresseDomicile: clients.adresseDomicile,
+      lieuActivite: clients.lieuActivite,
+      ville: clients.ville,
+      pays: clients.pays,
+      dateNaissance: clients.dateNaissance,
+      numeroPiece: clients.numeroPiece,
+      typePiece: clients.typePiece,
+      profession: clients.profession,
+      employeur: clients.employeur,
+      typeActivite: clients.typeActivite,
+      revenuMensuel: clients.revenuMensuel,
+      revenuJournalier: clients.revenuJournalier,
+      typeRevenu: clients.typeRevenu,
+      typeMarcheId: clients.typeMarcheId,
+      segment: clients.segment,
+      frequenceCarte: clients.frequenceCarte,
+      latitude: clients.latitude,
+      longitude: clients.longitude,
+      score: clients.score,
+      creditTotal: clients.creditTotal,
+      epargneTotal: clients.epargneTotal,
+      tauxRemboursement: clients.tauxRemboursement,
+      limiteRetraitJournalier: clients.limiteRetraitJournalier,
+      limiteRetraitHebdomadaire: clients.limiteRetraitHebdomadaire,
+      limiteRetraitMensuel: clients.limiteRetraitMensuel,
+      pointsFidelite: clients.pointsFidelite,
+      scoreEngagement: clients.scoreEngagement,
+      derniereActivite: clients.derniereActivite,
+      agenceId: clients.agenceId,
+      agentReferentId: clients.agentReferentId,
+      dateAdhesion: clients.dateAdhesion,
+      dateInscription: clients.dateInscription,
+      createdBy: clients.createdBy,
+      createdAt: clients.createdAt,
+      updatedAt: clients.updatedAt,
+      deletedAt: clients.deletedAt,
+      // Related fields
       type_marche_nom: typesMarches.nom,
       agence_nom: agences.nom,
       user_nom: users.nom,
@@ -259,13 +300,52 @@ export async function getClientsPaginated(
 
   return {
     data: results.map((r) => ({
-      ...r.client,
+      id: r.id,
+      userId: r.userId,
+      adresseDomicile: r.adresseDomicile,
+      lieuActivite: r.lieuActivite,
+      ville: r.ville,
+      pays: r.pays,
+      dateNaissance: r.dateNaissance,
+      numeroPiece: r.numeroPiece,
+      typePiece: r.typePiece,
+      profession: r.profession,
+      employeur: r.employeur,
+      typeActivite: r.typeActivite,
+      revenuMensuel: r.revenuMensuel,
+      revenuJournalier: r.revenuJournalier,
+      typeRevenu: r.typeRevenu,
+      typeMarcheId: r.typeMarcheId,
+      segment: r.segment,
+      frequenceCarte: r.frequenceCarte,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      score: r.score,
+      creditTotal: r.creditTotal,
+      epargneTotal: r.epargneTotal,
+      tauxRemboursement: r.tauxRemboursement,
+      limiteRetraitJournalier: r.limiteRetraitJournalier,
+      limiteRetraitHebdomadaire: r.limiteRetraitHebdomadaire,
+      limiteRetraitMensuel: r.limiteRetraitMensuel,
+      pointsFidelite: r.pointsFidelite,
+      scoreEngagement: r.scoreEngagement,
+      derniereActivite: r.derniereActivite,
+      agenceId: r.agenceId,
+      agentReferentId: r.agentReferentId,
+      dateAdhesion: r.dateAdhesion,
+      dateInscription: r.dateInscription,
+      createdBy: r.createdBy,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      deletedAt: r.deletedAt,
+      // Identity fields from users
       nom: r.user_nom || "Client",
       prenom: r.user_prenom,
       email: r.user_email,
       telephone: r.user_telephone,
       photoProfile: r.user_photo_profile,
       statut: r.user_statut || StatutUser.ACTIVE,
+      // Enriched fields
       type_marche_nom: r.type_marche_nom,
       agence_nom: r.agence_nom,
       photoUrl: (() => {
@@ -278,7 +358,7 @@ export async function getClientsPaginated(
         }
         return url;
       })(),
-    })),
+    })) as ClientFull[],
     total,
   };
 }

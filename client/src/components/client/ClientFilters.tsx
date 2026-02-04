@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Filter } from 'lucide-react';
 import { SearchInput } from '../ui';
 import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
@@ -41,6 +41,23 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
 
   const [debouncedSearch, setDebouncedSearch] = useState(filters.searchTerm);
 
+  // P5.7: Memoized handlers to prevent unnecessary re-renders
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFilters(prev => ({ ...prev, searchTerm: e.target.value }));
+  }, []);
+
+  const handleSearchClear = useCallback(() => {
+    setFilters(prev => ({ ...prev, searchTerm: '' }));
+  }, []);
+
+  const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters(prev => ({ ...prev, status: e.target.value }));
+  }, []);
+
+  const handleSegmentChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters(prev => ({ ...prev, segment: e.target.value }));
+  }, []);
+
   // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -70,8 +87,8 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       <div className="flex-1 min-w-0">
         <SearchInput
           value={filters.searchTerm}
-          onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
-          onClear={() => setFilters(prev => ({ ...prev, searchTerm: '' }))}
+          onChange={handleSearchChange}
+          onClear={handleSearchClear}
           placeholder="Rechercher un client..."
           className="w-full"
         />
@@ -80,7 +97,7 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       {/* Status filter */}
       <select
         value={filters.status}
-        onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+        onChange={handleStatusChange}
         className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-blue-500/30 ${
           filters.status !== 'all'
             ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'
@@ -96,7 +113,7 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       {/* Segment filter */}
       <select
         value={filters.segment}
-        onChange={(e) => setFilters(prev => ({ ...prev, segment: e.target.value }))}
+        onChange={handleSegmentChange}
         className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-blue-500/30 ${
           filters.segment !== 'all'
             ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'

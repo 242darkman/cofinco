@@ -1,6 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Users, TrendingUp, TrendingDown, Award, DollarSign, Activity, Calendar, Target, PieChart, BarChart3 } from 'lucide-react';
 import { clientApi, type ClientStatsResponse } from '../../lib/api-client';
+
+// P5.8: Memoized distribution bar component to prevent unnecessary re-renders
+interface DistributionBarProps {
+  name: string;
+  value: number;
+  color: string;
+  percentage: string;
+}
+
+const DistributionBar = memo(function DistributionBar({ name, value, color, percentage }: DistributionBarProps) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-medium text-slate-300">{name}</span>
+        <span className="text-xs font-bold" style={{ color }}>
+          {value} ({percentage}%)
+        </span>
+      </div>
+      <div className="w-full bg-slate-700/50 rounded-full h-2">
+        <div
+          className="h-2 rounded-full transition-all shadow-[0_0_10px_rgba(0,0,0,0.2)]"
+          style={{
+            width: `${percentage}%`,
+            backgroundColor: color,
+            boxShadow: `0 0 8px ${color}40`
+          }}
+        />
+      </div>
+    </div>
+  );
+});
 
 export default function ClientStatsDashboard() {
   const [stats, setStats] = useState<ClientStatsResponse | null>(null);
@@ -120,24 +151,13 @@ export default function ClientStatsDashboard() {
 
           <div className="space-y-4">
             {segmentDistribution.map((segment) => (
-              <div key={segment.name}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-medium text-slate-300">{segment.name}</span>
-                  <span className="text-xs font-bold" style={{ color: segment.color }}>
-                    {segment.value} ({segment.percentage}%)
-                  </span>
-                </div>
-                <div className="w-full bg-slate-700/50 rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full transition-all shadow-[0_0_10px_rgba(0,0,0,0.2)]"
-                    style={{
-                      width: `${segment.percentage}%`,
-                      backgroundColor: segment.color,
-                      boxShadow: `0 0 8px ${segment.color}40`
-                    }}
-                  ></div>
-                </div>
-              </div>
+              <DistributionBar
+                key={segment.name}
+                name={segment.name}
+                value={segment.value}
+                color={segment.color}
+                percentage={segment.percentage}
+              />
             ))}
           </div>
 
@@ -151,24 +171,13 @@ export default function ClientStatsDashboard() {
 
           <div className="space-y-4">
             {statusDistribution.map((status) => (
-              <div key={status.name}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-medium text-slate-300">{status.name}</span>
-                  <span className="text-xs font-bold" style={{ color: status.color }}>
-                    {status.value} ({status.percentage}%)
-                  </span>
-                </div>
-                <div className="w-full bg-slate-700/50 rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full transition-all shadow-[0_0_10px_rgba(0,0,0,0.2)]"
-                    style={{
-                      width: `${status.percentage}%`,
-                      backgroundColor: status.color,
-                      boxShadow: `0 0 8px ${status.color}40`
-                    }}
-                  ></div>
-                </div>
-              </div>
+              <DistributionBar
+                key={status.name}
+                name={status.name}
+                value={status.value}
+                color={status.color}
+                percentage={status.percentage}
+              />
             ))}
           </div>
 

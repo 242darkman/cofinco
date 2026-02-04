@@ -59,36 +59,50 @@ export default function ClientBulkCommunication({ clients, onClose, onComplete }
 
     setSending(true);
     setProgress(0);
-    let successCount = 0;
-    let failedCount = 0;
 
     try {
-      for (let i = 0; i < clients.length; i++) {
-        const client = clients[i];
-        const personalizedMessage = replacePlaceholders(message, client);
-        const personalizedSubject = subject ? replacePlaceholders(subject, client) : '';
+      // P5.10: Batched parallel sending instead of sequential with artificial delays
+      // Process in batches of 10 for better throughput while avoiding overwhelming the server
+      const BATCH_SIZE = 10;
+      let successCount = 0;
+      let failedCount = 0;
+      let processed = 0;
 
-        try {
-          const res = await fetch(`/api/clients/${client.id}/send-notification`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              channel: method === 'sms' ? 'SMS' : 'EMAIL',
-              message: personalizedMessage,
-              ...(method === 'email' ? { subject: personalizedSubject } : {}),
-            })
-          });
+      for (let i = 0; i < clients.length; i += BATCH_SIZE) {
+        const batch = clients.slice(i, i + BATCH_SIZE);
 
-          if (!res.ok) throw new Error('Envoi echoue');
-          successCount++;
-        } catch (error) {
-          console.error(`Erreur envoi a ${client.nom}:`, error);
-          failedCount++;
-        }
+        const results = await Promise.allSettled(
+          batch.map(async (client) => {
+            const personalizedMessage = replacePlaceholders(message, client);
+            const personalizedSubject = subject ? replacePlaceholders(subject, client) : '';
 
-        setProgress(Math.round(((i + 1) / clients.length) * 100));
-        await new Promise(resolve => setTimeout(resolve, 100));
+            const res = await fetch(`/api/clients/${client.id}/send-notification`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                channel: method === 'sms' ? 'SMS' : 'EMAIL',
+                message: personalizedMessage,
+                ...(method === 'email' ? { subject: personalizedSubject } : {}),
+              })
+            });
+
+            if (!res.ok) throw new Error('Envoi echoue');
+            return true;
+          })
+        );
+
+        // Count successes and failures
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        });
+
+        processed += batch.length;
+        setProgress(Math.round((processed / clients.length) * 100));
       }
 
       setResults({ success: successCount, failed: failedCount });
