@@ -100,13 +100,15 @@ class NetworkManager {
 
   /**
    * Report a successful request
+   * Only notifies listeners if status or circuit state actually changes
    */
   reportSuccess(latencyMs: number): void {
     this.updateLatency(latencyMs);
 
-    const prevState = this.state.status;
+    const prevStatus = this.state.status;
+    const prevCircuitState = this.state.circuitState;
 
-    // Update success counters
+    // Update success counters (internal tracking, doesn't trigger notification)
     this.state.consecutiveSuccesses += 1;
     this.state.consecutiveFailures = 0;
     this.state.lastSuccessAt = Date.now();
@@ -148,29 +150,40 @@ class NetworkManager {
       }
     }
 
-    if (prevState !== this.state.status) {
-      console.log(`[NetworkManager] Status: ${prevState} → ${this.state.status}`);
-    }
+    // Only notify if status or circuit state actually changed
+    const hasStateChanged =
+      prevStatus !== this.state.status ||
+      prevCircuitState !== this.state.circuitState;
 
-    this.notifyListeners();
+    if (hasStateChanged) {
+      console.log(`[NetworkManager] Status: ${prevStatus} → ${this.state.status}`);
+      this.notifyListeners();
+    }
   }
 
   /**
    * Report a failed request
+   * Only notifies listeners if status or circuit state actually changes
    */
   reportError(error: unknown, isApiError: boolean): void {
-    const prevState = this.state.status;
+    const prevStatus = this.state.status;
+    const prevCircuitState = this.state.circuitState;
 
-    // Update failure counters
+    // Update failure counters (internal tracking)
     this.state.consecutiveFailures += 1;
     this.state.consecutiveSuccesses = 0;
     this.state.lastErrorAt = Date.now();
 
     // Check if browser reports offline
     if (!navigator.onLine) {
+      const wasOffline = this.state.status === 'offline';
       this.state.status = 'offline';
       this.state.isNavigatorOnline = false;
-      this.notifyListeners();
+      // Only notify if we weren't already offline
+      if (!wasOffline) {
+        console.log(`[NetworkManager] Status: ${prevStatus} → offline`);
+        this.notifyListeners();
+      }
       return;
     }
 
@@ -199,15 +212,21 @@ class NetworkManager {
       }
     }
 
-    if (prevState !== this.state.status) {
-      console.log(`[NetworkManager] Status: ${prevState} → ${this.state.status}`);
-    }
+    // Only notify if status or circuit state actually changed
+    const hasStateChanged =
+      prevStatus !== this.state.status ||
+      prevCircuitState !== this.state.circuitState;
 
-    this.notifyListeners();
+    if (hasStateChanged) {
+      console.log(`[NetworkManager] Status: ${prevStatus} → ${this.state.status}`);
+      this.notifyListeners();
+    }
   }
 
   /**
    * Check if circuit breaker is open (requests should be blocked)
+   * Note: Does NOT notify listeners to avoid re-render loops
+   * Circuit state transitions are reported via reportSuccess/reportError
    */
   isCircuitOpen(): boolean {
     if (this.state.circuitState !== 'open') {
@@ -216,10 +235,11 @@ class NetworkManager {
 
     // Check if cooldown has passed
     if (this.state.nextRetryAt && Date.now() >= this.state.nextRetryAt) {
-      // Transition to half_open for probe
+      // Transition to half_open for probe (silent transition)
+      // The actual notification will happen when the probe succeeds/fails
       this.state.circuitState = 'half_open';
       this.state.nextRetryAt = null;
-      this.notifyListeners();
+      // Don't notify here - this is called frequently during request checks
       return false;
     }
 

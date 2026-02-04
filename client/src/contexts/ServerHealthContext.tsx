@@ -90,14 +90,16 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
 
     if (reachable) {
       consecutiveFailuresRef.current = 0; // Reset failure counter on successful health check
-      setIsServerReachable(true);
       backoffIndexRef.current = 0;
       clearPolling();
       resolvePending();
+      // Only update state if it was previously false to avoid unnecessary re-renders
+      setIsServerReachable((prev) => (prev ? prev : true));
       return true;
     }
 
-    setIsServerReachable(false);
+    // Only update state if it was previously true
+    setIsServerReachable((prev) => (prev ? false : prev));
     return false;
   }, [clearPolling, resolvePending]);
 
@@ -153,10 +155,11 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
 
   const reportSuccess = useCallback(() => {
     consecutiveFailuresRef.current = 0; // Reset failure counter on success
-    setIsServerReachable(true);
     backoffIndexRef.current = 0;
     clearPolling();
     resolvePending();
+    // Only update state if it was previously false to avoid unnecessary re-renders
+    setIsServerReachable((prev) => (prev ? prev : true));
   }, [clearPolling, resolvePending]);
 
   const waitForReachable = useCallback(() => {
@@ -195,9 +198,14 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
     onlineManager.setOnline(isServerReachable);
   }, [isServerReachable]);
 
+  // Only run health check once on mount
+  const hasInitializedRef = useRef(false);
   useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
     void checkHealth();
-  }, [checkHealth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {
