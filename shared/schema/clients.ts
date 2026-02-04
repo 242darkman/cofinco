@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, serial, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, serial, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { agences } from "./agences";
@@ -117,7 +117,16 @@ export const clients = pgTable("clients", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
-});
+}, (t) => ({
+  // P1.2: Performance indexes for frequently queried columns
+  idxUserId: index("idx_clients_user_id").on(t.userId),
+  idxAgenceId: index("idx_clients_agence_id").on(t.agenceId),
+  idxAgentReferent: index("idx_clients_agent_referent_id").on(t.agentReferentId),
+  idxDeletedAt: index("idx_clients_deleted_at").on(t.deletedAt),
+  // Composite indexes for common query patterns
+  idxAgenceSegment: index("idx_clients_agence_segment").on(t.agenceId, t.segment),
+  idxAgenceCreatedAt: index("idx_clients_agence_created_at").on(t.agenceId, t.createdAt),
+}));
 
 export const insertClientSchema = createInsertSchema(clients, {
   creditTotal: (schema) =>
@@ -189,7 +198,10 @@ export const clientTags = pgTable("client_tags", {
   clientId: uuid("client_id").notNull().references(() => clients.id),
   tagId: uuid("tag_id").notNull().references(() => tags.id),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  idxClientId: index("idx_client_tags_client_id").on(t.clientId),
+  idxTagId: index("idx_client_tags_tag_id").on(t.tagId),
+}));
 
 export const insertClientTagSchema = createInsertSchema(clientTags).omit({ id: true, createdAt: true });
 export type InsertClientTag = z.infer<typeof insertClientTagSchema>;
@@ -203,7 +215,10 @@ export const clientActivities = pgTable("client_activities", {
   description: text("description").notNull(),
   metadata: text("metadata"), // JSON stringified or text
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  idxClientId: index("idx_client_activities_client_id").on(t.clientId),
+  idxClientCreatedAt: index("idx_client_activities_client_created").on(t.clientId, t.createdAt),
+}));
 
 export const insertClientActivitySchema = createInsertSchema(clientActivities).omit({ id: true, createdAt: true });
 export type InsertClientActivity = z.infer<typeof insertClientActivitySchema>;
@@ -218,7 +233,10 @@ export const historiquePoints = pgTable("historique_points", {
   description: text("description"),
   montantAssocie: integer("montant_associe"), // Montant de la transaction qui a généré les points
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  idxClientId: index("idx_historique_points_client_id").on(t.clientId),
+  idxClientCreatedAt: index("idx_historique_points_client_created").on(t.clientId, t.createdAt),
+}));
 
 export const insertHistoriquePointsSchema = createInsertSchema(historiquePoints).omit({ id: true, createdAt: true });
 export type InsertHistoriquePoints = z.infer<typeof insertHistoriquePointsSchema>;

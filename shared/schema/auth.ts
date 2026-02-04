@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { SystemRole } from "../types/roles";
@@ -50,7 +50,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
-});
+}, (t) => ({
+  // P1.2: Performance indexes for users table (frequently queried)
+  idxStatut: index("idx_users_statut").on(t.statut),
+  idxTypeCompte: index("idx_users_type_compte").on(t.typeCompte),
+  idxDeletedAt: index("idx_users_deleted_at").on(t.deletedAt),
+  idxCanLogin: index("idx_users_can_login").on(t.canLogin),
+  // Composite index for client search (used in /clients/search)
+  idxStatutTypeCompte: index("idx_users_statut_type_compte").on(t.statut, t.typeCompte),
+  // Text search optimization (partial indexes for non-null values)
+  idxTelephone: index("idx_users_telephone").on(t.telephone),
+}));
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -84,7 +94,11 @@ export const loginAttempts = pgTable("login_attempts", {
   success: boolean("success").notNull().default(false),
   reason: text("reason"), // 'invalid_password', 'account_locked', 'account_disabled'
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  idxUsername: index("idx_login_attempts_username").on(t.username),
+  idxUsernameCreatedAt: index("idx_login_attempts_username_created").on(t.username, t.createdAt),
+  idxIpAddress: index("idx_login_attempts_ip_address").on(t.ipAddress),
+}));
 
 export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).omit({ id: true, createdAt: true });
 export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
@@ -129,7 +143,11 @@ export const activeSessions = pgTable("active_sessions", {
   // Device fingerprinting for stolen cookie detection
   deviceFingerprint: text("device_fingerprint"),        // Full fingerprint hash
   deviceFingerprintPartial: text("device_fingerprint_partial"), // Partial fingerprint for tolerant comparison
-});
+}, (t) => ({
+  idxUserId: index("idx_active_sessions_user_id").on(t.userId),
+  idxUserIdIsActive: index("idx_active_sessions_user_active").on(t.userId, t.isActive),
+  idxExpiresAt: index("idx_active_sessions_expires_at").on(t.expiresAt),
+}));
 
 export const insertActiveSessionSchema = createInsertSchema(activeSessions).omit({ id: true });
 export type InsertActiveSession = z.infer<typeof insertActiveSessionSchema>;
@@ -157,7 +175,11 @@ export const refreshTokens = pgTable("refresh_tokens", {
   revoked: boolean("revoked").notNull().default(false),
   revokedAt: timestamp("revoked_at"),
   revokeReason: text("revoke_reason"),
-});
+}, (t) => ({
+  idxUserId: index("idx_refresh_tokens_user_id").on(t.userId),
+  idxFamilyId: index("idx_refresh_tokens_family_id").on(t.familyId),
+  idxUserIdRevoked: index("idx_refresh_tokens_user_revoked").on(t.userId, t.revoked),
+}));
 
 export const insertRefreshTokenSchema = createInsertSchema(refreshTokens).omit({ id: true, createdAt: true });
 export type InsertRefreshToken = z.infer<typeof insertRefreshTokenSchema>;
@@ -282,6 +304,10 @@ export const userRoles = pgTable("user_roles", {
 }, (t) => ({
   // Un utilisateur ne peut avoir le même rôle qu'une fois par agence
   uniqueUserRoleAgence: unique().on(t.userId, t.role, t.agenceId),
+  // P1.2: Performance indexes for role lookups
+  idxUserId: index("idx_user_roles_user_id").on(t.userId),
+  idxUserIdPrimary: index("idx_user_roles_user_primary").on(t.userId, t.isPrimary),
+  idxAgenceId: index("idx_user_roles_agence_id").on(t.agenceId),
 }));
 
 export const insertUserRoleSchema = createInsertSchema(userRoles).omit({ id: true, createdAt: true, updatedAt: true });
@@ -483,7 +509,14 @@ export const rbacAuditLog = pgTable("rbac_audit_log", {
   // Version tracking
   rbacVersionBefore: integer("rbac_version_before"),
   rbacVersionAfter: integer("rbac_version_after"),
-});
+}, (t) => ({
+  // P1.2: Performance indexes for audit log queries
+  idxCreatedAt: index("idx_rbac_audit_log_created_at").on(t.createdAt),
+  idxActorUserId: index("idx_rbac_audit_log_actor_user").on(t.actorUserId),
+  idxTargetUserId: index("idx_rbac_audit_log_target_user").on(t.targetUserId),
+  idxAction: index("idx_rbac_audit_log_action").on(t.action),
+  idxActorCreatedAt: index("idx_rbac_audit_log_actor_created").on(t.actorUserId, t.createdAt),
+}));
 
 export const insertRbacAuditLogSchema = createInsertSchema(rbacAuditLog).omit({ id: true, createdAt: true });
 export type InsertRbacAuditLog = z.infer<typeof insertRbacAuditLogSchema>;

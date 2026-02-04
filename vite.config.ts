@@ -199,6 +199,30 @@ export default defineConfig({
     // Report compressed sizes
     reportCompressedSize: true,
 
+    // P1.4: Module preload optimization for critical chunks
+    // This injects <link rel="modulepreload"> for dynamically imported modules
+    modulePreload: {
+      // Preload all direct imports (improves time to interactive)
+      polyfill: true,
+      // Customize which modules to preload based on entry point
+      resolveDependencies: (_filename, deps, _context) => {
+        // Always preload core dependencies for faster initial render
+        const criticalChunks = ['react-core', 'react-dom', 'query', 'radix-ui', 'icons'];
+        return deps.filter(dep => {
+          // Preload critical chunks immediately
+          if (criticalChunks.some(chunk => dep.includes(chunk))) {
+            return true;
+          }
+          // Don't preload heavy optional chunks (will be loaded on demand)
+          const heavyChunks = ['charts', 'maps', 'face-recognition', 'export-tools', 'animations'];
+          if (heavyChunks.some(chunk => dep.includes(chunk))) {
+            return false;
+          }
+          return true;
+        });
+      },
+    },
+
     // Rollup options for code splitting
     rollupOptions: {
       output: {

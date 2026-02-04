@@ -52,7 +52,7 @@ export function registerClientRoutes(app: Express) {
 
   // CLIENTS ÉLIGIBLES AU CRÉDIT: Clients actifs avec un compte courant dans l'agence
   // MUST BE REGISTERED BEFORE /:id ROUTE TO AVOID COLLISIONS
-  // OPTIMISÉ: Single SQL query instead of N+1 pattern
+  // OPTIMISÉ: Single SQL query with proper server-side pagination (P1.5)
   app.get("/api/clients/eligible-credit", requireAuth, requireAgenceIdAccess(), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
@@ -67,12 +67,8 @@ export function registerClientRoutes(app: Express) {
         ? sql`AND c.agence_id = ${agenceFilter.agenceId}`
         : sql``;
 
-      // OPTIMIZED: Single SQL query that filters eligible clients directly
-      // Eligibility rules:
-      // 1. Client must be ACTIVE
-      // 2. Must have an active CURRENT account in the agency
-      // 3. Must NOT have an active credit (ACTIVE or LATE)
-      // 4. Must NOT have a pending demande
+      // P1.5: Server-side pagination with COUNT(*) OVER() window function
+      // This avoids fetching all 500 results and slicing in memory
       const results = await db.execute(sql`
         SELECT
           c.id,
@@ -90,7 +86,8 @@ export function registerClientRoutes(app: Express) {
           a.nom as agence_nom,
           co.id as compte_courant_id,
           co.numero_compte as compte_courant_numero,
-          co.solde_courant as compte_courant_solde
+          co.solde_courant as compte_courant_solde,
+          COUNT(*) OVER() as total_count
         FROM clients c
         INNER JOIN users u ON c.user_id = u.id
         LEFT JOIN agences a ON c.agence_id = a.id
@@ -114,8 +111,12 @@ export function registerClientRoutes(app: Express) {
               AND dc.statut IN (${StatutDemande.PENDING_FEES}, ${StatutDemande.READY_FOR_INVESTIGATION}, ${StatutDemande.UNDER_INVESTIGATION}, ${StatutDemande.APPROVED})
           )
         ORDER BY u.nom, u.prenom
-        LIMIT 500
+        LIMIT ${perPage}
+        OFFSET ${offset}
       `);
+
+      // Get total from window function (all rows have same total_count)
+      const total = results.rows.length > 0 ? Number((results.rows[0] as any).total_count) : 0;
 
       // Transform results to match expected format
       const eligibleClients = results.rows.map((row: any) => ({
@@ -137,13 +138,10 @@ export function registerClientRoutes(app: Express) {
         compteCourantSolde: row.compte_courant_solde,
       }));
 
-      const total = eligibleClients.length;
-      const paged = eligibleClients.slice(offset, offset + perPage);
-
-      logger.debug({ total }, 'Eligible clients fetched (optimized)');
+      logger.debug({ total, page, perPage }, 'Eligible clients fetched (SQL pagination)');
 
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
+        paginateResponse(addSnakeCaseAliasesDeep(eligibleClients) as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
           filters: agenceFilter || {},
@@ -180,7 +178,7 @@ export function registerClientRoutes(app: Express) {
     }
   });
 
-  // RECHERCHE : Filtrée par agence - OPTIMISÉ avec SQL (évite N+1)
+  // RECHERCHE : Filtrée par agence - OPTIMISÉ avec SQL (évite N+1) + pagination serveur (P1.5)
   app.get("/api/clients/search", requireAuth, requireAgenceIdAccess(), async (req, res) => {
     try {
         const query = req.query.q as string;
@@ -198,8 +196,7 @@ export function registerClientRoutes(app: Express) {
           ? sql`AND c.agence_id = ${agenceFilter.agenceId}`
           : sql``;
 
-        // OPTIMIZED: Single SQL query with eligibility computed via subqueries
-        // This replaces the N+1 pattern (was 3 queries per client)
+        // P1.5: Server-side pagination with COUNT(*) OVER() window function
         const results = await db.execute(sql`
           WITH client_search AS (
             SELECT
@@ -228,8 +225,6 @@ export function registerClientRoutes(app: Express) {
               OR LOWER(UNACCENT(COALESCE(u.nom, '') || ' ' || COALESCE(u.prenom, ''))) LIKE LOWER(UNACCENT(${searchPattern}))
             )
             ${agenceCondition}
-            ORDER BY u.nom, u.prenom
-            LIMIT 100
           ),
           eligibility AS (
             SELECT
@@ -276,11 +271,17 @@ export function registerClientRoutes(app: Express) {
               WHEN e.has_active_credit THEN 'Crédit en cours'
               WHEN e.has_pending_demande THEN 'Dossier déjà en cours'
               ELSE NULL
-            END as ineligibility_reason
+            END as ineligibility_reason,
+            COUNT(*) OVER() as total_count
           FROM client_search cs
           JOIN eligibility e ON cs.id = e.id
           ORDER BY cs.nom, cs.prenom
+          LIMIT ${perPage}
+          OFFSET ${offset}
         `);
+
+        // Get total from window function
+        const total = results.rows.length > 0 ? Number((results.rows[0] as any).total_count) : 0;
 
         // Transform results to match expected format
         const enrichedResults = results.rows.map((row: any) => ({
@@ -301,14 +302,10 @@ export function registerClientRoutes(app: Express) {
           ineligibilityReason: row.ineligibility_reason,
         }));
 
-        // Paginate results
-        const total = enrichedResults.length;
-        const paged = enrichedResults.slice(offset, offset + perPage);
-
-        logger.debug({ count: total, query: normalizedQuery }, 'Optimized search results');
+        logger.debug({ total, page, perPage, query: normalizedQuery }, 'Search results (SQL pagination)');
 
         res.json(
-          paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
+          paginateResponse(addSnakeCaseAliasesDeep(enrichedResults) as unknown[], total, page, perPage, {
             path: `${req.baseUrl}${req.path}`,
             query: req.query,
             filters: { q: query },
