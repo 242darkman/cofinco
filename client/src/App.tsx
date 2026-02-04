@@ -15,7 +15,9 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { SessionProvider } from './contexts/SessionContext';
 import { UpdatePrompt } from './components/shared/UpdatePrompt';
 import { useServerHealth } from './contexts/ServerHealthContext';
+import { useNetwork } from './contexts/NetworkContext';
 import NetworkOverlay from './components/shared/NetworkOverlay';
+import NetworkBanner from './components/shared/NetworkBanner';
 import SessionExpirationWarning from './components/shared/SessionExpirationWarning';
 
 // Lazy load heavy components
@@ -33,7 +35,12 @@ function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
+  const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
   const queryClient = useQueryClient();
+
+  // Show NetworkOverlay only for prolonged offline (not just unstable)
+  // The NetworkBanner handles showing status for unstable connections
+  const showNetworkOverlay = isOffline || (isApiDown && !isServerReachable);
 
   // Précharger l'image de profil pour qu'elle soit en cache
   const preloadProfilePhoto = useCallback((photoUrl: string | undefined) => {
@@ -164,7 +171,7 @@ function App() {
     return (
       <>
         <LoadingScreen showLogo={true} message="Chargement de COFIN&CO-M..." />
-        <NetworkOverlay isOpen={!isServerReachable} isChecking={isChecking} onRetry={checkHealth} />
+        <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
       </>
     );
   }
@@ -176,7 +183,7 @@ function App() {
           onLoginSuccess={handleLogin}
           sessionExpiredMessage={sessionExpiredMessage}
         />
-        <NetworkOverlay isOpen={!isServerReachable} isChecking={isChecking} onRetry={checkHealth} />
+        <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
       </>
     );
   }
@@ -186,7 +193,7 @@ function App() {
     return (
       <>
         <LoadingScreen showLogo={true} message="Connexion en cours..." />
-        <NetworkOverlay isOpen={!isServerReachable} isChecking={isChecking} onRetry={checkHealth} />
+        <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
       </>
     );
   }
@@ -261,7 +268,7 @@ function App() {
             }
           `}</style>
         </AppShell>
-        <NetworkOverlay isOpen={!isServerReachable} isChecking={isChecking} onRetry={checkHealth} />
+        <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
       </>
     );
   }
@@ -279,6 +286,8 @@ function App() {
               >
                 <ErrorBoundary>
                   <Toaster position="top-right" richColors closeButton />
+                  {/* Network status banner - shows for unstable/offline/api_down */}
+                  <NetworkBanner />
                   <UpdatePrompt />
                   <LocationTracker />
                   <SessionExpirationWarning />
@@ -290,23 +299,27 @@ function App() {
                       />
                     )}
                   </Suspense>
-                  <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
-                    {authService.isAgentCaisse() ? (
-                      <AgentCaisseInterface
-                        agentId={currentUser.id}
-                        onLogout={handleLogout}
-                      />
-                    ) : (
-                      <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
-                    )}
-                  </Suspense>
+                  {/* Add top padding when network banner is visible */}
+                  <div className={networkStatus !== 'online' ? 'pt-14' : ''}>
+                    <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
+                      {authService.isAgentCaisse() ? (
+                        <AgentCaisseInterface
+                          agentId={currentUser.id}
+                          onLogout={handleLogout}
+                        />
+                      ) : (
+                        <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
+                      )}
+                    </Suspense>
+                  </div>
                 </ErrorBoundary>
               </SessionProvider>
             </PermissionsProvider>
           </WebSocketProvider>
         </AgenceProvider>
       </FeatureFlagsProvider>
-      <NetworkOverlay isOpen={!isServerReachable} isChecking={isChecking} onRetry={checkHealth} />
+      {/* Full-screen overlay only for prolonged offline or API down */}
+      <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
     </>
   );
 }

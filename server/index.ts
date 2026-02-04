@@ -134,9 +134,22 @@ registerMetricsRoute(app);
 
 // ========== HEALTH CHECK ENDPOINT ==========
 // Simple health check that verifies DB connectivity (no auth required)
-app.get("/api/health", async (_req, res) => {
+// Supports both GET (full response) and HEAD (lightweight ping) methods
+
+// HEAD method for lightweight pings (no body, just status)
+app.head("/api/health", async (_req, res) => {
   const { checkDatabaseHealth } = await import("./db");
   const dbHealth = await checkDatabaseHealth();
+  const httpStatus = dbHealth.healthy ? 200 : 503;
+  res.status(httpStatus).end();
+});
+
+// GET method for full health check response
+app.get("/api/health", async (_req, res) => {
+  const startTime = Date.now();
+  const { checkDatabaseHealth } = await import("./db");
+  const dbHealth = await checkDatabaseHealth();
+  const responseTime = Date.now() - startTime;
 
   const status = dbHealth.healthy ? "healthy" : "unhealthy";
   const httpStatus = dbHealth.healthy ? 200 : 503;
@@ -144,6 +157,10 @@ app.get("/api/health", async (_req, res) => {
   res.status(httpStatus).json({
     status,
     timestamp: new Date().toISOString(),
+    // Server time in ms for client-side latency calculation
+    serverTime: Date.now(),
+    // Response time of this health check (includes DB ping)
+    responseTime,
     version: process.env.npm_package_version || "1.0.0",
     uptime: Math.floor(process.uptime()),
     database: dbHealth,
