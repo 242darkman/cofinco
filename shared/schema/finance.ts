@@ -563,6 +563,11 @@ export const comptes = pgTable(
     idxAgenceTypeStatut: index("idx_comptes_agence_type_statut").on(t.agenceId, t.typeCompte, t.statut),
     idxTypeStatut: index("idx_comptes_type_statut").on(t.typeCompte, t.statut),
     idxVersementAuto: index("idx_comptes_versement_auto").on(t.versementAutoActif, t.prochainVersementAuto),
+    // P3.2: Additional indexes for common queries
+    idxStatut: index("idx_comptes_statut").on(t.statut),
+    idxDeletedAt: index("idx_comptes_deleted_at").on(t.deletedAt),
+    idxProduitId: index("idx_comptes_produit_id").on(t.produitId),
+    idxAgenceId: index("idx_comptes_agence_id").on(t.agenceId),
 
     chkSoldeNonNeg: sql`CONSTRAINT chk_comptes_solde_nonneg CHECK (${t.soldeCourant} >= 0)`,
     chkBlocageRange: sql`CONSTRAINT chk_comptes_blocage_range CHECK (${t.blocageFin} IS NULL OR ${t.blocageDebut} IS NULL OR ${t.blocageFin} > ${t.blocageDebut})`,

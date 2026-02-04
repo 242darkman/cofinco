@@ -1765,6 +1765,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
             }
         }
 
+        // P3.5: Add LIMIT to prevent unbounded query on large datasets
         const activeCredits = await db.select({
             credit: credits,
             client: clients,
@@ -1773,7 +1774,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         .from(credits)
         .innerJoin(clients, eq(credits.clientId, clients.id))
         .innerJoin(users, eq(clients.userId, users.id))
-        .where(and(...conditions));
+        .where(and(...conditions))
+        .orderBy(credits.prochaineEcheance)
+        .limit(100);
         const upcomingPayments: { client: string; amount: number; date: string; status: string }[] = [];
         const now = new Date();
 
@@ -1808,7 +1811,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
             }
         }
         
-        return upcomingPayments.sort((a, b) => 0);
+        // P3.5: Limit results for dashboard display
+        return upcomingPayments.slice(0, 20).sort((a, b) => 0);
     }
 
     // Durees Suggerees

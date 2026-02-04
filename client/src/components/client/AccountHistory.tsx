@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { Badge, ConfirmDialog, Modal, Button } from '../ui';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import AccountStatsChart from './AccountStatsChart';
+
+// P3.3: Lazy-loaded export utilities (jsPDF ~500KB, xlsx ~500KB)
+const loadExportLibraries = async () => {
+  const [jsPDFModule, autoTableModule, xlsxModule] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+    import('xlsx')
+  ]);
+  return {
+    jsPDF: jsPDFModule.default,
+    autoTable: autoTableModule.default,
+    XLSX: xlsxModule
+  };
+};
 
 interface Transaction {
   id: string;
@@ -33,10 +46,13 @@ interface AccountHistoryProps {
 }
 
 export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose }: AccountHistoryProps) {
+  const queryClient = useQueryClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [exportingCSV, setExportingCSV] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   // Closure state
   const [showClosureConfirm, setShowClosureConfirm] = useState(false);
@@ -83,8 +99,10 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
         // Success
         setShowClosureConfirm(false);
         onClose(); // Close modal
-        // Ideally trigger refresh of accounts list here
-        window.location.reload(); // Simple brute force refresh for now to ensure state sync
+        // P3.4: Invalidate cache instead of hard reload
+        await queryClient.invalidateQueries({ queryKey: ['comptes'] });
+        await queryClient.invalidateQueries({ queryKey: ['client-accounts'] });
+        toast.success('Compte clôturé avec succès');
       }
     } catch (err) {
       console.error(err);
@@ -132,54 +150,78 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
     return matchesFilter && matchesSearch;
   });
 
-  const handleExportCSV = () => {
-    const data = filteredTransactions.map(t => ({
-      Date: safeFormatDate(t.createdAt),
-      Description: t.displayDescription,
-      Type: t.typePaiement || t.type,
-      Reference: t.displayRef,
-      Sens: t.sens,
-      Montant: t.montant,
-      Solde: t.solde_apres || '-'
-    }));
+  // P3.3: Lazy-loaded CSV export
+  const handleExportCSV = async () => {
+    setExportingCSV(true);
+    try {
+      const { XLSX } = await loadExportLibraries();
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Historique");
-    XLSX.writeFile(wb, `historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.csv`);
+      const data = filteredTransactions.map(t => ({
+        Date: safeFormatDate(t.createdAt),
+        Description: t.displayDescription,
+        Type: t.typePaiement || t.type,
+        Reference: t.displayRef,
+        Sens: t.sens,
+        Montant: t.montant,
+        Solde: t.solde_apres || '-'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Historique");
+      XLSX.writeFile(wb, `historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.csv`);
+      toast.success('Export CSV terminé');
+    } catch (error) {
+      console.error('Erreur export CSV:', error);
+      toast.error('Erreur lors de l\'export CSV');
+    } finally {
+      setExportingCSV(false);
+    }
   };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text('Historique de Compte', 14, 22);
-    
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`N° Compte: ${numeroCompte}`, 14, 30);
-    doc.text(`Date impression: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr })}`, 14, 36);
+  // P3.3: Lazy-loaded PDF export
+  const handleExportPDF = async () => {
+    setExportingPDF(true);
+    try {
+      const { jsPDF, autoTable } = await loadExportLibraries();
 
-    const tableColumn = ["Date", "Description", "Ref", "Sens", "Montant", "Solde"];
-    const tableRows = filteredTransactions.map(t => [
-      safeFormatDate(t.createdAt),
-      t.displayDescription,
-      t.displayRef,
-      t.sens === 'CREDIT' ? 'Dépôt' : 'Retrait',
-      `${formatMoney(t.montant)} FCFA`,
-      t.solde_apres ? `${formatMoney(t.solde_apres)} FCFA` : '-'
-    ]);
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Historique de Compte', 14, 22);
 
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 44,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [22, 163, 74] },
-      alternateRowStyles: { fillColor: [240, 253, 244] },
-      columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' } }
-    });
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`N° Compte: ${numeroCompte}`, 14, 30);
+      doc.text(`Date impression: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr })}`, 14, 36);
 
-    doc.save(`historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      const tableColumn = ["Date", "Description", "Ref", "Sens", "Montant", "Solde"];
+      const tableRows = filteredTransactions.map(t => [
+        safeFormatDate(t.createdAt),
+        t.displayDescription,
+        t.displayRef,
+        t.sens === 'CREDIT' ? 'Dépôt' : 'Retrait',
+        `${formatMoney(t.montant)} FCFA`,
+        t.solde_apres ? `${formatMoney(t.solde_apres)} FCFA` : '-'
+      ]);
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 44,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [22, 163, 74] },
+        alternateRowStyles: { fillColor: [240, 253, 244] },
+        columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' } }
+      });
+
+      doc.save(`historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      toast.success('Export PDF terminé');
+    } catch (error) {
+      console.error('Erreur export PDF:', error);
+      toast.error('Erreur lors de l\'export PDF');
+    } finally {
+      setExportingPDF(false);
+    }
   };
 
 
@@ -246,21 +288,23 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
               ))}
             </div>
             
-            <button 
+            <button
                 onClick={handleExportCSV}
-                className="p-2 border border-slate-700 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center gap-2" 
+                disabled={exportingCSV}
+                className="p-2 border border-slate-700 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Export CSV"
             >
-                <Download size={18} />
+                {exportingCSV ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                 <span className="hidden sm:inline text-xs font-medium">CSV</span>
             </button>
-            
-            <button 
+
+            <button
                 onClick={handleExportPDF}
-                className="p-2 border border-slate-700 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center gap-2" 
+                disabled={exportingPDF}
+                className="p-2 border border-slate-700 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Export PDF"
             >
-                <FileText size={18} />
+                {exportingPDF ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
                 <span className="hidden sm:inline text-xs font-medium">PDF</span>
             </button>
           </div>
