@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { addPdfLogoHeader } from '../lib/pdf-logo';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '../lib/lazy-export';
 
 export interface UserActivity {
   user_id: string;
@@ -109,7 +109,9 @@ export function useUserActivity() {
     URL.revokeObjectURL(url);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    // P4.1: Lazy-load PDF library
+    const { jsPDF, autoTable } = await loadPDFLibraries();
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
 
@@ -126,8 +128,8 @@ export function useUserActivity() {
       act.modules_used,
       act.activity_date || '-'
     ]);
-    
-    (doc as any).autoTable({
+
+    autoTable(doc, {
       head: [['N°', 'Utilisateur', 'Actions', 'Modules', 'Date']],
       body: tableData,
       startY,
@@ -135,7 +137,7 @@ export function useUserActivity() {
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
-    
+
     doc.save(`COFIN_Activite_Utilisateurs_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 

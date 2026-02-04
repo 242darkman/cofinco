@@ -5,9 +5,9 @@ import {
   PieChart as PieChartIcon, BarChart3, Printer, RefreshCw
 } from 'lucide-react';
 import { Card, Button, Badge, ResponsiveTable } from '../../ui';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
 import { useCompteResultat } from '../../../hooks/accounting/useAccounting';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
 import {
   ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -48,8 +48,11 @@ export default function CompteResultat() {
 
   const formatMoney = (amount: number) => (amount || 0).toLocaleString() + ' FCFA';
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     try {
+      // P4.1: Lazy-load Excel library
+      const XLSX = await loadExcelLibrary();
+
       // Feuille Charges
       const chargesData = charges.map(c => ({
         'N° Compte': c.numero_compte,
@@ -91,8 +94,10 @@ export default function CompteResultat() {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     try {
+      // P4.1: Lazy-load PDF library
+      const { jsPDF } = await loadPDFLibraries();
       const doc = new jsPDF('portrait');
 
       // Header

@@ -1,8 +1,8 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Employe } from './useEmployes';
 import { savePDFToLoge } from '../../lib/loge-storage';
 import { LOGO_BASE64 } from '../../lib/pdf-logo';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '../../lib/lazy-export';
 
 export function useBulletinPDF() {
   // Logo is now imported directly as base64, no async loading needed
@@ -10,7 +10,9 @@ export function useBulletinPDF() {
     return LOGO_BASE64;
   };
 
-  const generateBulletinPDF = async (employe: Employe, logoBase64?: string): Promise<jsPDF> => {
+  const generateBulletinPDF = async (employe: Employe, logoBase64?: string): Promise<any> => {
+    // P4.1: Lazy-load PDF libraries
+    const { jsPDF, autoTable } = await loadPDFLibraries();
     const doc = new jsPDF();
     const mois = 'Décembre';
     const annee = '2024';

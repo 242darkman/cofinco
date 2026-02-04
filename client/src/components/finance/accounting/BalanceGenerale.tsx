@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Download, Printer, Filter, Calendar, BarChart3, RefreshCw, ChevronDown } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
 import { toast, handleApiError } from '../../../lib/toast';
 import { addPdfLogoHeader } from '../../../lib/pdf-logo';
 import { useBalanceGenerale, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
+// P4.1: Lazy-load heavy export libraries
+import { loadExportLibraries } from '../../../lib/lazy-export';
 
 interface BalanceCompte {
   compteId: string;
@@ -66,12 +66,15 @@ export default function BalanceGenerale() {
     return montant.toString();
   };
 
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
     if (filteredBalance.length === 0) {
       toast.warning('Aucune donnee a exporter');
       return;
     }
     try {
+      // P4.1: Lazy-load export library
+      const { XLSX } = await loadExportLibraries();
+
       const data = filteredBalance.map(compte => ({
         'N Compte': compte.numeroCompte || '',
         'Intitule': compte.intitule,
@@ -102,12 +105,14 @@ export default function BalanceGenerale() {
     }
   }, [filteredBalance, totaux]);
 
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback(async () => {
     if (filteredBalance.length === 0) {
       toast.warning('Aucune donnée à exporter');
       return;
     }
     try {
+      // P4.1: Lazy-load PDF library
+      const { jsPDF } = await loadExportLibraries();
       const doc = new jsPDF('landscape');
 
       const startY = addPdfLogoHeader(doc, {

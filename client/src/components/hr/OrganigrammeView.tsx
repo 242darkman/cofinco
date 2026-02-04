@@ -9,7 +9,8 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { resolveStorageUrl } from '@/lib/format';
 import { toast } from '../../lib/toast';
-import jsPDF from 'jspdf';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '@/lib/lazy-export';
 
 // --- Interfaces ---
 interface OrgChartNode {
@@ -715,6 +716,8 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
           ctx.drawImage(img, 0, 0, width, height);
 
           const imgData = canvas.toDataURL('image/png');
+          // P4.1: Lazy-load PDF library
+          const { jsPDF } = await loadPDFLibraries();
           const pdf = new jsPDF({
             orientation: width > height ? 'landscape' : 'portrait',
             unit: 'px',

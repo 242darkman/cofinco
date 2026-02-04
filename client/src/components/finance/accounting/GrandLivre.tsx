@@ -5,11 +5,11 @@ import StatCard from '../../ui/StatCard';
 import ResponsiveTable from '../../ui/ResponsiveTable';
 import Button from '../../ui/Button';
 import Card from '../../ui/Card';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
 import { toast, handleApiError } from '../../../lib/toast';
 import { addPdfLogoHeader } from '../../../lib/pdf-logo';
 import { useChartOfAccounts, useGrandLivre, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
+// P4.1: Lazy-load heavy export libraries
+import { loadExportLibraries } from '../../../lib/lazy-export';
 
 interface GrandLivreEntry {
   id: string;
@@ -80,13 +80,16 @@ export default function GrandLivre() {
   const soldeOuverture = grandLivreData?.soldeOuverture || 0;
   const pagination = grandLivreData?.pagination;
 
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
     if (!grandLivreData || entries.length === 0) {
       toast.warning('Aucune donnee a exporter');
       return;
     }
 
     try {
+      // P4.1: Lazy-load export library
+      const { XLSX } = await loadExportLibraries();
+
       const data = entries.map(m => ({
         'Date': new Date(m.dateEcriture).toLocaleDateString('fr-FR'),
         'N Piece': m.numeroPiece,
@@ -127,13 +130,15 @@ export default function GrandLivre() {
     }
   }, [grandLivreData, entries, totalDebit, totalCredit, soldeFinal, soldeOuverture, dateDebut, dateFin]);
 
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback(async () => {
     if (!grandLivreData || entries.length === 0) {
       toast.warning('Aucune donnee a exporter');
       return;
     }
 
     try {
+      // P4.1: Lazy-load PDF library
+      const { jsPDF } = await loadExportLibraries();
       const doc = new jsPDF('landscape');
 
       // Header with logo

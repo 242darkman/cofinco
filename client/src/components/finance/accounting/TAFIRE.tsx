@@ -4,8 +4,8 @@ import {
   TrendingUp, TrendingDown, RefreshCw, Layers, PlusCircle, MinusCircle
 } from 'lucide-react';
 import { Card, Button, Badge } from '../../ui';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
 
 interface LigneTAFIRE {
   code: string;
@@ -85,10 +85,12 @@ export default function TAFIRE() {
   const variationBFR = data ? calcTotal(data.variationBFR, 'montantN') : 0;
   const variationTresorerie = excedentRessources - variationBFR;
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!data) return;
 
     try {
+      // P4.1: Lazy-load Excel library
+      const XLSX = await loadExcelLibrary();
       const wb = XLSX.utils.book_new();
 
       // Feuille principale
@@ -127,10 +129,12 @@ export default function TAFIRE() {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!data) return;
 
     try {
+      // P4.1: Lazy-load PDF library
+      const { jsPDF } = await loadPDFLibraries();
       const doc = new jsPDF('portrait');
 
       // Header

@@ -10,9 +10,9 @@ import { api } from '../../lib/api-client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { addPdfLogoHeader, addPdfLogoFooter } from '@/lib/pdf-logo';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '@/lib/lazy-export';
 
 // ============================================
 // TYPES
@@ -357,13 +357,15 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     : 0;
 
   // PDF report generation
-  const handleDownloadReport = useCallback(() => {
+  const handleDownloadReport = useCallback(async () => {
     if (!migrationStatus?.report) {
       toast.error('Aucun rapport disponible');
       return;
     }
 
     try {
+      // P4.1: Lazy-load PDF library
+      const { jsPDF, autoTable } = await loadPDFLibraries();
       const report = migrationStatus.report;
       const doc = new jsPDF();
       const H = doc.internal.pageSize.getHeight();

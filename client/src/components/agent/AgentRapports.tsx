@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { requestAllPages } from '../../lib/api-client';
 import { FileText, Download, Calendar, TrendingUp, Users, DollarSign, Activity, BarChart3, Filter } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { toast } from '../../lib/toast';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '@/lib/lazy-export';
 
 interface Rapport {
   id: string;
@@ -104,9 +104,11 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
     }
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     if (rapports.length === 0) return;
 
+    // P4.1: Lazy-load PDF library
+    const { jsPDF, autoTable } = await loadPDFLibraries();
     const doc = new jsPDF();
     const startY = addPdfLogoHeader(doc, {
       title: 'Rapport Agent Terrain',

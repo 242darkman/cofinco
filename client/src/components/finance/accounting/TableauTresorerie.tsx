@@ -4,8 +4,8 @@ import {
   TrendingUp, TrendingDown, Wallet, RefreshCw, Calendar
 } from 'lucide-react';
 import { Card, Button, Badge } from '../../ui';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
 
 interface FluxTresorerie {
   categorie: string;
@@ -79,10 +79,12 @@ export default function TableauTresorerie() {
   const totalFinancement = data ? calcTotal(data.financement) : 0;
   const variationTresorerie = totalExploitation + totalInvestissement + totalFinancement;
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!data) return;
 
     try {
+      // P4.1: Lazy-load Excel library
+      const XLSX = await loadExcelLibrary();
       const allFlux = [
         ...data.exploitation.map(f => ({ ...f, Section: 'Exploitation' })),
         { Section: 'TOTAL EXPLOITATION', libelle: '', montant: totalExploitation, type: '', categorie: '' },
@@ -119,10 +121,12 @@ export default function TableauTresorerie() {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!data) return;
 
     try {
+      // P4.1: Lazy-load PDF library
+      const { jsPDF } = await loadPDFLibraries();
       const doc = new jsPDF('portrait');
 
       // Header

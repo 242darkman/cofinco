@@ -3,10 +3,10 @@
  * Inclut signature numérique et billetage détaillé
  */
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../../lib/pdf-logo';
 import { toast } from '../../lib/toast';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '../../lib/lazy-export';
 
 interface BilletageRow {
   denomination: number;
@@ -121,6 +121,8 @@ export const useClosurePDF = () => {
     try {
       toast.info('Génération du rapport de clôture...');
 
+      // P4.1: Lazy-load PDF libraries
+      const { jsPDF, autoTable } = await loadPDFLibraries();
       const doc = new jsPDF('p', 'mm', 'a4');
       const W = doc.internal.pageSize.getWidth();
       const signature = data.signatureNumérique || generateSignature(data);

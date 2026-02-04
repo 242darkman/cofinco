@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
 import { Users, Wallet, PiggyBank, UsersRound, LucideIcon } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { requestListAll } from '../lib/api-client';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../lib/pdf-logo';
+// P4.1: Lazy-load heavy export libraries (saves ~650KB on initial bundle)
+import { loadPDFLibraries, loadExcelLibrary } from '../lib/lazy-export';
 
 // ============================================================================
 // TYPES
@@ -300,6 +299,9 @@ export function useReportGenerator() {
   const generatePDF = async () => {
     setLoading(true);
     try {
+      // P4.1: Lazy-load PDF libraries on demand
+      const { jsPDF, autoTable } = await loadPDFLibraries();
+
       const data = await fetchReportData();
       const config = getReportConfig();
       const doc = new jsPDF();
@@ -367,6 +369,9 @@ export function useReportGenerator() {
   const generateExcel = async () => {
     setLoading(true);
     try {
+      // P4.1: Lazy-load Excel library on demand
+      const XLSX = await loadExcelLibrary();
+
       const data = await fetchReportData();
       const config = getReportConfig();
 

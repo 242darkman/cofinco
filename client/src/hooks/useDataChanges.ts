@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { addPdfLogoHeader } from '../lib/pdf-logo';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '../lib/lazy-export';
 
 export interface DataChange {
   id: string;
@@ -114,7 +114,9 @@ export function useDataChanges() {
     URL.revokeObjectURL(url);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    // P4.1: Lazy-load PDF library
+    const { jsPDF, autoTable } = await loadPDFLibraries();
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
 
@@ -132,8 +134,8 @@ export function useDataChanges() {
       ch.user_email || 'Système',
       (ch.record_id || '').toString().substring(0, 8) + '...'
     ]);
-    
-    (doc as any).autoTable({
+
+    autoTable(doc, {
       head: [['N°', 'Date/Heure', 'Table', 'Opération', 'Utilisateur', 'ID']],
       body: tableData,
       startY,
@@ -141,7 +143,7 @@ export function useDataChanges() {
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
-    
+
     doc.save(`COFIN_Modifications_Donnees_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 

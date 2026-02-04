@@ -15,9 +15,8 @@ import TableauTresorerie from './TableauTresorerie';
 import TAFIRE from './TAFIRE';
 import CoffreOperationsPanel from './CoffreOperationsPanel';
 import PayrollSummaryPanel from './PayrollSummaryPanel';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
 import TabGroup from '../../ui/TabGroup';
+// P4.1: jsPDF and XLSX are lazy-loaded via lazy-export.ts in child components
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';

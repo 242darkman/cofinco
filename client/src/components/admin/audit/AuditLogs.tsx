@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Filter, Download, Search, AlertTriangle, CheckCircle, XCircle, Clock, FileSpreadsheet, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { auditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '@/lib/lazy-export';
 
 interface AuditLog {
   id: string;
@@ -126,7 +126,9 @@ export default function AuditLogs() {
     setShowExportMenu(false);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    // P4.1: Lazy-load PDF library
+    const { jsPDF } = await loadPDFLibraries();
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
 

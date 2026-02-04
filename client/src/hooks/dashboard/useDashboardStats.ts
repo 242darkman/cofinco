@@ -164,8 +164,8 @@ export function useDashboardStats(userRole?: string) {
   const { data: fullStats, isLoading: fullLoading, error, refetch } = useQuery<DashboardStats>({
     queryKey: dashboardKeys.stats(userRole, selectedAgence?.id),
     queryFn: () => dashboardApi.getStats(),
-    // On slow connections: longer stale time, no polling
-    staleTime: isSlow ? 60_000 : 10_000,
+    // P4.4: 30s minimum staleTime for slow connection optimization
+    staleTime: isSlow ? 60_000 : 30_000,
     refetchInterval: isSlow ? false : 30_000, // Disable polling on 3G
     refetchOnWindowFocus: !isSlow, // Don't auto-refresh on slow connections
     // On slow connections with light stats: mark as not essential initially

@@ -8,9 +8,9 @@ import Modal from '../ui/Modal';
 import { notificationApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '@/lib/lazy-export';
 
 interface SecurityAlert {
   id: string;
@@ -127,7 +127,9 @@ export default function SecurityAlertsPanel() {
     setShowExportMenu(false);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    // P4.1: Lazy-load PDF library
+    const { jsPDF, autoTable } = await loadPDFLibraries();
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
     const activeCount = alerts.filter(a => a.status === 'active').length;
@@ -147,8 +149,8 @@ export default function SecurityAlertsPanel() {
       alert.status,
       alert.user_email || 'N/A'
     ]);
-    
-    (doc as any).autoTable({
+
+    autoTable(doc, {
       head: [['N°', 'Date', 'Type', 'Sévérité', 'Statut', 'Utilisateur']],
       body: tableData,
       startY,
@@ -156,7 +158,7 @@ export default function SecurityAlertsPanel() {
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
-    
+
     doc.save(`COFIN_Alertes_Securite_${new Date().toISOString().split('T')[0]}.pdf`);
     setShowExportMenu(false);
   };

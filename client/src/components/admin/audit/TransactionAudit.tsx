@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Filter, Download, Search, FileSpreadsheet, FileText, Shield } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { auditApi } from '../../../lib/api-client';
+// P4.1: Lazy-load heavy export libraries
+import { loadPDFLibraries } from '@/lib/lazy-export';
 import { toast, handleApiError } from '../../../lib/toast';
 
 interface TransactionLog {
@@ -117,7 +117,9 @@ export default function TransactionAudit() {
     setShowExportMenu(false);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    // P4.1: Lazy-load PDF library
+    const { jsPDF, autoTable } = await loadPDFLibraries();
     const doc = new jsPDF();
     const dateExport = new Date().toLocaleDateString('fr-FR');
 
@@ -135,7 +137,7 @@ export default function TransactionAudit() {
       `${trans.montant?.toLocaleString() || 0} FCFA`
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       head: [['N°', 'Date', 'Type', 'Référence', 'Montant']],
       body: tableData,
       startY,
@@ -143,7 +145,7 @@ export default function TransactionAudit() {
       headStyles: { fillColor: [30, 58, 138], textColor: 255 },
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
-    
+
     doc.save(`COFIN_Transactions_${new Date().toISOString().split('T')[0]}.pdf`);
     setShowExportMenu(false);
   };

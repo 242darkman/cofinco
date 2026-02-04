@@ -145,7 +145,7 @@ export function useUnreadMessagesCount() {
 
       return res.json();
     },
-    staleTime: 10000, // 10 seconds - more frequent updates
+    staleTime: 30000, // P4.4: 30s minimum - WebSocket handles real-time updates
     refetchInterval: 30000, // Refresh every 30s as backup
   });
 
