@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet,
@@ -9,7 +9,7 @@ import {
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
-import { Button, Card, StatCard, TabGroup } from '../../ui';
+import { Button, Card, StatCard, TabGroup, LoadingSpinner } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compteEpargneApi, api } from '../../../lib/api-client';
 import { computeSessionStatus } from '../../../lib/format';
@@ -18,14 +18,15 @@ import { CaisseQuickActions } from './CaisseQuickActions';
 import CaisseOuverture from './CaisseOuverture';
 import { useCaisseWebSocket } from '../../../hooks/useCaisseWebSocket';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import CaisseOperations from './CaisseOperations';
-import CaisseRapprochement from './CaisseRapprochement';
-import CaisseTransferts from './CaisseTransferts';
-import CaisseEtats from './CaisseEtats';
-import CaisseSupervision from './CaisseSupervision';
+// P2.1: Lazy load heavy tab components to reduce initial bundle size
+const CaisseOperations = lazy(() => import('./CaisseOperations'));
+const CaisseRapprochement = lazy(() => import('./CaisseRapprochement'));
+const CaisseTransferts = lazy(() => import('./CaisseTransferts'));
+const CaisseEtats = lazy(() => import('./CaisseEtats'));
+const CaisseSupervision = lazy(() => import('./CaisseSupervision'));
 import CaissePaiementModal from './CaissePaiementModal';
-import CaisseEspeces from './CaisseEspeces';
-import CaisseMobileMoney from './CaisseMobileMoney';
+const CaisseEspeces = lazy(() => import('./CaisseEspeces'));
+const CaisseMobileMoney = lazy(() => import('./CaisseMobileMoney'));
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { SupervisionSession } from './shared/SupervisionConfirmModal';
@@ -33,17 +34,24 @@ import { isAdminRole } from '@shared/types/roles';
 
 import { useSessionTimeout } from '../../../hooks/finance/useSessionTimeout';
 import { usePendingSessionSync } from '../../../hooks/finance/usePendingSessionSync';
-import CaisseAuditLog from './CaisseAuditLog';
-import WeightVerificationPanel from './WeightVerificationPanel';
-import CaisseAccessControl from './CaisseAccessControl';
-import CaisseClientInfos from './CaisseClientInfos';
-import CaisseHistoriqueGlobal from './CaisseHistoriqueGlobal';
-import PendingDisbursements from './PendingDisbursements';
+const CaisseAuditLog = lazy(() => import('./CaisseAuditLog'));
+const WeightVerificationPanel = lazy(() => import('./WeightVerificationPanel'));
+const CaisseAccessControl = lazy(() => import('./CaisseAccessControl'));
+const CaisseClientInfos = lazy(() => import('./CaisseClientInfos'));
+const CaisseHistoriqueGlobal = lazy(() => import('./CaisseHistoriqueGlobal'));
+const PendingDisbursements = lazy(() => import('./PendingDisbursements'));
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
 import { PendingActivationDrawer } from './PendingActivationDrawer';
 import { AccountActivationModal } from './AccountActivationModal';
 import { SessionCaisse, CaisseTransaction as Transaction } from '../../../types/finance';
+
+// P2.1: Suspense fallback for lazy loaded components
+const TabLoadingFallback = () => (
+  <div className="flex items-center justify-center h-48">
+    <LoadingSpinner size="md" />
+  </div>
+);
 
 interface CaisseProps {
   userRole?: string;
@@ -1327,9 +1335,11 @@ export default function CaisseDashboard({
           />
         </div>
 
-        {/* Main Content */}
+        {/* Main Content - P2.1: Wrapped in Suspense for lazy loaded components */}
         <div className="flex-1 overflow-y-auto no-scrollbar">
-             {renderContent()}
+          <Suspense fallback={<TabLoadingFallback />}>
+            {renderContent()}
+          </Suspense>
         </div>
       </div>
 
