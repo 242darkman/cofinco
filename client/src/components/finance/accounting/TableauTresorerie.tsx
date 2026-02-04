@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import {
   DollarSign, Download, Printer, ArrowUpRight, ArrowDownRight,
   TrendingUp, TrendingDown, Wallet, RefreshCw, Calendar
@@ -6,6 +6,32 @@ import {
 import { Card, Button, Badge } from '../../ui';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
+
+// P3.3: Memoized flux row component to prevent unnecessary re-renders
+interface FluxRowProps {
+  libelle: string;
+  montant: number;
+  type: 'entree' | 'sortie';
+}
+
+const FluxRow = memo(function FluxRow({ libelle, montant, type }: FluxRowProps) {
+  const isEntree = type === 'entree';
+  return (
+    <div className="flex justify-between items-center py-1.5 px-2 hover:bg-slate-700/30 rounded text-xs">
+      <div className="flex items-center gap-2">
+        {isEntree ? (
+          <ArrowUpRight size={12} className="text-emerald-400" />
+        ) : (
+          <ArrowDownRight size={12} className="text-red-400" />
+        )}
+        <span className="text-slate-300">{libelle}</span>
+      </div>
+      <span className={`font-mono ${isEntree ? 'text-emerald-400' : 'text-red-400'}`}>
+        {isEntree ? '+' : '-'}{Math.abs(montant).toLocaleString()}
+      </span>
+    </div>
+  );
+});
 
 interface FluxTresorerie {
   categorie: string;
@@ -211,21 +237,10 @@ export default function TableauTresorerie() {
           {total >= 0 ? '+' : ''}{total.toLocaleString()} FCFA
         </span>
       </div>
+      {/* P3.3: Use memoized FluxRow component */}
       <div className="space-y-1">
         {flux.map((f, i) => (
-          <div key={i} className="flex justify-between items-center py-1.5 px-2 hover:bg-slate-700/30 rounded text-xs">
-            <div className="flex items-center gap-2">
-              {f.type === 'entree' ? (
-                <ArrowUpRight size={12} className="text-emerald-400" />
-              ) : (
-                <ArrowDownRight size={12} className="text-red-400" />
-              )}
-              <span className="text-slate-300">{f.libelle}</span>
-            </div>
-            <span className={`font-mono ${f.type === 'entree' ? 'text-emerald-400' : 'text-red-400'}`}>
-              {f.type === 'entree' ? '+' : '-'}{Math.abs(f.montant).toLocaleString()}
-            </span>
-          </div>
+          <FluxRow key={i} libelle={f.libelle} montant={f.montant} type={f.type} />
         ))}
       </div>
     </Card>

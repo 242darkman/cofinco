@@ -53,6 +53,9 @@ const TabLoadingFallback = () => (
   </div>
 );
 
+// P3.2: Pre-instantiated number formatter to avoid creating new Intl.NumberFormat on each render
+const moneyFormatter = new Intl.NumberFormat('fr-FR');
+
 interface CaisseProps {
   userRole?: string;
   onModuleChange?: (module: string) => void;
@@ -575,9 +578,8 @@ export default function CaisseDashboard({
 
 
 
-  const formattedMoney = (amount: number) => {
-      return new Intl.NumberFormat('fr-FR').format(amount);
-  }
+  // P3.2: Use pre-instantiated formatter instead of creating new one each call
+  const formattedMoney = (amount: number) => moneyFormatter.format(amount);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -748,7 +750,7 @@ export default function CaisseDashboard({
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black text-white tracking-tight">Vérification Coffre</h2>
                     <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
-                      Votre demande de <span className="text-amber-500 font-bold">{new Intl.NumberFormat('fr-FR').format(pendingSession.montant_demande || 0)} FCFA</span> est en cours d'examen par la supervision.
+                      Votre demande de <span className="text-amber-500 font-bold">{moneyFormatter.format(pendingSession.montant_demande || 0)} FCFA</span> est en cours d'examen par la supervision.
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 rounded-full border border-amber-500/20 text-[10px] font-black text-amber-500 uppercase tracking-widest">
                        <Timer size={12} className="animate-spin" style={{ animationDuration: '3s' }} />
@@ -776,7 +778,7 @@ export default function CaisseDashboard({
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black text-white tracking-tight">Dotation Prête</h2>
                     <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
-                      Le coffre a débloqué <span className="text-emerald-500 font-bold">{new Intl.NumberFormat('fr-FR').format(pendingSession.montant_demande || 0)} FCFA</span>. Vous devez confirmer le comptage pour activer votre session.
+                      Le coffre a débloqué <span className="text-emerald-500 font-bold">{moneyFormatter.format(pendingSession.montant_demande || 0)} FCFA</span>. Vous devez confirmer le comptage pour activer votre session.
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
                        <Check size={12} />
@@ -855,11 +857,11 @@ export default function CaisseDashboard({
                   <div className="space-y-2">
                     <h2 className="text-2xl font-bold text-white">Transfert en Attente</h2>
                     <p className="text-slate-400 max-w-md mx-auto">
-                      Le transfert de <span className="text-amber-400 font-bold">{new Intl.NumberFormat('fr-FR').format(currentSession.montant_vers_coffre || 0)} FCFA</span> vers le coffre est en attente de validation.
+                      Le transfert de <span className="text-amber-400 font-bold">{moneyFormatter.format(currentSession.montant_vers_coffre || 0)} FCFA</span> vers le coffre est en attente de validation.
                     </p>
                     {currentSession.montant_reporte && Number(currentSession.montant_reporte) > 0 && (
                       <p className="text-xs text-emerald-400">
-                        Fonds reportés: {new Intl.NumberFormat('fr-FR').format(currentSession.montant_reporte)} FCFA
+                        Fonds reportés: {moneyFormatter.format(currentSession.montant_reporte)} FCFA
                       </p>
                     )}
                     {currentSession.count_submitted_at && (
@@ -894,7 +896,7 @@ export default function CaisseDashboard({
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
                        <Shield size={12} />
-                       Comptage Physique: {new Intl.NumberFormat('fr-FR').format(currentSession.montant_physique || 0)} F
+                       Comptage Physique: {moneyFormatter.format(currentSession.montant_physique || 0)} F
                     </div>
                   </div>
                   <div className="flex flex-col gap-3 items-center w-full max-w-xs">
