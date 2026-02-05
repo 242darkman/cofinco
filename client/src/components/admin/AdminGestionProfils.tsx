@@ -70,7 +70,7 @@ export default function AdminGestionProfils() {
   const [permissionFilter, setPermissionFilter] = useState<string>('all');
   
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(8);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -459,11 +459,11 @@ export default function AdminGestionProfils() {
     <div className="h-full flex flex-col space-y-2">
       <Card variant="default" padding="none" className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Mobile-First Header */}
-        <div className="p-4 border-b border-edge bg-surface-muted/30">
+        <div className="p-2 border-b border-edge bg-surface-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+              <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-blue-400" />
               </div>
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-content-primary">Personnel</h2>
@@ -491,7 +491,7 @@ export default function AdminGestionProfils() {
           </div>
 
           {/* Filters */}
-          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+          <div className="mt-2 flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={18} />
               <input
@@ -540,8 +540,8 @@ export default function AdminGestionProfils() {
                     format: (_, emp) => {
                       const user = emp.user || emp;
                       return (
-                        <div className="flex items-center gap-3 py-1">
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 shrink-0 overflow-hidden">
+                        <div className="flex items-center gap-2 py-0.5">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 shrink-0 overflow-hidden">
                             {user.photoProfile ? (
                               <img
                                 src={resolveStorageUrl(user.photoProfile)}
@@ -549,7 +549,7 @@ export default function AdminGestionProfils() {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-xs sm:text-sm font-bold text-primary max-w-full truncate px-1">
+                              <span className="text-xs font-bold text-primary max-w-full truncate px-1">
                                 {getInitials(user.nom, user.prenom)}
                               </span>
                             )}
@@ -668,10 +668,10 @@ export default function AdminGestionProfils() {
                   }}
                   className="px-2 py-1 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-primary outline-none"
                 >
-                  <option value={5}>5 / page</option>
+                  <option value={7}>7 / page</option>
+                  <option value={8}>8 / page</option>
                   <option value={10}>10 / page</option>
-                  <option value={25}>25 / page</option>
-                  <option value={50}>50 / page</option>
+                  <option value={20}>20 / page</option>
                 </select>
               </div>
 

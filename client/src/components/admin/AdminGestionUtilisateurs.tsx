@@ -41,7 +41,7 @@ export default function AdminGestionUtilisateurs() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(6);
+  const [pageSize, setPageSize] = useState(8);
 
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -301,7 +301,7 @@ export default function AdminGestionUtilisateurs() {
                   }}
                   className="px-2 py-1 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-primary outline-none"
                 >
-                  <option value={5}>5 / page</option>
+                  <option value={8}>8 / page</option>
                   <option value={10}>10 / page</option>
                   <option value={25}>25 / page</option>
                   <option value={50}>50 / page</option>

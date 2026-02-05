@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Monitor, LogOut, MapPin, Clock, AlertCircle, CheckCircle, XCircle, Smartphone, Tablet, Globe, Laptop, AlertTriangle } from 'lucide-react';
+import { Monitor, LogOut, MapPin, Clock, AlertCircle, CheckCircle, XCircle, Smartphone, Tablet, Globe, Laptop, AlertTriangle, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Card, Button, IconButton, ResponsiveTable, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -34,8 +34,9 @@ export default function AdminSessionsManager() {
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'idle'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [pageSize, setPageSize] = useState(8);
 
   // Confirmation dialog
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
@@ -113,18 +114,28 @@ export default function AdminSessionsManager() {
   }, [openConfirm, loadSessions]);
 
   const filteredSessions = sessions.filter(s => {
-    if (filterStatus === 'all') return true;
-    return s.status === filterStatus;
+    // Filter by Filter Tabs
+    if (filterStatus !== 'all' && s.status !== filterStatus) return false;
+    
+    // Filter by Search
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      s.user_name.toLowerCase().includes(query) ||
+      s.user_email.toLowerCase().includes(query) ||
+      s.user_role.toLowerCase().includes(query) ||
+      (s.ip_address && s.ip_address.toLowerCase().includes(query))
+    );
   });
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterStatus]);
+  }, [searchQuery, filterStatus]);
 
-  const totalPages = Math.ceil(filteredSessions.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredSessions.length / pageSize);
   const paginatedSessions = filteredSessions.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const getStatusColor = (status: string) => {
@@ -147,52 +158,52 @@ export default function AdminSessionsManager() {
     <div className="space-y-4">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center border border-emerald-500/20 shrink-0">
-            <CheckCircle className="text-emerald-400" size={24} />
+        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center border border-emerald-500/20 shrink-0">
+            <CheckCircle className="text-emerald-400" size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-white">{sessions.filter(s => s.status === 'active').length}</p>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Sessions Actives</p>
+            <p className="text-xl font-bold text-white">{sessions.filter(s => s.status === 'active').length}</p>
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Sessions Actives</p>
           </div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center border border-amber-500/20 shrink-0">
-            <Clock className="text-amber-400" size={24} />
+        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center border border-amber-500/20 shrink-0">
+            <Clock className="text-amber-400" size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-white">{sessions.filter(s => s.status === 'idle').length}</p>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Inactives</p>
+            <p className="text-xl font-bold text-white">{sessions.filter(s => s.status === 'idle').length}</p>
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Inactives</p>
           </div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20 shrink-0">
-            <Monitor className="text-blue-400" size={24} />
+        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20 shrink-0">
+            <Monitor className="text-blue-400" size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-white">{sessions.length}</p>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Total Sessions</p>
+            <p className="text-xl font-bold text-white">{sessions.length}</p>
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Total Sessions</p>
           </div>
         </div>
       </div>
 
       <Card variant="default" padding="none" className="overflow-hidden">
         {/* Header & Filters */}
-        <div className="p-4 border-b border-edge bg-surface-muted/30">
-          <FeatureHeader
-            featureKey="admin.sessions"
-            title={FEATURE_DESCRIPTIONS['admin.sessions'].title}
-            subtitle={`${FEATURE_DESCRIPTIONS['admin.sessions'].subtitle} (${sessions.length})`}
-            helpText={FEATURE_DESCRIPTIONS['admin.sessions'].helpText}
-            icon={
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+        <div className="p-2 border-b border-edge bg-surface-muted/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
+                  <Monitor className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-content-primary">Sessions Actives</h2>
+                  <p className="text-[10px] text-content-muted">Surveillez les connexions en cours ({sessions.length})</p>
+                </div>
               </div>
-            }
-            actions={
-              <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
+              
+              <div className="flex bg-surface-base rounded-lg p-0.5 border border-edge self-start sm:self-auto">
                 {[
                   { id: 'all', label: 'Toutes' },
                   { id: 'active', label: 'Actives' },
@@ -202,7 +213,7 @@ export default function AdminSessionsManager() {
                     key={tab.id}
                     onClick={() => setFilterStatus(tab.id as any)}
                     className={`
-                      px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all
+                      px-2 py-1 text-[10px] sm:text-xs font-medium rounded-md transition-all
                       ${filterStatus === tab.id
                         ? 'bg-primary text-white shadow-sm'
                         : 'text-content-muted hover:text-content-primary hover:bg-surface-muted'
@@ -213,8 +224,18 @@ export default function AdminSessionsManager() {
                   </button>
                 ))}
               </div>
-            }
-          />
+          </div>
+
+          <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={14} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher par utilisateur, email, rôle ou IP..."
+                className="w-full pl-9 pr-4 py-1.5 bg-surface-base border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+              />
+          </div>
         </div>
 
         {/* Content */}
@@ -305,31 +326,79 @@ export default function AdminSessionsManager() {
 
         
         {/* Pagination Controls */}
-        {filteredSessions.length > itemsPerPage && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-edge bg-surface-muted/30">
-             <Button
-               variant="secondary"
-               size="sm"
-               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-               disabled={currentPage === 1}
-               className="min-w-[100px]"
-             >
-               Précédent
-             </Button>
-             <span className="text-xs sm:text-sm text-content-secondary font-medium">
-               Page {currentPage} sur {totalPages}
-             </span>
-             <Button
-               variant="secondary"
-               size="sm"
-               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-               disabled={currentPage === totalPages}
-               className="min-w-[100px]"
-             >
-               Suivant
-             </Button>
-          </div>
-        )}
+        {/* Advanced Pagination Controls */}
+        <div className="p-2 sm:p-3 border-t border-edge bg-surface-muted/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Page info & size selector */}
+            <div className="flex items-center gap-3 text-xs sm:text-sm text-content-muted">
+              <span className="hidden sm:inline">
+                {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredSessions.length)} sur {filteredSessions.length}
+              </span>
+              <span className="sm:hidden">
+                Page {currentPage}/{totalPages}
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-primary outline-none"
+              >
+                <option value={8}>8 / page</option>
+                <option value={10}>10 / page</option>
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
+              </select>
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex items-center gap-1">
+              <IconButton
+                icon={ChevronsLeft}
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="w-8 h-8 text-content-muted disabled:opacity-30"
+                aria-label="Première page"
+              />
+              <IconButton
+                icon={ChevronLeft}
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-8 h-8 text-content-muted disabled:opacity-30"
+                aria-label="Page précédente"
+              />
+              
+              <div className="flex items-center gap-1 mx-1">
+                <span className="text-xs font-medium text-content-primary">
+                  {currentPage}
+                </span>
+                <span className="text-xs text-content-muted">/ {Math.max(1, totalPages)}</span>
+              </div>
+
+              <IconButton
+                icon={ChevronRight}
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="w-8 h-8 text-content-muted disabled:opacity-30"
+                aria-label="Page suivante"
+              />
+              <IconButton
+                icon={ChevronsRight}
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="w-8 h-8 text-content-muted disabled:opacity-30"
+                aria-label="Dernière page"
+              />
+            </div>
+        </div>
       </Card>
 
       <ConfirmDialog
