@@ -483,7 +483,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
 
                         {accessViewMode === 'temporary' && (
                             <TemporaryPermissionsManager
-                            users={users}
+                            users={users.map(u => ({ ...u, nom: u.nom || '' }))}
                             />
                         )}
 
