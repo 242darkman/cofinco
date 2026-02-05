@@ -778,7 +778,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                       <div className="relative h-12">
                           <input 
                             type="number" 
-                            className="w-full h-full bg-slate-900 border border-slate-700 rounded-lg px-4 text-white focus:border-indigo-500 outline-none" 
+                            className="w-full h-full bg-slate-900 border border-slate-700 rounded-lg pl-4 pr-36 text-white focus:border-indigo-500 outline-none" 
                             placeholder="0" 
                             value={formData.type_revenu === 'DAILY' ? formData.revenu_journalier : formData.revenus_mensuels}
                             onChange={(e) => {
@@ -791,14 +791,38 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                                 }
                             }}
                           />
-                          <button 
-                             type="button"
-                             onClick={() => setFormData(prev => ({ ...prev, type_revenu: prev.type_revenu === 'MONTHLY' ? 'DAILY' : 'MONTHLY' }))}
-                             className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-indigo-400 hover:text-white"
-                             title="Changer unité"
-                           >
-                             <RefreshCw size={14} />
-                           </button>
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-slate-800 p-0.5 flex">
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                   if (formData.type_revenu !== 'MONTHLY') {
+                                       setFormData(prev => ({ ...prev, type_revenu: 'MONTHLY' })); 
+                                   }
+                                }}
+                                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                                    formData.type_revenu === 'MONTHLY' 
+                                    ? 'bg-indigo-600 text-white shadow-sm' 
+                                    : 'text-slate-400 hover:text-slate-300'
+                                }`}
+                              >
+                                Mois
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                   if (formData.type_revenu !== 'DAILY') {
+                                       setFormData(prev => ({ ...prev, type_revenu: 'DAILY' })); 
+                                   }
+                                }}
+                                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                                    formData.type_revenu === 'DAILY' 
+                                    ? 'bg-indigo-600 text-white shadow-sm' 
+                                    : 'text-slate-400 hover:text-slate-300'
+                                }`}
+                              >
+                                Jour
+                              </button>
+                          </div>
                       </div>
                    </div>
                    <div className="space-y-1.5">
@@ -845,7 +869,21 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                          <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Coût Total</div>
                          <div className="text-xl font-bold text-white">
                              {Math.round(calculatedData.montantTotal).toLocaleString()} <span className="text-xs font-normal text-slate-600">FCFA</span>
-                         </div>
+                          </div>
+                          
+                          {/* Cost Breakdown */}
+                          <div className="mt-1 flex flex-col items-end space-y-0.5">
+                             <div className="text-[10px] text-slate-500 font-medium">
+                                Intérêts: <span className="text-slate-300">{Math.round(calculatedData.montantTotal - (parseFloat(formData.montant_demande) || 0)).toLocaleString()}</span>
+                             </div>
+                             {(selectedPlan?.fraisDossier || selectedPlan?.frais_dossier) && (
+                                <div className="text-[10px] text-slate-500 font-medium">
+                                    Frais: <span className="text-slate-300">
+                                        {(selectedPlan?.fraisDossier || selectedPlan?.frais_dossier).toLocaleString()}
+                                    </span>
+                                </div>
+                             )}
+                          </div>
                       </div>
                    </div>
                    
