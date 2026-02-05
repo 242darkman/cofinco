@@ -583,7 +583,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
               </div>
               <button 
                 onClick={onClose} 
-                className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-white transition-colors"
+                className="p-2 hover:bg-red-500/10 rounded-full text-slate-500 hover:text-red-500 transition-colors"
                 type="button"
               >
                   <span className="sr-only">Fermer</span>
