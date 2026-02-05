@@ -704,7 +704,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
 
       // Create image and draw to canvas
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const canvas = document.createElement('canvas');
         canvas.width = width * 2;
         canvas.height = height * 2;
