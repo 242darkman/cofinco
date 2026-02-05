@@ -1477,6 +1477,18 @@ export function registerAuthRoutes(app: Express) {
     res.json(usersWithRoles);
   });
 
+  app.get("/api/users/search", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
+    const query = req.query.q as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+
+    if (!query) {
+      return res.json([]);
+    }
+
+    const results = await storage.searchUsers(query, limit);
+    res.json(results);
+  });
+
   app.get("/api/users/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });

@@ -47,6 +47,7 @@ export interface IStorage {
     getAllUsers(): Promise<User[]>;
     createUser(user: InsertUser): Promise<User>;
     updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
+    searchUsers(query: string, limit?: number): Promise<User[]>;
 
     // Agent Location (GPS Tracking) - updates agents_terrain table
     updateAgentLocation(userId: string, latitude: string, longitude: string): Promise<void>;

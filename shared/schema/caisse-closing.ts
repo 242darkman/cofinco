@@ -42,6 +42,7 @@ export const mmBalanceReconciliations = pgTable("mm_balance_reconciliations", {
   overriddenAt: timestamp("overridden_at"),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
   idxSession: index("idx_mm_balance_recon_session").on(t.sessionId),
   idxStatut: index("idx_mm_balance_recon_statut").on(t.statut),

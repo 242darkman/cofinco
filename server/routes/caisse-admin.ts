@@ -17,8 +17,8 @@ import { Actions, Subjects } from "@shared/ability";
 import { db } from "../db";
 import { sessionsCaisseAuditLogs, denominationTemplates, caisses } from "@shared/schema/finance";
 import { caisseSecurityCodes } from "@shared/schema/operations";
-import { users } from "@shared/schema";
-import { eq, desc, and, gte, lte, sql, count, isNull, or } from "drizzle-orm";
+import { users, userRoles } from "@shared/schema";
+import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, or } from "drizzle-orm";
 
 export const caisseAdminRouter = Router();
 
@@ -628,16 +628,16 @@ caisseAdminRouter.post(
         .from(sessionsCaisse)
         .where(eq(sessionsCaisse.id, sessionId));
 
-      if (session) {
-        await db.insert(sessionsCaisseAuditLogs).values({
-          sessionId,
-          caisseId: session.caisseId,
-          action: 'MM_DISCREPANCY_OVERRIDE',
-          actorId: userId,
-          metadata: { provider, reason },
-          ipAddress: req.ip,
-        });
-      }
+        if (session) {
+          await db.insert(sessionsCaisseAuditLogs).values({
+            sessionId,
+            caisseId: session.caisseId,
+            action: 'MM_DISCREPANCY_OVERRIDE',
+            userId: userId,
+            details: { provider, reason },
+            ipAddress: req.ip,
+          });
+        }
 
       res.json({ message: 'Écart Mobile Money validé' });
     } catch (error: any) {
@@ -1454,13 +1454,18 @@ caisseAdminRouter.post(
 
       // Si un utilisateur est assigné, utiliser son agenceId (sauf si agenceId explicite)
       if (validation.data.assignedToUserId && !validation.data.agenceId) {
-        const [assignedUser] = await db.select({ agenceId: users.agenceId })
-          .from(users)
-          .where(eq(users.id, validation.data.assignedToUserId))
+        // Architecture V3: Récupérer l'agence via userRoles (users.agenceId n'existe plus)
+        const [assignedRole] = await db.select({ agenceId: userRoles.agenceId })
+          .from(userRoles)
+          .where(and(
+            eq(userRoles.userId, validation.data.assignedToUserId),
+            isNotNull(userRoles.agenceId)
+          ))
+          .orderBy(desc(userRoles.isPrimary)) // Priorité au rôle principal
           .limit(1);
 
-        if (assignedUser?.agenceId) {
-          targetAgenceId = assignedUser.agenceId;
+        if (assignedRole?.agenceId) {
+          targetAgenceId = assignedRole.agenceId;
         }
       }
 

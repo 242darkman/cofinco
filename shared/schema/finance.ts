@@ -1324,6 +1324,7 @@ export const sessionsCaisseAuditLogs = pgTable("sessions_caisse_audit_logs", {
   statutAvant: text("statut_avant"),
   statutApres: text("statut_apres"),
   details: jsonb("details").notNull().default({}),
+  caisseId: uuid("caisse_id").references(() => caisses.id, { onDelete: "set null" }),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),

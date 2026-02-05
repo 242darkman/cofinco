@@ -1,7 +1,7 @@
 import { users, loginAttempts, pushSubscriptions, notificationPreferences, pushNotificationLogs } from "@shared/schema";
 import { type User, type InsertUser, type LoginAttempt, type InsertLoginAttempt, type PushSubscription, type InsertPushSubscription, type NotificationPreferences, type InsertNotificationPreferences, type PushNotificationLog, type InsertPushNotificationLog } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, ilike } from "drizzle-orm";
 import { notDeleted } from "./query-helpers";
 import { normalizeNom, normalizePrenom } from "./name-utils";
 
@@ -17,6 +17,24 @@ export async function getUserByUsername(username: string): Promise<User | undefi
 
 export async function getAllUsers(): Promise<User[]> {
   return db.select().from(users).where(notDeleted(users)).orderBy(desc(users.createdAt));
+}
+
+export async function searchUsers(query: string, limit: number = 10): Promise<User[]> {
+  const searchTerm = `%${query}%`;
+  return db.select()
+    .from(users)
+    .where(
+      and(
+        notDeleted(users),
+        or(
+          ilike(users.username, searchTerm),
+          ilike(users.nom, searchTerm),
+          ilike(users.prenom, searchTerm),
+          ilike(users.email, searchTerm)
+        )
+      )
+    )
+    .limit(limit);
 }
 
 export async function createUser(insertUser: InsertUser): Promise<User> {
