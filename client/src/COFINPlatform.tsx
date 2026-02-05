@@ -104,7 +104,12 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     if (route && !canAccessRoute(route, normalizedRole)) {
        // Access revoked!
        console.warn(`[Security] Access to module ${currentModule} revoked. Redirecting...`);
-       showNotification('error', "Votre accès à ce module a été révoqué.");
+       
+       // Get human readable module name
+       const menuItem = PLATFORM_MENU_ITEMS.find(item => item.key === currentModule);
+       const moduleName = menuItem ? t(menuItem.labelKey) : currentModule;
+       
+       showNotification('error', `Votre accès au module "${moduleName}" a été révoqué.`);
        navigateToModule('dashboard');
     }
   }, [currentModule, permissionsVersion, currentUser, normalizedRole, navigateToModule]);
