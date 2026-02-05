@@ -967,7 +967,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 }`}
              >
                 {loading ? (
-                    <>Creating...</>
+                    <>Création en cours...</>
                 ) : (
                     <>
                         <Save size={18} /> Créer la Demande
