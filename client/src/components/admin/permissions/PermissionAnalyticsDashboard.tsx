@@ -147,125 +147,122 @@ export default function PermissionAnalyticsDashboard() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Activity size={20} className="text-purple-400" />
-            Analytics des Permissions
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Analyse de l'utilisation et des refus de permissions
-          </p>
+    <div className="space-y-2">
+      {/* Header - Compact */}
+      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-purple-500/10 rounded-lg flex items-center justify-center shrink-0">
+            <Activity size={14} className="text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-white">Analytics des Permissions</h2>
+            <p className="text-[10px] text-slate-500">Analyse de l'utilisation et des refus</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {config && (
             <button
               onClick={handleToggleEnabled}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition ${
                 config.enabled
                   ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                   : 'bg-slate-800 text-slate-400 border border-slate-700'
               }`}
             >
-              {config.enabled ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+              {config.enabled ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
               {config.enabled ? 'Actif' : 'Inactif'}
             </button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={handleRefreshStats}
             disabled={refreshing}
+            className="w-7 h-7 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700"
           >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          </Button>
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+          </button>
           {canManage && (
             <>
-              <Button variant="ghost" size="sm" onClick={() => {
-                setConfigForm(config || {});
-                setShowConfigModal(true);
-              }}>
-                <Settings size={14} />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowPurgeModal(true)}>
-                <Trash2 size={14} />
-              </Button>
+              <button 
+                onClick={() => {
+                  setConfigForm(config || {});
+                  setShowConfigModal(true);
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700"
+              >
+                <Settings size={12} />
+              </button>
+              <button 
+                onClick={() => setShowPurgeModal(true)}
+                className="w-7 h-7 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700"
+              >
+                <Trash2 size={12} />
+              </button>
             </>
           )}
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 bg-purple-500/10 rounded">
-              <Activity size={14} className="text-purple-400" />
-            </div>
-            <span className="text-[10px] text-slate-400 uppercase">Total checks</span>
+      {/* KPI Cards - Compact */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 shrink-0">
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-2.5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] text-slate-500 uppercase font-medium">Total checks</span>
+            <Activity size={12} className="text-purple-400" />
           </div>
-          <p className="text-xl font-bold text-white">{totalChecks.toLocaleString('fr-FR')}</p>
+          <p className="text-lg font-bold text-white">{totalChecks.toLocaleString('fr-FR')}</p>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 bg-green-500/10 rounded">
-              <CheckCircle size={14} className="text-green-400" />
-            </div>
-            <span className="text-[10px] text-slate-400 uppercase">Autorises</span>
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-2.5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] text-slate-500 uppercase font-medium">Autorises</span>
+            <CheckCircle size={12} className="text-green-400" />
           </div>
-          <p className="text-xl font-bold text-green-400">{totalAllowed.toLocaleString('fr-FR')}</p>
+          <p className="text-lg font-bold text-green-400">{totalAllowed.toLocaleString('fr-FR')}</p>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 bg-red-500/10 rounded">
-              <XCircle size={14} className="text-red-400" />
-            </div>
-            <span className="text-[10px] text-slate-400 uppercase">Refuses</span>
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-2.5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] text-slate-500 uppercase font-medium">Refuses</span>
+            <XCircle size={12} className="text-red-400" />
           </div>
-          <p className="text-xl font-bold text-red-400">{totalDenied.toLocaleString('fr-FR')}</p>
+          <p className="text-lg font-bold text-red-400">{totalDenied.toLocaleString('fr-FR')}</p>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 bg-cyan-500/10 rounded">
-              <TrendingUp size={14} className="text-cyan-400" />
-            </div>
-            <span className="text-[10px] text-slate-400 uppercase">Taux autorisation</span>
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-2.5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] text-slate-500 uppercase font-medium">Taux</span>
+            <TrendingUp size={12} className="text-cyan-400" />
           </div>
-          <p className="text-xl font-bold text-cyan-400">{overallAllowRate}%</p>
+          <p className="text-lg font-bold text-cyan-400">{overallAllowRate}%</p>
         </div>
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Charts Grid - Compact */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 shrink-0">
         {/* Top permissions usage */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-          <h4 className="text-xs font-semibold text-slate-400 mb-3 flex items-center gap-2">
-            <Shield size={14} />
+        <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3">
+          <h4 className="text-[10px] font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
+            <Shield size={12} />
             Permissions les plus utilisees
           </h4>
-          <div className="h-56">
+          <div className="h-32">
             {topPermissions.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topPermissions} layout="vertical" margin={{ left: 80, right: 20 }}>
+                <BarChart data={topPermissions} layout="vertical" margin={{ left: 60, right: 10, top: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <XAxis type="number" tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <YAxis
                     type="category"
                     dataKey="permissionCode"
                     tick={{ fontSize: 8, fill: '#64748b' }}
                     axisLine={false}
                     tickLine={false}
-                    width={75}
+                    width={55}
                     tickFormatter={(v) => v.split('.').pop() || v}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="totalChecks" name="Verifications" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={12} />
+                  <Bar dataKey="totalChecks" name="Verifications" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={8} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+              <div className="flex items-center justify-center h-full text-slate-500 text-xs">
                 Aucune donnee disponible
               </div>
             )}
@@ -273,25 +270,25 @@ export default function PermissionAnalyticsDashboard() {
         </div>
 
         {/* Allow vs Deny comparison */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-          <h4 className="text-xs font-semibold text-slate-400 mb-3 flex items-center gap-2">
-            <Activity size={14} />
+        <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3">
+          <h4 className="text-[10px] font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
+            <Activity size={12} />
             Autorises vs Refuses
           </h4>
-          <div className="h-56">
+          <div className="h-32">
             {allowDenyData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={allowDenyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <BarChart data={allowDenyData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="allowed" name="Autorises" fill="#10b981" radius={[4, 4, 0, 0]} barSize={16} />
-                  <Bar dataKey="denied" name="Refuses" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={16} />
+                  <Bar dataKey="allowed" name="Autorises" fill="#10b981" radius={[4, 4, 0, 0]} barSize={12} />
+                  <Bar dataKey="denied" name="Refuses" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={12} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+              <div className="flex items-center justify-center h-full text-slate-500 text-xs">
                 Aucune donnee disponible
               </div>
             )}
@@ -299,44 +296,44 @@ export default function PermissionAnalyticsDashboard() {
         </div>
       </div>
 
-      {/* Tables Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Tables Grid - Compact - Flex grow to fill space */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-1 min-h-0">
         {/* Top denials */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <h4 className="text-xs font-semibold text-slate-400 flex items-center gap-2">
-              <AlertTriangle size={14} className="text-red-400" />
+        <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg overflow-hidden flex flex-col">
+          <div className="px-3 py-2 border-b border-slate-700 bg-slate-800/30">
+            <h4 className="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <AlertTriangle size={12} className="text-red-400" />
               Permissions les plus refusees
             </h4>
           </div>
-          <div className="max-h-64 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {loadingDenials ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
               </div>
             ) : denials.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 text-xs">
+              <div className="text-center py-4 text-slate-500 text-[10px]">
                 Aucun refus enregistre
               </div>
             ) : (
               <table className="w-full text-xs">
-                <thead className="bg-slate-900/50">
+                <thead className="bg-slate-900/50 sticky top-0">
                   <tr>
-                    <th className="text-left px-4 py-2 text-slate-400 font-medium">Permission</th>
-                    <th className="text-right px-4 py-2 text-slate-400 font-medium">Refus</th>
-                    <th className="text-right px-4 py-2 text-slate-400 font-medium">Utilisateurs</th>
+                    <th className="text-left px-3 py-1.5 text-slate-400 font-medium text-[9px]">Permission</th>
+                    <th className="text-right px-3 py-1.5 text-slate-400 font-medium text-[9px]">Refus</th>
+                    <th className="text-right px-3 py-1.5 text-slate-400 font-medium text-[9px]">Utilisateurs</th>
                   </tr>
                 </thead>
                 <tbody>
                   {denials.map((d, i) => (
-                    <tr key={i} className="border-t border-slate-800 hover:bg-slate-800/30">
-                      <td className="px-4 py-2">
-                        <span className="text-slate-300 font-mono text-[10px]">{d.permissionCode}</span>
+                    <tr key={i} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+                      <td className="px-3 py-1.5">
+                        <span className="text-slate-300 font-mono text-[9px]">{d.permissionCode}</span>
                       </td>
-                      <td className="px-4 py-2 text-right">
-                        <span className="text-red-400 font-bold">{d.deniedCount}</span>
+                      <td className="px-3 py-1.5 text-right">
+                        <span className="text-red-400 font-bold text-[10px]">{d.deniedCount}</span>
                       </td>
-                      <td className="px-4 py-2 text-right text-slate-400">{d.uniqueUsers}</td>
+                      <td className="px-3 py-1.5 text-right text-slate-400 text-[10px]">{d.uniqueUsers}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -346,41 +343,43 @@ export default function PermissionAnalyticsDashboard() {
         </div>
 
         {/* Unused permissions */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <h4 className="text-xs font-semibold text-slate-400 flex items-center gap-2">
-              <Archive size={14} className="text-amber-400" />
+        <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg overflow-hidden flex flex-col">
+          <div className="px-3 py-2 border-b border-slate-700 bg-slate-800/30">
+            <h4 className="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <Archive size={12} className="text-amber-400" />
               Permissions inutilisees
               {unused.length > 0 && (
-                <Badge variant="warning" value={unused.length} size="sm" />
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[9px] font-bold">
+                  {unused.length}
+                </span>
               )}
             </h4>
           </div>
-          <div className="max-h-64 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {loadingUnused ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
               </div>
             ) : unused.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 text-xs">
+              <div className="text-center py-4 text-slate-500 text-[10px]">
                 Toutes les permissions sont utilisees
               </div>
             ) : (
               <table className="w-full text-xs">
-                <thead className="bg-slate-900/50">
+                <thead className="bg-slate-900/50 sticky top-0">
                   <tr>
-                    <th className="text-left px-4 py-2 text-slate-400 font-medium">Code</th>
-                    <th className="text-left px-4 py-2 text-slate-400 font-medium">Module</th>
+                    <th className="text-left px-3 py-1.5 text-slate-400 font-medium text-[9px]">Code</th>
+                    <th className="text-left px-3 py-1.5 text-slate-400 font-medium text-[9px]">Module</th>
                   </tr>
                 </thead>
                 <tbody>
                   {unused.map((p) => (
-                    <tr key={p.id} className="border-t border-slate-800 hover:bg-slate-800/30">
-                      <td className="px-4 py-2">
-                        <span className="text-amber-400 font-mono text-[10px]">{p.code}</span>
-                        <p className="text-[9px] text-slate-500">{p.name}</p>
+                    <tr key={p.id} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+                      <td className="px-3 py-1.5">
+                        <span className="text-amber-400 font-mono text-[9px]">{p.code}</span>
+                        <p className="text-[8px] text-slate-500 truncate max-w-[200px]">{p.name}</p>
                       </td>
-                      <td className="px-4 py-2 text-slate-400">{p.moduleName}</td>
+                      <td className="px-3 py-1.5 text-slate-400 text-[10px]">{p.moduleName}</td>
                     </tr>
                   ))}
                 </tbody>

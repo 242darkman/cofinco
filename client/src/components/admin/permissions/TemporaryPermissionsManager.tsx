@@ -15,8 +15,9 @@ import {
   Clock, Shield, UserPlus, Trash2, RefreshCw,
   AlertTriangle, Timer, Users, X, Calendar,
   History, ChevronLeft, ChevronRight, Filter,
-  CheckCircle2, XCircle, AlertCircle
+  CheckCircle2, XCircle, AlertCircle, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
+import { usePagination } from '../../../hooks/usePagination';
 import {
   useTemporaryPermissions,
   useTemporaryPermissionsHistory,
@@ -695,6 +696,16 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
     );
   }, [tempPermissions, searchTerm]);
 
+  // Pagination for active permissions
+  const [itemsPerPage, setItemsPerPage] = useState(8);
+  const { currentPage, totalPages, goToPage, paginateArray } = usePagination({
+    totalItems: filteredPermissions.length,
+    itemsPerPage,
+    initialPage: 1
+  });
+
+  const paginatedPermissions = paginateArray(filteredPermissions);
+
   // Handle grant
   const handleGrant = async (data: {
     userId: string;
@@ -852,7 +863,7 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
               </div>
             ) : (
               <div className="space-y-1.5">
-                {filteredPermissions.map(perm => (
+                {paginatedPermissions.map(perm => (
                   <TempPermissionCard
                     key={perm.id}
                     permission={perm}
@@ -863,6 +874,96 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
               </div>
             )}
           </div>
+
+          {/* Pagination Controls - Advanced */}
+          {totalPages > 1 && (
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                {/* Page info & size selector */}
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span className="hidden sm:inline">
+                    {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredPermissions.length)} sur {filteredPermissions.length}
+                  </span>
+                  <span className="sm:hidden">
+                    Page {currentPage}/{totalPages || 1}
+                  </span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      goToPage(1);
+                    }}
+                    className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-slate-300 focus:border-indigo-500 outline-none"
+                  >
+                    <option value={6}>6 / page</option>
+                    <option value={8}>8 / page</option>
+                    <option value={10}>10 / page</option>
+                    <option value={20}>20 / page</option>
+                  </select>
+                </div>
+
+                {/* Navigation buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => goToPage(1)}
+                    disabled={currentPage === 1}
+                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronsLeft size={16} />
+                  </button>
+                  <button
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  
+                  <div className="flex items-center gap-1 mx-1">
+                    {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                        let pageNum: number;
+                        if (totalPages <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage === 1) {
+                          pageNum = i + 1;
+                        } else if (currentPage === totalPages) {
+                          pageNum = totalPages - 2 + i;
+                        } else {
+                          pageNum = currentPage - 1 + i;
+                        }
+                        if (pageNum < 1 || pageNum > totalPages) return null;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => goToPage(pageNum)}
+                            className={`w-6 h-6 rounded text-xs font-medium transition-colors ${
+                              currentPage === pageNum
+                                ? 'bg-indigo-600 text-white'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                  </div>
+
+                  <button
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    onClick={() => goToPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronsRight size={16} />
+                  </button>
+                </div>
+            </div>
+          )}
         </>
       )}
 

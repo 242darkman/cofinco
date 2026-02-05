@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Users, Shield, Search, CheckCircle,
-  RotateCcw, Filter, Wifi, ArrowLeft, Award, Loader2, Sparkles, Ban
+  RotateCcw, Filter, Wifi, ArrowLeft, Award, Loader2, Sparkles, Ban,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { UserPermission } from '../../../hooks/admin/useUserPermissions';
@@ -207,9 +208,10 @@ export default function UserCustomPermissionsManager({
   }, [permissions, getUserPermissionStatus]);
 
   // Pagination for users
+  const [itemsPerPage, setItemsPerPage] = useState(8);
   const { currentPage, totalPages, goToPage, paginateArray } = usePagination({
     totalItems: filteredUsers.length,
-    itemsPerPage: 12,
+    itemsPerPage,
     initialPage: 1
   });
 
@@ -335,43 +337,93 @@ export default function UserCustomPermissionsManager({
         </div>
 
         {/* Pagination - Compact */}
-        {totalPages > 1 && (
-          <div className="flex justify-center shrink-0">
-            <div className="flex items-center gap-1 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => goToPage(1)}
-                className="px-1.5 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                «
-              </button>
-              <button
-                disabled={currentPage === 1}
-                onClick={() => goToPage(currentPage - 1)}
-                className="px-2 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                Préc.
-              </button>
-              <span className="px-2 py-1 text-[10px] text-slate-300 bg-slate-950 rounded min-w-[60px] text-center">
-                {currentPage} / {totalPages}
+        {/* Pagination - Compact & Advanced */}
+        <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            {/* Page info & size selector */}
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span className="hidden sm:inline">
+                {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredUsers.length)} sur {filteredUsers.length}
               </span>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => goToPage(currentPage + 1)}
-                className="px-2 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              <span className="sm:hidden">
+                Page {currentPage}/{totalPages || 1}
+              </span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  goToPage(1);
+                }}
+                className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-slate-300 focus:border-indigo-500 outline-none"
               >
-                Suiv.
+                <option value={6}>6 / page</option>
+                <option value={8}>8 / page</option>
+                <option value={10}>10 / page</option>
+                <option value={20}>20 / page</option>
+              </select>
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => goToPage(1)}
+                disabled={currentPage === 1}
+                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronsLeft size={16} />
               </button>
               <button
-                disabled={currentPage === totalPages}
-                onClick={() => goToPage(totalPages)}
-                className="px-1.5 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
-                »
+                <ChevronLeft size={16} />
+              </button>
+              
+              <div className="flex items-center gap-1 mx-1">
+                 {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage === 1) {
+                      pageNum = i + 1;
+                    } else if (currentPage === totalPages) {
+                      pageNum = totalPages - 2 + i;
+                    } else {
+                      pageNum = currentPage - 1 + i;
+                    }
+                    if (pageNum < 1 || pageNum > totalPages) return null;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => goToPage(pageNum)}
+                        className={`w-6 h-6 rounded text-xs font-medium transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+              </div>
+
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+              <button
+                onClick={() => goToPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronsRight size={16} />
               </button>
             </div>
           </div>
-        )}
       </div>
     );
   }
