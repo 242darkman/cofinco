@@ -860,7 +860,13 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-5 rounded-xl shadow-inner mt-auto">
                    <div className="flex justify-between items-end mb-4">
                       <div>
-                         <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Mensualité Estimée</div>
+                          <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">
+                             {formData.frequence_remboursement === 'DAILY' ? 'Échéance Journalière' :
+                              formData.frequence_remboursement === 'WEEKLY' ? 'Échéance Hebdo.' :
+                              formData.frequence_remboursement === 'BI_MONTHLY' ? 'Échéance Bimensuelle' :
+                              formData.frequence_remboursement === 'QUARTERLY' ? 'Échéance Trimestrielle' :
+                              'Mensualité'} Estimée
+                          </div>
                          <div className="text-3xl font-black text-emerald-400 tracking-tight">
                             ~ {Math.round(calculatedData.montantEcheance).toLocaleString()} <span className="text-sm font-normal text-emerald-500/50">FCFA</span>
                          </div>
