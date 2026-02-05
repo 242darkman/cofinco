@@ -255,6 +255,18 @@ export default function AdminCreditPlansGestion({
     });
   };
 
+  const formatDuration = (val: number, unit: string) => {
+    const units: Record<string, string> = {
+      'DAY': 'Jour',
+      'WEEK': 'Semaine',
+      'MONTH': 'Mois'
+    };
+    const label = units[unit] || unit;
+    // Mois is invariant, others take 's' if > 1
+    const suffix = (val > 1 && unit !== 'MONTH') ? 's' : '';
+    return `${val} ${label}${suffix}`;
+  };
+
   if (!canManagePlans) {
     return (
       <EmptyState
@@ -322,7 +334,7 @@ export default function AdminCreditPlansGestion({
                             </div>
                         </td>
                         <td className="px-3 py-2">
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            <span className="inline-flex items-center justify-center w-24 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
                             {plan.type_credit}
                             </span>
                         </td>
@@ -330,7 +342,7 @@ export default function AdminCreditPlansGestion({
                             {plan.taux_interet}%
                         </td>
                         <td className="px-3 py-2 text-xs text-slate-300">
-                            {plan.duree_valeur} {plan.duree_unite}(s)
+                            {formatDuration(plan.duree_valeur, plan.duree_unite)}
                         </td>
                         <td className="px-3 py-2 text-xs text-slate-300">
                             {plan.frequence_remboursement}
@@ -343,11 +355,13 @@ export default function AdminCreditPlansGestion({
                             </span>
                         </td>
                         <td className="px-3 py-2">
-                             <Badge 
-                                value={plan.actif ? 'Actif' : 'Inactif'} 
-                                variant={plan.actif ? 'success' : 'neutral'} 
-                                className="text-[10px] px-1.5 py-0"
+                             <div className="w-20">
+                                <Badge 
+                                    value={plan.actif ? 'Actif' : 'Inactif'} 
+                                    variant={plan.actif ? 'success' : 'neutral'} 
+                                    className="w-full justify-center text-[10px] py-0.5"
                                 />
+                             </div>
                         </td>
                         <td className="px-3 py-2 text-right">
                              <div className="flex items-center justify-end gap-1">
