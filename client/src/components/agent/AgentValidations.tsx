@@ -27,6 +27,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { caisseAgentApi, agencesApi, type Agence } from '@/lib/api-client';
 import FormField from '@/components/ui/FormField';
 import { useToast } from '../../hooks/use-toast';
+import { useIsOnline } from '@/contexts/NetworkContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -334,6 +335,14 @@ export default function AgentValidations() {
     return () => window.removeEventListener('operation-update', handleOperationEvent as EventListener);
   }, []);
 
+  // Auto-refresh when back online
+  const isOnline = useIsOnline();
+  useEffect(() => {
+    if (isOnline) {
+      loadData(true);
+    }
+  }, [isOnline]);
+
   const loadData = async (isBackgroundRefresh = false) => {
     if (!isBackgroundRefresh) {
       setLoading(true);
@@ -347,7 +356,7 @@ export default function AgentValidations() {
 
       const [opsResponse, agencesResponse] = await Promise.all([opsPromise, agencesPromise]);
 
-      const opsData = Array.isArray(opsResponse) ? opsResponse : (opsResponse.operations || opsResponse.data || []);
+      const opsData = opsResponse.data || [];
       setOperations(opsData);
 
       if (Array.isArray(agencesResponse)) {

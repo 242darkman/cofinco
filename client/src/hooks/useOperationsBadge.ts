@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { caisseAgentApi } from '@/lib/api-client';
+import { useIsOnline } from '@/contexts/NetworkContext';
 
 export interface OperationsBadgeData {
   pendingCount: number;
@@ -43,6 +44,14 @@ export function useOperationsBadge() {
   useEffect(() => {
     loadPendingCount();
   }, [loadPendingCount]);
+
+  // Refetch when back online
+  const isOnline = useIsOnline();
+  useEffect(() => {
+    if (isOnline) {
+      loadPendingCount();
+    }
+  }, [isOnline, loadPendingCount]);
 
   // Listen for custom DOM events (fallback for non-WS updates)
   useEffect(() => {
