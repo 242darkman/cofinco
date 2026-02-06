@@ -445,9 +445,9 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       format: (_: any, row: any) => (
         <div className="flex flex-col xs:flex-row xs:items-center gap-0.5 xs:gap-2">
             {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
-                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px]" />
+                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px] w-[70px] justify-center" />
             ) : (
-                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px]" />
+                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px] w-[70px] justify-center" />
             )}
             <span className="text-[10px] sm:text-xs text-slate-400">
                 {row.typeTransfert === "COFFRE_VERS_CAISSE" ? "Vers Caisse" : "De Caisse"}
@@ -493,7 +493,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         if (row.statut === StatutTransfertCoffre.REQUESTED) variant = 'warning';
         if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) variant = 'danger';
 
-        return <Badge variant={variant} value={row.statut} className="text-[9px] sm:text-xs" />;
+        return <Badge variant={variant} value={row.statut} className="text-[9px] sm:text-xs w-[80px] justify-center" />;
       }
     },
   ];
@@ -1570,7 +1570,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                                 Fermer
                             </Button>
                             <Button
-                                variant="destructive"
+                                variant="danger"
                                 className="flex-1 h-9 text-xs"
                                 onClick={handleCancel}
                                 disabled={isLoading || !cancelReason.trim() || (canBeReversed && cancelReason.length < 10)}

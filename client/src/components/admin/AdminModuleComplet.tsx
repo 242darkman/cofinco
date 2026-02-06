@@ -365,7 +365,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'product-rates' && <AdminProductRates />}
 
                   {activeTab === 'roles' && (
-                    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden space-y-4">
+                    <div className="flex flex-col h-full overflow-hidden space-y-2">
                       <div className="border-b border-slate-800 pb-2 shrink-0">
                         {(() => {
                         const viewTabs = [

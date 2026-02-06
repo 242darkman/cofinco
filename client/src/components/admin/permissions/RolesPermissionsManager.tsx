@@ -329,16 +329,16 @@ export default function RolesPermissionsManager({
       )}
 
       {/* SPLIT VIEW - Compact */}
-      <div className="grid grid-cols-12 gap-3 items-start flex-1 min-h-0">
+      <div className="grid grid-cols-12 gap-3 flex-1 min-h-0">
 
         {/* SIDEBAR NAVIGATION - Compact */}
-        <div className="col-span-12 lg:col-span-3 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+        <div className="col-span-12 lg:col-span-3 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col lg:h-full max-h-[40vh] lg:max-h-none">
           <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-2">
             <Award size={14} className="text-slate-400" />
             <span className="text-sm font-semibold text-slate-300">Modules</span>
             <span className="ml-auto text-[10px] text-slate-500">{allModules.length}</span>
           </div>
-          <div className="divide-y divide-slate-800/50 max-h-[400px] lg:max-h-[calc(100vh-280px)] overflow-y-auto">
+          <div className="divide-y divide-slate-800/50 flex-1 overflow-y-auto custom-scrollbar">
             {Object.entries(groupedModules).map(([category, categoryModules]) => (
               <div key={category}>
                 <div className="px-3 py-1.5 bg-slate-800/30">
@@ -375,7 +375,7 @@ export default function RolesPermissionsManager({
         </div>
 
         {/* MAIN CONTENT (Permissions List) - Compact */}
-        <div className="col-span-12 lg:col-span-9 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col max-h-[400px] lg:max-h-[calc(100vh-280px)]">
+        <div className="col-span-12 lg:col-span-9 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col h-full">
           {/* Module Header - Compact */}
           <div className="px-3 py-2 border-b border-slate-800 flex justify-between items-center gap-3 bg-slate-800/30 shrink-0">
             <div className="min-w-0">
