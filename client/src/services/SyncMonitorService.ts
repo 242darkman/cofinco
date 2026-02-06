@@ -213,6 +213,7 @@ class SyncMonitorService {
     this.counterInterval = null;
     this.retryTimeout = null;
     this.stateChangeTimeout = null;
+    this.pendingStateChange = null;
   }
 
   subscribe(listener: SyncStatusListener): () => void {
@@ -429,9 +430,8 @@ class SyncMonitorService {
     });
 
     // Set connection state (with debounce for stability)
-    if (this.consecutiveSuccesses >= this.config.successesBeforeOnline) {
-      this.setConnectionState('connected');
-    }
+    // ALWAYS force immediate update on success if we are getting data
+    this.setConnectionState('connected', true);
 
     this.log(`Heartbeat OK - latency: ${latency}ms (${latencyQuality})`);
   }
@@ -486,8 +486,9 @@ class SyncMonitorService {
     }
 
     // Debounced change
-    if (this.pendingStateChange === newState) {
-      // Already pending this change
+    // Debounced change
+    if (this.pendingStateChange === newState && this.stateChangeTimeout) {
+      // Already pending this change AND we have a timeout tracking it
       return;
     }
 
