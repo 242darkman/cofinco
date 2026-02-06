@@ -324,6 +324,7 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "MISC_DISBURSEMENT",
   "FEE",
   "BANK_FEE",
+  "CASH_TRANSFER",
 ]);
 
 // ============================================

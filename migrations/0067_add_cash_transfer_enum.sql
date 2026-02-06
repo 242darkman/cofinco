@@ -1,0 +1,1 @@
+ALTER TYPE type_paiement_terrain_enum ADD VALUE IF NOT EXISTS 'CASH_TRANSFER';
