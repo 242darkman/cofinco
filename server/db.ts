@@ -170,6 +170,20 @@ export async function closePool(): Promise<void> {
  * instead of migrations (db:push only syncs tables, not functions).
  */
 export async function ensureCustomFunctions(): Promise<void> {
+    // Custom unaccent function (fallback if extension is missing/restricted)
+  // This uses translate() to map accented characters to ASCII
+  await db.execute(sql`
+    CREATE OR REPLACE FUNCTION public.unaccent(text)
+    RETURNS text AS $$
+    BEGIN
+        RETURN translate($1,
+            'âãäåāăąÁÂÃÄÅĀĂĄèééêëēĕėęěÈÉÊËĒĔĖĘĚìíîïìĩīĭÌÍÎÏÌĨĪĬóôõöōŏőÒÓÔÕÖŌŎŐùúûüũūŭůÙÚÛÜŨŪŬŮñÑçÇ',
+            'aaaaaaaAAAAAAAAeeeeeeeeeeEEEEEEEEiiiiiiiiIIIIIIIIoooooooOOOOOOOOuuuuuuuuUUUUUUUUnNcC'
+        );
+    END;
+    $$ LANGUAGE plpgsql IMMUTABLE;
+  `);
+
   // get_next_piece_number: Generates sequential piece numbers for GL entries
   // This function is essential for the accounting module
   await db.execute(sql`

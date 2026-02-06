@@ -205,7 +205,6 @@ export function registerClientRoutes(app: Express) {
               c.numero_piece,
               c.profession,
               c.segment,
-              c.statut as client_statut,
               c.created_at,
               u.nom,
               u.prenom,

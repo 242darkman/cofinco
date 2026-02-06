@@ -73,7 +73,7 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
   };
 
   const validateCode = async () => {
-    if (code.length !== 8) { setError('Le code doit contenir 8 caractères'); return; }
+    if (code.length !== 6) { setError('Le code doit contenir 6 caractères'); return; }
     setValidating(true);
     setError('');
     try {
@@ -95,7 +95,7 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
 
   const handleCodeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (value.length <= 8) { setCode(value); setError(''); }
+    if (value.length <= 6) { setCode(value); setError(''); }
   };
 
   if (loading) {
@@ -179,16 +179,16 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
                 value={code}
                 onChange={handleCodeInput}
                 onKeyDown={(e) => e.key === 'Enter' && validateCode()}
-                placeholder="XXXXXXXX"
+                placeholder="XXXXXX"
                 className="w-full px-3 py-3 sm:py-3.5 bg-surface-muted border border-edge rounded-xl text-content-primary text-center text-lg sm:text-xl tracking-[0.3em] font-mono placeholder:tracking-normal placeholder:text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                maxLength={8}
+                maxLength={6}
                 autoFocus
                 data-testid="input-security-code"
               />
               <Shield className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[10px] text-content-muted">{code.length}/8 caractères</span>
+              <span className="text-[10px] text-content-muted">{code.length}/6 caractères</span>
               {error && <span className="text-[10px] sm:text-xs text-danger font-medium">{error}</span>}
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
           <Button
             onClick={validateCode}
             isLoading={validating}
-            disabled={code.length !== 8}
+            disabled={code.length !== 6}
             variant="primary"
             icon={Unlock}
             className="w-full"
