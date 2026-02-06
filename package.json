@@ -29,7 +29,11 @@
     "monitor:gl:alert": "node --env-file=.env --import tsx scripts/monitor-gl-strict.ts --alert",
     "cleanup:logs": "node --env-file=.env --import tsx scripts/cleanup-logs.ts",
     "cleanup:logs:dry-run": "node --env-file=.env --import tsx scripts/cleanup-logs.ts --dry-run",
-    "test": "vitest"
+    "test": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "playwright:install": "playwright install chromium"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.969.0",
@@ -159,6 +163,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.1.0",
+    "@playwright/test": "^1.58.1",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.4",

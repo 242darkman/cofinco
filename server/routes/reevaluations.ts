@@ -8,6 +8,8 @@ import type { Express, Request, Response } from "express";
 import { createLogger } from "../lib/logger";
 import { z } from "zod";
 import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization/middleware";
+import { Actions, Subjects } from "@shared/ability";
 
 const logger = createLogger('Routes:Reevaluations');
 import {
@@ -134,7 +136,7 @@ export function registerReevaluationRoutes(app: Express) {
    * POST /api/demandes/:demandeId/reevaluations
    * Create a new reevaluation request
    */
-  app.post("/api/demandes/:demandeId/reevaluations", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/demandes/:demandeId/reevaluations", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { demandeId } = req.params;
       const userId = (req as any).user?.id;
@@ -416,7 +418,7 @@ export function registerReevaluationRoutes(app: Express) {
    * POST /api/reevaluations/:reevaluationId/eligibility/validate
    * Validate eligibility for a reevaluation
    */
-  app.post("/api/reevaluations/:reevaluationId/eligibility/validate", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reevaluations/:reevaluationId/eligibility/validate", requireAuth, attachAbility, requireAbility(Actions.VALIDATE_REEVALUATION, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
       const userId = (req as any).user?.id;
@@ -460,7 +462,7 @@ export function registerReevaluationRoutes(app: Express) {
    * POST /api/reevaluations/:reevaluationId/enquete-complementaire
    * Start a complementary inquiry
    */
-  app.post("/api/reevaluations/:reevaluationId/enquete-complementaire", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reevaluations/:reevaluationId/enquete-complementaire", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
       const userId = (req as any).user?.id;
@@ -509,7 +511,7 @@ export function registerReevaluationRoutes(app: Express) {
    * POST /api/reevaluations/:reevaluationId/submit-to-committee
    * Submit reevaluation to committee
    */
-  app.post("/api/reevaluations/:reevaluationId/submit-to-committee", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reevaluations/:reevaluationId/submit-to-committee", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
       const userId = (req as any).user?.id;
@@ -578,7 +580,7 @@ export function registerReevaluationRoutes(app: Express) {
    * POST /api/reevaluations/:reevaluationId/committee-decision
    * Record committee decision
    */
-  app.post("/api/reevaluations/:reevaluationId/committee-decision", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reevaluations/:reevaluationId/committee-decision", requireAuth, attachAbility, requireAbility(Actions.DECIDE_REEVALUATION, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
       const userId = (req as any).user?.id;
@@ -647,7 +649,7 @@ export function registerReevaluationRoutes(app: Express) {
    * POST /api/reevaluations/:reevaluationId/cancel
    * Cancel a reevaluation
    */
-  app.post("/api/reevaluations/:reevaluationId/cancel", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reevaluations/:reevaluationId/cancel", requireAuth, attachAbility, requireAbility(Actions.REEVALUATE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
       const userId = (req as any).user?.id;

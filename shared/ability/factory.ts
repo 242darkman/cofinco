@@ -10,7 +10,7 @@
  */
 
 import { Actions, type Action } from './actions';
-import { Subjects, type Subject } from './subjects';
+import { Subjects, type Subject, MODULE_ENTITY_MAP } from './subjects';
 import { PERMISSION_MAPPINGS, getPermissionMapping, normalizePermissionCode } from './mappings';
 import type { CaslRule, AbilityUserContext } from './types';
 
@@ -320,4 +320,66 @@ export function validateRules(rules: CaslRule[]): { valid: boolean; errors: stri
     valid: errors.length === 0,
     errors,
   };
+}
+
+/**
+ * Check if a module should be visible based on permissions
+ *
+ * A module is visible if any of these conditions is true:
+ * 1. User has admin access (can manage all)
+ * 2. User can view the module directly (can(view, module))
+ * 3. User has any permission on any entity that belongs to the module (via MODULE_ENTITY_MAP)
+ * 4. Fallback: any permission code that starts with the module prefix is granted
+ *
+ * This solves the "module vs entity" mismatch problem where permission codes like
+ * `clients.view` map to entity `Client` but the menu checks `can('view', 'clients')`.
+ *
+ * @param rules - CASL rules
+ * @param moduleSubject - The module subject to check (e.g., Subjects.CLIENTS)
+ * @returns true if the module should be visible
+ */
+export function isModuleVisible(
+  rules: CaslRule[],
+  moduleSubject: Subject
+): boolean {
+  // 1. Check for admin/manage all
+  if (canWithRules(rules, Actions.MANAGE as Action, Subjects.ALL as Subject)) {
+    return true;
+  }
+
+  // 2. Direct module visibility check
+  if (canWithRules(rules, Actions.VIEW as Action, moduleSubject)) {
+    return true;
+  }
+
+  // 3. Check if any entity of the module has any permission
+  const moduleEntities = MODULE_ENTITY_MAP[moduleSubject];
+  if (moduleEntities && moduleEntities.length > 0) {
+    for (const entity of moduleEntities) {
+      // Check if user has any non-inverted rule for this entity
+      for (const rule of rules) {
+        if (rule.inverted) continue;
+
+        const ruleSubjects = Array.isArray(rule.subject) ? rule.subject : [rule.subject];
+        if (ruleSubjects.includes(entity) || ruleSubjects.includes(Subjects.ALL as Subject)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 4. Fallback: Check if any permission code starting with the module prefix is granted
+  const moduleName = moduleSubject.toLowerCase();
+
+  for (const [code, mapping] of Object.entries(PERMISSION_MAPPINGS)) {
+    // Check if the permission code belongs to this module
+    if (code.startsWith(`${moduleName}.`)) {
+      // Check if this permission is granted in the rules
+      if (canWithRules(rules, mapping.action, mapping.subject)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }

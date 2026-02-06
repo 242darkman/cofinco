@@ -43,6 +43,11 @@ export {
   parsePermissionCode,
   getPermissionCodesForSubject,
   getPermissionCodesForAction,
+  // Module permission bundles (P1-1)
+  MODULE_PERMISSION_BUNDLES,
+  getModulePermissionBundle,
+  getAllModulesWithBundles,
+  validateModuleBundles,
 } from './mappings';
 
 // Types
@@ -71,6 +76,7 @@ export {
   getAllowedActionsForSubject,
   rulesToPermissionsMap,
   validateRules,
+  isModuleVisible,
 } from './factory';
 
 // Re-export for convenience (aliased)

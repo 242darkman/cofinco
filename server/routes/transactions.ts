@@ -3,6 +3,8 @@ import { createLogger } from "../lib/logger";
 import { GlobalTransactionService } from "../services/global-transaction-service";
 import { z } from "zod";
 import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization/middleware";
+import { Actions, Subjects } from "@shared/ability";
 
 const logger = createLogger('Routes:Transactions');
 
@@ -30,7 +32,12 @@ const transactionSchema = z.object({
   numeroTelephone: z.string().optional()
 });
 
-transactionsRouter.post("/process", requireAuth, async (req, res) => {
+transactionsRouter.post(
+  "/process",
+  requireAuth,
+  attachAbility,
+  requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION),
+  async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Non authentifié" });

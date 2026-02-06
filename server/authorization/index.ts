@@ -44,14 +44,17 @@
  *    res.json(response); // Includes caslRules and permissionsMap
  */
 
-// Types (values)
+// Types (values) - Actions and Subjects from shared
+export { Actions, Subjects } from './types';
+
+// Permission mappings from shared (single source of truth)
 export {
-  Actions,
-  Subjects,
-  PERMISSION_CODE_MAPPINGS,
+  PERMISSION_MAPPINGS,
+  getPermissionMapping,
   normalizePermissionCode,
   parsePermissionCode,
-} from './types';
+  type PermissionMapping,
+} from '@shared/ability';
 
 // Types (type-only)
 export type {
@@ -60,7 +63,6 @@ export type {
   AppAbility,
   AppAbilityRule,
   AbilityResponse,
-  PermissionMapping,
 } from './types';
 
 // Ability builder (values)

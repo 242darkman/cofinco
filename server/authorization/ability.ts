@@ -66,9 +66,8 @@ import {
   Subjects,
   Subject,
   Action,
-  normalizePermissionCode,
-  parsePermissionCode,
 } from './types';
+import { getPermissionMapping, normalizePermissionCode } from '@shared/ability';
 import { getActiveTemporaryPermissionCodes } from '../services/temporary-permissions-service';
 
 /**
@@ -256,7 +255,7 @@ function buildRulesFromPermissions(
 
   // Process each permission
   for (const perm of permissions) {
-    const mapping = parsePermissionCode(perm.code);
+    const mapping = getPermissionMapping(perm.code);
     if (!mapping) continue;
 
     if (perm.granted) {
@@ -474,7 +473,7 @@ export async function getAbilityForUser(context: AbilityContext): Promise<AppAbi
  * Used for backwards compatibility with legacy permission checks
  */
 export function hasPermissionCode(ability: AppAbility, code: string): boolean {
-  const mapping = parsePermissionCode(code);
+  const mapping = getPermissionMapping(code);
   if (!mapping) return false;
   return ability.can(mapping.action, mapping.subject);
 }

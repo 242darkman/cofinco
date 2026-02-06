@@ -6,9 +6,23 @@
  * - Schema validation (bulkUserPermissionUpdateSchema)
  * - Critical permission detection (isCriticalPermission)
  * - Permission scope validation
+ * - P2-1: Anti-drift tests (seed codes vs mappings, no duplication)
  */
 
 import { describe, it, expect } from 'vitest';
+import {
+  PERMISSION_MAPPINGS,
+  MODULE_PERMISSION_BUNDLES,
+  validateModuleBundles,
+  getModulePermissionBundle,
+  isModuleVisible,
+  canWithRules,
+  buildRulesFromPermissionCodes,
+  Actions,
+  Subjects,
+} from '@shared/ability';
+import { PERMISSIONS_DATA, APP_MODULES, SEED_ROLE_PERMISSIONS } from '@shared/config/rbac';
+import type { CaslRule } from '@shared/ability';
 import {
   bulkUserPermissionUpdateSchema,
   isCriticalPermission,
@@ -379,5 +393,303 @@ describe('RBAC Audit Action Types', () => {
 
   it('should have 6 audit action types', () => {
     expect(AUDIT_ACTIONS).toHaveLength(6);
+  });
+});
+
+// ============================================================================
+// P2-1: Anti-Drift Tests - Seed Permission Codes vs PERMISSION_MAPPINGS
+// ============================================================================
+
+describe('P2-1: Anti-Drift - Seed Codes Coverage', () => {
+  it('should have all PERMISSIONS_DATA codes in PERMISSION_MAPPINGS', () => {
+    const missingCodes: string[] = [];
+
+    for (const [moduleName, permissions] of Object.entries(PERMISSIONS_DATA)) {
+      if (!permissions) continue;
+      for (const perm of permissions) {
+        const normalizedCode = perm.code.toLowerCase();
+        if (!PERMISSION_MAPPINGS[normalizedCode]) {
+          missingCodes.push(`${moduleName}: ${perm.code}`);
+        }
+      }
+    }
+
+    if (missingCodes.length > 0) {
+      console.error('Missing permission codes in PERMISSION_MAPPINGS:');
+      missingCodes.forEach(code => console.error(`  - ${code}`));
+    }
+
+    expect(missingCodes).toEqual([]);
+  });
+
+  it('should have all SEED_ROLE_PERMISSIONS codes in PERMISSION_MAPPINGS', () => {
+    const missingCodes: string[] = [];
+
+    for (const [role, codes] of Object.entries(SEED_ROLE_PERMISSIONS)) {
+      if (codes.includes('*')) continue; // Skip admin wildcard
+
+      for (const code of codes) {
+        const normalizedCode = code.toLowerCase();
+        if (!PERMISSION_MAPPINGS[normalizedCode]) {
+          missingCodes.push(`${role}: ${code}`);
+        }
+      }
+    }
+
+    if (missingCodes.length > 0) {
+      console.error('Missing permission codes from SEED_ROLE_PERMISSIONS:');
+      missingCodes.forEach(code => console.error(`  - ${code}`));
+    }
+
+    expect(missingCodes).toEqual([]);
+  });
+});
+
+// ============================================================================
+// P2-1: Anti-Drift Tests - MODULE_PERMISSION_BUNDLES Validation
+// ============================================================================
+
+describe('P2-1: Anti-Drift - Module Permission Bundles', () => {
+  it('should have all bundle codes in PERMISSION_MAPPINGS', () => {
+    const result = validateModuleBundles();
+
+    if (!result.valid) {
+      console.error('Invalid bundle codes:');
+      result.errors.forEach(err => console.error(`  - ${err}`));
+    }
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('should have bundles for all APP_MODULES', () => {
+    const missingModules: string[] = [];
+
+    for (const moduleName of APP_MODULES) {
+      const bundle = getModulePermissionBundle(moduleName);
+      if (bundle.length === 0) {
+        missingModules.push(moduleName);
+      }
+    }
+
+    // Some modules might not have bundles (intentionally empty)
+    // But we should at least warn about them
+    if (missingModules.length > 0) {
+      console.warn('Modules without permission bundles:');
+      missingModules.forEach(m => console.warn(`  - ${m}`));
+    }
+
+    // Allow some modules to not have bundles (intentional)
+    // But main modules should have bundles
+    const criticalModules = ['Crédits', 'Caisse', 'Clients', 'Comptes', 'Administration'];
+    for (const module of criticalModules) {
+      expect(getModulePermissionBundle(module).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('should not have duplicate codes within a bundle', () => {
+    const duplicates: string[] = [];
+
+    for (const [moduleName, codes] of Object.entries(MODULE_PERMISSION_BUNDLES)) {
+      const seen = new Set<string>();
+      for (const code of codes) {
+        if (seen.has(code)) {
+          duplicates.push(`${moduleName}: ${code}`);
+        }
+        seen.add(code);
+      }
+    }
+
+    expect(duplicates).toEqual([]);
+  });
+});
+
+// ============================================================================
+// P2-1: Anti-Drift Tests - No Duplicated Mappings in Server
+// ============================================================================
+
+describe('P2-1: Anti-Drift - No Duplicated Server Mappings', () => {
+  it('should import permission mappings from @shared/ability only', () => {
+    // This test ensures that server/authorization/types.ts
+    // no longer exports PERMISSION_CODE_MAPPINGS
+    // The actual check is done at compile time, but we verify the shared export works
+    expect(PERMISSION_MAPPINGS).toBeDefined();
+    expect(Object.keys(PERMISSION_MAPPINGS).length).toBeGreaterThan(50);
+  });
+
+  it('should have consistent mapping keys (all lowercase)', () => {
+    const nonLowercaseKeys = Object.keys(PERMISSION_MAPPINGS).filter(
+      key => key !== key.toLowerCase()
+    );
+
+    expect(nonLowercaseKeys).toEqual([]);
+  });
+});
+
+// ============================================================================
+// isModuleVisible Tests (P0-2 Validation)
+// ============================================================================
+
+describe('isModuleVisible - Module Visibility Logic', () => {
+  it('should return true for admin (manage all)', () => {
+    const adminRules: CaslRule[] = [
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ];
+
+    expect(isModuleVisible(adminRules, Subjects.CLIENTS)).toBe(true);
+    expect(isModuleVisible(adminRules, Subjects.CREDITS)).toBe(true);
+    expect(isModuleVisible(adminRules, Subjects.ADMIN)).toBe(true);
+  });
+
+  it('should return true when user can view module directly', () => {
+    const rules: CaslRule[] = [
+      { action: Actions.VIEW, subject: Subjects.CLIENTS },
+    ];
+
+    expect(isModuleVisible(rules, Subjects.CLIENTS)).toBe(true);
+    expect(isModuleVisible(rules, Subjects.CREDITS)).toBe(false);
+  });
+
+  it('should return true when user has permission on module entity', () => {
+    // User has permission on Client entity (not clients module)
+    const rules: CaslRule[] = [
+      { action: Actions.VIEW, subject: Subjects.CLIENT },
+    ];
+
+    // MODULE_ENTITY_MAP maps 'clients' -> ['Client']
+    // So isModuleVisible should detect the entity permission
+    expect(isModuleVisible(rules, Subjects.CLIENTS)).toBe(true);
+  });
+
+  it('should return true via fallback when permission code prefix matches', () => {
+    // Build rules from permission codes
+    const rules = buildRulesFromPermissionCodes(['clients.view']);
+
+    // The code maps to Client entity, and isModuleVisible should find it
+    expect(isModuleVisible(rules, Subjects.CLIENTS)).toBe(true);
+  });
+
+  it('should return false when user has no permission on module', () => {
+    const rules: CaslRule[] = [
+      { action: Actions.VIEW, subject: Subjects.CREDITS },
+    ];
+
+    expect(isModuleVisible(rules, Subjects.CLIENTS)).toBe(false);
+    expect(isModuleVisible(rules, Subjects.CAISSE)).toBe(false);
+  });
+
+  it('should handle empty rules', () => {
+    const rules: CaslRule[] = [];
+
+    expect(isModuleVisible(rules, Subjects.CLIENTS)).toBe(false);
+    expect(isModuleVisible(rules, Subjects.DASHBOARD)).toBe(false);
+  });
+});
+
+// ============================================================================
+// buildRulesFromPermissionCodes Tests
+// ============================================================================
+
+describe('buildRulesFromPermissionCodes - Rule Generation', () => {
+  it('should generate rules for valid permission codes', () => {
+    const codes = ['credits.view', 'clients.create', 'caisse.manage'];
+    const rules = buildRulesFromPermissionCodes(codes);
+
+    expect(rules.length).toBe(3);
+    expect(rules.some(r => r.action === Actions.VIEW && r.subject === Subjects.CREDIT)).toBe(true);
+    expect(rules.some(r => r.action === Actions.CREATE && r.subject === Subjects.CLIENT)).toBe(true);
+    expect(rules.some(r => r.action === Actions.MANAGE && r.subject === Subjects.CAISSE)).toBe(true);
+  });
+
+  it('should skip unknown permission codes', () => {
+    const codes = ['credits.view', 'unknown.code', 'invalid.permission'];
+    const rules = buildRulesFromPermissionCodes(codes);
+
+    // Only credits.view should produce a rule
+    expect(rules.length).toBe(1);
+    expect(rules[0].subject).toBe(Subjects.CREDIT);
+  });
+
+  it('should deduplicate rules', () => {
+    const codes = ['credits.view', 'credits.view', 'clients.create', 'clients.create'];
+    const rules = buildRulesFromPermissionCodes(codes);
+
+    expect(rules.length).toBe(2);
+  });
+
+  it('should handle empty input', () => {
+    const rules = buildRulesFromPermissionCodes([]);
+    expect(rules).toEqual([]);
+  });
+});
+
+// ============================================================================
+// DoD Criteria Validation Tests
+// ============================================================================
+
+describe('DoD: Module visible <=> at least one action possible', () => {
+  it('should make module visible only when user has at least one action', () => {
+    // No permissions - module not visible
+    const noPerms = buildRulesFromPermissionCodes([]);
+    expect(isModuleVisible(noPerms, Subjects.CREDITS)).toBe(false);
+
+    // One permission - module visible
+    const onePerms = buildRulesFromPermissionCodes(['credits.view']);
+    expect(isModuleVisible(onePerms, Subjects.CREDITS)).toBe(true);
+
+    // Multiple permissions - module visible
+    const multiPerms = buildRulesFromPermissionCodes(['credits.view', 'credits.create', 'credits.approve']);
+    expect(isModuleVisible(multiPerms, Subjects.CREDITS)).toBe(true);
+  });
+});
+
+describe('DoD: Enable All Module assigns all bundle permissions', () => {
+  it('should have complete bundle for Credits module', () => {
+    const creditsBundle = getModulePermissionBundle('Crédits');
+
+    // Should include core permissions
+    expect(creditsBundle).toContain('credits.view');
+    expect(creditsBundle).toContain('credits.create');
+    expect(creditsBundle).toContain('credits.approve');
+    expect(creditsBundle).toContain('credits.disburse');
+
+    // Should include sub-permissions
+    expect(creditsBundle).toContain('credits.reevaluations.view');
+  });
+
+  it('should have complete bundle for Caisse module', () => {
+    const caisseBundle = getModulePermissionBundle('Caisse');
+
+    expect(caisseBundle).toContain('caisse.view');
+    expect(caisseBundle).toContain('caisse.manage');
+    expect(caisseBundle).toContain('caisse.deposit');
+    expect(caisseBundle).toContain('caisse.withdraw');
+    expect(caisseBundle).toContain('caisse.open');
+    expect(caisseBundle).toContain('caisse.close');
+  });
+
+  it('should generate valid rules for all bundle codes', () => {
+    for (const [moduleName, codes] of Object.entries(MODULE_PERMISSION_BUNDLES)) {
+      const rules = buildRulesFromPermissionCodes(codes);
+
+      // All valid codes in bundle should produce at least one rule
+      // Note: buildRulesFromPermissionCodes deduplicates by action:subject
+      // So multiple codes mapping to same action:subject will produce one rule
+      const validCodes = codes.filter(code => PERMISSION_MAPPINGS[code]);
+
+      // Each valid code should have its action:subject in the rules
+      for (const code of validCodes) {
+        const mapping = PERMISSION_MAPPINGS[code];
+        const hasRule = rules.some(
+          r => r.action === mapping.action && r.subject === mapping.subject
+        );
+        expect(hasRule).toBe(true);
+      }
+
+      // Should have at least one rule if there are valid codes
+      if (validCodes.length > 0) {
+        expect(rules.length).toBeGreaterThan(0);
+      }
+    }
   });
 });
