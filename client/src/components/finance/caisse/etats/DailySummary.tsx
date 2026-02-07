@@ -49,11 +49,11 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
   // Calculs des métriques
   const metrics = useMemo(() => {
     const totalEntrees = transactions
-      .filter((t) => isEntreeOperation(t.type_operation || t.typeOperation || ''))
+      .filter((t) => isEntreeOperation(t.typeOperation || ''))
       .reduce((sum, t) => sum + Number(t.montant), 0);
 
     const totalSorties = transactions
-      .filter((t) => !isEntreeOperation(t.type_operation || t.typeOperation || ''))
+      .filter((t) => !isEntreeOperation(t.typeOperation || ''))
       .reduce((sum, t) => sum + Number(t.montant), 0);
 
     const soldeNet = totalEntrees - totalSorties;
@@ -93,12 +93,12 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
       {};
 
     for (const tx of transactions) {
-      const date = new Date(tx.created_at || tx.createdAt || '').toLocaleDateString('fr-FR');
+      const date = new Date(tx.createdAt || '').toLocaleDateString('fr-FR');
       if (!byDay[date]) {
         byDay[date] = { date, entrees: 0, sorties: 0, transactions: 0 };
       }
 
-      const isEntree = isEntreeOperation(tx.type_operation || tx.typeOperation || '');
+      const isEntree = isEntreeOperation(tx.typeOperation || '');
       if (isEntree) {
         byDay[date].entrees += Number(tx.montant);
       } else {
@@ -118,7 +118,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
     const byType: Record<string, number> = {};
 
     for (const tx of transactions) {
-      const type = tx.type_operation || tx.typeOperation || 'AUTRE';
+      const type = tx.typeOperation || 'AUTRE';
       const label = getOperationLabel(type);
       byType[label] = (byType[label] || 0) + Number(tx.montant);
     }
@@ -135,13 +135,13 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
     const data: { date: string; solde: number }[] = [];
 
     const sortedTx = [...transactions].sort((a, b) => {
-      const dateA = new Date(a.created_at || a.createdAt || '');
-      const dateB = new Date(b.created_at || b.createdAt || '');
+      const dateA = new Date(a.createdAt || '');
+      const dateB = new Date(b.createdAt || '');
       return dateA.getTime() - dateB.getTime();
     });
 
     for (const tx of sortedTx) {
-      const isEntree = isEntreeOperation(tx.type_operation || tx.typeOperation || '');
+      const isEntree = isEntreeOperation(tx.typeOperation || '');
       if (isEntree) {
         solde += Number(tx.montant);
       } else {
@@ -149,7 +149,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
       }
 
       data.push({
-        date: new Date(tx.created_at || tx.createdAt || '').toLocaleDateString('fr-FR'),
+        date: new Date(tx.createdAt || '').toLocaleDateString('fr-FR'),
         solde,
       });
     }

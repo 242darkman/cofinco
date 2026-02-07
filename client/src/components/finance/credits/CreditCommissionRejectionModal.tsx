@@ -52,7 +52,7 @@ export default function CreditCommissionRejectionModal({
         throw new Error(data.message || 'Erreur lors du rejet de la demande');
       }
 
-      toast.success(`Demande ${demande.numero_demande} rejetée. Le client peut demander une réévaluation immédiatement.`);
+      toast.success(`Demande ${demande.numeroDemande} rejetée. Le client peut demander une réévaluation immédiatement.`);
       onSuccess();
     } catch (err: any) {
       console.error('Erreur rejet commission:', err);
@@ -97,7 +97,7 @@ export default function CreditCommissionRejectionModal({
         <div className="bg-slate-700/50 rounded-lg p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Numéro de demande</span>
-            <span className="text-white font-mono font-bold">{demande.numero_demande}</span>
+            <span className="text-white font-mono font-bold">{demande.numeroDemande}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Client</span>
@@ -106,7 +106,7 @@ export default function CreditCommissionRejectionModal({
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Montant demandé</span>
             <span className="text-emerald-400 font-bold">
-              {(demande.montant_demande || 0).toLocaleString('fr-FR')} FCFA
+              {(demande.montantDemande || 0).toLocaleString('fr-FR')} FCFA
             </span>
           </div>
           <div className="flex justify-between text-sm">

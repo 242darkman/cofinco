@@ -9,19 +9,19 @@ import { StatutCredit, StatutEcheanceCredit, STATUT_ECHEANCE_CREDIT_LABELS } fro
 
 interface Echeance {
   id: string;
-  credit_id: string;
-  numero_echeance: number;
-  date_echeance: string;
-  montant_principal: number;
-  montant_interet: number;
-  montant_total: number;
+  creditId: string;
+  numeroEcheance: number;
+  dateEcheance: string;
+  montantPrincipal: number;
+  montantInteret: number;
+  montantTotal: number;
   statut: string;
-  date_paiement: string | null;
-  montant_paye: number;
-  jours_retard: number;
+  datePaiement: string | null;
+  montantPaye: number;
+  joursRetard: number;
   penalite: number;
   credits: {
-    numero_credit: string;
+    numeroCredit: string;
     clients: {
       nom: string;
     };
@@ -52,9 +52,9 @@ export default function CreditEcheancier() {
             allEcheances.push({
               ...ech,
               credits: {
-                numero_credit: credit.numero_credit,
+                numeroCredit: credit.numeroCredit,
                 clients: {
-                  nom: formatClientName(credit.clients?.nom || credit.client_nom || 'Client', credit.clients?.prenom)
+                  nom: formatClientName(credit.clients?.nom || credit.clientNom || 'Client', credit.clients?.prenom)
                 }
               }
             });
@@ -67,7 +67,7 @@ export default function CreditEcheancier() {
 
       // Calcul du retard pour chaque échéance
       let processedEcheances = allEcheances.map(ech => {
-        const dateEch = new Date(ech.date_echeance);
+        const dateEch = new Date(ech.dateEcheance);
         dateEch.setHours(0, 0, 0, 0);
         const joursRetard = ech.statut === StatutEcheanceCredit.UPCOMING && dateEch < today
           ? Math.floor((today.getTime() - dateEch.getTime()) / (1000 * 60 * 60 * 24))
@@ -75,7 +75,7 @@ export default function CreditEcheancier() {
 
         return {
           ...ech,
-          jours_retard: joursRetard,
+          joursRetard: joursRetard,
           statut: joursRetard > 0 ? StatutEcheanceCredit.LATE : ech.statut
         };
       });
@@ -83,7 +83,7 @@ export default function CreditEcheancier() {
       // Application des filtres
       if (filter === 'upcoming') {
         processedEcheances = processedEcheances.filter(e =>
-          e.statut === StatutEcheanceCredit.UPCOMING && new Date(e.date_echeance) >= today
+          e.statut === StatutEcheanceCredit.UPCOMING && new Date(e.dateEcheance) >= today
         );
       } else if (filter === 'overdue') {
         processedEcheances = processedEcheances.filter(e => e.statut === StatutEcheanceCredit.LATE);
@@ -96,19 +96,19 @@ export default function CreditEcheancier() {
         const nextWeek = new Date();
         nextWeek.setDate(nextWeek.getDate() + 7);
         processedEcheances = processedEcheances.filter(e =>
-          new Date(e.date_echeance) <= nextWeek
+          new Date(e.dateEcheance) <= nextWeek
         );
       } else if (dateFilter === 'month') {
         const nextMonth = new Date();
         nextMonth.setMonth(nextMonth.getMonth() + 1);
         processedEcheances = processedEcheances.filter(e =>
-          new Date(e.date_echeance) <= nextMonth
+          new Date(e.dateEcheance) <= nextMonth
         );
       }
 
       // Tri par date
       processedEcheances.sort((a, b) =>
-        new Date(a.date_echeance).getTime() - new Date(b.date_echeance).getTime()
+        new Date(a.dateEcheance).getTime() - new Date(b.dateEcheance).getTime()
       );
 
       setEcheances(processedEcheances);
@@ -175,15 +175,15 @@ export default function CreditEcheancier() {
   const stats = useMemo(() => ({
     total: echeances.length,
     enAttente: echeances.filter(e => e.statut === StatutEcheanceCredit.UPCOMING).length,
-    enRetard: echeances.filter(e => e.statut === StatutEcheanceCredit.LATE || e.jours_retard > 0).length,
+    enRetard: echeances.filter(e => e.statut === StatutEcheanceCredit.LATE || e.joursRetard > 0).length,
     paye: echeances.filter(e => e.statut === StatutEcheanceCredit.PAID).length,
-    montantTotal: echeances.reduce((sum, e) => sum + (e.montant_total || 0), 0),
+    montantTotal: echeances.reduce((sum, e) => sum + (e.montantTotal || 0), 0),
     montantEnAttente: echeances
       .filter(e => e.statut === StatutEcheanceCredit.UPCOMING)
-      .reduce((sum, e) => sum + (e.montant_total || 0), 0),
+      .reduce((sum, e) => sum + (e.montantTotal || 0), 0),
     montantRetard: echeances
-      .filter(e => e.statut === StatutEcheanceCredit.LATE || e.jours_retard > 0)
-      .reduce((sum, e) => sum + (e.montant_total || 0), 0)
+      .filter(e => e.statut === StatutEcheanceCredit.LATE || e.joursRetard > 0)
+      .reduce((sum, e) => sum + (e.montantTotal || 0), 0)
   }), [echeances]);
 
   // Groupement par mois mémorisé
@@ -191,7 +191,7 @@ export default function CreditEcheancier() {
     const grouped: Record<string, Echeance[]> = {};
 
     echeances.forEach(ech => {
-      const date = new Date(ech.date_echeance);
+      const date = new Date(ech.dateEcheance);
       const monthName = date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
 
       if (!grouped[monthName]) {
@@ -355,13 +355,13 @@ export default function CreditEcheancier() {
                   {escapeHtml(month)}
                 </h3>
                 <div className="text-sm text-slate-400 mt-1">
-                  {echs.length} échéance{echs.length > 1 ? 's' : ''} · {formatMoney(echs.reduce((sum, e) => sum + (e.montant_total || 0), 0))}
+                  {echs.length} échéance{echs.length > 1 ? 's' : ''} · {formatMoney(echs.reduce((sum, e) => sum + (e.montantTotal || 0), 0))}
                 </div>
               </header>
 
               <ul className="divide-y divide-slate-700">
                 {echs.map(echeance => {
-                  const daysUntil = getDaysUntil(echeance.date_echeance);
+                  const daysUntil = getDaysUntil(echeance.dateEcheance);
                   const isUrgent = daysUntil && (daysUntil === "Aujourd'hui" || daysUntil === "Demain");
 
                   return (
@@ -373,12 +373,12 @@ export default function CreditEcheancier() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <span className="text-cyan-400 font-mono font-bold">
-                              {escapeHtml(echeance.credits.numero_credit)}
+                              {escapeHtml(echeance.credits.numeroCredit)}
                             </span>
                             <span className="text-white font-semibold">
                               {escapeHtml(echeance.credits.clients.nom)}
                             </span>
-                            {getStatutBadge(echeance.statut, echeance.jours_retard)}
+                            {getStatutBadge(echeance.statut, echeance.joursRetard)}
                             {isUrgent && (
                               <span
                                 className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-semibold"
@@ -392,8 +392,8 @@ export default function CreditEcheancier() {
                           <div className="flex items-center gap-6 text-sm text-slate-400 flex-wrap">
                             <div className="flex items-center gap-2">
                               <Calendar size={16} aria-hidden="true" />
-                              <time dateTime={echeance.date_echeance}>
-                                {new Date(echeance.date_echeance).toLocaleDateString('fr-FR', {
+                              <time dateTime={echeance.dateEcheance}>
+                                {new Date(echeance.dateEcheance).toLocaleDateString('fr-FR', {
                                   weekday: 'short',
                                   day: 'numeric',
                                   month: 'short',
@@ -405,7 +405,7 @@ export default function CreditEcheancier() {
 
                             <div className="flex items-center gap-2">
                               <DollarSign size={16} aria-hidden="true" />
-                              <span>Échéance #{echeance.numero_echeance}</span>
+                              <span>Échéance #{echeance.numeroEcheance}</span>
                             </div>
 
                             {echeance.penalite > 0 && (
@@ -419,11 +419,11 @@ export default function CreditEcheancier() {
 
                         <div className="text-right">
                           <div className="text-2xl font-bold text-white">
-                            {formatMoney(echeance.montant_total)}
+                            {formatMoney(echeance.montantTotal)}
                           </div>
                           <div className="text-xs text-slate-400 mt-1">
-                            Principal: {formatMoney(echeance.montant_principal)} ·
-                            Intérêt: {formatMoney(echeance.montant_interet)}
+                            Principal: {formatMoney(echeance.montantPrincipal)} ·
+                            Intérêt: {formatMoney(echeance.montantInteret)}
                           </div>
                         </div>
                       </div>

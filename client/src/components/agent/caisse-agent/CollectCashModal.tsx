@@ -181,12 +181,12 @@ export default function CollectCashModal({
 
   const creditOptions = clientCredits.map((c) => ({
     value: c.id,
-    label: `Crédit #${c.numero || c.id.slice(0, 8)} - ${new Intl.NumberFormat('fr-FR').format(c.solde_restant || 0)} XOF`
+    label: `Crédit #${c.numero || c.id.slice(0, 8)} - ${new Intl.NumberFormat('fr-FR').format(c.soldeRestant || 0)} XOF`
   }));
 
   const compteOptions = clientComptes.map((c) => ({
     value: c.id,
-    label: `${c.type_compte || 'Épargne'} - ${c.numero || c.id.slice(0, 8)}`
+    label: `${c.typeCompte || 'Épargne'} - ${c.numero || c.id.slice(0, 8)}`
   }));
 
   return (

@@ -12,13 +12,13 @@ import { formatClientName } from '../../../lib/format';
 
 interface CompteBloque {
   id: string;
-  numero_compte: string;
-  montant_initial: number;
-  montant_actuel: number;
-  taux_interet: number;
-  date_ouverture: string;
-  date_echeance: string;
-  duree_mois: number;
+  numeroCompte: string;
+  montantInitial: number;
+  montantActuel: number;
+  tauxInteret: number;
+  dateOuverture: string;
+  dateEcheance: string;
+  dureeMois: number;
   statut: string;
   clients: {
     nom: string;
@@ -82,7 +82,7 @@ export default function ComptesBloquesSection() {
     const searchLower = debouncedSearch.toLowerCase();
     return comptes.filter(c => {
       const clientName = c.clients ? `${c.clients.nom || ''} ${c.clients.prenom || ''}`.toLowerCase() : '';
-      const numero = (c.numero_compte || '').toLowerCase();
+      const numero = (c.numeroCompte || '').toLowerCase();
       return clientName.includes(searchLower) || numero.includes(searchLower);
     });
   }, [comptes, debouncedSearch]);
@@ -102,7 +102,7 @@ export default function ComptesBloquesSection() {
   };
 
   const calculateInterets = (compte: CompteBloque) => {
-    return Math.round(compte.montant_initial * (compte.taux_interet / 100) * (compte.duree_mois / 12));
+    return Math.round(compte.montantInitial * (compte.tauxInteret / 100) * (compte.dureeMois / 12));
   };
 
   const activeComptes = (comptes || []).filter(c => c && c.statut === StatutCompte.ACTIVE);
@@ -110,14 +110,14 @@ export default function ComptesBloquesSection() {
   const stats = {
     total: (comptes || []).length,
     actifs: activeComptes.length,
-    montantTotal: activeComptes.reduce((sum, c) => sum + (c.montant_actuel || 0), 0),
+    montantTotal: activeComptes.reduce((sum, c) => sum + (c.montantActuel || 0), 0),
     interetsEstimes: activeComptes.reduce((sum, c) => sum + calculateInterets(c), 0)
   };
 
   const columns = [
     {
       label: 'Compte',
-      key: 'numero_compte',
+      key: 'numeroCompte',
       primary: true,
       format: (value: any, row: CompteBloque) => (
         <div>
@@ -130,24 +130,24 @@ export default function ComptesBloquesSection() {
     },
     {
       label: 'Montant',
-      key: 'montant_initial',
+      key: 'montantInitial',
       format: (value: any) => (
         <span className="font-bold text-white">{Number(value).toLocaleString()} FCFA</span>
       )
     },
     {
       label: 'Termes',
-      key: 'taux_interet',
+      key: 'tauxInteret',
       format: (value: any, row: CompteBloque) => (
         <div className="flex flex-col text-xs">
           <span className="text-emerald-300 font-semibold">{value}% / an</span>
-          <span className="text-slate-400">{row.duree_mois} mois</span>
+          <span className="text-slate-400">{row.dureeMois} mois</span>
         </div>
       )
     },
     {
       label: 'Échéance',
-      key: 'date_echeance',
+      key: 'dateEcheance',
       format: (value: any, row: CompteBloque) => {
         const jours = getJoursRestants(value);
         return (
@@ -166,7 +166,7 @@ export default function ComptesBloquesSection() {
       label: 'Statut',
       key: 'statut',
       format: (value: any, row: CompteBloque) => {
-        const joursRestants = getJoursRestants(row.date_echeance);
+        const joursRestants = getJoursRestants(row.dateEcheance);
         const estEchu = joursRestants === 0 && row.statut === StatutCompte.ACTIVE;
         
         if (estEchu) return <Badge value="Échu" variant="success" />;

@@ -14,17 +14,13 @@ import ConfirmDialog from '../../ui/ConfirmDialog';
 interface PendingCredit {
   id: string;
   numeroCredit: string;
-  numero_credit?: string;
   montant: string;
   taux: number | string;
   duree: number;
   statut: string;
   disbursementChannel: string;
-  disbursement_channel?: string;
   disbursementStatus: string;
-  disbursement_status?: string;
   createdAt: string;
-  created_at?: string;
   client: {
     id: string;
     nom: string;
@@ -305,7 +301,7 @@ export default function PendingDisbursements({
                         {formatClientName(credit.client.nom, credit.client.prenom)}
                       </p>
                       <p className="text-[10px] text-slate-500 font-mono">
-                        #{credit.numeroCredit || credit.numero_credit}
+                        #{credit.numeroCredit}
                       </p>
                     </div>
 
@@ -319,7 +315,7 @@ export default function PendingDisbursements({
                   <div className="flex items-center justify-between pl-6">
                     <div className="flex items-center gap-1 text-[10px] text-slate-500">
                       <Clock size={10} />
-                      {new Date(credit.createdAt || credit.created_at || '').toLocaleDateString('fr', { day: '2-digit', month: '2-digit' })}
+                      {new Date(credit.createdAt || '').toLocaleDateString('fr', { day: '2-digit', month: '2-digit' })}
                     </div>
                     <p className="text-sm font-bold text-orange-400 tabular-nums">
                       {formatMoney(parseFloat(credit.montant))}
@@ -349,7 +345,7 @@ export default function PendingDisbursements({
                       <div className="bg-slate-950/50 rounded-lg p-2 text-center">
                         <p className="text-[9px] text-slate-500 uppercase tracking-wider">Crédit</p>
                         <p className="text-xs font-bold text-slate-300 font-mono mt-1">
-                          #{credit.numeroCredit || credit.numero_credit}
+                          #{credit.numeroCredit}
                         </p>
                       </div>
                     </div>

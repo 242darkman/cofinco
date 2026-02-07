@@ -178,12 +178,12 @@ export default function CaisseSupervision({
   };
 
   const resolveSessionStatus = (session: any) => session.computedStatus || computeSessionStatus(session);
-  const resolveOpenedAt = (session: any) => session.openedAt || session.opened_at;
-  const resolveClosedAt = (session: any) => session.closedAt || session.closed_at;
+  const resolveOpenedAt = (session: any) => session.openedAt;
+  const resolveClosedAt = (session: any) => session.closedAt;
   // Helper pour récupérer le solde théorique (nom de champ varie selon les routes)
   const getSoldeTheorique = (session: any) => {
     if (!session) return 0;
-    return Number(session.montant_fermeture_theorique || session.montantFermetureTheorique || session.solde_theorique || 0);
+    return Number(session.montantFermetureTheorique || session.soldeTheorique || 0);
   };
   const activeSessions = sessions.filter((s) => resolveSessionStatus(s) === 'OPEN');
   const closedSessions = sessions.filter((s) => resolveSessionStatus(s) === 'CLOSED');
@@ -191,7 +191,7 @@ export default function CaisseSupervision({
 
   // Compter les caisses UNIQUES (pas les sessions) — une même caisse ouverte/fermée
   // plusieurs fois ne doit compter que comme 1
-  const resolveCaisseId = (s: any) => s.caisseId || s.caisse_id;
+  const resolveCaisseId = (s: any) => s.caisseId;
   const uniqueActiveCaisseCount = new Set(activeSessions.map(resolveCaisseId)).size;
   const uniqueClosedTodayCaisseCount = new Set(
     closedSessions
@@ -281,7 +281,7 @@ export default function CaisseSupervision({
         const closedHistory = history.filter((s: any) => resolveSessionStatus(s) === 'CLOSED');
         const totalEncaisse = closedHistory.reduce((acc: number, s: any) => {
           const ops = s.operations || [];
-          const depots = ops.filter((o: any) => !(o.type_operation || '').toLowerCase().includes('retrait'));
+          const depots = ops.filter((o: any) => !(o.typeOperation || '').toLowerCase().includes('retrait'));
           return acc + depots.reduce((sum: number, o: any) => sum + Number(o.montant || 0), 0);
         }, 0);
 
@@ -403,9 +403,9 @@ export default function CaisseSupervision({
 
     const supervisionInfo: SupervisionSession = {
       sessionId: pendingSupervisionSession.id,
-      targetCaissierName: pendingSupervisionSession.caissier_nom || 'Inconnu',
-      targetCaisseName: pendingSupervisionSession.caisse_nom || 'Caisse',
-      targetAgenceName: pendingSupervisionSession.agence_nom,
+      targetCaissierName: pendingSupervisionSession.caissierNom || 'Inconnu',
+      targetCaisseName: pendingSupervisionSession.caisseNom || 'Caisse',
+      targetAgenceName: pendingSupervisionSession.agenceNom,
       currentBalance: getSoldeTheorique(pendingSupervisionSession),
       openedAt: resolveOpenedAt(pendingSupervisionSession),
       supervisorId: currentUser.id,
@@ -599,22 +599,22 @@ export default function CaisseSupervision({
                       <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${isOwnSession ? 'from-cyan-400 to-cyan-600' : 'from-emerald-400 to-emerald-600'}`} />
 
                       {/* Badge Agence - positionné en haut à droite */}
-                      {session.agence_nom && (
+                      {session.agenceNom && (
                         <div className="absolute top-2 right-2 z-10">
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                            {session.agence_code || session.agence_nom.substring(0, 4).toUpperCase()}
+                            {session.agenceCode || session.agenceNom.substring(0, 4).toUpperCase()}
                           </span>
                         </div>
                       )}
 
                       <div className="p-3 pl-4">
                         {/* En-tête: Nom de la Caisse */}
-                        {session.caisse_nom && (
+                        {session.caisseNom && (
                           <div className="mb-2 pb-1.5 border-b border-slate-700/30">
                             <div className="flex items-center gap-1.5">
                               <Wallet size={12} className="text-amber-400" />
                               <span className="text-xs font-bold text-white truncate max-w-[140px]">
-                                {session.caisse_nom}
+                                {session.caisseNom}
                               </span>
                               {isOwnSession && (
                                 <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
@@ -634,13 +634,13 @@ export default function CaisseSupervision({
                                           ? 'from-cyan-700 to-cyan-800 border-cyan-600 text-cyan-200'
                                           : 'from-slate-700 to-slate-800 border-slate-600 text-slate-200'
                                         }`}>
-                            {session.caissier_nom?.[0] || 'C'}
+                            {session.caissierNom?.[0] || 'C'}
                           </div>
 
                           {/* Info caissier */}
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-white text-sm truncate pr-8">
-                              {session.caissier_nom || 'Caissier Inconnu'}
+                              {session.caissierNom || 'Caissier Inconnu'}
                             </h4>
                             <div className="flex items-center gap-1 text-[10px] text-emerald-400">
                               <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse shrink-0" />
@@ -1104,7 +1104,7 @@ export default function CaisseSupervision({
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
         title="Détails de la Session"
-        subtitle={selectedSession ? `Caissier: ${selectedSession.caissier_nom}` : ""}
+        subtitle={selectedSession ? `Caissier: ${selectedSession.caissierNom}` : ""}
         size="lg"
       >
         {selectedSession && (
@@ -1120,7 +1120,7 @@ export default function CaisseSupervision({
                 </div>
                 <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
                   <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold mb-1">Solde Initial</div>
-                  <div className="text-white text-xs sm:text-sm font-mono font-bold">{formatMoney(Number(selectedSession.solde_initial || 0))}</div>
+                  <div className="text-white text-xs sm:text-sm font-mono font-bold">{formatMoney(Number(selectedSession.soldeInitial || 0))}</div>
                 </div>
                 <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 col-span-2 sm:col-span-1">
                   <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold mb-1">Solde Actuel</div>
@@ -1152,20 +1152,20 @@ export default function CaisseSupervision({
                         {selectedSession.operations?.map((op: any) => (
                           <tr key={op.id} className="hover:bg-slate-800/20 active:bg-slate-800/30 transition-colors">
                             <td className="p-2 sm:p-3 text-slate-400 font-mono text-[10px] sm:text-xs whitespace-nowrap">
-                              {op.created_at ? new Date(op.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                              {op.createdAt ? new Date(op.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                             </td>
                             <td className="p-2 sm:p-3">
                               <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap ${
-                                (op.type_operation || '').toLowerCase().includes('retrait') || (op.type_operation || '').toLowerCase().includes('disbursement') || (op.type_operation || '').toLowerCase().includes('distribution')
+                                (op.typeOperation || '').toLowerCase().includes('retrait') || (op.typeOperation || '').toLowerCase().includes('disbursement') || (op.typeOperation || '').toLowerCase().includes('distribution')
                                   ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
                               }`}>
-                                {translateOperationType(op.type_operation)}
+                                {translateOperationType(op.typeOperation)}
                               </span>
                             </td>
                             <td className={`p-2 sm:p-3 text-right font-mono font-bold whitespace-nowrap text-[10px] sm:text-xs ${
-                              (op.type_operation || '').toLowerCase().includes('retrait') ? 'text-red-400' : 'text-emerald-400'
+                              (op.typeOperation || '').toLowerCase().includes('retrait') ? 'text-red-400' : 'text-emerald-400'
                             }`}>
-                              {(op.type_operation || '').toLowerCase().includes('retrait') ? '-' : '+'}{formatMoney(Number(op.montant || 0))}
+                              {(op.typeOperation || '').toLowerCase().includes('retrait') ? '-' : '+'}{formatMoney(Number(op.montant || 0))}
                             </td>
                           </tr>
                         ))}
@@ -1215,7 +1215,7 @@ export default function CaisseSupervision({
             <div>
               <p className="font-bold">Action irréversible</p>
               <p className="text-sm opacity-80">
-                Vous êtes sur le point de forcer la clôture de la caisse de <strong>{selectedSession?.caissier_nom}</strong>.
+                Vous êtes sur le point de forcer la clôture de la caisse de <strong>{selectedSession?.caissierNom}</strong>.
               </p>
             </div>
           </div>
@@ -1439,15 +1439,15 @@ export default function CaisseSupervision({
                         }`} />
                         <div>
                           <div className="text-xs font-medium text-white">
-                            {new Date(session.openedAt || session.opened_at).toLocaleDateString('fr-FR', {
+                            {new Date(session.openedAt).toLocaleDateString('fr-FR', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric'
                             })}
                           </div>
                           <div className="text-[10px] text-slate-500">
-                            {session.closedAt || session.closed_at
-                              ? `Fermée à ${new Date(session.closedAt || session.closed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                            {session.closedAt
+                              ? `Fermée à ${new Date(session.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                               : resolveSessionStatus(session) === 'TIMED_OUT'
                                 ? 'Expirée'
                                 : 'En cours'
@@ -1457,7 +1457,7 @@ export default function CaisseSupervision({
                       </div>
                       <div className="text-right">
                         <div className="text-xs font-mono font-bold text-white">
-                          {formatMoney(Number(session.solde_reel || session.montant_fermeture_declare || 0) || getSoldeTheorique(session))}
+                          {formatMoney(Number(session.soldeReel || session.montantFermetureDeclare || 0) || getSoldeTheorique(session))}
                         </div>
                         {session.ecart && Number(session.ecart) !== 0 && (
                           <div className={`text-[10px] font-mono ${Number(session.ecart) > 0 ? 'text-emerald-400' : 'text-red-400'}`}>

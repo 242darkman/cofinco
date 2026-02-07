@@ -187,8 +187,8 @@ export default function CaisseDashboard({
   });
 
   // Get the first non-occupied caisse for displaying available funds
-  const availableCaisse = myCaisses.find((c: any) => !c.is_occupied || !c.isOccupied);
-  const availableBalance = availableCaisse?.available_balance ?? availableCaisse?.availableBalance ?? 0;
+  const availableCaisse = myCaisses.find((c: any) => !c.isOccupied);
+  const availableBalance = availableCaisse?.availableBalance ?? 0;
 
   // Actual session being used (own or supervised)
   const currentSession = supervisedSession || sessionActive;
@@ -292,7 +292,7 @@ export default function CaisseDashboard({
   // Real-time Updates
   // Enable WebSocket for both active sessions AND pending opening sessions
   const wsEnabled = !!currentSession || !!hasPendingOpening;
-  const wsCaisseId = currentSession?.caisse_id || pendingSession?.caisse_id;
+  const wsCaisseId = currentSession?.caisseId || pendingSession?.caisseId;
   const wsSessionId = currentSession?.id || pendingSession?.id;
 
   useCaisseWebSocket({
@@ -521,8 +521,8 @@ export default function CaisseDashboard({
   };
 
   // Calcul des entrées/sorties en utilisant les helpers centralisés
-  const entreesOps = transactions.filter(t => isIncomingOperation(t.type_operation));
-  const sortiesOps = transactions.filter(t => isOutgoingOperation(t.type_operation));
+  const entreesOps = transactions.filter(t => isIncomingOperation(t.typeOperation));
+  const sortiesOps = transactions.filter(t => isOutgoingOperation(t.typeOperation));
 
   const totalEntrees = entreesOps.reduce((sum, t) => sum + toNumber(t.montant), 0);
   const totalSorties = sortiesOps.reduce((sum, t) => sum + toNumber(t.montant), 0);
@@ -533,7 +533,7 @@ export default function CaisseDashboard({
   // Le calcul manuel (montant_ouverture + entrées - sorties) peut diverger si des opérations sont manquantes côté client
   // When no session is active, show available balance from assigned caisse
   const soldeActuel = currentSession
-    ? toNumber((currentSession as any).montant_fermeture_theorique || currentSession.montantFermetureTheorique || 0)
+    ? toNumber(currentSession.montantFermetureTheorique || 0)
     : availableBalance;
 
   const isSessionOpen = !!currentSession;
@@ -648,11 +648,11 @@ export default function CaisseDashboard({
               </div>
             </div>
 
-            {historiqueMode === 'global' && currentSession?.caisse_id ? (
+            {historiqueMode === 'global' && currentSession?.caisseId ? (
               <div className="flex-1 min-h-0">
                   <CaisseHistoriqueGlobal
-                    caisseId={currentSession.caisse_id}
-                    caisseName={currentSession.caisse_nom}
+                    caisseId={currentSession.caisseId}
+                    caisseName={currentSession.caisseNom}
                     onBack={() => setActiveTab('dashboard')}
                   />
               </div>
@@ -663,18 +663,18 @@ export default function CaisseDashboard({
                     id: tx.id,
                     reference: tx.reference,
                     amount: toNumber(tx.montant),
-                    type: tx.type_operation,
-                    type_operation: tx.type_operation,
+                    type: tx.typeOperation,
+                    typeOperation: tx.typeOperation,
                     status: tx.statut || tx.status || 'POSTED',
-                    date: tx.created_at,
+                    date: tx.createdAt,
                     description: tx.description,
-                    client: tx.client_nom ? {
-                      name: `${tx.client_nom} ${tx.client_prenom || ''}`.trim(),
-                      phone: tx.client_telephone
+                    client: tx.clientNom ? {
+                      name: `${tx.clientNom} ${tx.clientPrenom || ''}`.trim(),
+                      phone: tx.clientTelephone
                     } : undefined,
-                    agent: currentSession?.caissier_nom,
-                    mode_paiement: tx.mode_paiement,
-                    created_at: tx.created_at
+                    agent: currentSession?.caissierNom,
+                    mode_paiement: tx.modePaiement,
+                    created_at: tx.createdAt
                   }))}
                   isLoading={loadingTransactions}
                   onRefresh={() => refetchTransactions()}
@@ -750,7 +750,7 @@ export default function CaisseDashboard({
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black text-white tracking-tight">Vérification Coffre</h2>
                     <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
-                      Votre demande de <span className="text-amber-500 font-bold">{moneyFormatter.format(pendingSession.montant_demande || 0)} FCFA</span> est en cours d'examen par la supervision.
+                      Votre demande de <span className="text-amber-500 font-bold">{moneyFormatter.format(pendingSession.montantDemande || 0)} FCFA</span> est en cours d'examen par la supervision.
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 rounded-full border border-amber-500/20 text-[10px] font-black text-amber-500 uppercase tracking-widest">
                        <Timer size={12} className="animate-spin" style={{ animationDuration: '3s' }} />
@@ -778,7 +778,7 @@ export default function CaisseDashboard({
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black text-white tracking-tight">Dotation Prête</h2>
                     <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
-                      Le coffre a débloqué <span className="text-emerald-500 font-bold">{moneyFormatter.format(pendingSession.montant_demande || 0)} FCFA</span>. Vous devez confirmer le comptage pour activer votre session.
+                      Le coffre a débloqué <span className="text-emerald-500 font-bold">{moneyFormatter.format(pendingSession.montantDemande || 0)} FCFA</span>. Vous devez confirmer le comptage pour activer votre session.
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
                        <Check size={12} />
@@ -814,7 +814,7 @@ export default function CaisseDashboard({
         if (currentSession && (currentSession.statut === 'CLOSING_COUNT' || currentSession.statut === 'CLOSING_VALIDATION')) {
           const isCountPhase = currentSession.statut === 'CLOSING_COUNT';
           const isValidationPhase = currentSession.statut === 'CLOSING_VALIDATION';
-          const isPendingCoffreValidation = isValidationPhase && currentSession.coffre_validation_status === 'PENDING';
+          const isPendingCoffreValidation = isValidationPhase && currentSession.coffreValidationStatus === 'PENDING';
 
           return (
             <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -830,9 +830,9 @@ export default function CaisseDashboard({
                     <p className="text-slate-400 max-w-md mx-auto">
                       La session est <span className="text-blue-400 font-bold">gelée</span>. Veuillez compter vos billets et soumettre le comptage physique.
                     </p>
-                    {currentSession.closing_initiated_at && (
+                    {currentSession.closingInitiatedAt && (
                       <p className="text-xs text-slate-500">
-                        Fermeture initiée le {new Date(currentSession.closing_initiated_at).toLocaleString('fr-FR')}
+                        Fermeture initiée le {new Date(currentSession.closingInitiatedAt).toLocaleString('fr-FR')}
                       </p>
                     )}
                   </div>
@@ -857,16 +857,16 @@ export default function CaisseDashboard({
                   <div className="space-y-2">
                     <h2 className="text-2xl font-bold text-white">Transfert en Attente</h2>
                     <p className="text-slate-400 max-w-md mx-auto">
-                      Le transfert de <span className="text-amber-400 font-bold">{moneyFormatter.format(currentSession.montant_vers_coffre || 0)} FCFA</span> vers le coffre est en attente de validation.
+                      Le transfert de <span className="text-amber-400 font-bold">{moneyFormatter.format(currentSession.montantVersCoffre || 0)} FCFA</span> vers le coffre est en attente de validation.
                     </p>
-                    {currentSession.montant_reporte && Number(currentSession.montant_reporte) > 0 && (
+                    {currentSession.montantReporte && Number(currentSession.montantReporte) > 0 && (
                       <p className="text-xs text-emerald-400">
-                        Fonds reportés: {moneyFormatter.format(currentSession.montant_reporte)} FCFA
+                        Fonds reportés: {moneyFormatter.format(currentSession.montantReporte)} FCFA
                       </p>
                     )}
-                    {currentSession.count_submitted_at && (
+                    {currentSession.countSubmittedAt && (
                       <p className="text-xs text-slate-500">
-                        Comptage soumis le {new Date(currentSession.count_submitted_at).toLocaleString('fr-FR')}
+                        Comptage soumis le {new Date(currentSession.countSubmittedAt).toLocaleString('fr-FR')}
                       </p>
                     )}
                   </div>
@@ -896,7 +896,7 @@ export default function CaisseDashboard({
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
                        <Shield size={12} />
-                       Comptage Physique: {moneyFormatter.format(currentSession.montant_physique || 0)} F
+                       Comptage Physique: {moneyFormatter.format(currentSession.montantPhysique || 0)} F
                     </div>
                   </div>
                   <div className="flex flex-col gap-3 items-center w-full max-w-xs">
@@ -966,8 +966,8 @@ export default function CaisseDashboard({
           <div className="space-y-2 animate-in fade-in duration-500 h-full flex flex-col">
       {currentSession && (
         <CaisseQuickActions
-          caisseId={currentSession.caisse_id || ''}
-          agenceId={currentSession.agence_id || ''}
+          caisseId={currentSession.caisseId || ''}
+          agenceId={currentSession.agenceId || ''}
           onNouvelleOperation={handleNouvelleOperation}
         />
       )}
@@ -979,15 +979,15 @@ export default function CaisseDashboard({
              value={`${formattedMoney(soldeActuel)} FCFA`}
              icon={Wallet}
              color="primary"
-             subtitle={currentSession ? `Initial: ${formattedMoney(toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial))} FCFA` : (availableBalance > 0 ? "Fonds disponibles" : "Session Fermée")}
+             subtitle={currentSession ? `Initial: ${formattedMoney(toNumber(currentSession.montantOuverture || currentSession.soldeInitial))} FCFA` : (availableBalance > 0 ? "Fonds disponibles" : "Session Fermée")}
              trend={(() => {
                if (!currentSession) return undefined;
-               const initial = toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial);
+               const initial = toNumber(currentSession.montantOuverture || currentSession.soldeInitial);
                if (initial <= 0) return undefined;
                const variation = Math.round(((soldeActuel - initial) / initial) * 100);
                return variation >= 0 ? `+${variation}%` : `${variation}%`;
              })()}
-             trendUp={currentSession ? soldeActuel >= toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial) : undefined}
+             trendUp={currentSession ? soldeActuel >= toNumber(currentSession.montantOuverture || currentSession.soldeInitial) : undefined}
              className="shadow-sm"
           />
           <StatCard
@@ -1056,7 +1056,7 @@ export default function CaisseDashboard({
         <AccountActivationModal
           account={activationAccount}
           sessionId={currentSession.id}
-          caisseName={currentSession.caisse_nom}
+          caisseName={currentSession.caisseNom}
           onClose={() => setActivationAccount(null)}
           onSuccess={() => {
             setActivationAccount(null);
@@ -1072,32 +1072,32 @@ export default function CaisseDashboard({
           id: tx.id,
           reference: tx.reference,
           amount: toNumber(tx.montant),
-          type: tx.type_operation,
-          type_operation: tx.type_operation,
+          type: tx.typeOperation,
+          typeOperation: tx.typeOperation,
           status: tx.statut || tx.status || 'POSTED',
-          date: tx.created_at,
+          date: tx.createdAt,
           description: tx.description,
-          client: tx.client_nom ? {
-            name: `${tx.client_nom} ${tx.client_prenom || ''}`.trim(),
-            phone: tx.client_telephone
+          client: tx.clientNom ? {
+            name: `${tx.clientNom} ${tx.clientPrenom || ''}`.trim(),
+            phone: tx.clientTelephone
           } : undefined,
-          agent: currentSession?.caissier_nom,
-          mode_paiement: tx.mode_paiement,
-          created_at: tx.created_at
+          agent: currentSession?.caissierNom,
+          modePaiement: tx.modePaiement,
+          createdAt: tx.createdAt
         }))}
         onTransactionClick={(tx) => {
           setSelectedTxDetail({
             id: tx.id,
             reference: tx.reference,
             amount: tx.amount,
-            type: tx.type_operation || tx.type,
-            type_operation: tx.type_operation,
+            type: tx.typeOperation || tx.type,
+            typeOperation: tx.typeOperation,
             status: tx.status,
             date: tx.date,
             description: tx.description,
             client: tx.client,
             agent: tx.agent,
-            mode_paiement: tx.mode_paiement
+            modePaiement: tx.modePaiement
           });
           setIsTxDrawerOpen(true);
         }}
@@ -1121,25 +1121,25 @@ export default function CaisseDashboard({
       // Ideally backend view should include client info.
       
       const rData: ReceiptData = {
-          title: `Reçu ${tx.type_operation}`,
+          title: `Reçu ${tx.typeOperation}`,
           reference: tx.reference,
-          date: new Date(tx.created_at),
-          type: tx.type_operation,
+          date: new Date(tx.createdAt),
+          type: tx.typeOperation,
           client: {
-              nom: tx.client_nom || 'Client',
-              prenom: tx.client_prenom || 'Inconnu',
-              telephone: tx.client_telephone
+              nom: tx.clientNom || 'Client',
+              prenom: tx.clientPrenom || 'Inconnu',
+              telephone: tx.clientTelephone
           },
           items: [{
-              description: tx.description || tx.type_operation,
+              description: tx.description || tx.typeOperation,
               montant: toNumber(tx.montant),
               quantite: 1
           }],
           total: toNumber(tx.montant),
-          modePaiement: tx.mode_paiement,
+          modePaiement: tx.modePaiement,
           notes: 'Duplicata issu de l\'historique',
           agent: {
-              nom: currentSession?.caissier_nom || 'Caissier',
+              nom: currentSession?.caissierNom || 'Caissier',
               prenom: ''
           }
       };
@@ -1167,9 +1167,9 @@ export default function CaisseDashboard({
           title={
             <>
               {FEATURE_DESCRIPTIONS['finance.caisse'].title}
-              {currentSession?.caisse_nom && (
+              {currentSession?.caisseNom && (
                 <span className="ml-2 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-bold uppercase tracking-wider border border-cyan-500/20">
-                  {currentSession.caisse_nom}
+                  {currentSession.caisseNom}
                 </span>
               )}
               {hasPendingOpening && (

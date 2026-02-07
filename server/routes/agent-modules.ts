@@ -18,9 +18,11 @@ import {
   agentIncidents,
   agentMateriel,
   agentCommunications,
-  agentFormationsCatalogue,
-  agentFormationsSuivi,
+  formations,
+  formationParticipants,
+  employes,
   agentsTerrain,
+  users,
   insertAgentCommissionSchema,
   insertAgentObjectifSchema,
   insertAgentPlanningSchema,
@@ -28,8 +30,7 @@ import {
   insertAgentIncidentSchema,
   insertAgentMaterielSchema,
   insertAgentCommunicationSchema,
-  insertAgentFormationCatalogueSchema,
-  insertAgentFormationSuiviSchema,
+  insertFormationSchema,
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, gte, lt, ne } from "drizzle-orm";
 import { z } from "zod";
@@ -40,7 +41,6 @@ import {
 } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { logAudit } from "../audit";
-import { addSnakeCaseAliasesDeep } from "./utils";
 
 // Helper to get user from request
 function getUser(req: Request): { id: string; agenceId?: string } | null {
@@ -50,7 +50,8 @@ function getUser(req: Request): { id: string; agenceId?: string } | null {
 // Helper to join agent name
 async function withAgentName(rows: any[]) {
   if (rows.length === 0) return rows;
-  const agentIds = [...new Set(rows.map(r => r.agentId).filter(Boolean))];
+  const agentIds = Array.from(new Set(rows.map(r => r.agentId).filter(Boolean)));
+
   if (agentIds.length === 0) return rows;
 
   const agents = await db.select({
@@ -86,7 +87,7 @@ export function registerAgentModulesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(agentCommissions.createdAt));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -105,7 +106,7 @@ export function registerAgentModulesRoutes(app: Express) {
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "commission", action: "created", id: row.id } });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      res.status(201).json(row);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
       res.status(500).json({ error: error.message || "Erreur serveur" });
@@ -124,7 +125,7 @@ export function registerAgentModulesRoutes(app: Express) {
       if (!row) return res.status(404).json({ error: "Commission non trouvée" });
 
       logAudit(req, "UPDATE", "agent_commission", id, updates);
-      res.json(addSnakeCaseAliasesDeep(row));
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -191,7 +192,7 @@ export function registerAgentModulesRoutes(app: Express) {
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "commission", action: "recalculated", id } });
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -230,12 +231,12 @@ export function registerAgentModulesRoutes(app: Express) {
         results.push(updated);
       }
 
-      logAudit(req, "RECALCULATE_ALL", "agent_commissions", null, { count: results.length, agent_id, periode });
+      logAudit(req, "RECALCULATE_ALL", "agent_commissions", undefined, { count: results.length, agent_id, periode });
 
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "commission", action: "recalculated-all" } });
 
-      res.json({ updated: results.length, commissions: addSnakeCaseAliasesDeep(results) });
+      res.json({ updated: results.length, commissions: results });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -261,7 +262,7 @@ export function registerAgentModulesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(agentObjectifs.createdAt));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -277,7 +278,7 @@ export function registerAgentModulesRoutes(app: Express) {
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "objectif", action: "created", id: row.id } });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      res.status(201).json(row);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
       res.status(500).json({ error: error.message || "Erreur serveur" });
@@ -296,7 +297,7 @@ export function registerAgentModulesRoutes(app: Express) {
       if (!row) return res.status(404).json({ error: "Objectif non trouvé" });
 
       logAudit(req, "UPDATE", "agent_objectif", id, updates);
-      res.json(addSnakeCaseAliasesDeep(row));
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -363,8 +364,8 @@ export function registerAgentModulesRoutes(app: Express) {
           .from(prospections)
           .where(and(
             eq(prospections.agentId, agentId),
-            gte(prospections.dateProspection, periodStart),
-            lt(prospections.dateProspection, periodEnd),
+            gte(prospections.createdAt, periodStart),
+            lt(prospections.createdAt, periodEnd),
             isNull(prospections.deletedAt),
           ));
         return Number(result?.total || 0);
@@ -441,7 +442,7 @@ export function registerAgentModulesRoutes(app: Express) {
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "objectif", action: "recalculated", id } });
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -478,14 +479,14 @@ export function registerAgentModulesRoutes(app: Express) {
       for (const objectif of nonPerformance) {
         const valeurRealisee = await computeObjectifValue(agentId, objectif.typeObjectif, periode);
         const updated = await applyRecalculation(objectif.id, valeurRealisee, Number(objectif.valeurObjectif));
-        results.push(addSnakeCaseAliasesDeep(updated));
+        results.push(updated);
       }
 
       // Second pass: Performance objectifs (depends on updated non-Performance values)
       for (const objectif of performance) {
         const valeurRealisee = await computeObjectifValue(agentId, objectif.typeObjectif, periode);
         const updated = await applyRecalculation(objectif.id, valeurRealisee, Number(objectif.valeurObjectif));
-        results.push(addSnakeCaseAliasesDeep(updated));
+        results.push(updated);
       }
 
       logAudit(req, "RECALCULATE_ALL", "agent_objectifs", agentId, { periode, count: objectifs.length });
@@ -525,7 +526,7 @@ export function registerAgentModulesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(agentPlannings.datePlanning));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -627,9 +628,12 @@ export function registerAgentModulesRoutes(app: Express) {
       const { recurrence, ...planningData } = req.body;
       const parsed = insertAgentPlanningSchema.parse(planningData);
 
+      const heureDebut = parsed.heureDebut || "08:00";
+      const heureFin = parsed.heureFin || "17:00";
+
       // Detect conflicts for the primary date
       const conflicts = await detectPlanningConflicts(
-        parsed.agentId, parsed.datePlanning, parsed.heureDebut, parsed.heureFin
+        parsed.agentId, parsed.datePlanning, heureDebut, heureFin
       );
 
       // Generate recurrence dates if requested
@@ -643,7 +647,7 @@ export function registerAgentModulesRoutes(app: Express) {
         allConflicts.push({ date: parsed.datePlanning, conflicts });
       }
       for (const d of dates.slice(1)) {
-        const dc = await detectPlanningConflicts(parsed.agentId, d, parsed.heureDebut, parsed.heureFin);
+        const dc = await detectPlanningConflicts(parsed.agentId, d, heureDebut, heureFin);
         if (dc.length > 0) allConflicts.push({ date: d, conflicts: dc });
       }
 
@@ -675,7 +679,7 @@ export function registerAgentModulesRoutes(app: Express) {
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "planning", action: "created", count: created.length } });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(created.length === 1 ? created[0] : created));
+      res.status(201).json(created.length === 1 ? created[0] : created);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
       res.status(500).json({ error: error.message || "Erreur serveur" });
@@ -694,7 +698,7 @@ export function registerAgentModulesRoutes(app: Express) {
       if (!row) return res.status(404).json({ error: "Planning non trouvé" });
 
       logAudit(req, "UPDATE", "agent_planning", id, updates);
-      res.json(addSnakeCaseAliasesDeep(row));
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -720,7 +724,7 @@ export function registerAgentModulesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(agentRapports.createdAt));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -733,7 +737,7 @@ export function registerAgentModulesRoutes(app: Express) {
 
       logAudit(req, "CREATE", "agent_rapport", row.id, { agentId: parsed.agentId, type: parsed.typeRapport });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      res.status(201).json(row);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
       res.status(500).json({ error: error.message || "Erreur serveur" });
@@ -757,7 +761,7 @@ export function registerAgentModulesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(agentIncidents.createdAt));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -773,7 +777,7 @@ export function registerAgentModulesRoutes(app: Express) {
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "incident", action: "created", id: row.id } });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      res.status(201).json(row);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
       res.status(500).json({ error: error.message || "Erreur serveur" });
@@ -792,7 +796,7 @@ export function registerAgentModulesRoutes(app: Express) {
       if (!row) return res.status(404).json({ error: "Incident non trouvé" });
 
       logAudit(req, "UPDATE", "agent_incident", id, updates);
-      res.json(addSnakeCaseAliasesDeep(row));
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -836,7 +840,7 @@ export function registerAgentModulesRoutes(app: Express) {
         payload: { entity: "incident", action: "escalated", id, gravite: existing.gravite },
       });
 
-      res.json(addSnakeCaseAliasesDeep(row));
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -859,7 +863,7 @@ export function registerAgentModulesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(agentMateriel.createdAt));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -872,7 +876,7 @@ export function registerAgentModulesRoutes(app: Express) {
 
       logAudit(req, "CREATE", "agent_materiel", row.id, { agentId: parsed.agentId, type: parsed.typeMateriel });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      res.status(201).json(row);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
       res.status(500).json({ error: error.message || "Erreur serveur" });
@@ -891,7 +895,7 @@ export function registerAgentModulesRoutes(app: Express) {
       if (!row) return res.status(404).json({ error: "Matériel non trouvé" });
 
       logAudit(req, "UPDATE", "agent_materiel", id, updates);
-      res.json(addSnakeCaseAliasesDeep(row));
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -914,7 +918,7 @@ export function registerAgentModulesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(agentCommunications.createdAt));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -930,7 +934,7 @@ export function registerAgentModulesRoutes(app: Express) {
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "communication", action: "created", id: row.id } });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      res.status(201).json(row);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
       res.status(500).json({ error: error.message || "Erreur serveur" });
@@ -948,23 +952,37 @@ export function registerAgentModulesRoutes(app: Express) {
 
       if (!row) return res.status(404).json({ error: "Communication non trouvée" });
 
-      res.json(addSnakeCaseAliasesDeep(row));
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
   });
 
   // ════════════════════════════════════════════════════════════════════════════
-  // FORMATIONS CATALOGUE
+  // FORMATIONS CATALOGUE (Source: HR Module)
   // ════════════════════════════════════════════════════════════════════════════
 
   app.get("/api/agent-formations", requireAuth, async (req: Request, res: Response) => {
     try {
-      const rows = await db.select().from(agentFormationsCatalogue)
-        .where(isNull(agentFormationsCatalogue.deletedAt))
-        .orderBy(desc(agentFormationsCatalogue.createdAt));
+      // Query HR formations table (Single Source of Truth)
+      const rows = await db.select({
+        id: formations.id,
+        titre: formations.titre,
+        description: formations.description,
+        type_formation: formations.typeFormation,
+        duree_heures: formations.dureeHeures,
+        contenu_url: formations.contenuUrl,
+        obligatoire: formations.obligatoire,
+        created_at: formations.createdAt,
+      })
+      .from(formations)
+      .where(isNull(formations.deletedAt))
+      .orderBy(desc(formations.createdAt));
 
-      res.json(addSnakeCaseAliasesDeep(rows));
+      // Cast IDs to string to match frontend expectations if necessary, 
+      // but JSON serialization handles numbers fine. Frontend interface might need update if it strictly expects string.
+      // We return as is, assuming frontend handles JSON numbers gracefully or we update frontend.
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
@@ -972,54 +990,74 @@ export function registerAgentModulesRoutes(app: Express) {
 
   app.post("/api/agent-formations", requireAuth, async (req: Request, res: Response) => {
     try {
-      const parsed = insertAgentFormationCatalogueSchema.parse(req.body);
-      const [row] = await db.insert(agentFormationsCatalogue).values(parsed).returning();
+      // Create in HR table directly
+      // Helper to validate input since we switched schemas
+      const { titre, description, type_formation, duree_heures, contenu_url, obligatoire } = req.body;
 
-      logAudit(req, "CREATE", "agent_formation", row.id, { titre: parsed.titre });
+      if (!titre) return res.status(400).json({ error: "Titre requis" });
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      const [row] = await db.insert(formations).values({
+        titre,
+        description,
+        typeFormation: type_formation,
+        dureeHeures: duree_heures,
+        contenuUrl: contenu_url,
+        obligatoire: obligatoire || false,
+        formateur: "Auto-Assignment", // Default or required field
+        duree: `${duree_heures} heures`, // Legacy/Display field
+        statut: "PLANNED",
+        dateDebut: new Date().toISOString().slice(0, 10), // Required by schema, defaulting to today
+      }).returning();
+
+      logAudit(req, "CREATE", "agent_formation", String(row.id), { titre });
+
+      res.status(201).json(row);
     } catch (error: any) {
-      if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
-      res.status(500).json({ error: error.message || "Erreur serveur" });
+       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
   });
 
   // ════════════════════════════════════════════════════════════════════════════
-  // FORMATIONS SUIVI
+  // FORMATIONS SUIVI (Source: HR Module)
   // ════════════════════════════════════════════════════════════════════════════
 
   app.get("/api/agent-formations-suivi", requireAuth, async (req: Request, res: Response) => {
     try {
       const { agent_id } = req.query;
-      const conditions = [isNull(agentFormationsSuivi.deletedAt)];
 
+      // Base query joining formationParticipants with Formations and Agents (to recover agentId)
+      const baseQuery = db.select({
+        id: formationParticipants.id,
+        agentId: agentsTerrain.id,
+        formationId: formationParticipants.formationId,
+        dateDebut: formationParticipants.dateDebut,
+        dateFin: formationParticipants.dateFin,
+        progression: formationParticipants.progression,
+        statut: formationParticipants.statut,
+        score: formationParticipants.scoreEvaluation,
+        certificatUrl: formationParticipants.certificatUrl,
+        createdAt: formationParticipants.dateInscription,
+        
+        // Formation details
+        formationTitre: formations.titre,
+        formationDescription: formations.description,
+        formationType: formations.typeFormation,
+        formationDuree: formations.dureeHeures,
+        formationObligatoire: formations.obligatoire,
+        formationContenuUrl: formations.contenuUrl,
+      })
+      .from(formationParticipants)
+      .leftJoin(formations, eq(formationParticipants.formationId, formations.id))
+      .leftJoin(agentsTerrain, eq(formationParticipants.employeId, agentsTerrain.employeId));
+
+      const conditions = [];
+      
       if (agent_id && typeof agent_id === "string") {
-        conditions.push(eq(agentFormationsSuivi.agentId, agent_id));
+        conditions.push(eq(agentsTerrain.id, agent_id));
       }
 
-      // Join with formations catalogue for formation details
-      const rows = await db.select({
-        id: agentFormationsSuivi.id,
-        agentId: agentFormationsSuivi.agentId,
-        formationId: agentFormationsSuivi.formationId,
-        dateDebut: agentFormationsSuivi.dateDebut,
-        dateFin: agentFormationsSuivi.dateFin,
-        progression: agentFormationsSuivi.progression,
-        statut: agentFormationsSuivi.statut,
-        score: agentFormationsSuivi.score,
-        certificatUrl: agentFormationsSuivi.certificatUrl,
-        createdAt: agentFormationsSuivi.createdAt,
-        formationTitre: agentFormationsCatalogue.titre,
-        formationDescription: agentFormationsCatalogue.description,
-        formationType: agentFormationsCatalogue.typeFormation,
-        formationDuree: agentFormationsCatalogue.dureeHeures,
-        formationObligatoire: agentFormationsCatalogue.obligatoire,
-        formationContenuUrl: agentFormationsCatalogue.contenuUrl,
-      })
-        .from(agentFormationsSuivi)
-        .leftJoin(agentFormationsCatalogue, eq(agentFormationsSuivi.formationId, agentFormationsCatalogue.id))
-        .where(and(...conditions))
-        .orderBy(desc(agentFormationsSuivi.createdAt));
+      const rows = await baseQuery.where(and(...conditions))
+        .orderBy(desc(formationParticipants.dateInscription));
 
       // Transform to match frontend expected format
       const formatted = rows.map(r => ({
@@ -1052,15 +1090,47 @@ export function registerAgentModulesRoutes(app: Express) {
 
   app.post("/api/agent-formations-suivi", requireAuth, async (req: Request, res: Response) => {
     try {
-      const parsed = insertAgentFormationSuiviSchema.parse(req.body);
-      const [row] = await db.insert(agentFormationsSuivi).values(parsed).returning();
+      const { agent_id, formation_id, date_debut, progression, statut } = req.body;
 
-      logAudit(req, "CREATE", "agent_formation_suivi", row.id, { agentId: parsed.agentId, formationId: parsed.formationId });
+      if (!agent_id || !formation_id) {
+        return res.status(400).json({ error: "Agent ID et Formation ID requis" });
+      }
 
-      res.status(201).json(addSnakeCaseAliasesDeep(row));
+      // Resolve Employe ID
+      const [agent] = await db.select().from(agentsTerrain).where(eq(agentsTerrain.id, agent_id));
+      if (!agent || !agent.employeId) {
+        return res.status(404).json({ error: "Agent ou Employé non trouvé" });
+      }
+
+      // Get Employe Name (denormalized required for formationParticipants)
+      const [userData] = await db
+        .select({
+          nom: users.nom,
+          prenom: users.prenom,
+        })
+        .from(employes)
+        .innerJoin(users, eq(employes.userId, users.id))
+        .where(eq(employes.id, agent.employeId));
+
+      const employeNom = userData ? `${userData.nom} ${userData.prenom}` : "Inconnu";
+
+      // Insert into formationParticipants
+      const [row] = await db.insert(formationParticipants).values({
+        formationId: Number(formation_id), // Cast to number for HR schema
+        employeId: agent.employeId,
+        employeNom: employeNom,
+        dateDebut: date_debut ? new Date(date_debut) : undefined,
+        progression: progression || 0,
+        statut: statut || "IN_PROGRESS",
+        presence: "Non noté",
+      }).returning();
+
+      logAudit(req, "CREATE", "agent_formation_suivi_hr", row.id, { agentId: agent_id, formationId: formation_id });
+
+      res.status(201).json(row);
     } catch (error: any) {
-      if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
-      res.status(500).json({ error: error.message || "Erreur serveur" });
+       console.error("Error creating formation suivi:", error);
+       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
   });
 
@@ -1068,15 +1138,23 @@ export function registerAgentModulesRoutes(app: Express) {
     try {
       const { id } = req.params;
       const updates = req.body;
-      const [row] = await db.update(agentFormationsSuivi)
-        .set({ ...updates, updatedAt: new Date() })
-        .where(and(eq(agentFormationsSuivi.id, id), isNull(agentFormationsSuivi.deletedAt)))
+
+      // Extract relevant fields to update
+      const updateData: any = {};
+      if (updates.progression !== undefined) updateData.progression = updates.progression;
+      if (updates.statut !== undefined) updateData.statut = updates.statut;
+      if (updates.score !== undefined) updateData.scoreEvaluation = updates.score;
+      if (updates.date_fin !== undefined) updateData.dateFin = updates.date_fin ? new Date(updates.date_fin) : null;
+
+      const [row] = await db.update(formationParticipants)
+        .set(updateData)
+        .where(eq(formationParticipants.id, id)) // UUID id we added
         .returning();
 
       if (!row) return res.status(404).json({ error: "Suivi non trouvé" });
 
-      logAudit(req, "UPDATE", "agent_formation_suivi", id, updates);
-      res.json(addSnakeCaseAliasesDeep(row));
+      logAudit(req, "UPDATE", "agent_formation_suivi_hr", id, updates);
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }

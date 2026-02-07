@@ -51,6 +51,7 @@ interface Client {
   id: string;
   nom: string;
   prenom: string;
+  numeroCompte?: string;
   numero_compte?: string;
   telephone: string;
   email?: string;
@@ -221,7 +222,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       const echeance = await echeanceCreditApi.getProchaine(creditId);
       if (echeance) {
         setProchaineEcheance(echeance);
-        setMontant(echeance.montant_total.toString());
+        setMontant(echeance.montantTotal.toString());
         setMontantError(null);
       } else {
         setProchaineEcheance(null);
@@ -270,7 +271,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
 
     if (targetType) {
       const compte = comptesClient.find(c => {
-        const ct = c.type_compte || c.typeCompte || '';
+        const ct = c.typeCompte || '';
         return ct === targetType;
       });
       return compte?.id;
@@ -384,10 +385,10 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       // Logique spécifique pour remboursement crédit
       if (typeDepot === 'Remboursement Crédit' && prochaineEcheance && creditSelectionne) {
         const montantPaye = parseFloat(montant);
-        const montantEcheance = prochaineEcheance.montant_total;
+        const montantEcheance = prochaineEcheance.montantTotal;
 
         await echeanceCreditApi.update(prochaineEcheance.id, {
-          montant_paye: (prochaineEcheance.montant_paye || 0) + montantPaye,
+          montant_paye: (prochaineEcheance.montantPaye || 0) + montantPaye,
           status: montantPaye >= montantEcheance ? 'Payée' : 'Partielle',
           date_paiement: montantPaye >= montantEcheance ? new Date().toISOString().split('T')[0] : null
         });
@@ -490,7 +491,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         nom: lastOperationData.client?.nom || '',
         prenom: lastOperationData.client?.prenom || '',
         telephone: lastOperationData.client?.telephone || lastOperationData.client?.phone || '',
-        numeroCompte: lastOperationData.client?.numero_compte
+        numeroCompte: lastOperationData.client?.numeroCompte
       },
       agent: {
         nom: user?.nom || 'Agent',
@@ -571,12 +572,12 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                     </h3>
                     <p className="text-xs text-slate-400 mb-2">{escapeHtml(selectedClient.telephone || '')}</p>
                     
-                    {selectedClient.numero_compte && (
+                    {selectedClient.numeroCompte && (
                         <Badge
                             variant="neutral"
                             size="sm"
                             className="bg-slate-800 border-slate-700 text-slate-300 text-[10px] mb-4"
-                            value={escapeHtml(selectedClient.numero_compte)}
+                            value={escapeHtml(selectedClient.numeroCompte)}
                         />
                     )}
 
@@ -705,7 +706,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                                         : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-600'
                                     }`}
                                   >
-                                    <div className="text-xs font-bold text-slate-200"># {escapeHtml(credit.numero_credit)}</div>
+                                    <div className="text-xs font-bold text-slate-200"># {escapeHtml(credit.numeroCredit)}</div>
                                     <div className="text-[10px] text-slate-400 mt-1">Reste: <span className="text-blue-400 font-bold">{formatMoney(credit.solde_restant)}</span></div>
                                   </div>
                                 ))}

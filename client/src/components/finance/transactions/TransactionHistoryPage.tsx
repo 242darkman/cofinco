@@ -211,7 +211,7 @@ export default function TransactionHistoryPage({
     // Type filter
     if (filters.type !== 'all') {
       result = result.filter(t => {
-        const type = t.type_operation || t.type;
+        const type = t.typeOperation || t.type;
         const transactionIsEntree = isEntree(type);
         return filters.type === 'entrees' ? transactionIsEntree : !transactionIsEntree;
       });
@@ -233,7 +233,7 @@ export default function TransactionHistoryPage({
       const fromDate = new Date(filters.dateFrom);
       fromDate.setHours(0, 0, 0, 0);
       result = result.filter(t => {
-        const txDate = new Date(t.created_at || t.date);
+        const txDate = new Date(t.createdAt || t.date);
         return txDate >= fromDate;
       });
     }
@@ -242,7 +242,7 @@ export default function TransactionHistoryPage({
       const toDate = new Date(filters.dateTo);
       toDate.setHours(23, 59, 59, 999);
       result = result.filter(t => {
-        const txDate = new Date(t.created_at || t.date);
+        const txDate = new Date(t.createdAt || t.date);
         return txDate <= toDate;
       });
     }
@@ -251,8 +251,8 @@ export default function TransactionHistoryPage({
     result.sort((a, b) => {
       let comparison = 0;
       if (filters.sortBy === 'date') {
-        const dateA = new Date(a.created_at || a.date).getTime();
-        const dateB = new Date(b.created_at || b.date).getTime();
+        const dateA = new Date(a.createdAt || a.date).getTime();
+        const dateB = new Date(b.createdAt || b.date).getTime();
         comparison = dateA - dateB;
       } else if (filters.sortBy === 'amount') {
         comparison = a.amount - b.amount;
@@ -289,8 +289,8 @@ export default function TransactionHistoryPage({
       const csvContent = [
         'Date,Référence,Type,Description,Montant,Statut',
         ...filteredTransactions.map(t => {
-          const date = new Date(t.created_at || t.date).toLocaleDateString('fr-FR');
-          const type = t.type_operation || t.type;
+          const date = new Date(t.createdAt || t.date).toLocaleDateString('fr-FR');
+          const type = t.typeOperation || t.type;
           return `${date},${t.reference || ''},"${type}","${t.description || ''}",${t.amount},${ALL_STATUS_LABELS[t.status] || t.status}`;
         })
       ].join('\n');
@@ -328,10 +328,10 @@ export default function TransactionHistoryPage({
   // Calculate totals
   const totals = useMemo(() => {
     const entrees = filteredTransactions
-      .filter(t => isEntree(t.type_operation || t.type))
+      .filter(t => isEntree(t.typeOperation || t.type))
       .reduce((sum, t) => sum + t.amount, 0);
     const sorties = filteredTransactions
-      .filter(t => !isEntree(t.type_operation || t.type))
+      .filter(t => !isEntree(t.typeOperation || t.type))
       .reduce((sum, t) => sum + t.amount, 0);
     return { entrees, sorties, net: entrees - sorties };
   }, [filteredTransactions]);

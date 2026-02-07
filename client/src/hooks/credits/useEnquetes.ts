@@ -24,35 +24,35 @@ export interface GeotaggedPhoto {
 
 export interface EnqueteCredit {
   id: string;
-  client_id: string;
-  credit_id?: string;
-  montant_demande: number;
-  montant_approuve?: number;
+  clientId: string;
+  creditId?: string;
+  montantDemande: number;
+  montantApprouve?: number;
   statut: StatutEnqueteType;
-  type_activite: string;
-  revenus_mensuels?: number;
-  charges_mensuelles?: number;
-  autres_credits?: boolean;
-  montant_autres_credits?: number;
-  patrimoine_estime?: number;
-  score_global?: number;
+  typeActivite: string;
+  revenusMensuels?: number;
+  chargesMensuelles?: number;
+  autresCredits?: boolean;
+  montantAutresCredits?: number;
+  patrimoineEstime?: number;
+  scoreGlobal?: number;
   recommandation?: string;
   commentaire?: string;
-  date_enquete: string;
+  dateEnquete: string;
   enqueteur?: string;
   // Géolocalisation
-  geo_latitude?: string | number;
-  geo_longitude?: string | number;
-  geo_accuracy?: string | number;
-  geo_timestamp?: string;
+  geoLatitude?: string | number;
+  geoLongitude?: string | number;
+  geoAccuracy?: string | number;
+  geoTimestamp?: string;
   // Photos de l'activité (avec géolocalisation)
-  photos_activite?: string[];
-  photos_geotagged?: GeotaggedPhoto[];
+  photosActivite?: string[];
+  photosGeotagged?: GeotaggedPhoto[];
   clients?: {
     nom: string;
     prenom?: string;
     telephone: string;
-    adresse_domicile?: string;
+    adresseDomicile?: string;
     profession?: string;
     latitude?: string | number;
     longitude?: string | number;

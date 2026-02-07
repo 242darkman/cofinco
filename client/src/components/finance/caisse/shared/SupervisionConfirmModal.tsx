@@ -24,12 +24,11 @@ interface SupervisionConfirmModalProps {
   onConfirm: (reason: string, reasonDetail?: string) => void;
   session: {
     id: string;
-    caissier_nom?: string;
-    caisse_nom?: string;
-    agence_nom?: string;
-    solde_theorique: number;
+    caissierNom?: string;
+    caisseNom?: string;
+    agenceNom?: string;
+    soldeTheorique: number;
     openedAt?: string;
-    opened_at?: string;
   } | null;
   isLoading?: boolean;
   existingSupervision?: SupervisionSession | null;
@@ -148,19 +147,19 @@ export default function SupervisionConfirmModal({
         <div className="p-4 bg-gradient-to-r from-slate-800/60 to-slate-800/30 rounded-xl border border-slate-700/50">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-lg shrink-0">
-              {session.caissier_nom?.[0] || 'C'}
+              {session.caissierNom?.[0] || 'C'}
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-white text-base">
-                {session.caissier_nom || 'Caissier inconnu'}
+                {session.caissierNom || 'Caissier inconnu'}
               </h4>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm">
                 <span className="text-slate-400 flex items-center gap-1">
                   <Wallet size={12} />
-                  {session.caisse_nom || 'Caisse'}
+                  {session.caisseNom || 'Caisse'}
                 </span>
-                {session.agence_nom && (
-                  <span className="text-slate-500">• {session.agence_nom}</span>
+                {session.agenceNom && (
+                  <span className="text-slate-500">• {session.agenceNom}</span>
                 )}
               </div>
             </div>
@@ -170,14 +169,14 @@ export default function SupervisionConfirmModal({
             <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
               <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Solde actuel</div>
               <div className="text-lg font-bold text-emerald-400 font-mono">
-                {formatMoney(Number(session.solde_theorique))} <span className="text-xs text-slate-500">F</span>
+                {formatMoney(Number(session.soldeTheorique))} <span className="text-xs text-slate-500">F</span>
               </div>
             </div>
             <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
               <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Session ouverte</div>
               <div className="text-base font-medium text-white flex items-center gap-1.5">
                 <Clock size={14} className="text-cyan-400" />
-                {formatTimeAgo(session.openedAt || session.opened_at || '')}
+                {formatTimeAgo(session.openedAt || '')}
               </div>
             </div>
           </div>

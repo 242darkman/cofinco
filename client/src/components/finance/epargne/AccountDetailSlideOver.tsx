@@ -85,16 +85,16 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
     const raw = transactionsQuery.data?.data;
     if (!raw) return [];
     return raw.map((t: any) => {
-      const rawType = t.typePaiement || t.type_paiement || 'Autre';
+      const rawType = t.typePaiement || 'Autre';
       const translatedLabel = getStatusLabel(rawType, ALL_STATUS_LABELS);
       return {
         ...t,
         montant: Number(t.montant) || 0,
-        solde_apres: Number(t.solde_apres || t.soldeApres || 0),
-        type_transaction: translatedLabel !== rawType ? translatedLabel : rawType.replace(/ (Épargne|Courant|Bloqué)$/, ''),
-        date_transaction: t.createdAt || t.created_at || new Date().toISOString(),
+        soldeApres: Number(t.soldeApres || 0),
+        typeTransaction: translatedLabel !== rawType ? translatedLabel : rawType.replace(/ (Épargne|Courant|Bloqué)$/, ''),
+        dateTransaction: t.createdAt || new Date().toISOString(),
         description: t.observations || t.typePaiement,
-        reference: t.billingReference || t.billing_reference || t.id?.substring(0, 8)
+        reference: t.billingReference || t.id?.substring(0, 8)
       };
     });
   }, [transactionsQuery.data]);
@@ -102,7 +102,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
   const stats = useMemo(() => {
     return transactions.reduce((acc: { totalDepots: number; totalRetraits: number; nombreTransactions: number }, t: any) => {
       const m = Number(t.montant) || 0;
-      const rawType = t.typePaiement || t.type_transaction || '';
+      const rawType = t.typePaiement || t.typeTransaction || '';
       if (isDepositType(rawType) || (m > 0 && !isWithdrawalType(rawType))) {
         acc.totalDepots += Math.abs(m);
       } else if (isWithdrawalType(rawType) || m < 0) {
@@ -166,7 +166,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
 
   // Gradient based on type
   const getGradient = () => {
-    const type = compte?.type_compte || '';
+    const type = compte?.typeCompte || '';
     if (type.includes('Épargne')) return 'bg-gradient-to-br from-emerald-600 to-teal-800';
     if (type.includes('Bloqué')) return 'bg-gradient-to-br from-slate-700 to-slate-900';
     return 'bg-gradient-to-br from-blue-600 to-indigo-900';
@@ -184,11 +184,11 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                <div>
                   <div className="flex items-center gap-2">
                      <SheetTitle className="font-mono text-lg font-bold text-white tracking-tight">
-                        {compte?.numero_compte || 'Chargement...'}
+                        {compte?.numeroCompte || 'Chargement...'}
                      </SheetTitle>
-                     {compte?.numero_compte && (
+                     {compte?.numeroCompte && (
                         <button 
-                           onClick={() => navigator.clipboard.writeText(compte.numero_compte)}
+                           onClick={() => navigator.clipboard.writeText(compte.numeroCompte)}
                            className="text-slate-500 hover:text-white transition-colors"
                            title="Copier le numéro"
                         >
@@ -199,7 +199,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                   <SheetDescription className="sr-only">
                     Détails du compte et historique des transactions
                   </SheetDescription>
-                  <div className="text-xs text-slate-400">{getTypeCompteLabel(compte?.type_compte || '')}</div>
+                  <div className="text-xs text-slate-400">{getTypeCompteLabel(compte?.typeCompte || '')}</div>
                </div>
                {compte && (
                  <Badge 
@@ -275,11 +275,11 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
 
                              const accountData: ActivationAccountData = {
                                id: compte.id,
-                               numeroCompte: compte.numero_compte || compte.numeroCompte || '',
-                               typeCompte: compte.type_compte || compte.typeCompte || '',
+                               numeroCompte: compte.numeroCompte || compte.numeroCompte || '',
+                               typeCompte: compte.typeCompte || compte.typeCompte || '',
                                montantInitial: getPendingDepositAmount(compte),
                                client: {
-                                 id: compte.clients?.id || compte.client_id,
+                                 id: compte.clients?.id || compte.clientId,
                                  nom: compte.clients?.nom || '',
                                  prenom: compte.clients?.prenom || '',
                                }
@@ -309,7 +309,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                          </div>
                          <div className="text-right">
                            <div className="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Ouverture</div>
-                           <div className="text-slate-400">{new Date(compte.date_ouverture || compte.createdAt).toLocaleDateString()}</div>
+                           <div className="text-slate-400">{new Date(compte.dateOuverture || compte.createdAt).toLocaleDateString()}</div>
                          </div>
                        </div>
                      </div>
@@ -338,7 +338,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                               </div>
                               <div className="text-right shrink-0">
                                  <div className="text-[10px] sm:text-xs opacity-60 uppercase tracking-wider mb-0.5">Ouverture</div>
-                                 <div>{new Date(compte.date_ouverture || compte.createdAt).toLocaleDateString()}</div>
+                                 <div>{new Date(compte.dateOuverture || compte.createdAt).toLocaleDateString()}</div>
                               </div>
                            </div>
                         </div>
@@ -400,9 +400,9 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                                            {!isDebit ? <TrendingUp size={14} className="sm:w-[18px] sm:h-[18px]"/> : <TrendingDown size={14} className="sm:w-[18px] sm:h-[18px]"/>}
                                         </div>
                                         <div className="min-w-0">
-                                           <div className="font-medium text-slate-200 text-xs sm:text-sm truncate">{t.type_transaction}</div>
+                                           <div className="font-medium text-slate-200 text-xs sm:text-sm truncate">{t.typeTransaction}</div>
                                            <div className="text-[10px] sm:text-xs text-slate-500">
-                                             {new Date(t.date_transaction).toLocaleDateString()} • {new Date(t.date_transaction).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                             {new Date(t.dateTransaction).toLocaleDateString()} • {new Date(t.dateTransaction).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                            </div>
                                         </div>
                                      </div>
@@ -462,11 +462,11 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                                <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-700/50">
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Numéro</span>
-                                     <span className="text-white font-mono text-[11px] sm:text-sm">{compte.numero_compte}</span>
+                                     <span className="text-white font-mono text-[11px] sm:text-sm">{compte.numeroCompte}</span>
                                   </div>
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Date d'ouverture</span>
-                                     <span className="text-white">{new Date(compte.date_ouverture).toLocaleDateString()}</span>
+                                     <span className="text-white">{new Date(compte.dateOuverture).toLocaleDateString()}</span>
                                   </div>
                                   {uiConfig.interestRate > 0 && (
                                      <div className="flex justify-between items-center py-1.5 sm:py-2">
@@ -510,17 +510,17 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
         <AccountActivationModal
           account={{
             id: compte.id,
-            numeroCompte: compte.numero_compte || compte.numeroCompte || '',
-            typeCompte: compte.type_compte || compte.typeCompte || '',
+            numeroCompte: compte.numeroCompte || compte.numeroCompte || '',
+            typeCompte: compte.typeCompte || compte.typeCompte || '',
             montantInitial: getPendingDepositAmount(compte),
             client: {
-              id: compte.clients?.id || compte.client_id,
+              id: compte.clients?.id || compte.clientId,
               nom: compte.clients?.nom || '',
               prenom: compte.clients?.prenom || '',
             }
           }}
           sessionId={sessionActive.id}
-          caisseName={sessionActive.caisse_nom}
+          caisseName={sessionActive.caisseNom}
           onClose={() => setShowActivationModal(false)}
           onSuccess={() => {
             setShowActivationModal(false);

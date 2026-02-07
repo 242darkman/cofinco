@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, AlertCircle, CheckCircle, DollarSign, Shield, Wrench, TrendingDown, Calendar, X } from 'lucide-react';
+import { Package, Plus, AlertCircle, CheckCircle, DollarSign, Shield, Wrench, TrendingDown, Calendar, ChevronLeft, ChevronRight, Eye, AlertTriangle, X } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
+import { authService } from '../../lib/auth';
 
 interface Maintenance {
   date: string;
@@ -43,18 +45,20 @@ function getWarrantyStatus(dateGarantieFin?: string): { label: string; color: st
   const now = new Date();
   const joursRestants = Math.ceil((fin.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   if (joursRestants < 0) return { label: 'Expirée', color: 'text-red-400', expired: true };
-  if (joursRestants <= 30) return { label: `${joursRestants}j restants`, color: 'text-orange-400', expired: false };
-  if (joursRestants <= 90) return { label: `${joursRestants}j restants`, color: 'text-yellow-400', expired: false };
-  return { label: `${joursRestants}j restants`, color: 'text-green-400', expired: false };
+  if (joursRestants <= 30) return { label: `${joursRestants}j`, color: 'text-orange-400', expired: false };
+  if (joursRestants <= 90) return { label: `${joursRestants}j`, color: 'text-yellow-400', expired: false };
+  return { label: `${joursRestants}j`, color: 'text-green-400', expired: false };
 }
 
 export default function AgentMateriel({ agentId }: { agentId?: string }) {
   const [materiels, setMateriels] = useState<Materiel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [maintenanceModal, setMaintenanceModal] = useState<Materiel | null>(null);
-  const [newMaintenance, setNewMaintenance] = useState({ description: '', cout: 0 });
+  const isAdmin = authService.isAdmin();
+  const isChefAgence = authService.hasRole?.('chef_agence') || false;
+  const canManage = isAdmin || isChefAgence;
 
+  // Form state (admin/chef only)
+  const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     agent_id: agentId || '',
     type_materiel: 'Tablette',
@@ -69,21 +73,34 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
     notes: ''
   });
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
+  // Detail Sheet
+  const [selectedMateriel, setSelectedMateriel] = useState<Materiel | null>(null);
+
+  // Problem Report (agent)
+  const [reportingProblem, setReportingProblem] = useState(false);
+  const [problemDescription, setProblemDescription] = useState('');
+
+  // Maintenance Modal (admin/chef)
+  const [maintenanceModal, setMaintenanceModal] = useState<Materiel | null>(null);
+  const [newMaintenance, setNewMaintenance] = useState({ description: '', cout: 0 });
+
   useEffect(() => {
     loadMateriels();
   }, [agentId]);
 
   const loadMateriels = async () => {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (agentId) {
         params.append('agent_id', agentId);
         params.append('actif', 'true');
       }
-
-      const response = await fetch(`/api/agent-materiel?${params.toString()}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`/api/agent-materiel?${params.toString()}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Erreur lors du chargement');
       const data = await response.json();
       setMateriels(data || []);
@@ -97,7 +114,6 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const response = await fetch('/api/agent-materiel', {
         method: 'POST',
@@ -105,7 +121,6 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
         credentials: 'include',
         body: JSON.stringify(formData)
       });
-
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Erreur lors de la création');
@@ -138,14 +153,11 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          date_retour: new Date().toISOString().slice(0, 10),
-          etat: 'Retourné'
-        })
+        body: JSON.stringify({ date_retour: new Date().toISOString().slice(0, 10), etat: 'Retourné' })
       });
-
       if (!response.ok) throw new Error('Erreur lors du retour');
       loadMateriels();
+      setSelectedMateriel(null);
     } catch (error: any) {
       alert('Erreur: ' + error.message);
     }
@@ -159,7 +171,6 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
         credentials: 'include',
         body: JSON.stringify({ etat: nouvelEtat })
       });
-
       if (!response.ok) throw new Error('Erreur lors de la mise à jour');
       loadMateriels();
     } catch (error: any) {
@@ -190,72 +201,76 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
     }
   };
 
+  const signalerProbleme = async () => {
+    if (!selectedMateriel || !problemDescription.trim()) return;
+    try {
+      const historique = [...(selectedMateriel.historique_maintenances || []), {
+        date: new Date().toISOString().slice(0, 10),
+        description: `⚠️ Problème signalé: ${problemDescription}`,
+        cout: 0
+      }];
+      const response = await fetch(`/api/agent-materiel/${selectedMateriel.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ historique_maintenances: historique, etat: 'Mauvais' })
+      });
+      if (!response.ok) throw new Error('Erreur');
+      setProblemDescription('');
+      setReportingProblem(false);
+      loadMateriels();
+      setSelectedMateriel(null);
+    } catch (error: any) {
+      alert('Erreur: ' + error.message);
+    }
+  };
+
   const actifs = materiels.filter(m => !m.date_retour);
+  const bonEtat = actifs.filter(m => m.etat === 'Neuf' || m.etat === 'Bon').length;
+  const materielProblemes = actifs.filter(m => m.etat === 'Mauvais' || m.etat === 'Perdu').length;
   const valeurTotale = actifs.reduce((sum, m) => sum + m.valeur, 0);
   const valeurResiduelle = actifs.reduce((sum, m) => {
     const dep = calcDepreciation(m.valeur, m.date_attribution, m.duree_amortissement_mois || 36);
     return sum + dep.valeurResiduelle;
   }, 0);
-  const materielProblemes = actifs.filter(m => m.etat === 'Mauvais' || m.etat === 'Perdu').length;
-  const garantiesExpirees = actifs.filter(m => {
-    const w = getWarrantyStatus(m.date_garantie_fin);
-    return w.expired;
-  }).length;
+
+  // Pagination Logic
+  const totalPages = Math.ceil(actifs.length / ITEMS_PER_PAGE);
+  const paginatedMateriels = actifs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white">
-          <Package size={20} className="mb-2" />
-          <div className="text-2xl font-bold mb-1">{actifs.length}</div>
-          <div className="text-blue-100 text-xs">Matériel Actif</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white">
-          <CheckCircle size={20} className="mb-2" />
-          <div className="text-2xl font-bold mb-1">{actifs.filter(m => m.etat === 'Neuf' || m.etat === 'Bon').length}</div>
-          <div className="text-green-100 text-xs">Bon État</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 text-white">
-          <AlertCircle size={20} className="mb-2" />
-          <div className="text-2xl font-bold mb-1">{materielProblemes}</div>
-          <div className="text-amber-100 text-xs">Problèmes</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white">
-          <DollarSign size={20} className="mb-2" />
-          <div className="text-2xl font-bold mb-1">{valeurTotale.toLocaleString()}</div>
-          <div className="text-emerald-100 text-xs">Valeur Achat (FCFA)</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-5 text-white">
-          <TrendingDown size={20} className="mb-2" />
-          <div className="text-2xl font-bold mb-1">{valeurResiduelle.toLocaleString()}</div>
-          <div className="text-cyan-100 text-xs">Val. Résiduelle (FCFA)</div>
-        </div>
+    <div className="space-y-3">
+      {/* Stats - Different for Agent vs Admin/Chef */}
+      <div className={`grid gap-2 ${canManage ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-3'}`}>
+        <StatCard icon={<Package size={14} />} label={canManage ? "Matériel Actif" : "Mon Matériel"} value={actifs.length.toString()} color="blue" />
+        <StatCard icon={<CheckCircle size={14} />} label="Bon État" value={bonEtat.toString()} color="green" />
+        <StatCard icon={<AlertCircle size={14} />} label="Problèmes" value={materielProblemes.toString()} color="amber" />
+        {canManage && (
+          <>
+            <StatCard icon={<DollarSign size={14} />} label="Val. Achat" value={`${(valeurTotale / 1000).toFixed(0)}k`} color="emerald" />
+            <StatCard icon={<TrendingDown size={14} />} label="Val. Résid." value={`${(valeurResiduelle / 1000).toFixed(0)}k`} color="cyan" />
+          </>
+        )}
       </div>
 
-      <button
-        onClick={() => setShowForm(!showForm)}
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
-      >
-        <Plus size={20} />
-        Attribuer Matériel
-      </button>
+      {/* Admin/Chef: Attribution Button */}
+      {canManage && (
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition"
+        >
+          {showForm ? <X size={14} /> : <Plus size={14} />}
+          {showForm ? 'Annuler' : 'Attribuer Matériel'}
+        </button>
+      )}
 
-      {showForm && (
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h3 className="text-xl font-bold text-white mb-4">Attribution de Matériel</h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Type de Matériel</label>
-                <select
-                  value={formData.type_materiel}
-                  onChange={(e) => setFormData({ ...formData, type_materiel: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                >
+      {/* Admin/Chef: Attribution Form */}
+      {canManage && showForm && (
+        <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-800">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <FormField label="Type">
+                <select value={formData.type_materiel} onChange={(e) => setFormData({ ...formData, type_materiel: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs">
                   <option value="Tablette">Tablette</option>
                   <option value="Badge">Badge</option>
                   <option value="Uniforme">Uniforme</option>
@@ -263,332 +278,289 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
                   <option value="Téléphone">Téléphone</option>
                   <option value="Autre">Autre</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Nom/Modèle</label>
-                <input
-                  type="text"
-                  value={formData.nom_materiel}
-                  onChange={(e) => setFormData({ ...formData, nom_materiel: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                  placeholder="Ex: Samsung Galaxy Tab A"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Numéro de Série</label>
-                <input
-                  type="text"
-                  value={formData.numero_serie}
-                  onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                  placeholder="Ex: SN123456"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Date d'Attribution</label>
-                <input
-                  type="date"
-                  value={formData.date_attribution}
-                  onChange={(e) => setFormData({ ...formData, date_attribution: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">État</label>
-                <select
-                  value={formData.etat}
-                  onChange={(e) => setFormData({ ...formData, etat: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                >
-                  <option value="Neuf">Neuf</option>
-                  <option value="Bon">Bon</option>
-                  <option value="Moyen">Moyen</option>
-                  <option value="Mauvais">Mauvais</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Valeur (FCFA)</label>
-                <input
-                  type="number"
-                  value={formData.valeur}
-                  onChange={(e) => setFormData({ ...formData, valeur: Number(e.target.value) })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  <Shield size={14} className="inline mr-1" />
-                  Fin de Garantie
-                </label>
-                <input
-                  type="date"
-                  value={formData.date_garantie_fin}
-                  onChange={(e) => setFormData({ ...formData, date_garantie_fin: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  <TrendingDown size={14} className="inline mr-1" />
-                  Amortissement (mois)
-                </label>
-                <input
-                  type="number"
-                  value={formData.duree_amortissement_mois}
-                  onChange={(e) => setFormData({ ...formData, duree_amortissement_mois: Number(e.target.value) })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                  min={1}
-                  max={120}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  <Wrench size={14} className="inline mr-1" />
-                  Prochaine Maintenance
-                </label>
-                <input
-                  type="date"
-                  value={formData.prochaine_maintenance}
-                  onChange={(e) => setFormData({ ...formData, prochaine_maintenance: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                  rows={2}
-                />
-              </div>
+              </FormField>
+              <FormField label="Nom/Modèle">
+                <input type="text" value={formData.nom_materiel} onChange={(e) => setFormData({ ...formData, nom_materiel: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" required />
+              </FormField>
+              <FormField label="N° Série">
+                <input type="text" value={formData.numero_serie} onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
+              </FormField>
+              <FormField label="Valeur (FCFA)">
+                <input type="number" value={formData.valeur} onChange={(e) => setFormData({ ...formData, valeur: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
+              </FormField>
             </div>
-
-            <div className="flex gap-3">
-              <button type="submit" disabled={loading} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
-                Attribuer
-              </button>
-              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-3 bg-slate-700 text-white rounded-lg">
-                Annuler
-              </button>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <FormField label="Attribution">
+                <input type="date" value={formData.date_attribution} onChange={(e) => setFormData({ ...formData, date_attribution: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
+              </FormField>
+              <FormField label="État">
+                <select value={formData.etat} onChange={(e) => setFormData({ ...formData, etat: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs">
+                  <option value="Neuf">Neuf</option><option value="Bon">Bon</option><option value="Moyen">Moyen</option><option value="Mauvais">Mauvais</option>
+                </select>
+              </FormField>
+              <FormField label="Fin Garantie">
+                <input type="date" value={formData.date_garantie_fin} onChange={(e) => setFormData({ ...formData, date_garantie_fin: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
+              </FormField>
+              <FormField label="Amortis. (mois)">
+                <input type="number" value={formData.duree_amortissement_mois} onChange={(e) => setFormData({ ...formData, duree_amortissement_mois: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" min={1} max={120} />
+              </FormField>
+              <FormField label="Maintenance">
+                <input type="date" value={formData.prochaine_maintenance} onChange={(e) => setFormData({ ...formData, prochaine_maintenance: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
+              </FormField>
+            </div>
+            <div className="flex gap-2">
+              <input type="text" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="flex-1 px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" placeholder="Notes..." />
+              <button type="submit" disabled={loading} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs shrink-0">Attribuer</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Inventory Table */}
+      {/* Inventory List */}
       <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Package size={20} className="text-blue-400" />
-            Inventaire du Matériel ({actifs.length})
+        <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between bg-slate-900/30">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Package size={16} className="text-blue-400" />
+            {canManage ? 'Inventaire du Matériel' : 'Mon Équipement'}
           </h3>
-          {garantiesExpirees > 0 && (
-            <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-semibold">
-              {garantiesExpirees} garantie{garantiesExpirees > 1 ? 's' : ''} expirée{garantiesExpirees > 1 ? 's' : ''}
-            </span>
-          )}
+          <span className="text-[10px] text-slate-500 font-medium">{actifs.length} article(s)</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-700">
-              <tr>
-                {!agentId && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Agent</th>}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Nom/Modèle</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">N° Série</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Attribution</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">État</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Garantie</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300">Valeur</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300">V. Résid.</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {materiels.map((mat) => {
-                const dep = calcDepreciation(mat.valeur, mat.date_attribution, mat.duree_amortissement_mois || 36);
-                const warranty = getWarrantyStatus(mat.date_garantie_fin);
-                const maintenanceDue = mat.prochaine_maintenance && new Date(mat.prochaine_maintenance) <= new Date();
+        
+        {loading ? (
+          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500" /></div>
+        ) : actifs.length === 0 ? (
+          <div className="text-center py-12 opacity-50">
+            <Package size={32} className="mx-auto mb-2 text-slate-500" />
+            <p className="text-sm text-slate-400">Aucun matériel attribué</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-700/50">
+            {paginatedMateriels.map((mat) => {
+              const warranty = getWarrantyStatus(mat.date_garantie_fin);
+              const maintenanceDue = mat.prochaine_maintenance && new Date(mat.prochaine_maintenance) <= new Date();
+              const dep = calcDepreciation(mat.valeur, mat.date_attribution, mat.duree_amortissement_mois || 36);
 
-                return (
-                  <tr key={mat.id} className="hover:bg-slate-700/50 transition">
-                    {!agentId && (
-                      <td className="px-4 py-3 text-white text-sm">
-                        {mat.agent?.nom} {mat.agent?.prenom}
-                      </td>
-                    )}
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold">
-                        {mat.type_materiel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-white text-sm">{mat.nom_materiel}</td>
-                    <td className="px-4 py-3 text-slate-300 font-mono text-xs">{mat.numero_serie || '-'}</td>
-                    <td className="px-4 py-3 text-slate-300 text-sm">{new Date(mat.date_attribution).toLocaleDateString('fr-FR')}</td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={mat.etat}
-                        onChange={(e) => changerEtat(mat.id, e.target.value)}
-                        disabled={!!mat.date_retour}
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          mat.etat === 'Neuf' || mat.etat === 'Bon' ? 'bg-green-500/20 text-green-400' :
-                          mat.etat === 'Moyen' ? 'bg-yellow-500/20 text-yellow-400' :
-                          mat.etat === 'Mauvais' ? 'bg-red-500/20 text-red-400' :
-                          mat.etat === 'Perdu' ? 'bg-red-500/20 text-red-400' :
-                          'bg-slate-500/20 text-slate-400'
-                        } bg-transparent border-0 cursor-pointer`}
-                      >
-                        <option value="Neuf">Neuf</option>
-                        <option value="Bon">Bon</option>
-                        <option value="Moyen">Moyen</option>
-                        <option value="Mauvais">Mauvais</option>
-                        <option value="Perdu">Perdu</option>
-                        <option value="Retourné">Retourné</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <Shield size={12} className={warranty.color} />
-                        <span className={`text-xs font-medium ${warranty.color}`}>{warranty.label}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right text-white text-sm font-semibold">{mat.valeur.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div>
-                        <span className="text-sm font-semibold text-cyan-400">{dep.valeurResiduelle.toLocaleString()}</span>
-                        <div className="w-full bg-slate-600 rounded-full h-1 mt-1">
-                          <div
-                            className={`h-1 rounded-full ${dep.pourcentage > 80 ? 'bg-red-500' : dep.pourcentage > 50 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                            style={{ width: `${100 - dep.pourcentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {!mat.date_retour && (
-                          <>
-                            <button
-                              onClick={() => setMaintenanceModal(mat)}
-                              className={`text-xs font-semibold flex items-center gap-1 ${maintenanceDue ? 'text-orange-400 hover:text-orange-300' : 'text-slate-400 hover:text-slate-300'}`}
-                              title="Maintenance"
-                            >
-                              <Wrench size={14} />
-                              {maintenanceDue && <span className="w-1.5 h-1.5 bg-orange-400 rounded-full" />}
-                            </button>
-                            <button
-                              onClick={() => retournerMateriel(mat.id)}
-                              className="text-xs font-semibold text-blue-400 hover:text-blue-300"
-                            >
-                              Retourner
-                            </button>
-                          </>
-                        )}
-                        {mat.date_retour && (
-                          <span className="text-xs text-slate-500">
-                            Retourné le {new Date(mat.date_retour).toLocaleDateString('fr-FR')}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+              return (
+                <div
+                  key={mat.id}
+                  onClick={() => setSelectedMateriel(mat)}
+                  className="p-3 hover:bg-slate-700/30 transition cursor-pointer group flex items-center gap-3"
+                >
+                  <div className="p-2 bg-blue-500/10 rounded-lg shrink-0">
+                    <Package size={16} className="text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white truncate">{mat.nom_materiel}</span>
+                      {maintenanceDue && <span className="w-2 h-2 bg-orange-400 rounded-full shrink-0" title="Maintenance requise" />}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500 flex-wrap">
+                      <span className="text-blue-400 font-bold">{mat.type_materiel}</span>
+                      <span>•</span>
+                      <span>{new Date(mat.date_attribution).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                      {canManage && mat.valeur > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-cyan-400">{dep.valeurResiduelle.toLocaleString()} FCFA</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                    mat.etat === 'Neuf' || mat.etat === 'Bon' ? 'bg-green-500/20 text-green-400' :
+                    mat.etat === 'Moyen' ? 'bg-yellow-500/20 text-yellow-400' :
+                    'bg-red-500/20 text-red-400'
+                  }`}>
+                    {mat.etat}
+                  </span>
+                  <Eye size={14} className="text-slate-600 group-hover:text-cyan-400 shrink-0" />
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-          {materiels.length === 0 && (
-            <div className="text-center py-12">
-              <Package size={48} className="mx-auto text-slate-600 mb-4" />
-              <p className="text-slate-400">Aucun matériel attribué</p>
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700/50 bg-slate-900/20">
+            <span className="text-[10px] text-slate-500">Page {currentPage} sur {totalPages}</span>
+            <div className="flex gap-1">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"><ChevronLeft size={12} /></button>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"><ChevronRight size={12} /></button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Maintenance Modal */}
-      {maintenanceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setMaintenanceModal(null)}>
-          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Wrench size={20} className="text-blue-400" />
-                Maintenance - {maintenanceModal.nom_materiel}
-              </h3>
-              <button onClick={() => setMaintenanceModal(null)} className="text-slate-400 hover:text-white">
-                <X size={20} />
-              </button>
-            </div>
+      {/* Detail Sheet */}
+      <Sheet open={!!selectedMateriel} onOpenChange={(open) => { if (!open) { setSelectedMateriel(null); setReportingProblem(false); } }}>
+        <SheetContent className="w-full sm:max-w-md bg-slate-950 border-l-slate-800 p-0 overflow-y-auto">
+          {selectedMateriel && (
+            <>
+              <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
+                <SheetTitle className="text-white flex items-center gap-2">
+                  <Package size={16} className="text-blue-400" />
+                  {selectedMateriel.nom_materiel}
+                </SheetTitle>
+                <SheetDescription className="text-slate-400">
+                  {selectedMateriel.type_materiel} • N° {selectedMateriel.numero_serie || 'N/A'}
+                </SheetDescription>
+              </SheetHeader>
 
-            <div className="p-6 space-y-4">
-              {/* Next maintenance */}
-              {maintenanceModal.prochaine_maintenance && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                  new Date(maintenanceModal.prochaine_maintenance) <= new Date()
-                    ? 'bg-orange-500/10 border-orange-500/30'
-                    : 'bg-slate-700/50 border-slate-600'
-                }`}>
-                  <Calendar size={16} className={new Date(maintenanceModal.prochaine_maintenance) <= new Date() ? 'text-orange-400' : 'text-slate-400'} />
-                  <span className="text-sm text-slate-300">Prochaine maintenance:</span>
-                  <span className={`text-sm font-semibold ${new Date(maintenanceModal.prochaine_maintenance) <= new Date() ? 'text-orange-400' : 'text-white'}`}>
-                    {new Date(maintenanceModal.prochaine_maintenance).toLocaleDateString('fr-FR')}
-                  </span>
+              <div className="p-6 space-y-6">
+                {/* Status Badge */}
+                <div className="flex justify-center">
+                  {canManage ? (
+                    <select
+                      value={selectedMateriel.etat}
+                      onChange={(e) => { changerEtat(selectedMateriel.id, e.target.value); setSelectedMateriel({ ...selectedMateriel, etat: e.target.value }); }}
+                      className={`px-4 py-2 rounded-full text-sm font-bold uppercase bg-transparent border cursor-pointer ${
+                        selectedMateriel.etat === 'Neuf' || selectedMateriel.etat === 'Bon' ? 'border-green-500/30 text-green-400' :
+                        selectedMateriel.etat === 'Moyen' ? 'border-yellow-500/30 text-yellow-400' :
+                        'border-red-500/30 text-red-400'
+                      }`}
+                    >
+                      <option value="Neuf">Neuf</option><option value="Bon">Bon</option><option value="Moyen">Moyen</option><option value="Mauvais">Mauvais</option><option value="Perdu">Perdu</option>
+                    </select>
+                  ) : (
+                    <span className={`px-4 py-2 rounded-full text-sm font-bold uppercase border ${
+                      selectedMateriel.etat === 'Neuf' || selectedMateriel.etat === 'Bon' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                      selectedMateriel.etat === 'Moyen' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                      'bg-red-500/20 text-red-400 border-red-500/30'
+                    }`}>{selectedMateriel.etat}</span>
+                  )}
                 </div>
-              )}
 
-              {/* Add maintenance */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-slate-300">Enregistrer une maintenance</h4>
-                <input
-                  type="text"
-                  value={newMaintenance.description}
-                  onChange={(e) => setNewMaintenance({ ...newMaintenance, description: e.target.value })}
-                  placeholder="Description de l'intervention..."
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
-                />
-                <div className="flex gap-3">
-                  <input
-                    type="number"
-                    value={newMaintenance.cout}
-                    onChange={(e) => setNewMaintenance({ ...newMaintenance, cout: Number(e.target.value) })}
-                    placeholder="Coût (FCFA)"
-                    className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
-                    min={0}
-                  />
-                  <button
-                    onClick={ajouterMaintenance}
-                    disabled={!newMaintenance.description}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
-                  >
-                    Ajouter
-                  </button>
+                {/* Info Grid */}
+                <div className={`grid gap-3 ${canManage ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                  <InfoItem label="Type" value={selectedMateriel.type_materiel} />
+                  <InfoItem label="N° Série" value={selectedMateriel.numero_serie || 'N/A'} />
+                  <InfoItem label="Attribué le" value={new Date(selectedMateriel.date_attribution).toLocaleDateString('fr-FR')} />
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5 flex items-center gap-1"><Shield size={10} />Garantie</div>
+                    <div className={`text-sm font-medium ${getWarrantyStatus(selectedMateriel.date_garantie_fin).color}`}>{getWarrantyStatus(selectedMateriel.date_garantie_fin).label}</div>
+                  </div>
+                  {canManage && (
+                    <>
+                      <InfoItem label="Valeur Achat" value={`${selectedMateriel.valeur.toLocaleString()} FCFA`} />
+                      <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                        <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5 flex items-center gap-1"><TrendingDown size={10} />Val. Résiduelle</div>
+                        <div className="text-sm font-medium text-cyan-400">{calcDepreciation(selectedMateriel.valeur, selectedMateriel.date_attribution, selectedMateriel.duree_amortissement_mois || 36).valeurResiduelle.toLocaleString()} FCFA</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Next Maintenance */}
+                {selectedMateriel.prochaine_maintenance && (
+                  <div className={`flex items-center gap-2 p-3 rounded-lg border ${
+                    new Date(selectedMateriel.prochaine_maintenance) <= new Date() ? 'bg-orange-500/10 border-orange-500/30' : 'bg-slate-900 border-slate-800'
+                  }`}>
+                    <Wrench size={14} className={new Date(selectedMateriel.prochaine_maintenance) <= new Date() ? 'text-orange-400' : 'text-slate-400'} />
+                    <span className="text-xs text-slate-300">Prochaine maintenance:</span>
+                    <span className={`text-xs font-bold ${new Date(selectedMateriel.prochaine_maintenance) <= new Date() ? 'text-orange-400' : 'text-white'}`}>{new Date(selectedMateriel.prochaine_maintenance).toLocaleDateString('fr-FR')}</span>
+                    {canManage && <button onClick={() => setMaintenanceModal(selectedMateriel)} className="ml-auto text-xs font-bold text-blue-400 hover:text-blue-300">Gérer</button>}
+                  </div>
+                )}
+
+                {/* Notes */}
+                {selectedMateriel.notes && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase">Notes</h4>
+                    <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-300 italic">"{selectedMateriel.notes}"</div>
+                  </div>
+                )}
+
+                {/* Maintenance History */}
+                {(selectedMateriel.historique_maintenances || []).length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase">Historique</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {(selectedMateriel.historique_maintenances || []).slice().reverse().map((m, i) => (
+                        <div key={i} className="p-2 bg-slate-900 border border-slate-800 rounded-lg">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString('fr-FR')}</span>
+                            {canManage && m.cout > 0 && <span className="text-[10px] font-bold text-cyan-400">{m.cout.toLocaleString()} FCFA</span>}
+                          </div>
+                          <p className="text-xs text-slate-300">{m.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="pt-4 border-t border-slate-800 space-y-3">
+                  {/* Agent: Report Problem */}
+                  {!canManage && !reportingProblem && (
+                    <button onClick={() => setReportingProblem(true)} className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition">
+                      <AlertTriangle size={16} />Signaler un Problème
+                    </button>
+                  )}
+                  {!canManage && reportingProblem && (
+                    <div className="space-y-2">
+                      <textarea value={problemDescription} onChange={(e) => setProblemDescription(e.target.value)} placeholder="Décrivez le problème..." className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500" rows={3} />
+                      <div className="flex gap-2">
+                        <button onClick={signalerProbleme} disabled={!problemDescription.trim()} className="flex-1 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg font-bold text-xs">Envoyer</button>
+                        <button onClick={() => { setReportingProblem(false); setProblemDescription(''); }} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs">Annuler</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Admin/Chef: Actions */}
+                  {canManage && (
+                    <div className="flex gap-2">
+                      <button onClick={() => setMaintenanceModal(selectedMateriel)} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition">
+                        <Wrench size={14} />Maintenance
+                      </button>
+                      <button onClick={() => retournerMateriel(selectedMateriel.id)} className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold text-xs transition">
+                        Retourner
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
-              {/* History */}
+      {/* Maintenance Modal (Admin/Chef) */}
+      {canManage && maintenanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setMaintenanceModal(null)}>
+          <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Wrench size={16} className="text-blue-400" />Maintenance - {maintenanceModal.nom_materiel}</h3>
+              <button onClick={() => setMaintenanceModal(null)} className="text-slate-400 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              {maintenanceModal.prochaine_maintenance && (
+                <div className={`flex items-center gap-2 p-3 rounded-lg border ${new Date(maintenanceModal.prochaine_maintenance) <= new Date() ? 'bg-orange-500/10 border-orange-500/30' : 'bg-slate-800 border-slate-700'}`}>
+                  <Calendar size={14} className={new Date(maintenanceModal.prochaine_maintenance) <= new Date() ? 'text-orange-400' : 'text-slate-400'} />
+                  <span className="text-xs text-slate-300">Prochaine:</span>
+                  <span className={`text-xs font-bold ${new Date(maintenanceModal.prochaine_maintenance) <= new Date() ? 'text-orange-400' : 'text-white'}`}>{new Date(maintenanceModal.prochaine_maintenance).toLocaleDateString('fr-FR')}</span>
+                </div>
+              )}
               <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-slate-300">Historique ({(maintenanceModal.historique_maintenances || []).length})</h4>
+                <h4 className="text-xs font-bold text-slate-500">Enregistrer une maintenance</h4>
+                <input type="text" value={newMaintenance.description} onChange={(e) => setNewMaintenance({ ...newMaintenance, description: e.target.value })} placeholder="Description..." className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
+                <div className="flex gap-2">
+                  <input type="number" value={newMaintenance.cout} onChange={(e) => setNewMaintenance({ ...newMaintenance, cout: Number(e.target.value) })} placeholder="Coût (FCFA)" className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" min={0} />
+                  <button onClick={ajouterMaintenance} disabled={!newMaintenance.description} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold">Ajouter</button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-500">Historique ({(maintenanceModal.historique_maintenances || []).length})</h4>
                 {(maintenanceModal.historique_maintenances || []).length === 0 ? (
-                  <p className="text-xs text-slate-500 py-3 text-center">Aucune maintenance enregistrée</p>
+                  <p className="text-xs text-slate-500 text-center py-3">Aucune maintenance enregistrée</p>
                 ) : (
                   (maintenanceModal.historique_maintenances || []).slice().reverse().map((m, i) => (
-                    <div key={i} className="p-3 bg-slate-700/50 rounded-lg border border-slate-600">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-slate-400">{new Date(m.date).toLocaleDateString('fr-FR')}</span>
-                        {m.cout > 0 && <span className="text-xs font-semibold text-cyan-400">{m.cout.toLocaleString()} FCFA</span>}
+                    <div key={i} className="p-2 bg-slate-800 border border-slate-700 rounded-lg">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString('fr-FR')}</span>
+                        {m.cout > 0 && <span className="text-[10px] font-bold text-cyan-400">{m.cout.toLocaleString()} FCFA</span>}
                       </div>
-                      <p className="text-sm text-white">{m.description}</p>
+                      <p className="text-xs text-slate-300">{m.description}</p>
                     </div>
                   ))
                 )}
@@ -597,6 +569,45 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SUB COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
+  const colorClasses: Record<string, string> = {
+    blue: 'from-blue-500/20 to-blue-600/5 border-blue-500/20 text-blue-400',
+    green: 'from-green-500/20 to-green-600/5 border-green-500/20 text-green-400',
+    amber: 'from-amber-500/20 to-amber-600/5 border-amber-500/20 text-amber-400',
+    emerald: 'from-emerald-500/20 to-emerald-600/5 border-emerald-500/20 text-emerald-400',
+    cyan: 'from-cyan-500/20 to-cyan-600/5 border-cyan-500/20 text-cyan-400',
+  };
+  return (
+    <div className={`rounded-xl p-3 border bg-gradient-to-br ${colorClasses[color] || colorClasses.blue}`}>
+      <div className="flex justify-between items-start mb-1"><div className="p-1.5 rounded-lg bg-white/5">{icon}</div></div>
+      <div className="text-lg font-bold text-white truncate">{value}</div>
+      <div className="text-[10px] uppercase font-bold opacity-70 tracking-wide">{label}</div>
+    </div>
+  );
+}
+
+function InfoItem({ label, value }: { label: string, value: string }) {
+  return (
+    <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+      <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">{label}</div>
+      <div className="text-sm font-medium text-slate-200 truncate">{value}</div>
+    </div>
+  );
+}
+
+function FormField({ label, children }: { label: string, children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">{label}</label>
+      {children}
     </div>
   );
 }

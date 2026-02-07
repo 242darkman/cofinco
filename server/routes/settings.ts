@@ -22,7 +22,7 @@ import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
 import { auditTrailService } from "../services/audit-trail-service";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
+import { normalizeKeysDeep, coerceValueToSchema } from "./utils";
 import { db } from "../db";
 import { eq, sql, desc, and, gte, lte, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -144,7 +144,7 @@ export function registerSettingsRoutes(app: Express) {
           ipWhitelistEnabled: false,
           auditLogEnabled: true,
         };
-        return res.json(addSnakeCaseAliasesDeep(defaults));
+        return res.json(defaults);
       }
 
       const payload = {
@@ -162,7 +162,7 @@ export function registerSettingsRoutes(app: Express) {
         auditLogEnabled: result.auditLogEnabled,
       };
 
-      res.json(addSnakeCaseAliasesDeep(payload));
+      res.json(payload);
     } catch (error) {
       logger.error({ err: error }, 'Error fetching security settings');
       res.status(500).json({ error: "Failed to fetch security settings" });
@@ -176,7 +176,7 @@ export function registerSettingsRoutes(app: Express) {
         ...parsed,
         updatedAt: new Date(),
       }).returning();
-      res.status(201).json(addSnakeCaseAliasesDeep(created));
+      res.status(201).json(created);
     } catch (error: any) {
       logger.error({ err: error }, 'Error creating security settings');
       res.status(500).json({ error: error.message || "Failed to create security settings" });
@@ -195,7 +195,7 @@ export function registerSettingsRoutes(app: Express) {
         return res.status(404).json({ error: "Security settings not found" });
       }
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       logger.error({ err: error }, 'Error updating security settings');
       res.status(500).json({ error: error.message || "Failed to update security settings" });

@@ -37,14 +37,14 @@ type PaymentMode = typeof MethodePaiement[keyof typeof MethodePaiement];
 
 interface TontineContribution {
   id: string;
-  tontine_id: string;
-  membre_id: string;
-  client_id: string;
+  tontineId: string;
+  membreId: string;
+  clientId: string;
   montant: number;
-  tour_numero: number;
-  date_contribution: string;
-  mode_paiement: PaymentMode;
-  reference_paiement: string | null;
+  tourNumero: number;
+  dateContribution: string;
+  modePaiement: PaymentMode;
+  referencePaiement: string | null;
   statut: typeof StatutContributionTontine[keyof typeof StatutContributionTontine];
   notes: string | null;
   client: {
@@ -55,8 +55,8 @@ interface TontineContribution {
 
 interface TontineMembre {
   id: string;
-  client_id: string;
-  position_ordre: number;
+  clientId: string;
+  positionOrdre: number;
   statut: string;
   client: {
     nom: string;
@@ -111,9 +111,9 @@ const PaymentPreview = ({
   let toursDejaPayes = 0;
   if (selectedMembre) {
     const memberContribs = contributions.filter(
-      c => c.client_id === selectedMembre.client_id && c.statut === StatutContributionTontine.VALIDATED
+      c => c.clientId === selectedMembre.clientId && c.statut === StatutContributionTontine.VALIDATED
     );
-    toursDejaPayes = memberContribs.reduce((max, c) => Math.max(max, c.tour_numero), 0);
+    toursDejaPayes = memberContribs.reduce((max, c) => Math.max(max, c.tourNumero), 0);
   }
 
   // 3. Tours complets et partiels
@@ -222,7 +222,7 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
           <div className="text-center">
              <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Montant versé</div>
              <div className="text-3xl font-bold text-emerald-400">{formatMoney(contribution.montant)}</div>
-             <div className="text-sm text-slate-500 mt-1">Tour #{contribution.tour_numero}</div>
+             <div className="text-sm text-slate-500 mt-1">Tour #{contribution.tourNumero}</div>
           </div>
 
           <div className="bg-slate-800/50 rounded-xl p-4 space-y-3 border border-slate-700/50">
@@ -236,7 +236,7 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
              <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
                 <span className="text-slate-400 text-sm">Date</span>
                 <span className="text-white font-medium text-right">
-                  {new Date(contribution.date_contribution).toLocaleDateString('fr-FR', { 
+                  {new Date(contribution.dateContribution).toLocaleDateString('fr-FR', { 
                     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
                   })}
                 </span>
@@ -245,12 +245,12 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
              <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
                 <span className="text-slate-400 text-sm">Mode</span>
                 <span className="text-white font-medium text-right flex items-center gap-2">
-                  {getModeLabel(contribution.mode_paiement)}
+                  {getModeLabel(contribution.modePaiement)}
                 </span>
              </div>
 
              {/* Afficher l'opérateur uniquement si Mobile Money */}
-             {contribution.mode_paiement === MethodePaiement.MOBILE_MONEY && (
+             {contribution.modePaiement === MethodePaiement.MOBILE_MONEY && (
                 // Note: Si l'opérateur n'est pas stocké explicitement dans le type TontineContribution actuel, 
                 // on pourrait avoir besoin de modifier le type ou le backend. 
                 // Mais s'il est dans 'notes' ou un champ dédié que j'aurais manqué...
@@ -258,16 +258,16 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
                  <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
                     <span className="text-slate-400 text-sm">Référence</span>
                     <span className="text-cyan-400 font-mono text-sm text-right break-all max-w-[150px]">
-                      {contribution.reference_paiement || 'N/A'}
+                      {contribution.referencePaiement || 'N/A'}
                     </span>
                  </div>
              )}
              
-             {contribution.reference_paiement && contribution.mode_paiement !== MethodePaiement.MOBILE_MONEY && (
+             {contribution.referencePaiement && contribution.modePaiement !== MethodePaiement.MOBILE_MONEY && (
                 <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
                   <span className="text-slate-400 text-sm">Référence</span>
                   <span className="text-slate-200 font-mono text-sm text-right">
-                    {contribution.reference_paiement}
+                    {contribution.referencePaiement}
                   </span>
                 </div>
              )}
@@ -430,7 +430,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
         const providerName = operator ? operator.toUpperCase() : undefined;
         await contributionTontineApi.create({
           tontineId: tontineId,
-          clientId: membre.client_id,
+          clientId: membre.clientId,
           typeOperation: 'Versement',
           montant: String(formData.montant),
           tourNumero: formData.tour_numero,
@@ -554,13 +554,13 @@ export default function TontineContributions({ tontineId }: TontineContributions
   // Export contributions data
   const buildContributionExportData = useCallback(() => {
     return contributions.map((c) => ({
-      'Date': new Date(c.date_contribution).toLocaleDateString('fr-FR'),
+      'Date': new Date(c.dateContribution).toLocaleDateString('fr-FR'),
       'Membre': c.client ? `${c.client.nom}${c.client.prenom ? ' ' + c.client.prenom : ''}` : '-',
-      'Tour': c.tour_numero,
+      'Tour': c.tourNumero,
       'Montant (FCFA)': c.montant,
-      'Mode paiement': METHODE_PAIEMENT_LABELS[c.mode_paiement as keyof typeof METHODE_PAIEMENT_LABELS] || c.mode_paiement,
+      'Mode paiement': METHODE_PAIEMENT_LABELS[c.modePaiement as keyof typeof METHODE_PAIEMENT_LABELS] || c.modePaiement,
       'Statut': ALL_STATUS_LABELS[c.statut] || c.statut,
-      'Référence': c.reference_paiement || '-',
+      'Référence': c.referencePaiement || '-',
     }));
   }, [contributions]);
 
@@ -716,24 +716,24 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     <div className="flex items-center gap-3 text-xs text-slate-400 mb-2 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Calendar size={12} aria-hidden="true" />
-                        {formatDate(contribution.date_contribution)}
+                        {formatDate(contribution.dateContribution)}
                       </span>
                       <span className="flex items-center gap-1 text-slate-300">
-                        {getModeIcon(contribution.mode_paiement)}
-                        {contribution.mode_paiement}
+                        {getModeIcon(contribution.modePaiement)}
+                        {contribution.modePaiement}
                       </span>
                     </div>
 
                     <div className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
                       <span className="bg-slate-700/50 px-1.5 py-0.5 rounded text-white font-medium">
-                        Tour #{contribution.tour_numero}
+                        Tour #{contribution.tourNumero}
                       </span>
-                      {contribution.reference_paiement && (
+                      {contribution.referencePaiement && (
                         <span
                           className="font-mono text-[10px] px-1 bg-slate-800 rounded text-cyan-500/80 truncate max-w-[100px]"
-                          title={contribution.reference_paiement}
+                          title={contribution.referencePaiement}
                         >
-                          {escapeHtml(contribution.reference_paiement)}
+                          {escapeHtml(contribution.referencePaiement)}
                         </span>
                       )}
                     </div>
@@ -811,8 +811,8 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     
                     // Auto-calculate next tour
                     if (newMembreId) {
-                        const memberContribs = contributions.filter(c => c.membre_id === newMembreId && c.statut === StatutContributionTontine.VALIDATED);
-                        const maxTour = memberContribs.length > 0 ? Math.max(...memberContribs.map(c => c.tour_numero)) : 0;
+                        const memberContribs = contributions.filter(c => c.membreId === newMembreId && c.statut === StatutContributionTontine.VALIDATED);
+                        const maxTour = memberContribs.length > 0 ? Math.max(...memberContribs.map(c => c.tourNumero)) : 0;
                         newTour = maxTour + 1;
                     }
 
@@ -832,7 +832,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   <option value="">Sélectionner...</option>
                   {membres.map((membre) => (
                     <option key={membre.id} value={membre.id}>
-                      {escapeHtml(membre.client?.nom || 'Inconnu')} (Pos. #{membre.position_ordre})
+                      {escapeHtml(membre.client?.nom || 'Inconnu')} (Pos. #{membre.positionOrdre})
                     </option>
                   ))}
                 </select>

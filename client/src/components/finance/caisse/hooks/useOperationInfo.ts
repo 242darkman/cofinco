@@ -103,12 +103,12 @@ export function useOperationInfo({
             if (subType.includes('Épargne') || subType.includes('Epargne')) targetType = TypeCompte.SAVINGS;
             else if (subType.includes('Bloqué') || subType.includes('Bloque')) targetType = TypeCompte.BLOCKED;
 
-            const compte = comptesClient.find((c: any) => (c.type_compte || c.typeCompte) === targetType);
+            const compte = comptesClient.find((c: any) => c.typeCompte === targetType);
 
             if (compte) {
-                amount = parseFloat(compte.soldeCourant || compte.solde_courant || '0');
+                amount = parseFloat(compte.soldeCourant || '0');
                 if (config.kind === 'balance') {
-                     subtitle = `Compte ${compte.numeroCompte || compte.numero_compte || ''}`;
+                     subtitle = `Compte ${compte.numeroCompte || ''}`;
                 } else {
                      // For withdrawals, maybe check withdrawal limits?
                      subtitle = `Max: ${amount}`;
@@ -130,7 +130,7 @@ export function useOperationInfo({
                 // If specific tontine selection logic exists in parent, it might be better to pass selectedTontine.
                 // But simplified: take the first one for now as per previous code logic
                 const tontine = tontinesActives[0];
-                amount = parseFloat(tontine.montantCotisation || tontine.montant_cotisation || '0');
+                amount = parseFloat(tontine.montantCotisation || '0');
                 subtitle = tontine.nom || 'Tontine';
                 suggestion = amount.toString();
             } else {
@@ -148,9 +148,9 @@ export function useOperationInfo({
                 try {
                     const echeance = await echeanceCreditApi.getProchaine(credit.id);
                     if (echeance) {
-                        amount = parseFloat(echeance.montant_total || echeance.montantTotal || '0');
+                        amount = parseFloat(echeance.montantTotal || '0');
                         suggestion = amount.toString();
-                        subtitle = `Échéance du ${new Date(echeance.date_echeance || echeance.dateEcheance).toLocaleDateString('fr-FR')}`;
+                        subtitle = `Échéance du ${new Date(echeance.dateEcheance).toLocaleDateString('fr-FR')}`;
                     } else {
                         subtitle = 'Aucune échéance due';
                     }
@@ -177,14 +177,14 @@ export function useOperationInfo({
                 if (response.ok) {
                     const data = await response.json();
                     const pending = data?.data?.find((d: any) =>
-                        (d.clientId === clientId || d.client_id === clientId) ||
+                        (d.clientId === clientId) ||
                         (d.client?.id === clientId)
                     );
 
                     if (pending) {
                          amount = parseFloat(pending.montant || '0');
                          suggestion = amount.toString();
-                         subtitle = `Crédit #${pending.numeroCredit || pending.numero_credit || '?'}`;
+                         subtitle = `Crédit #${pending.numeroCredit || '?'}`;
                     } else {
                         subtitle = 'Aucun décaissement en attente';
                     }

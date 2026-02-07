@@ -27,11 +27,11 @@ interface Transfert {
   agenceDestId: string;
   agenceSource?: { id: string; nom: string };
   agenceDest?: { id: string; nom: string };
-  agence_source_nom?: string;
-  agence_dest_nom?: string;
-  created_by_nom?: string;
-  created_by_prenom?: string;
-  created_by_username?: string;
+  agenceSourceNom?: string;
+  agenceDestNom?: string;
+  createdByNom?: string;
+  createdByPrenom?: string;
+  createdByUsername?: string;
 }
 
 interface CaisseTransfertsProps {
@@ -313,10 +313,10 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       transfers: transferts.map(t => ({
         reference: t.reference,
         date: t.dateCreation,
-        source: t.agence_source_nom || t.agenceSource?.nom || 'Source',
-        destination: t.agence_dest_nom || t.agenceDest?.nom || 'Dest',
+        source: t.agenceSourceNom || t.agenceSource?.nom || 'Source',
+        destination: t.agenceDestNom || t.agenceDest?.nom || 'Dest',
         montant: Number(t.montant),
-        initiator: t.created_by_nom ? `${t.created_by_nom} ${t.created_by_prenom || ''}` : '-',
+        initiator: t.createdByNom ? `${t.createdByNom} ${t.createdByPrenom || ''}` : '-',
         statut: t.statut
       })),
       stats: {
@@ -342,20 +342,20 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       label: 'Trajet',
       format: (_: any, t: Transfert) => (
          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-slate-400 max-w-[100px] truncate" title={t.agence_source_nom || t.agenceSource?.nom}>
-              {t.agence_source_nom || t.agenceSource?.nom || 'Source'}
+            <span className="text-slate-400 max-w-[100px] truncate" title={t.agenceSourceNom || t.agenceSource?.nom}>
+              {t.agenceSourceNom || t.agenceSource?.nom || 'Source'}
             </span>
             <ArrowRight size={12} className="text-slate-600 shrink-0" />
-            <span className="text-white font-medium max-w-[100px] truncate" title={t.agence_dest_nom || t.agenceDest?.nom}>
-              {t.agence_dest_nom || t.agenceDest?.nom || 'Dest'}
+            <span className="text-white font-medium max-w-[100px] truncate" title={t.agenceDestNom || t.agenceDest?.nom}>
+              {t.agenceDestNom || t.agenceDest?.nom || 'Dest'}
             </span>
          </div>
       ),
       mobileFormat: (_: any, t: Transfert) => (
         <div className="flex items-center gap-2 text-sm text-slate-300">
-           <span className="font-medium text-slate-400">{t.agence_source_nom || t.agenceSource?.nom}</span>
+           <span className="font-medium text-slate-400">{t.agenceSourceNom || t.agenceSource?.nom}</span>
            <ArrowRight size={14} className="text-slate-600" />
-           <span className="font-medium text-white">{t.agence_dest_nom || t.agenceDest?.nom}</span>
+           <span className="font-medium text-white">{t.agenceDestNom || t.agenceDest?.nom}</span>
         </div>
       )
     },
@@ -373,7 +373,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
         <div className="flex flex-col">
             <span className="text-slate-300">{new Date(t.dateCreation).toLocaleDateString('fr-FR')}</span>
             <span className="text-[10px] text-slate-500">
-                {t.created_by_nom ? `${t.created_by_nom} ${t.created_by_prenom?.charAt(0)}.` : '-'}
+                {t.createdByNom ? `${t.createdByNom} ${t.createdByPrenom?.charAt(0)}.` : '-'}
             </span>
         </div>
       ),
@@ -587,8 +587,8 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 <div className="space-y-1">
                   <p className="text-xs text-slate-500 uppercase">Initié par</p>
                   <p className="text-white">
-                    {selectedTransfert.created_by_nom 
-                      ? `${selectedTransfert.created_by_nom} ${selectedTransfert.created_by_prenom || ''}`
+                    {selectedTransfert.createdByNom 
+                      ? `${selectedTransfert.createdByNom} ${selectedTransfert.createdByPrenom || ''}`
                       : 'Inconnu'}
                   </p>
                 </div>
@@ -599,7 +599,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 
                 <div className="space-y-1">
                   <p className="text-xs text-slate-500 uppercase">De (Source)</p>
-                  <p className="text-white font-medium">{selectedTransfert.agence_source_nom || selectedTransfert.agenceSource?.nom || 'Agence Source'}</p>
+                  <p className="text-white font-medium">{selectedTransfert.agenceSourceNom || selectedTransfert.agenceSource?.nom || 'Agence Source'}</p>
                 </div>
                 
                 <div className="pl-2 border-l-2 border-slate-700 my-2">
@@ -608,7 +608,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 
                 <div className="space-y-1">
                   <p className="text-xs text-slate-500 uppercase">Vers (Destination)</p>
-                  <p className="text-white font-medium">{selectedTransfert.agence_dest_nom || selectedTransfert.agenceDest?.nom || 'Agence Dest'}</p>
+                  <p className="text-white font-medium">{selectedTransfert.agenceDestNom || selectedTransfert.agenceDest?.nom || 'Agence Dest'}</p>
                 </div>
               </div>
             </div>

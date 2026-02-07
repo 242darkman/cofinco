@@ -3,7 +3,7 @@ import { Plus, Edit2, Trash2, Building2, MapPin, Phone, User, ChevronLeft, Chevr
 import { Card, Button, Badge, SearchInput, SelectField, FormField, Modal, EmptyState, LoadingSpinner, IconButton, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { agenceApi } from '../../lib/api-client';
+import { agenceApi, villeApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { AgencyMigrationWizard } from '../agences/AgencyMigrationWizard';
@@ -65,6 +65,7 @@ export default function AdminGestionAgences() {
     typeAgence: TypeAgence.SECONDARY as TypeAgenceType,
     adresse: '',
     ville: '',
+    villeId: '',
     region: '',
     pays: 'Congo-Brazzaville',
     telephone: '',
@@ -80,8 +81,11 @@ export default function AdminGestionAgences() {
     notes: ''
   });
 
+  const [villesList, setVillesList] = useState<{ id: string; nom: string }[]>([]);
+
   useEffect(() => {
     loadAgences();
+    villeApi.getAll({ actif: true }).then(setVillesList).catch(console.error);
   }, []);
 
   const loadAgences = useCallback(async () => {
@@ -159,6 +163,7 @@ export default function AdminGestionAgences() {
       typeAgence: agence.typeAgence,
       adresse: agence.adresse || '',
       ville: agence.ville || '',
+      villeId: (agence as any).villeId || '',
       region: agence.region || '',
       pays: agence.pays || 'Congo-Brazzaville',
       telephone: agence.telephone || '',
@@ -183,6 +188,7 @@ export default function AdminGestionAgences() {
       typeAgence: TypeAgence.SECONDARY as TypeAgenceType,
       adresse: '',
       ville: '',
+      villeId: '',
       region: '',
       pays: 'Congo-Brazzaville',
       telephone: '',
@@ -585,12 +591,18 @@ export default function AdminGestionAgences() {
                 placeholder="Adresse complète"
               />
             </div>
-            <FormField
+            <SelectField
               label="Ville"
-              name="ville"
-              value={formData.ville}
-              onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
-              placeholder="Ville"
+              name="villeId"
+              value={formData.villeId}
+              onChange={(e) => {
+                const selected = villesList.find(v => v.id === e.target.value);
+                setFormData({ ...formData, villeId: e.target.value, ville: selected?.nom || '' });
+              }}
+              options={[
+                { value: '', label: 'Sélectionner une ville...' },
+                ...villesList.map(v => ({ value: v.id, label: v.nom })),
+              ]}
             />
             <FormField
               label="Région"

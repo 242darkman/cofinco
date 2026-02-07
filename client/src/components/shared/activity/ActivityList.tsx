@@ -71,24 +71,24 @@ export default function ActivityList({
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-cyan-900/20">
-                            {activity.user_email?.charAt(0).toUpperCase() || 'U'}
+                            {activity.userEmail?.charAt(0).toUpperCase() || 'U'}
                           </div>
                           <div className="text-sm font-medium text-white">
-                            {activity.user_email || 'Utilisateur Inconnu'}
+                            {activity.userEmail || 'Utilisateur Inconnu'}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <Badge variant="info" value={`${activity.total_actions} actions`} />
+                        <Badge variant="info" value={`${activity.totalActions} actions`} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <Badge variant="success" value={`${activity.modules_used} modules`} />
+                        <Badge variant="success" value={`${activity.modulesUsed} modules`} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                        {activity.last_activity ? new Date(activity.last_activity).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '-'}
+                        {activity.lastActivity ? new Date(activity.lastActivity).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                        {activity.activity_date ? new Date(activity.activity_date).toLocaleDateString('fr-FR') : '-'}
+                        {activity.activityDate ? new Date(activity.activityDate).toLocaleDateString('fr-FR') : '-'}
                       </td>
                     </tr>
                   ))

@@ -10,7 +10,7 @@ import Button from '../ui/Button';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole, SystemRole } from '@shared/types/roles';
-import { agenceApi, employeApi } from '../../lib/api-client';
+import { agenceApi, employeApi, villeApi } from '../../lib/api-client';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl } from '../../lib/format';
 import { StatutClient, StatutAgence } from '@shared/enum/status-constants';
@@ -39,6 +39,7 @@ interface ClientFormData {
   adresseDomicile?: string | null;
   lieuActivite?: string | null;
   ville?: string | null;
+  villeId?: string | null;
   pays?: string | null;
   dateNaissance?: string | null;
   numeroPiece?: string | null;
@@ -142,6 +143,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [typesMarches, setTypesMarches] = useState<{id: string; nom: string}[]>([]);
+  const [villesList, setVillesList] = useState<{ id: string; nom: string }[]>([]);
 
   // Uploaded documents state (structured)
   const [uploadedDocs, setUploadedDocs] = useState<Record<DocumentType, UploadedDocument | null>>({
@@ -179,15 +181,15 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     // Try to parse from documents JSONB first
     if (clientData.documents && Array.isArray(clientData.documents)) {
       clientData.documents.forEach((doc: any) => {
-        const docType = doc.documentType || doc.document_type;
+        const docType = doc.documentType;
         if (docType && docs.hasOwnProperty(docType)) {
           docs[docType as DocumentType] = {
             id: doc.id || crypto.randomUUID(),
             documentType: docType,
-            documentName: doc.documentName || doc.document_name || 'Document',
-            documentUrl: doc.documentUrl || doc.document_url || '',
+            documentName: doc.documentName || 'Document',
+            documentUrl: doc.documentUrl || '',
             status: doc.status || 'pending',
-            createdAt: doc.createdAt || doc.created_at || new Date().toISOString(),
+            createdAt: doc.createdAt || new Date().toISOString(),
             isPrivate: doc.isPrivate !== false,
           };
         }
@@ -247,6 +249,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         adresse: c.adresse || '',
         adresseDomicile: c.adresseDomicile || '',
         ville: c.ville || '',
+        villeId: c.villeId || '',
         lieuActivite: c.lieuActivite || '',
         dateNaissance: c.dateNaissance || '',
         profession: c.profession || '',
@@ -289,6 +292,10 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
       }
     };
     loadTypesMarches();
+  }, []);
+
+  useEffect(() => {
+    villeApi.getAll({ actif: true }).then(setVillesList).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -568,13 +575,19 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             error={errors.dateNaissance}
             max={getMaxBirthDate()}
           />
-          <FormField
+          <SelectField
             label="Ville"
-            name="ville"
-            icon={MapPin}
-            value={formData.ville || ''}
-            onChange={(e) => handleChange('ville', e.target.value)}
-            placeholder="Brazzaville"
+            name="villeId"
+            value={formData.villeId || ''}
+            onChange={(e) => {
+              const selected = villesList.find((v: any) => v.id === e.target.value);
+              handleChange('villeId', e.target.value);
+              handleChange('ville', selected?.nom || '');
+            }}
+            options={[
+              { value: '', label: 'Sélectionner...' },
+              ...villesList.map((v: any) => ({ value: v.id, label: v.nom })),
+            ]}
           />
         </div>
 

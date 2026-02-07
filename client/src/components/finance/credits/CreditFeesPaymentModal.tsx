@@ -35,21 +35,21 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
 
   // Calculer le montant des frais
   const feeAmount = useMemo(() => {
-    if (demande.montant_frais_engagement) {
-      return parseFloat(demande.montant_frais_engagement);
+    if (demande.montantFraisEngagement) {
+      return parseFloat(demande.montantFraisEngagement);
     }
-    if (demande.plan_credit?.frais_dossier) {
+    if (demande.planCredit?.fraisDossier) {
       return parseFloat(demande.plan_credit.frais_dossier);
     }
-    if (demande.frais_dossier) {
-      return parseFloat(demande.frais_dossier);
+    if (demande.fraisDossier) {
+      return parseFloat(demande.fraisDossier);
     }
-    return (demande.montant_demande || 0) * 0.10;
+    return (demande.montantDemande || 0) * 0.10;
   }, [demande]);
 
   const feeSource = useMemo(() => {
-    if (demande.montant_frais_engagement) return 'demande';
-    if (demande.plan_credit?.frais_dossier || demande.frais_dossier) return 'plan';
+    if (demande.montantFraisEngagement) return 'demande';
+    if (demande.planCredit?.fraisDossier || demande.fraisDossier) return 'plan';
     return 'calculated';
   }, [demande]);
 
@@ -192,9 +192,9 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
   }, [step, hasPinConfigured]);
 
   const handleSelectCaisse = (caisse: any) => {
-    if (caisse.active_session) {
+    if (caisse.activeSession) {
       // Caisse already open - take control directly
-      setTakenSession(caisse.active_session);
+      setTakenSession(caisse.activeSession);
       setStep('payment');
       toast.success(`Caisse "${caisse.nom}" sélectionnée`);
     } else {
@@ -286,7 +286,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
       const result = await sessionCaisseApi.openDirect({
         caisseId: selectedCaisse.id,
         agenceId: demande.clients?.agenceId,
-        observations: `Ouverture pour paiement frais - ${demande.numero_demande}`,
+        observations: `Ouverture pour paiement frais - ${demande.numeroDemande}`,
         ...(accessCodeValidated && { supervisorOverride: true }),
       });
 
@@ -387,7 +387,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-white">Frais d'Engagement</h2>
-                    <p className="text-[10px] text-emerald-300/70">{demande.numero_demande}</p>
+                    <p className="text-[10px] text-emerald-300/70">{demande.numeroDemande}</p>
                   </div>
                 </div>
               </div>
@@ -406,7 +406,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate">{clientName}</p>
-                <p className="text-[10px] text-slate-400">Crédit: {formatMoney(demande.montant_demande)}</p>
+                <p className="text-[10px] text-slate-400">Crédit: {formatMoney(demande.montantDemande)}</p>
               </div>
               <Badge value={clientAgence} variant="neutral" className="text-[9px]" />
             </div>
@@ -450,22 +450,22 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                         >
                           <div className="flex items-center gap-2.5">
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                              c.active_session ? 'bg-emerald-500/20' : 'bg-slate-700/50'
+                              c.activeSession ? 'bg-emerald-500/20' : 'bg-slate-700/50'
                             }`}>
-                              <CreditCard size={14} className={c.active_session ? 'text-emerald-400' : 'text-slate-500'} />
+                              <CreditCard size={14} className={c.activeSession ? 'text-emerald-400' : 'text-slate-500'} />
                             </div>
                             <div>
                               <p className="text-sm font-medium text-white">{c.nom}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className={`w-1.5 h-1.5 rounded-full ${c.active_session ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-                                <span className={`text-[10px] ${c.active_session ? 'text-emerald-400' : 'text-slate-500'}`}>
-                                  {c.active_session ? 'Ouverte' : 'Fermée'}
+                                <span className={`w-1.5 h-1.5 rounded-full ${c.activeSession ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                                <span className={`text-[10px] ${c.activeSession ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                  {c.activeSession ? 'Ouverte' : 'Fermée'}
                                 </span>
-                                {c.active_session?.caissier_nom && (
-                                  <span className="text-[10px] text-slate-500">• {c.active_session.caissier_nom}</span>
+                                {c.activeSession?.caissierNom && (
+                                  <span className="text-[10px] text-slate-500">• {c.activeSession.caissierNom}</span>
                                 )}
                                 {/* Afficher le solde reporté pour les caisses fermées */}
-                                {!c.active_session && lastKnownBalance > 0 && (
+                                {!c.activeSession && lastKnownBalance > 0 && (
                                   <span className="text-[10px] text-cyan-400 font-medium">
                                     • Solde: {formatMoney(lastKnownBalance)}
                                   </span>
@@ -711,7 +711,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                   <div className="flex items-center gap-2">
                     <CheckCircle size={14} className="text-emerald-400" />
                     <span className="text-xs text-emerald-300">
-                      Caisse: <span className="font-semibold text-white">{activeSession?.caisse_nom || 'Ma Caisse'}</span>
+                      Caisse: <span className="font-semibold text-white">{activeSession?.caisseNom || 'Ma Caisse'}</span>
                     </span>
                   </div>
                   {isAdmin && (
@@ -883,7 +883,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                   </div>
                   <div className="flex justify-between items-center p-3">
                     <span className="text-xs text-slate-400">Référence</span>
-                    <span className="text-sm font-mono text-slate-300">{demande.numero_demande}</span>
+                    <span className="text-sm font-mono text-slate-300">{demande.numeroDemande}</span>
                   </div>
                   <div className="flex justify-between items-center p-3">
                     <span className="text-xs text-slate-400">Mode de paiement</span>
@@ -898,7 +898,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                   )}
                   <div className="flex justify-between items-center p-3">
                     <span className="text-xs text-slate-400">Caisse</span>
-                    <span className="text-sm font-medium text-emerald-400">{activeSession?.caisse_nom}</span>
+                    <span className="text-sm font-medium text-emerald-400">{activeSession?.caisseNom}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-emerald-500/5">
                     <span className="text-sm font-semibold text-white">Total à encaisser</span>
@@ -957,8 +957,8 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
           onClose={handleSuccessClose}
           data={{
             title: 'Reçu de Paiement',
-            reference: paidFacture.numero || `FRAIS-${demande.numero_demande}`,
-            date: paidFacture.date_facture || new Date(),
+            reference: paidFacture.numero || `FRAIS-${demande.numeroDemande}`,
+            date: paidFacture.dateFacture || new Date(),
             type: 'Frais d\'Engagement',
             client: demande.clients ? {
               nom: demande.clients.nom || '',
@@ -966,13 +966,13 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
               telephone: demande.clients.phone || demande.clients.telephone,
             } : undefined,
             items: [{
-              description: `Frais d'engagement - Demande de crédit N° ${demande.numero_demande}`,
-              montant: parseFloat(paidFacture.montant_total || feeAmount),
+              description: `Frais d'engagement - Demande de crédit N° ${demande.numeroDemande}`,
+              montant: parseFloat(paidFacture.montantTotal || feeAmount),
             }],
-            total: parseFloat(paidFacture.montant_total || feeAmount),
+            total: parseFloat(paidFacture.montantTotal || feeAmount),
             modePaiement: getMethodLabel(),
             devise: 'FCFA',
-            notes: `Demande de crédit: ${formatMoney(demande.montant_demande)}`,
+            notes: `Demande de crédit: ${formatMoney(demande.montantDemande)}`,
           } as ReceiptData}
         />
       )}

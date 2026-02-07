@@ -319,6 +319,8 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "PAYROLL_PAYMENT",
   "SALARY_ADVANCE",
   "FINANCIAL_PENALTY",
+  // Primes prospection
+  "PROSPECTION_PRIME",
   // Opérations diverses
   "MISC_COLLECTION",
   "MISC_DISBURSEMENT",

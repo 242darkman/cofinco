@@ -24,7 +24,7 @@ export function useCreditStats() {
       return norm === StatutCredit.ACTIVE;
     }).length,
     creditsTotal: credits.length,
-    creditsEnRetard: credits.filter(c => c.jours_retard > 0).length,
+    creditsEnRetard: credits.filter(c => c.joursRetard > 0).length,
 
     demandesEnAttente: demandes.filter(d => {
       const norm = normalizeDemande(d.statut);
@@ -48,21 +48,21 @@ export function useCreditStats() {
     montantTotalCredits: credits.filter(c => {
       const norm = normalizeCredit(c.statut);
       return norm === StatutCredit.ACTIVE || norm === StatutCredit.LATE || norm === StatutCredit.PAID || norm === StatutCredit.CLOSED;
-    }).reduce((sum, c) => sum + (c.montant_principal || 0), 0),
-    montantTotalDemandes: demandes.reduce((sum, d) => sum + (d.montant_demande || 0), 0),
+    }).reduce((sum, c) => sum + (c.montantPrincipal || 0), 0),
+    montantTotalDemandes: demandes.reduce((sum, d) => sum + (d.montantDemande || 0), 0),
     montantDemandesEnAttente: demandes.filter(d => {
       const norm = normalizeDemande(d.statut);
       return norm === StatutDemande.PENDING_FEES;
-    }).reduce((sum, d) => sum + (d.montant_demande || 0), 0),
+    }).reduce((sum, d) => sum + (d.montantDemande || 0), 0),
     montantDemandesAccorde: demandes.filter(d => {
       const norm = normalizeDemande(d.statut);
       return norm === StatutDemande.APPROVED || norm === StatutDemande.DISBURSED;
-    }).reduce((sum, d) => sum + (d.montant_demande || 0), 0),
+    }).reduce((sum, d) => sum + (d.montantDemande || 0), 0),
     montantDemandesRejete: demandes.filter(d => {
       const norm = normalizeDemande(d.statut);
       return norm === StatutDemande.REJECTED || norm === StatutDemande.DEFINITIVELY_REJECTED;
-    }).reduce((sum, d) => sum + (d.montant_demande || 0), 0),
-    montantTotalEnquetes: enquetes.reduce((sum, e) => sum + (e.montant_demande || 0), 0)
+    }).reduce((sum, d) => sum + (d.montantDemande || 0), 0),
+    montantTotalEnquetes: enquetes.reduce((sum, e) => sum + (e.montantDemande || 0), 0)
   };
 
   return stats;

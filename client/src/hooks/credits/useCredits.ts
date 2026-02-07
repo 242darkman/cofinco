@@ -6,23 +6,23 @@ import { creditKeys } from '../../lib/query-keys';
 
 export interface Credit {
   id: string;
-  numero_credit: string;
-  client_id: string;
-  montant_principal: number;
-  taux_interet: number;
-  duree_mois: number;
-  montant_total: number;
-  montant_echeance: number;
-  date_deblocage: string;
+  numeroCredit: string;
+  clientId: string;
+  montantPrincipal: number;
+  tauxInteret: number;
+  dureeMois: number;
+  montantTotal: number;
+  montantEcheance: number;
+  dateDeblocage: string;
   statut: string;
-  nombre_echeances_payees: number;
-  nombre_echeances_total: number;
-  jours_retard: number;
-  type_credit: string | null;
+  nombreEcheancesPayees: number;
+  nombreEcheancesTotal: number;
+  joursRetard: number;
+  typeCredit: string | null;
   clients?: {
     nom: string;
     phone: string;
-    photo_url?: string;
+    photoUrl?: string;
   };
 }
 
@@ -72,15 +72,15 @@ export function useCredits() {
 
   const getActiveCredits = () => credits.filter(c => c.statut === StatutCredit.ACTIVE);
   
-  const getCreditsEnRetard = () => credits.filter(c => c.jours_retard && c.jours_retard > 0);
+  const getCreditsEnRetard = () => credits.filter(c => c.joursRetard && c.joursRetard > 0);
 
-  const getCreditsByClient = (clientId: string) => credits.filter(c => c.client_id === clientId);
+  const getCreditsByClient = (clientId: string) => credits.filter(c => c.clientId === clientId);
 
   const searchCredits = (term: string) => {
     if (!term) return credits;
     const lower = term.toLowerCase();
-    return credits.filter(c => 
-      c.numero_credit.toLowerCase().includes(lower) ||
+    return credits.filter(c =>
+      c.numeroCredit.toLowerCase().includes(lower) ||
       c.clients?.nom.toLowerCase().includes(lower) ||
       c.clients?.phone?.includes(term)
     );

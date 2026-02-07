@@ -4,7 +4,7 @@ import { storage } from "../storage";
 
 const logger = createLogger('Routes:Accounting');
 import { insertJournalSchema, insertDeclarationTvaSchema } from "@shared/schema";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep, toHttpError, getErrorMessage, manualEntrySchema } from "./utils";
+import { normalizeKeysDeep, toHttpError, getErrorMessage, manualEntrySchema } from "./utils";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -35,19 +35,19 @@ export function registerAccountingRoutes(app: Express) {
   // 1. Plan Comptable (roles: admin, chef, comptable)
   app.get("/api/comptabilite/comptes", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const comptes = await storage.getAllComptesComptables();
-    res.json(addSnakeCaseAliasesDeep(comptes));
+    res.json(comptes);
   });
 
   app.get("/api/comptabilite/plan-ohada", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     // Return accounts with real-time calculated balances
     const comptes = await storage.getAllComptesComptablesWithBalances();
-    res.json(addSnakeCaseAliasesDeep(comptes));
+    res.json(comptes);
   });
 
   // 2. Journaux (roles: admin, chef, comptable)
   app.get("/api/comptabilite/journaux", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const journaux = await storage.getAllJournaux();
-    res.json(addSnakeCaseAliasesDeep(journaux));
+    res.json(journaux);
   });
 
   // Create journal (roles: admin, comptable)
@@ -62,7 +62,7 @@ export function registerAccountingRoutes(app: Express) {
           wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'journal_new', id: journal.id } });
       }
 
-      res.json(addSnakeCaseAliasesDeep(journal));
+      res.json(journal);
     } catch (error: unknown) {
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
@@ -72,7 +72,7 @@ export function registerAccountingRoutes(app: Express) {
   // 3. TVA (roles: admin, chef, comptable)
   app.get("/api/comptabilite/declarations-tva", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const declarations = await storage.getDeclarationsTva();
-    res.json(addSnakeCaseAliasesDeep(declarations));
+    res.json(declarations);
   });
 
   // Create déclaration TVA (roles: admin, comptable)
@@ -87,7 +87,7 @@ export function registerAccountingRoutes(app: Express) {
           wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'tva_new', id: declaration.id } });
       }
 
-      res.json(addSnakeCaseAliasesDeep(declaration));
+      res.json(declaration);
     } catch (error: unknown) {
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
@@ -97,7 +97,7 @@ export function registerAccountingRoutes(app: Express) {
   // 4. Stats Journaux (roles: admin, chef, comptable)
   app.get("/api/comptabilite/journaux-stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const stats = await storage.getJournauxStats();
-    res.json(addSnakeCaseAliasesDeep(stats));
+    res.json(stats);
   });
 
   // 5. Compte de Résultat (roles: admin, chef, comptable)
@@ -165,7 +165,7 @@ export function registerAccountingRoutes(app: Express) {
         dateFin
       });
 
-      res.json(addSnakeCaseAliasesDeep(entries));
+      res.json(entries);
     } catch (error: unknown) {
       logger.error({ err: error }, 'Erreur écritures journal');
       const err = toHttpError(error);
@@ -418,7 +418,7 @@ export function registerAccountingRoutes(app: Express) {
         .where(and(eq(glPeriods.agenceId, agenceId), eq(glPeriods.year, year)))
         .orderBy(asc(glPeriods.month));
 
-      res.json(addSnakeCaseAliasesDeep(periods));
+      res.json(periods);
     } catch (error: unknown) {
       logger.error({ err: error }, 'Erreur récupération périodes');
       const err = toHttpError(error);
@@ -555,9 +555,9 @@ export function registerAccountingRoutes(app: Express) {
       const totalCredit = lines.reduce((sum, l) => sum + parseFloat(l.credit), 0);
 
       res.json({
-        ...(addSnakeCaseAliasesDeep(entry) as Record<string, unknown>),
-        journal: journal ? addSnakeCaseAliasesDeep(journal) : null,
-        lignes: addSnakeCaseAliasesDeep(lines),
+        ...(entry as Record<string, unknown>),
+        journal: journal ? journal : null,
+        lignes: lines,
         total_debit: totalDebit,
         total_credit: totalCredit,
         is_balanced: Math.abs(totalDebit - totalCredit) < 0.01
@@ -651,7 +651,7 @@ export function registerAccountingRoutes(app: Express) {
         .limit(pageSize)
         .offset(offset);
 
-      res.json(addSnakeCaseAliasesDeep(entries));
+      res.json(entries);
     } catch (error: unknown) {
       logger.error({ err: error }, 'Erreur récupération écritures par source');
       const err = toHttpError(error);

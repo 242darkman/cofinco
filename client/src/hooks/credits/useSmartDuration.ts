@@ -21,15 +21,10 @@ interface CreditPlan {
   id?: string;
   nom?: string;
   dureeValeur?: number;
-  duree_valeur?: number;
   dureeUnite?: string;
-  duree_unite?: string;
   montantMin?: number;
-  montant_min?: number;
   montantMax?: number;
-  montant_max?: number;
   tauxInteret?: number;
-  taux_interet?: number;
 }
 
 /**
@@ -96,9 +91,9 @@ export function useSmartDuration({
    * Generate suggested durations based on plan or amount
    */
   const suggestedDurations = useMemo<DurationOption[]>(() => {
-    // Get plan duration values (normalized for snake_case vs camelCase)
-    const planDuration = selectedPlan?.dureeValeur || selectedPlan?.duree_valeur;
-    const rawPlanUnit = selectedPlan?.dureeUnite || selectedPlan?.duree_unite;
+    // Get plan duration values
+    const planDuration = selectedPlan?.dureeValeur;
+    const rawPlanUnit = selectedPlan?.dureeUnite;
     // Normalize the unit to EN values
     const planUnit = rawPlanUnit ? normalizeUnit(rawPlanUnit) as 'MONTH' | 'DAY' | 'WEEK' : undefined;
 
@@ -215,8 +210,8 @@ export function useSmartDuration({
 
       // 2. Validate against plan limits if a plan is selected
       if (selectedPlan) {
-        const planDuration = selectedPlan.dureeValeur || selectedPlan.duree_valeur;
-        const rawPlanUnit = selectedPlan.dureeUnite || selectedPlan.duree_unite;
+        const planDuration = selectedPlan.dureeValeur;
+        const rawPlanUnit = selectedPlan.dureeUnite;
         const planUnit = rawPlanUnit ? normalizeUnit(rawPlanUnit) : null;
 
         if (planDuration && planUnit) {

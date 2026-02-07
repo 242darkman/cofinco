@@ -17,14 +17,14 @@ import {
 
 interface TontineAlerte {
   id: string;
-  tontine_id: string;
-  membre_id: string | null;
-  type_alerte: string;
+  tontineId: string;
+  membreId: string | null;
+  typeAlerte: string;
   priorite: string;
   message: string;
   statut: string;
-  created_at: string;
-  tontine_membres?: {
+  createdAt: string;
+  tontineMembres?: {
     clients: {
       nom: string;
     };
@@ -189,27 +189,27 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
                       isAlertHigh(alerte.priorite) ? 'bg-amber-500/20 text-amber-400' :
                       'bg-cyan-500/20 text-cyan-400'}
                 `}>
-                  {getTypeIcon(alerte.type_alerte)}
+                  {getTypeIcon(alerte.typeAlerte)}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div>
                         <div className="flex items-center gap-2">
-                             <span className="font-bold text-white text-sm">{getTypeLabel(alerte.type_alerte)}</span>
+                             <span className="font-bold text-white text-sm">{getTypeLabel(alerte.typeAlerte)}</span>
                              <Badge variant={getPrioriteVariant(alerte.priorite)} value={getPrioriteLabel(alerte.priorite)} className="text-[10px] py-0" />
                         </div>
                         <p className="text-sm text-slate-300 mt-1">{alerte.message}</p>
                     </div>
                     <span className="text-[10px] text-slate-500 whitespace-nowrap">
-                       {new Date(alerte.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                       {new Date(alerte.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                     </span>
                   </div>
 
-                  {alerte.tontine_membres && (
+                  {alerte.tontineMembres && (
                     <div className="text-xs text-slate-500 mt-2 flex items-center gap-1">
                         <span>Membre:</span>
-                        <span className="text-slate-300 font-medium">{alerte.tontine_membres.clients.nom}</span>
+                        <span className="text-slate-300 font-medium">{alerte.tontineMembres.clients.nom}</span>
                     </div>
                   )}
 

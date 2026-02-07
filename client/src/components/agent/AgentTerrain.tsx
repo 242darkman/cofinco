@@ -37,9 +37,9 @@ interface Transaction {
 
 interface PlanningEntry {
   id: string;
-  heure_debut: string;
-  heure_fin: string;
-  type_activite: string;
+  heureDebut: string;
+  heureFin: string;
+  typeActivite: string;
   zone: string;
   statut: string;
 }
@@ -226,9 +226,9 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       kpiState.planningToday = plans.length;
       setTodayPlannings(plans.slice(0, 5).map((p: any) => ({
         id: p.id,
-        heure_debut: p.heure_debut || p.heureDebut || '08:00',
-        heure_fin: p.heure_fin || p.heureFin || '17:00',
-        type_activite: p.type_activite || p.typeActivite || 'Visite',
+        heureDebut: p.heureDebut || '08:00',
+        heureFin: p.heureFin || '17:00',
+        typeActivite: p.typeActivite || 'Visite',
         zone: p.zone || '',
         statut: p.statut || 'PLANNED',
       })));
@@ -551,17 +551,17 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   {todayPlannings.map(p => (
                     <div key={p.id} className="flex items-center gap-2.5 px-3 py-2">
                       <div className="text-[10px] font-mono font-bold text-slate-500 w-10 shrink-0">
-                        {p.heure_debut}
+                        {p.heureDebut}
                       </div>
                       <div className={`w-1 h-6 rounded-full shrink-0 ${
-                        p.type_activite === 'Visite' ? 'bg-blue-500' :
-                        p.type_activite === 'Collecte' ? 'bg-emerald-500' :
-                        p.type_activite === 'Prospection' ? 'bg-violet-500' :
+                        p.typeActivite === 'Visite' ? 'bg-blue-500' :
+                        p.typeActivite === 'Collecte' ? 'bg-emerald-500' :
+                        p.typeActivite === 'Prospection' ? 'bg-violet-500' :
                         'bg-slate-600'
                       }`} />
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-semibold text-white truncate">
-                          {p.type_activite}
+                          {p.typeActivite}
                         </div>
                         {p.zone && (
                           <div className="text-[10px] text-slate-500 flex items-center gap-1 truncate">

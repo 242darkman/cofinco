@@ -30,7 +30,7 @@ export interface TransactionDetails {
   reference: string;
   amount: number;
   type: string;
-  type_operation?: string;
+  typeOperation?: string;
   status: 'Succès' | 'Échec' | 'En attente' | 'Annulé' | 'completed' | 'pending' | 'failed' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'CANCELLED' | string;
   date: string | Date;
   client?: {
@@ -50,7 +50,7 @@ export interface TransactionDetails {
   description?: string;
   metadata?: Record<string, any>;
   agent?: string;
-  mode_paiement?: string;
+  modePaiement?: string;
   agence?: string;
 }
 
@@ -236,7 +236,7 @@ const DrawerContent = React.memo(function DrawerContent({
         {/* Transaction Type */}
         <p className="text-lg font-medium text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 mb-6">
           {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
-          {getStatusLabel(transaction.type_operation || transaction.type, ALL_STATUS_LABELS)}
+          {getStatusLabel(transaction.typeOperation || transaction.type, ALL_STATUS_LABELS)}
         </p>
 
         {/* Reference (Copyable) */}
@@ -323,7 +323,7 @@ const DrawerContent = React.memo(function DrawerContent({
               />
               <DetailRow
                 label="Mode de paiement"
-                value={transaction.mode_paiement || 'Espèces'}
+                value={transaction.modePaiement || 'Espèces'}
                 icon={<CreditCard size={14} className="text-slate-400" />}
               />
               <DetailRow
@@ -358,7 +358,7 @@ const DrawerContent = React.memo(function DrawerContent({
                     Transaction échouée
                   </p>
                   <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
-                    {transaction.metadata?.error_message || 'Une erreur est survenue lors du traitement de cette transaction.'}
+                    {transaction.metadata?.errorMessage || 'Une erreur est survenue lors du traitement de cette transaction.'}
                   </p>
                 </div>
               </div>
@@ -414,7 +414,7 @@ export default function TransactionDetailDrawer({
     const clientNom = clientNameParts[0];
     const clientPrenom = clientNameParts.slice(1).join(' ');
 
-    const typeLabel = getStatusLabel(transaction.type_operation || transaction.type, ALL_STATUS_LABELS);
+    const typeLabel = getStatusLabel(transaction.typeOperation || transaction.type, ALL_STATUS_LABELS);
 
     return {
       title: `Reçu - ${typeLabel}`,
@@ -441,7 +441,7 @@ export default function TransactionDetailDrawer({
       ],
       total: transaction.amount,
       devise: 'FCFA',
-      modePaiement: transaction.mode_paiement || 'Espèces',
+      modePaiement: transaction.modePaiement || 'Espèces',
     };
   }, [transaction]);
 
@@ -466,7 +466,7 @@ export default function TransactionDetailDrawer({
   // Don't render if no transaction and closed
   if (!transaction || !isOpen || !receiptData) return null;
 
-  const isCredit = isEntree(transaction.type_operation || transaction.type || '');
+  const isCredit = isEntree(transaction.typeOperation || transaction.type || '');
   const statusConfig = getStatusConfig(transaction.status || 'Succès');
   const isTransfer = !!(transaction.source && transaction.destination);
   const showError = normalizeStatus(transaction.status || '') === 'Échec';

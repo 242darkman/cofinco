@@ -4,12 +4,12 @@ import { addPdfLogoHeader } from '../lib/pdf-logo';
 import { loadPDFLibraries } from '../lib/lazy-export';
 
 export interface UserActivity {
-  user_id: string;
-  user_email: string;
-  total_actions: number;
-  modules_used: number;
-  last_activity: string;
-  activity_date: string;
+  userId: string;
+  userEmail: string;
+  totalActions: number;
+  modulesUsed: number;
+  lastActivity: string;
+  activityDate: string;
 }
 
 export interface ActivityStats {
@@ -66,10 +66,10 @@ export function useUserActivity() {
       const data = await res.json();
 
       if (data) {
-        const uniqueUsers = new Set(data.map((a: { user_id: string }) => a.user_id)).size;
+        const uniqueUsers = new Set(data.map((a: { userId: string }) => a.userId)).size;
         const today = new Date().toISOString().split('T')[0];
         const activeToday = new Set(
-          data.filter((a: { timestamp: string }) => a.timestamp?.startsWith(today)).map((a: { user_id: string }) => a.user_id)
+          data.filter((a: { timestamp: string }) => a.timestamp?.startsWith(today)).map((a: { userId: string }) => a.userId)
         ).size;
 
         setStats({
@@ -97,7 +97,7 @@ export function useUserActivity() {
     csvContent += `N°${separator}Utilisateur${separator}Actions${separator}Modules${separator}Dernière Activité${separator}Date\n`;
     
     activities.forEach((act, idx) => {
-      csvContent += `${idx + 1}${separator}${act.user_email || 'N/A'}${separator}${act.total_actions}${separator}${act.modules_used}${separator}${act.last_activity ? new Date(act.last_activity).toLocaleString('fr-FR') : '-'}${separator}${act.activity_date || '-'}\n`;
+      csvContent += `${idx + 1}${separator}${act.userEmail || 'N/A'}${separator}${act.totalActions}${separator}${act.modulesUsed}${separator}${act.lastActivity ? new Date(act.lastActivity).toLocaleString('fr-FR') : '-'}${separator}${act.activityDate || '-'}\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -123,10 +123,10 @@ export function useUserActivity() {
 
     const tableData = activities.slice(0, 50).map((act, idx) => [
       idx + 1,
-      act.user_email || 'N/A',
-      act.total_actions,
-      act.modules_used,
-      act.activity_date || '-'
+      act.userEmail || 'N/A',
+      act.totalActions,
+      act.modulesUsed,
+      act.activityDate || '-'
     ]);
 
     autoTable(doc, {
@@ -147,11 +147,11 @@ export function useUserActivity() {
       dateExport: new Date().toISOString(),
       statistiques: stats,
       activites: activities.map(act => ({
-        utilisateur: act.user_email,
-        actions: act.total_actions,
-        modules: act.modules_used,
-        derniereActivite: act.last_activity,
-        date: act.activity_date
+        utilisateur: act.userEmail,
+        actions: act.totalActions,
+        modules: act.modulesUsed,
+        derniereActivite: act.lastActivity,
+        date: act.activityDate
       }))
     };
     

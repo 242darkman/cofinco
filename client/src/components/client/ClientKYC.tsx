@@ -59,16 +59,15 @@ const translateDocumentType = (docType: string): string => {
 
 interface ClientDocument {
   id: string;
-  client_id: string;
-  document_type: 'ID Card' | 'Passport' | 'Contract' | 'Photo' | 'Other' | 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PROOF_OF_ADDRESS' | 'AVATAR' | 'OTHER';
-  document_name: string;
-  document_url: string;
-  owner_id?: string;
+  clientId: string;
+  documentType: 'ID Card' | 'Passport' | 'Contract' | 'Photo' | 'Other' | 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PROOF_OF_ADDRESS' | 'AVATAR' | 'OTHER';
+  documentName: string;
+  documentUrl: string;
   ownerId?: string;
   notes?: string;
   status: 'pending' | 'verified' | 'rejected';
-  verified_at?: string;
-  created_at: string;
+  verifiedAt?: string;
+  createdAt: string;
 }
 
 interface ClientKYCProps {
@@ -94,7 +93,7 @@ function KycDocumentCard({
   getStatusIcon
 }: KycDocumentCardProps) {
   // Normalize the URL first to fix any malformed double-prefix URLs
-  const normalizedDocUrl = normalizeDocumentUrl(doc.document_url);
+  const normalizedDocUrl = normalizeDocumentUrl(doc.documentUrl);
 
   // Déterminer si l'URL est directement utilisable (http/https ou data:)
   const hasDirectUrl = Boolean(normalizedDocUrl && isDirectUrl(normalizedDocUrl));
@@ -107,7 +106,7 @@ function KycDocumentCard({
   const [refreshAttempted, setRefreshAttempted] = useState(false);
 
   // Résoudre l'URL finale : URL directe si disponible, sinon URL signée
-  // Ne jamais utiliser doc.document_url si c'est une clé MinIO (ne commence pas par http/data)
+  // Ne jamais utiliser doc.documentUrl si c'est une clé MinIO (ne commence pas par http/data)
   const resolvedUrl = hasDirectUrl ? normalizedDocUrl : signedUrl;
   const showSkeleton = needsSignedUrl && isLoading;
 
@@ -129,7 +128,7 @@ function KycDocumentCard({
             ) : resolvedUrl && isImage(resolvedUrl) ? (
               <img
                 src={resolvedUrl}
-                alt={doc.document_name}
+                alt={doc.documentName}
                 className="w-full h-full object-cover"
                 onError={handleImageError}
               />
@@ -138,11 +137,11 @@ function KycDocumentCard({
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-white text-sm truncate pr-2">{doc.document_name}</p>
+            <p className="font-semibold text-white text-sm truncate pr-2">{doc.documentName}</p>
             <div className="flex items-center gap-2 mt-1">
-              <Badge value={translateDocumentType(doc.document_type)} size="sm" variant="neutral" />
+              <Badge value={translateDocumentType(doc.documentType)} size="sm" variant="neutral" />
               <span className="text-[10px] text-slate-500">
-                {new Date(doc.created_at).toLocaleDateString()}
+                {new Date(doc.createdAt).toLocaleDateString()}
               </span>
             </div>
           </div>
@@ -252,7 +251,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
 
       // Si pas de documents mais photoUrl existe, parser le format legacy
       if (clientDocs.length === 0) {
-        const photoUrlField = client.photoUrl || client.photo_url;
+        const photoUrlField = client.photoUrl;
         if (photoUrlField) {
           try {
             const parsed = JSON.parse(photoUrlField);
@@ -263,12 +262,12 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                   // URL simple - convertir en document
                   return {
                     id: `legacy-${index}-${Date.now()}`,
-                    client_id: clientId,
-                    document_type: 'ID Card' as const,
-                    document_name: `Document ${index + 1}`,
-                    document_url: item,
+                    clientId: clientId,
+                    documentType: 'ID Card' as const,
+                    documentName: `Document ${index + 1}`,
+                    documentUrl: item,
                     status: 'pending' as const,
-                    created_at: client.created_at || new Date().toISOString()
+                    createdAt: client.createdAt || new Date().toISOString()
                   };
                 }
                 // Déjà un objet document
@@ -280,12 +279,12 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
             if (photoUrlField.startsWith('data:') || photoUrlField.startsWith('http')) {
               clientDocs = [{
                 id: `legacy-0-${Date.now()}`,
-                client_id: clientId,
-                document_type: 'ID Card' as const,
-                document_name: 'Pièce d\'identité',
-                document_url: photoUrlField,
+                clientId: clientId,
+                documentType: 'ID Card' as const,
+                documentName: 'Pièce d\'identité',
+                documentUrl: photoUrlField,
                 status: 'pending' as const,
-                created_at: client.created_at || new Date().toISOString()
+                createdAt: client.createdAt || new Date().toISOString()
               }];
             }
           }
@@ -294,12 +293,12 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
 
       // Filter out AVATAR documents - they don't need KYC validation
       clientDocs = clientDocs.filter((doc: any) => {
-        const docType = doc.document_type || doc.documentType;
+        const docType = doc.documentType;
         return docType !== 'AVATAR' && docType !== 'Avatar';
       });
 
       setDocuments(clientDocs.sort((a: ClientDocument, b: ClientDocument) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ));
     } catch (error) {
       console.error('Erreur chargement documents:', error);
@@ -317,17 +316,17 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
       if (!res.ok) throw new Error('Erreur chargement client');
       const client = await res.json();
 
-      const ownerId = client.user_id || client.userId || undefined;
+      const ownerId = client.userId || undefined;
       const newDocData: ClientDocument = {
         id: crypto.randomUUID(),
-        client_id: clientId,
-        document_type: newDoc.type,
-        document_name: newDoc.name,
-        document_url: newDoc.url,
-        owner_id: ownerId,
+        clientId: clientId,
+        documentType: newDoc.type,
+        documentName: newDoc.name,
+        documentUrl: newDoc.url,
+        ownerId: ownerId,
         notes: newDoc.notes,
         status: 'pending',
-        created_at: new Date().toISOString()
+        createdAt: new Date().toISOString()
       };
       
       const updatedDocs = [newDocData, ...(client.documents || [])];

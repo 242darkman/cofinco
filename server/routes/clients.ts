@@ -24,7 +24,7 @@ import { Actions, Subjects } from "@shared/ability";
 import { SystemRole } from "@shared/types/roles"; // Still needed for role checks in some logic
 import { requireAgenceAccess, validateAgenceAction, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
+import { normalizeKeysDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
 import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
@@ -141,7 +141,7 @@ export function registerClientRoutes(app: Express) {
       logger.debug({ total, page, perPage }, 'Eligible clients fetched (SQL pagination)');
 
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(eligibleClients) as unknown[], total, page, perPage, {
+        paginateResponse(eligibleClients as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
           filters: agenceFilter || {},
@@ -164,7 +164,7 @@ export function registerClientRoutes(app: Express) {
       const { page, perPage } = parsePagination(req.query);
       const { data, total } = await storage.getClientsPaginated(filter, page, perPage);
 
-      const transformed = addSnakeCaseAliasesDeep(data) as unknown[];
+      const transformed = data as unknown[];
       res.json(
         paginateResponse(transformed, total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
@@ -304,7 +304,7 @@ export function registerClientRoutes(app: Express) {
         logger.debug({ total, page, perPage, query: normalizedQuery }, 'Search results (SQL pagination)');
 
         res.json(
-          paginateResponse(addSnakeCaseAliasesDeep(enrichedResults) as unknown[], total, page, perPage, {
+          paginateResponse(enrichedResults as unknown[], total, page, perPage, {
             path: `${req.baseUrl}${req.path}`,
             query: req.query,
             filters: { q: query },
@@ -327,7 +327,7 @@ export function registerClientRoutes(app: Express) {
       const total = withLoc.length;
       const paged = withLoc.slice(offset, offset + perPage);
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
+        paginateResponse(paged as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
           filters: filter,
@@ -593,7 +593,7 @@ export function registerClientRoutes(app: Express) {
     const usedMonth = sum(withdrawalsMonth);
 
     const result = {
-      ...(addSnakeCaseAliasesDeep(client) as any),
+      ...(client as any),
       security_limits: {
         daily: {
           limit: Number(client.limiteRetraitJournalier),
@@ -636,7 +636,7 @@ export function registerClientRoutes(app: Express) {
       // Get all accounts for this client
       const comptes = await getComptesByClient(req.params.id);
       
-      res.json(addSnakeCaseAliasesDeep(comptes));
+      res.json(comptes);
     } catch (error) {
       logger.error({ err: error }, 'Error fetching client comptes');
       res.status(500).json({ message: "Erreur lors de la récupération des comptes" });
@@ -1033,11 +1033,11 @@ export function registerClientRoutes(app: Express) {
             });
         }
 
-        res.status(201).json(addSnakeCaseAliasesDeep({
+        res.status(201).json({
             ...client,
             agence_nom: agenceNom,
             type_marche_nom: 'Standard' // Default for now, or fetch if needed
-        }));
+        });
       } catch (e) {
         // Cleanup temp files if creation failed (not on validation errors)
         if (!(e instanceof z.ZodError)) {
@@ -1140,7 +1140,7 @@ export function registerClientRoutes(app: Express) {
             wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { agenceId: client!.agenceId } });
         }
 
-        res.json(addSnakeCaseAliasesDeep(client));
+        res.json(client);
       } catch (e) {
           logger.error({ err: e }, 'Update client error');
           res.status(500).json({ message: "Update failed" });
@@ -1503,7 +1503,7 @@ export function registerClientRoutes(app: Express) {
       if (!client) {
         return res.json({ data: null, message: "Aucun profil client pour cet utilisateur" });
       }
-      res.json({ data: addSnakeCaseAliasesDeep(client) });
+      res.json({ data: client });
     } catch (error) {
       logger.error({ err: error }, 'Error fetching client by userId');
       res.status(500).json({ message: "Erreur lors de la récupération du client" });
@@ -1517,7 +1517,7 @@ export function registerClientRoutes(app: Express) {
       if (!client) {
         return res.status(404).json({ message: "Client non trouvé" });
       }
-      res.json(addSnakeCaseAliasesDeep(client));
+      res.json(client);
     } catch (error) {
       logger.error({ err: error }, 'Error fetching client with user');
       res.status(500).json({ message: "Erreur lors de la récupération du client" });
@@ -1601,7 +1601,7 @@ export function registerClientRoutes(app: Express) {
         "medium"
       );
 
-      res.status(201).json(addSnakeCaseAliasesDeep(result));
+      res.status(201).json(result);
 
     } catch (error) {
       logger.error({ err: error }, 'Error creating client with user');
@@ -1661,7 +1661,7 @@ export function registerClientRoutes(app: Express) {
         "medium"
       );
 
-      res.status(201).json(addSnakeCaseAliasesDeep(client));
+      res.status(201).json(client);
 
     } catch (error) {
       logger.error({ err: error }, 'Error creating client from user');

@@ -11,7 +11,7 @@ interface Alert {
   title: string;
   message: string;
   is_read: boolean;
-  created_at: string;
+  createdAt: string;
   metadata?: any;
 }
 
@@ -194,7 +194,7 @@ export default function AdminAlerts() {
                       </details>
                     )}
                     <div className="text-xs text-slate-400 mt-2">
-                      {formatTimeAgo(alert.created_at)}
+                      {formatTimeAgo(alert.createdAt)}
                     </div>
                   </div>
                 </div>

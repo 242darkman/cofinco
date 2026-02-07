@@ -4,7 +4,6 @@ import { storage } from "../storage";
 import { requireAuth } from "../auth";
 
 const logger = createLogger('Routes:Config');
-import { addSnakeCaseAliasesDeep } from "./utils";
 import {
   DEFAULT_DURATIONS_CONFIG,
   calculerNombreEcheances,
@@ -93,8 +92,8 @@ export function registerConfigRoutes(app: Express) {
       const recommandee = dureesWithLabels.find(d => d.estRecommandee === true) || dureesWithLabels[0] || null;
 
       res.json({
-        durees: addSnakeCaseAliasesDeep(dureesWithLabels),
-        recommandee: recommandee ? addSnakeCaseAliasesDeep(recommandee) : null,
+        durees: dureesWithLabels,
+        recommandee: recommandee ? recommandee : null,
         source: "database"
       });
     } catch (error) {

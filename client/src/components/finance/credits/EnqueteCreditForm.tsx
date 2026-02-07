@@ -13,7 +13,7 @@ import { StatutClient } from '@shared/enum/status-constants';
 interface Client {
   id: string;
   nom: string;
-  photo_url?: string;
+  photoUrl?: string;
   // Added GPS fields
   latitude?: string;
   longitude?: string;
@@ -666,8 +666,8 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               {selectedClient && (
                 <div className="mt-2 flex items-center gap-3 p-2 bg-slate-700/50 rounded-lg">
                   <div className="w-10 h-10 bg-slate-600 rounded-full flex items-center justify-center overflow-hidden border border-slate-500">
-                    {selectedClient.photo_url ? (
-                      <img src={selectedClient.photo_url} alt={selectedClient.nom} className="w-full h-full object-cover" />
+                    {selectedClient.photoUrl ? (
+                      <img src={selectedClient.photoUrl} alt={selectedClient.nom} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-sm font-bold text-white">{selectedClient.nom.charAt(0)}</span>
                     )}

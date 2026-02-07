@@ -181,7 +181,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     
     // 3. Enquête (Under Investigation)
     const stepEnquete = d.filter(i => i.statut === StatutDemande.UNDER_INVESTIGATION);
-    const overdueEnquete = stepEnquete.filter(i => new Date(i.updated_at || i.created_at || new Date().toISOString()) < sevenDaysAgo).length;
+    const overdueEnquete = stepEnquete.filter(i => new Date(i.updatedAt || i.createdAt || new Date().toISOString()) < sevenDaysAgo).length;
 
     // 4. Approbation (En cours d'approbation - enquête validée, attente décision comité)
     const stepComite = d.filter(i => i.statut === StatutDemande.PENDING_APPROVAL);
@@ -192,24 +192,24 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     return {
       demandes: { 
         count: stepDemande.length, 
-        amount: stepDemande.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0) 
+        amount: stepDemande.reduce((acc, curr) => acc + Number(curr.montantDemande || 0), 0) 
       },
       frais: { 
         count: stepFrais.length, 
-        amount: stepFrais.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0) 
+        amount: stepFrais.reduce((acc, curr) => acc + Number(curr.montantDemande || 0), 0) 
       },
       enquetes: { 
         count: stepEnquete.length, 
-        amount: stepEnquete.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0),
+        amount: stepEnquete.reduce((acc, curr) => acc + Number(curr.montantDemande || 0), 0),
         overdue: overdueEnquete
       },
       comite: { 
         count: stepComite.length, 
-        amount: stepComite.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0) 
+        amount: stepComite.reduce((acc, curr) => acc + Number(curr.montantDemande || 0), 0) 
       },
       decaissement: { 
         count: stepDecaissement.length, 
-        amount: stepDecaissement.reduce((acc, curr) => acc + Number(curr.montant_approuve || curr.montant_demande || 0), 0) 
+        amount: stepDecaissement.reduce((acc, curr) => acc + Number(curr.montantApprouve || curr.montantDemande || 0), 0) 
       }
     };
   }, [demandes.demandes]);
@@ -245,7 +245,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     // High Priority: En cours d'approbation & Overdue Investigations
     const high = d.filter(i =>
       i.statut === StatutDemande.PENDING_APPROVAL ||
-      (i.statut === StatutDemande.UNDER_INVESTIGATION && new Date(i.updated_at || i.created_at || new Date().toISOString()) < sevenDaysAgo)
+      (i.statut === StatutDemande.UNDER_INVESTIGATION && new Date(i.updatedAt || i.createdAt || new Date().toISOString()) < sevenDaysAgo)
     ).map(i => ({
       ...i,
       priority: 'high',
@@ -254,7 +254,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
     // Medium: Enquêtes en cours (On time) & Approved waiting for disbursement
     const medium = d.filter(i => 
-      (i.statut === StatutDemande.UNDER_INVESTIGATION && new Date(i.updated_at || i.created_at || new Date().toISOString()) >= sevenDaysAgo) ||
+      (i.statut === StatutDemande.UNDER_INVESTIGATION && new Date(i.updatedAt || i.createdAt || new Date().toISOString()) >= sevenDaysAgo) ||
       i.statut === StatutDemande.READY_FOR_INVESTIGATION
     ).map(i => ({ 
       ...i, 
@@ -320,7 +320,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const renderClientName = (item: any) => {
     const client = item.clients || item.client;
     const name = formatClientName(client?.nom, client?.prenom) || 'Client Inconnu';
-    const photoUrl = resolveClientPhotoUrl(client?.photo_url || client?.photoProfile);
+    const photoUrl = resolveClientPhotoUrl(client?.photoUrl || client?.photoProfile);
     const initials = ((client?.prenom?.[0] || '') + (client?.nom?.[0] || 'C')).toUpperCase();
 
     return (
@@ -357,41 +357,41 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
   // Column Definitions
   const creditColumns: TableColumn<any>[] = [
-    { key: 'numero_credit', label: 'Numéro', primary: true },
+    { key: 'numeroCredit', label: 'Numéro', primary: true },
     { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
-    { key: 'montant_principal', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
+    { key: 'montantPrincipal', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
     { 
       key: 'statut', 
       label: 'Statut', 
       align: 'center', 
       format: (val) => <Badge value={val} className="min-w-[100px] justify-center" />
     },
-    { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombre_echeances_payees || 0}/${item.nombre_echeances_total || 0}` },
-    { key: 'jours_retard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : <span className="text-slate-500">0j</span> }
+    { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombreEcheancesPayees || 0}/${item.nombreEcheancesTotal || 0}` },
+    { key: 'joursRetard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : <span className="text-slate-500">0j</span> }
   ];
 
   const demandeColumns: TableColumn<any>[] = [
-    { key: 'numero_demande', label: 'Numéro', primary: true },
+    { key: 'numeroDemande', label: 'Numéro', primary: true },
     { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
-    { key: 'montant_demande', label: 'Montant Demandé', align: 'right', format: (val) => formatMoney(val) },
+    { key: 'montantDemande', label: 'Montant Demandé', align: 'right', format: (val) => formatMoney(val) },
     { 
       key: 'statut', 
       label: 'Statut', 
       align: 'center', 
       format: (val, item) => {
-        if (item.deleted_at) {
+        if (item.deletedAt) {
           return <Badge value="Supprimé" variant="danger" icon={<XCircle size={12} />} className="min-w-[100px] justify-center" />;
         }
         return <Badge value={val} className="min-w-[100px] justify-center" />;
       }
     },
-    { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
+    { key: 'createdAt', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
 
   // Commission crédit specific columns with reevaluation indicator
   const commissionColumns: TableColumn<any>[] = [
     {
-      key: 'numero_demande',
+      key: 'numeroDemande',
       label: 'Numéro',
       primary: true,
       format: (val, item) => (
@@ -407,14 +407,14 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       )
     },
     { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
-    { key: 'montant_approuve', label: 'Montant Approuvé', align: 'right', format: (val, item) => formatMoney(val || item.montant_demande) },
-    { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
+    { key: 'montantApprouve', label: 'Montant Approuvé', align: 'right', format: (val, item) => formatMoney(val || item.montantDemande) },
+    { key: 'createdAt', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
 
   const enqueteColumns: TableColumn<any>[] = [
     { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => renderClientName(item) },
-    { key: 'type_activite', label: 'Activité' },
-    { key: 'montant_demande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
+    { key: 'typeActivite', label: 'Activité' },
+    { key: 'montantDemande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', align: 'center', format: (val) => {
       const translations: Record<string, string> = {
         'READY_FOR_INVESTIGATION': 'Prêt à enquêter',
@@ -534,10 +534,10 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                   </div>
                                   <div className="flex items-center gap-4">
                                      <div className="text-right">
-                                        <div className="text-sm font-bold text-white">{formatMoney(item.montant_demande)}</div>
+                                        <div className="text-sm font-bold text-white">{formatMoney(item.montantDemande)}</div>
                                         <div className="text-[10px] text-slate-500 flex items-center justify-end gap-1">
                                            <Clock size={10} />
-                                           {item.updated_at ? differenceInDays(new Date(), new Date(item.updated_at || new Date().toISOString())) + 'j' : '0j'}
+                                           {item.updatedAt ? differenceInDays(new Date(), new Date(item.updatedAt || new Date().toISOString())) + 'j' : '0j'}
                                         </div>
                                      </div>
                                      <ArrowRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
@@ -570,7 +570,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                       <span className="text-xs text-slate-500">{item.label}</span>
                                    </div>
                                    <div className="text-right">
-                                      <div className="text-sm font-medium text-slate-300">{formatMoney(item.montant_demande)}</div>
+                                      <div className="text-sm font-medium text-slate-300">{formatMoney(item.montantDemande)}</div>
                                    </div>
                                 </div>
                              ))}
@@ -590,7 +590,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                         <div className="absolute left-[19px] top-2 bottom-2 w-px bg-slate-700/50"></div>
 
                         {demandes.demandes
-                          .sort((a, b) => new Date(b.updated_at || b.created_at || new Date().toISOString()).getTime() - new Date(a.updated_at || a.created_at || new Date().toISOString()).getTime())
+                          .sort((a, b) => new Date(b.updatedAt || b.createdAt || new Date().toISOString()).getTime() - new Date(a.updatedAt || a.createdAt || new Date().toISOString()).getTime())
                           .slice(0, 3)
                           .map((item, idx) => (
                              <div key={item.id} className="relative flex gap-4 pb-4 last:pb-0 group">
@@ -601,7 +601,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                    <div className="text-sm text-slate-200">
                                       <span className="font-bold text-white">{formatClientName(item.clients?.nom, item.clients?.prenom)}</span>
                                       <span className="mx-1 text-slate-500">•</span>
-                                      {item.deleted_at ? (
+                                      {item.deletedAt ? (
                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20">
                                             <Trash2 size={10} />
                                             Supprimé
@@ -611,7 +611,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                       )}
                                    </div>
                                    <div className="text-xs text-slate-500 mt-1">
-                                      {item.updated_at ? new Date(item.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'Date inconnue'}
+                                      {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'Date inconnue'}
                                    </div>
                                 </div>
                              </div>
@@ -792,13 +792,13 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deleted_at)
+              .filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deletedAt)
               // Sort by updated_at desc
-              .sort((a, b) => new Date(b.updated_at || b.created_at || new Date().toISOString()).getTime() - new Date(a.updated_at || a.created_at || new Date().toISOString()).getTime())
+              .sort((a, b) => new Date(b.updatedAt || b.createdAt || new Date().toISOString()).getTime() - new Date(a.updatedAt || a.createdAt || new Date().toISOString()).getTime())
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={[
               ...demandeColumns,
-              { key: 'motif_rejet', label: 'Motif', format: (val) => <span className="text-slate-500 italic truncate max-w-[200px] block">{val || '-'}</span> }
+              { key: 'motifRejet', label: 'Motif', format: (val) => <span className="text-slate-500 italic truncate max-w-[200px] block">{val || '-'}</span> }
             ]}
             loading={isLoading}
             onRowClick={(item) => {
@@ -809,7 +809,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deleted_at).length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deletedAt).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             density="compact"
@@ -836,7 +836,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deleted_at)
+              .filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deletedAt)
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={demandeColumns}
             loading={isLoading}
@@ -853,7 +853,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deleted_at).length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deletedAt).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             density="compact"
@@ -937,7 +937,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                   .map(d => ({
                     ...d,
                     id: d.id,
-                    type_activite: d.objet_credit || 'À définir',
+                    typeActivite: d.objetCredit || 'À définir',
                     isDemande: true
                   }))
               }
@@ -1030,14 +1030,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       {/* Carte Tab - Analyse Géographique */}
       {activeTab === 'carte' && (
         <EnqueteZoneAnalytics
-          enquetes={enquetes.enquetes.map(e => ({
-            ...e,
-            // Map fields for compatibility
-            geo_latitude: (e as any).geo_latitude || (e as any).geoLatitude,
-            geo_longitude: (e as any).geo_longitude || (e as any).geoLongitude,
-            geo_accuracy: (e as any).geo_accuracy || (e as any).geoAccuracy,
-            geo_timestamp: (e as any).geo_timestamp || (e as any).geoTimestamp,
-          }))}
+          enquetes={enquetes.enquetes}
           loading={enquetes.loading}
           onRefresh={() => enquetes.fetchEnquetes?.()}
         />
@@ -1091,44 +1084,44 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             setSelectedDemande(null);
             setEnqueteData(null); // Reset enquête data on close
           }}
-          clientId={selectedDemande?.clients?.id || selectedDemande?.client_id}
+          clientId={selectedDemande?.clients?.id || selectedDemande?.clientId}
           clientNom={selectedDemande ? formatClientName(selectedDemande.clients?.nom, selectedDemande.clients?.prenom) : undefined}
           readOnly={selectedDemande?.statut === StatutDemande.INVESTIGATION_COMPLETE}
           initialData={enqueteData ? {
             // Use fetched enquête data if available
             id: enqueteData.id,
-            demandeId: enqueteData.demande_id || enqueteData.demandeId,
-            client_id: enqueteData.client_id || enqueteData.clientId,
-            montant_demande: enqueteData.montant_demande || enqueteData.montantDemande,
-            categorie_activite: enqueteData.categorie_activite || enqueteData.categorieActivite,
-            type_activite: enqueteData.type_activite || enqueteData.typeActivite,
-            anciennete_activite: enqueteData.anciennete_activite || enqueteData.ancienneteActivite,
-            description_activite: enqueteData.objet_credit || enqueteData.objetCredit,
-            objet_credit: enqueteData.objet_credit || enqueteData.objetCredit,
-            revenu_mensuel: enqueteData.revenu_mensuel || enqueteData.revenuMensuel,
-            revenus_mensuels: enqueteData.revenu_mensuel || enqueteData.revenuMensuel,
-            revenu_journalier: enqueteData.revenu_journalier || enqueteData.revenuJournalier,
-            type_revenu: enqueteData.type_revenu || enqueteData.typeRevenu,
-            charges_mensuelles: enqueteData.charges_mensuelles || enqueteData.chargesMensuelles,
-            photos_activite: enqueteData.photos_activite || enqueteData.photosActivite || [],
-            photos_geotagged: enqueteData.photos_geotagged || enqueteData.photosGeotagged || [],
-            garanties_proposees: enqueteData.garanties_proposees || enqueteData.garantiesProposees || [],
-            autres_credits: enqueteData.autres_credits || enqueteData.autresCredits || [],
+            demandeId: enqueteData.demandeId,
+            client_id: enqueteData.clientId,
+            montant_demande: enqueteData.montantDemande,
+            categorie_activite: enqueteData.categorieActivite,
+            type_activite: enqueteData.typeActivite,
+            anciennete_activite: enqueteData.ancienneteActivite,
+            description_activite: enqueteData.objetCredit,
+            objet_credit: enqueteData.objetCredit,
+            revenu_mensuel: enqueteData.revenuMensuel,
+            revenus_mensuels: enqueteData.revenuMensuel,
+            revenu_journalier: enqueteData.revenuJournalier,
+            type_revenu: enqueteData.typeRevenu,
+            charges_mensuelles: enqueteData.chargesMensuelles,
+            photos_activite: enqueteData.photosActivite || [],
+            photos_geotagged: enqueteData.photosGeotagged || [],
+            garanties_proposees: enqueteData.garantiesProposees || [],
+            autres_credits: enqueteData.autresCredits || [],
           } : selectedDemande ? {
             // Fallback to demande data for new enquêtes
             id: selectedDemande.id,
             demandeId: selectedDemande.id,
-            client_id: selectedDemande.client_id || selectedDemande.clients?.id,
-            montant_demande: selectedDemande.montant_demande?.toString(),
-            type_activite: selectedDemande.type_activite,
-            categorie_activite: selectedDemande.categorie_activite,
-            anciennete_activite: selectedDemande.anciennete_activite,
-            objet_credit: selectedDemande.objet_credit,
-            revenus_mensuels: selectedDemande.revenus_mensuels || selectedDemande.revenu_mensuel || selectedDemande.clients?.revenuMensuel,
-            revenu_mensuel: selectedDemande.revenu_mensuel || selectedDemande.revenus_mensuels || selectedDemande.clients?.revenuMensuel,
-            revenu_journalier: selectedDemande.revenu_journalier || selectedDemande.clients?.revenuJournalier,
-            type_revenu: selectedDemande.type_revenu || selectedDemande.clients?.typeRevenu,
-            charges_mensuelles: selectedDemande.charges_mensuelles
+            client_id: selectedDemande.clientId || selectedDemande.clients?.id,
+            montant_demande: selectedDemande.montantDemande?.toString(),
+            type_activite: selectedDemande.typeActivite,
+            categorie_activite: selectedDemande.categorieActivite,
+            anciennete_activite: selectedDemande.ancienneteActivite,
+            objet_credit: selectedDemande.objetCredit,
+            revenus_mensuels: selectedDemande.revenusMensuels || selectedDemande.revenuMensuel || selectedDemande.clients?.revenuMensuel,
+            revenu_mensuel: selectedDemande.revenuMensuel || selectedDemande.revenusMensuels || selectedDemande.clients?.revenuMensuel,
+            revenu_journalier: selectedDemande.revenuJournalier || selectedDemande.clients?.revenuJournalier,
+            type_revenu: selectedDemande.typeRevenu || selectedDemande.clients?.typeRevenu,
+            charges_mensuelles: selectedDemande.chargesMensuelles
           } : undefined}
           onSave={async (data) => {
             const success = await enquetes.createEnquete(data);

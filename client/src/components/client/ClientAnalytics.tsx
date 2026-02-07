@@ -14,22 +14,22 @@ interface ClientAnalyticsProps {
 
 interface AnalyticsData {
   summary: {
-    total_savings: number;
-    total_credit_due: number;
-    active_loans_count: number;
-    savings_accounts_count: number;
-    active_tontines_count: number;
-    fidelity_points: number;
-    repayment_rate: number;
+    totalSavings: number;
+    totalCreditDue: number;
+    activeLoansCount: number;
+    savingsAccountsCount: number;
+    activeTontinesCount: number;
+    fidelityPoints: number;
+    repaymentRate: number;
   };
   distribution: {
     label: string;
     value: number;
     color: string;
   }[];
-  monthly_trend: {
-    savings_growth: string;
-    credit_evolution: string;
+  monthlyTrend: {
+    savingsGrowth: string;
+    creditEvolution: string;
   };
 }
 
@@ -239,7 +239,7 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
     );
   }
 
-  const { summary, distribution, monthly_trend } = analytics;
+  const { summary, distribution, monthlyTrend } = analytics;
   const totalValue = distribution.reduce((sum, item) => sum + item.value, 0);
   const memberDays = client.dateInscription ? Math.floor((new Date().getTime() - new Date(client.dateInscription).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
@@ -254,7 +254,7 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
           </div>
           <div className="min-w-0">
             <p className="text-[10px] text-slate-500 uppercase font-semibold">Points Fidélité</p>
-            <p className="text-lg font-bold text-cyan-400 leading-tight">{summary.fidelity_points.toLocaleString()}</p>
+            <p className="text-lg font-bold text-cyan-400 leading-tight">{summary.fidelityPoints.toLocaleString()}</p>
             <p className="text-[10px] text-slate-500 truncate">Membre depuis {memberDays}j</p>
           </div>
         </div>
@@ -274,8 +274,8 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
             <Target size={16} />
           </div>
           <div className="text-right">
-            <span className={`text-xl font-bold ${summary.repayment_rate >= 90 ? 'text-emerald-400' : summary.repayment_rate >= 80 ? 'text-cyan-400' : 'text-amber-400'}`}>
-              {summary.repayment_rate}%
+            <span className={`text-xl font-bold ${summary.repaymentRate >= 90 ? 'text-emerald-400' : summary.repaymentRate >= 80 ? 'text-cyan-400' : 'text-amber-400'}`}>
+              {summary.repaymentRate}%
             </span>
             <p className="text-[10px] text-slate-500 uppercase font-medium">Taux Remboursement</p>
           </div>
@@ -287,7 +287,7 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
             <TrendingUp size={16} />
           </div>
           <div className="text-right">
-            <span className="text-xl font-bold text-emerald-400">{monthly_trend.savings_growth}</span>
+            <span className="text-xl font-bold text-emerald-400">{monthlyTrend.savingsGrowth}</span>
             <p className="text-[10px] text-slate-500 uppercase font-medium">Croissance (Mois)</p>
           </div>
         </div>
@@ -301,7 +301,7 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
             <DollarSign size={12} className="text-cyan-400" />
             Répartition Financière
           </h4>
-          {summary.total_savings === 0 ? (
+          {summary.totalSavings === 0 ? (
             <div className="flex flex-col items-center justify-center py-4 text-slate-500">
               <div className="w-12 h-12 rounded-full border border-slate-700 border-dashed flex items-center justify-center mb-1">
                 <DollarSign size={16} className="text-slate-600" />
@@ -323,7 +323,7 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <p className="text-[8px] text-slate-500 uppercase">Total</p>
-                  <p className="text-[10px] font-bold text-white">{(summary.total_savings / 1000).toFixed(0)}k</p>
+                  <p className="text-[10px] font-bold text-white">{(summary.totalSavings / 1000).toFixed(0)}k</p>
                 </div>
               </div>
               <div className="flex-1 space-y-1 min-w-0">
@@ -407,9 +407,9 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
       {/* Row 3: Navigation Cards - Inline compact */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { key: 'credits' as const, icon: CreditCard, count: summary.active_loans_count, label: 'Crédits en cours', color: 'blue' },
-          { key: 'savings' as const, icon: Wallet, count: summary.savings_accounts_count, label: 'Comptes Épargne', color: 'emerald' },
-          { key: 'tontines' as const, icon: Users, count: summary.active_tontines_count, label: 'Tontines Actives', color: 'amber' },
+          { key: 'credits' as const, icon: CreditCard, count: summary.activeLoansCount, label: 'Crédits en cours', color: 'blue' },
+          { key: 'savings' as const, icon: Wallet, count: summary.savingsAccountsCount, label: 'Comptes Épargne', color: 'emerald' },
+          { key: 'tontines' as const, icon: Users, count: summary.activeTontinesCount, label: 'Tontines Actives', color: 'amber' },
         ].map(({ key, icon: Icon, count, label, color }) => (
           <div key={key}
             className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all active:scale-[0.98] border border-transparent hover:border-${color}-500/50 ${count > 0 ? `bg-${color}-500/10 hover:bg-${color}-500/15` : 'bg-slate-800/30 hover:bg-slate-800/50'}`}

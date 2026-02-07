@@ -51,10 +51,10 @@ export function DiscrepancyReport({
       })
       .map((session): DiscrepancyEntry => {
         const soldeTheorique = Number(
-          session.solde_theorique || session.soldeTheorique || session.montant_fermeture_theorique || 0
+          session.soldeTheorique || session.montantFermetureTheorique || 0
         );
         const soldeReel = Number(
-          session.solde_reel || session.soldeReel || session.montant_fermeture_declare || 0
+          session.soldeReel || session.montantFermetureDeclare || 0
         );
         const ecart = Number(session.ecart || 0) || (soldeReel - soldeTheorique);
         const ecartPercent = soldeTheorique !== 0 ? (ecart / soldeTheorique) * 100 : 0;
@@ -65,14 +65,14 @@ export function DiscrepancyReport({
 
         return {
           session,
-          date: new Date(session.closedAt || session.closed_at || session.openedAt || session.opened_at || ''),
+          date: new Date(session.closedAt || session.openedAt || ''),
           soldeTheorique,
           soldeReel,
           ecart,
           ecartPercent,
           status,
-          caissier: session.caissier_nom,
-          justification: session.ecart_justification || session.ecartJustification,
+          caissier: session.caissierNom,
+          justification: session.ecartJustification,
         };
       })
       .sort((a, b) => Math.abs(b.ecart) - Math.abs(a.ecart));

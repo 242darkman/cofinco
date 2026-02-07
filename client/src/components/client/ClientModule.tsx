@@ -91,8 +91,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
     try {
       const result = await clientService.getAll(searchFilters, { page: currentPage, perPage: itemsPerPage });
       setClients(result.data);
-      setTotalItems(result.meta.pagination.total_items);
-      setTotalPages(result.meta.pagination.total_pages);
+      setTotalItems(result.meta.pagination.totalItems);
+      setTotalPages(result.meta.pagination.totalPages);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast.error('Erreur lors du chargement des clients');
@@ -220,12 +220,12 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                   className={getStatusColor(viewingClient.segment?.toUpperCase(), CLIENT_SEGMENT_COLORS)}
                   size="sm" 
                 />
-                {(viewingClient.agence || viewingClient.agence_nom) && (
+                {(viewingClient.agence || viewingClient.agenceNom) && (
                   <>
                     <span>•</span>
                     <span className="flex items-center gap-1">
                       <Building2 size={12} />
-                      {viewingClient.agence_nom || viewingClient.agence}
+                      {viewingClient.agenceNom || viewingClient.agence}
                     </span>
                   </>
                 )}
@@ -506,7 +506,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       format: (_, item) => (
                         <div className="w-24 mx-auto">
                           <Badge 
-                            value={item.agence_nom || item.agence || 'N/A'} 
+                            value={item.agenceNom || item.agence || 'N/A'} 
                             variant="neutral"
                             size="sm"
                             className="w-full justify-center text-[10px] font-medium py-0 h-5"

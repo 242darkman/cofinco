@@ -4,8 +4,8 @@ import IconButton from '../ui/IconButton';
 
 interface AgentHeaderProps {
   agent: {
-    nom_complet: string;
-    code_agent: string;
+    nomComplet: string;
+    codeAgent: string;
   } | null;
   onMenuToggle: () => void;
   isMobile: boolean;
@@ -38,7 +38,7 @@ export default function AgentHeader({
         <div>
           <h1 className="text-lg md:text-xl font-bold text-white">Interface Agent de Caisse</h1>
           <p className="text-sm text-slate-400">
-            {agent?.nom_complet || 'Agent'} • {agent?.code_agent || ''}
+            {agent?.nomComplet || 'Agent'} • {agent?.codeAgent || ''}
           </p>
         </div>
       </div>

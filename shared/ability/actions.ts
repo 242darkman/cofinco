@@ -99,6 +99,9 @@ export const Actions = {
 
   // Messages
   SEND: 'send',
+
+  // Prospection
+  CONVERT: 'convert',
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -175,4 +178,5 @@ export const ACTION_LABELS: Record<Action, string> = {
   [Actions.TRADE]: 'Trader',
   [Actions.UPLOAD]: 'Téléverser',
   [Actions.SEND]: 'Envoyer',
+  [Actions.CONVERT]: 'Convertir',
 };

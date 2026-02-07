@@ -26,7 +26,7 @@ interface Client {
   id: string;
   nom: string;
   prenom: string;
-  numero_compte?: string;
+  numeroCompte?: string;
   telephone: string;
   email?: string;
   phone?: string;
@@ -320,7 +320,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
         nom: selectedClient?.nom || '',
         prenom: selectedClient?.prenom || '',
         telephone: intent.phone,
-        numeroCompte: selectedClient?.numero_compte
+        numeroCompte: selectedClient?.numeroCompte
       },
       items: [{
         description: `${typeOperation} - ${subType}`,

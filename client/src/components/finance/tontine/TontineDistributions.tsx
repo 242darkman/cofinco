@@ -13,21 +13,13 @@ import { formatClientName } from '../../../lib/format';
 interface DistributionRequest {
   id: string;
   status: string;
-  amount_requested?: number;
   amountRequested?: number;
-  amount_paid?: number;
   amountPaid?: number;
-  net_amount?: number;
   netAmount?: number;
-  payout_method?: string;
   payoutMethod?: string;
-  created_at?: string;
   createdAt?: string;
-  paid_at?: string;
   paidAt?: string;
-  turn_id?: string;
   turnId?: string;
-  beneficiary_member_id?: string;
   beneficiaryMemberId?: string;
 }
 
@@ -36,7 +28,6 @@ interface Membre {
   position: number;
   statut: string;
   aRecuBenefice: boolean;
-  a_recu_benefice?: boolean;
   client: {
     id?: string;
     nom: string;
@@ -48,7 +39,6 @@ interface Membre {
   estAJour?: boolean;
   msisdn?: string;
   preferredPayoutMethod?: string;
-  preferred_payout_method?: string;
 }
 
 interface TontineDistributionsProps {
@@ -141,7 +131,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
   const currentCycle = dashboard?.currentCycle;
 
   // Members eligible for distribution (haven't received yet)
-  const membresEligibles = membres.filter(m => !(m.aRecuBenefice || m.a_recu_benefice));
+  const membresEligibles = membres.filter(m => !m.aRecuBenefice);
   const montantEstime = membres.length > 0 ? membres.length * montantContribution : 0;
   const soldeInsuffisant = soldeDisponible < montantEstime;
 
@@ -149,7 +139,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
   useEffect(() => {
     if (showModal && nextTurn) {
       setSelectedTurnId(nextTurn.id);
-      const memberId = nextTurn.beneficiaryMemberId || nextTurn.beneficiary_member_id;
+      const memberId = nextTurn.beneficiaryMemberId;
       if (memberId) {
         setSelectedMembreId(memberId);
       }
@@ -209,11 +199,11 @@ export default function TontineDistributions({ tontineId, montantContribution, t
 
   // Helper functions
   const getDistributionAmount = (dist: DistributionRequest) => {
-    return Number(dist.net_amount || dist.netAmount || dist.amount_paid || dist.amountPaid || dist.amount_requested || dist.amountRequested || 0);
+    return Number(dist.netAmount || dist.amountPaid || dist.amountRequested || 0);
   };
 
   const getDistributionDate = (dist: DistributionRequest) => {
-    return dist.paid_at || dist.paidAt || dist.created_at || dist.createdAt || '';
+    return dist.paidAt || dist.createdAt || '';
   };
 
   const getDistributionStatus = (dist: DistributionRequest) => {
@@ -221,7 +211,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
   };
 
   const getPayoutMethod = (dist: DistributionRequest) => {
-    return dist.payout_method || dist.payoutMethod || 'CASH';
+    return dist.payoutMethod || 'CASH';
   };
 
   // Find member name by ID
@@ -297,13 +287,13 @@ export default function TontineDistributions({ tontineId, montantContribution, t
           <div className="flex justify-between items-start">
             <div>
               <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${soldeInsuffisant ? 'text-amber-400' : 'text-emerald-400'}`}>
-                Prochain Bénéficiaire (Tour #{nextTurn.turnNumber || nextTurn.turn_number})
+                Prochain Bénéficiaire (Tour #{nextTurn.turnNumber})
               </div>
               <div className="text-lg font-bold text-white flex items-center gap-2">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${soldeInsuffisant ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
                   <User size={16} />
                 </div>
-                {getMemberName(nextTurn.beneficiaryMemberId || nextTurn.beneficiary_member_id)}
+                {getMemberName(nextTurn.beneficiaryMemberId)}
               </div>
             </div>
             <div className="text-right">
@@ -321,7 +311,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
         <div className="space-y-2">
           <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider">En attente</div>
           {pendingDistributions.map(dist => {
-            const memberId = dist.beneficiary_member_id || dist.beneficiaryMemberId;
+            const memberId = dist.beneficiaryMemberId;
             const status = getDistributionStatus(dist);
             const statusCfg = statusConfig[status] || statusConfig.DRAFT;
 
@@ -351,7 +341,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       ) : (
         <div className="space-y-2">
           {successDistributions.map((dist) => {
-            const memberId = dist.beneficiary_member_id || dist.beneficiaryMemberId;
+            const memberId = dist.beneficiaryMemberId;
             const status = getDistributionStatus(dist);
             const statusCfg = statusConfig[status] || statusConfig.SUCCESS;
             const method = getPayoutMethod(dist);

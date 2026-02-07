@@ -28,6 +28,10 @@ import {
   rolePermissions,
   agences,
   zones,
+  departements,
+  villes,
+  arrondissements,
+  marches,
   typesMarches,
   tags,
   systemSettings,
@@ -133,6 +137,68 @@ const ZONES_DATA = [
   { nom: 'Songolo', ville: 'Pointe-Noire', description: 'Zone industrielle et portuaire', statut: StatutUser.ACTIVE },
   { nom: 'Port Autonome', ville: 'Pointe-Noire', description: 'Zone portuaire et logistique', statut: StatutUser.ACTIVE }
 ];
+
+// ===== Données géographiques Congo-Brazzaville =====
+
+const DEPARTEMENTS_GEO_DATA = [
+  { nom: 'Bouenza', chefLieu: 'Madingou' },
+  { nom: 'Cuvette', chefLieu: 'Owando' },
+  { nom: 'Cuvette-Ouest', chefLieu: 'Ewo' },
+  { nom: 'Kouilou', chefLieu: 'Hinda' },
+  { nom: 'Lékoumou', chefLieu: 'Sibiti' },
+  { nom: 'Likouala', chefLieu: 'Impfondo' },
+  { nom: 'Niari', chefLieu: 'Dolisie' },
+  { nom: 'Plateaux', chefLieu: 'Djambala' },
+  { nom: 'Pool', chefLieu: 'Kinkala' },
+  { nom: 'Sangha', chefLieu: 'Ouesso' },
+  { nom: 'Brazzaville', chefLieu: 'Brazzaville' },
+  { nom: 'Pointe-Noire', chefLieu: 'Pointe-Noire' },
+];
+
+const VILLES_GEO_DATA: { nom: string; departement: string; lat: string; lng: string; isChefLieu: boolean }[] = [
+  { nom: 'Brazzaville', departement: 'Brazzaville', lat: '-4.2634', lng: '15.2429', isChefLieu: true },
+  { nom: 'Pointe-Noire', departement: 'Pointe-Noire', lat: '-4.7692', lng: '11.8664', isChefLieu: true },
+  { nom: 'Dolisie', departement: 'Niari', lat: '-4.1986', lng: '12.6716', isChefLieu: true },
+  { nom: 'Nkayi', departement: 'Bouenza', lat: '-4.1744', lng: '13.2847', isChefLieu: false },
+  { nom: 'Sibiti', departement: 'Lékoumou', lat: '-3.6833', lng: '13.35', isChefLieu: true },
+  { nom: 'Impfondo', departement: 'Likouala', lat: '1.6217', lng: '18.0647', isChefLieu: true },
+  { nom: 'Ouesso', departement: 'Sangha', lat: '1.6136', lng: '16.0517', isChefLieu: true },
+  { nom: 'Owando', departement: 'Cuvette', lat: '-0.4833', lng: '15.9', isChefLieu: true },
+  { nom: 'Madingou', departement: 'Bouenza', lat: '-4.1533', lng: '13.55', isChefLieu: true },
+  { nom: 'Kinkala', departement: 'Pool', lat: '-4.3564', lng: '14.7647', isChefLieu: true },
+  { nom: 'Djambala', departement: 'Plateaux', lat: '-2.5447', lng: '14.7553', isChefLieu: true },
+  { nom: 'Ewo', departement: 'Cuvette-Ouest', lat: '-0.8667', lng: '14.82', isChefLieu: true },
+  { nom: 'Mossendjo', departement: 'Niari', lat: '-2.95', lng: '12.7', isChefLieu: false },
+  { nom: 'Gamboma', departement: 'Plateaux', lat: '-1.8833', lng: '15.8667', isChefLieu: false },
+  { nom: 'Loutété', departement: 'Bouenza', lat: '-4.2833', lng: '13.5667', isChefLieu: false },
+  { nom: 'Mouyondzi', departement: 'Bouenza', lat: '-4.0', lng: '13.9667', isChefLieu: false },
+  { nom: 'Kindamba', departement: 'Pool', lat: '-3.7833', lng: '14.5167', isChefLieu: false },
+  { nom: 'Hinda', departement: 'Kouilou', lat: '-4.485', lng: '11.866', isChefLieu: true },
+];
+
+// Arrondissements by ville
+const ARRONDISSEMENTS_SEED: Record<string, string[]> = {
+  'Brazzaville': [
+    'Makélékélé', 'Bacongo', 'Poto-Poto', 'Moungali', 'Ouenzé',
+    'Talangaï', 'Mfilou', 'Madibou', 'Djiri',
+  ],
+  'Pointe-Noire': [
+    'Lumumba', 'Mvoumvou', 'Tié-Tié', 'Loandjili', 'Mongo-MPoukou', 'Ngoyo',
+  ],
+  'Sibiti': [
+    'Loumongo', 'Matindi', 'Mapindi', 'Mvouba', 'Moussanda', 'Indo', 'Mikamba', 'Molimba',
+  ],
+};
+
+// Marchés by arrondissement (Pointe-Noire)
+const MARCHES_SEED: Record<string, string[]> = {
+  'Lumumba': ['Marché OUI', 'Mpita', 'Tchimbamba', 'Marché Km4', 'Grand Marché'],
+  'Mvoumvou': ['Marché Sympathique', 'Marché Foire', 'Marché Mayaka'],
+  'Tié-Tié': ['Tié-Tié Massola', 'Marché Liberté', 'Marché Loussala', 'Bassongueur', 'Km8', 'Voungou'],
+  'Loandjili': ['Mbota', 'Carlos', 'Nkouikou', 'Quartier Culotte', 'Tystère 1', 'Movice'],
+  'Mongo-MPoukou': ['Tystère 2', 'Siafoumou', 'Tchiali', 'Makayabou', 'La patience', 'Faubourg', 'Terre jaune'],
+  'Ngoyo': ['Ngoyo Péage', 'Dubaï (fond tié-tié)', 'Patra', 'Tchimbambouka', 'Mpaka'],
+};
 
 const TYPES_MARCHES_DATA = [
   { nom: 'Commerce Général', description: 'Vente de produits divers (alimentaire et non alimentaire)', actif: true },
@@ -405,6 +471,20 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '421',   // Personnel — rémunérations dues
     creditAccount: '521',  // Caisse
     descriptionTemplate: 'Paiement salaire net — décaissement',
+    priority: 100,
+  },
+
+  // --- Primes Prospection ---
+  {
+    code: 'PROSPECTION_PRIME',
+    name: 'Prime de prospection (paiement)',
+    description: 'Paiement prime agent pour conversion prospect en client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'PROSPECTION_PRIME',
+    journalCode: 'OD',
+    debitAccount: '6615',  // Charges personnel - primes
+    creditAccount: '421',  // Personnel — rémunérations dues
+    descriptionTemplate: 'Prime prospection — {employeNom}',
     priority: 100,
   },
 
@@ -1282,12 +1362,117 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
     results.push({ table: 'zones', action: 'skipped', count: 0, details: 'production mode' });
   }
 
-  // Agence Siège
+  // ===== Départements =====
+  let deptCount = 0;
+  if (!dryRun) {
+    for (const dept of DEPARTEMENTS_GEO_DATA) {
+      const [existing] = await db.select().from(departements).where(eq(departements.nom, dept.nom));
+      if (!existing) {
+        await db.insert(departements).values(dept);
+        deptCount++;
+      }
+    }
+  }
+  results.push({ table: 'departements', action: 'created', count: deptCount, details: `${DEPARTEMENTS_GEO_DATA.length} départements (upsert by nom)` });
+
+  // ===== Villes =====
+  let villeCount = 0;
+  const villeIdMap: Record<string, string> = {};
+  if (!dryRun) {
+    for (const v of VILLES_GEO_DATA) {
+      // Find departement
+      const [dept] = await db.select().from(departements).where(eq(departements.nom, v.departement));
+      if (!dept) {
+        logger.warn(`Département '${v.departement}' not found for ville '${v.nom}', skipping`);
+        continue;
+      }
+      const [existing] = await db.select().from(villes).where(
+        and(eq(villes.nom, v.nom), eq(villes.departementId, dept.id))
+      );
+      if (!existing) {
+        const [inserted] = await db.insert(villes).values({
+          nom: v.nom,
+          departementId: dept.id,
+          latitude: v.lat,
+          longitude: v.lng,
+          isChefLieu: v.isChefLieu,
+        }).returning();
+        villeIdMap[v.nom] = inserted.id;
+        villeCount++;
+      } else {
+        villeIdMap[v.nom] = existing.id;
+      }
+    }
+  }
+  results.push({ table: 'villes', action: 'created', count: villeCount, details: `${VILLES_GEO_DATA.length} villes (upsert by nom+dept)` });
+
+  // ===== Backfill zones with villeId =====
+  if (!dryRun) {
+    for (const [villeNom, villeId] of Object.entries(villeIdMap)) {
+      await db.update(zones)
+        .set({ villeId })
+        .where(and(eq(zones.ville, villeNom), isNull(zones.villeId)));
+    }
+  }
+
+  // ===== Arrondissements =====
+  let arrCount = 0;
+  const arrIdMap: Record<string, string> = {};
+  if (!dryRun) {
+    for (const [villeNom, arrNames] of Object.entries(ARRONDISSEMENTS_SEED)) {
+      const villeId = villeIdMap[villeNom];
+      if (!villeId) {
+        logger.warn(`Ville '${villeNom}' not found in villeIdMap, skipping arrondissements`);
+        continue;
+      }
+      for (const arrNom of arrNames) {
+        const [existing] = await db.select().from(arrondissements).where(
+          and(eq(arrondissements.nom, arrNom), eq(arrondissements.villeId, villeId))
+        );
+        if (!existing) {
+          const [inserted] = await db.insert(arrondissements).values({
+            nom: arrNom,
+            villeId,
+          }).returning();
+          arrIdMap[arrNom] = inserted.id;
+          arrCount++;
+        } else {
+          arrIdMap[arrNom] = existing.id;
+        }
+      }
+    }
+  }
+  results.push({ table: 'arrondissements', action: 'created', count: arrCount, details: 'upsert by nom+villeId' });
+
+  // ===== Marchés =====
+  let marcheCount = 0;
+  if (!dryRun) {
+    for (const [arrNom, marcheNames] of Object.entries(MARCHES_SEED)) {
+      const arrId = arrIdMap[arrNom];
+      if (!arrId) {
+        logger.warn(`Arrondissement '${arrNom}' not found in arrIdMap, skipping marchés`);
+        continue;
+      }
+      for (const marcheNom of marcheNames) {
+        const [existing] = await db.select().from(marches).where(
+          and(eq(marches.nom, marcheNom), eq(marches.arrondissementId, arrId))
+        );
+        if (!existing) {
+          await db.insert(marches).values({ nom: marcheNom, arrondissementId: arrId });
+          marcheCount++;
+        }
+      }
+    }
+  }
+  results.push({ table: 'marches', action: 'created', count: marcheCount, details: 'upsert by nom+arrondissementId' });
+
+  // ===== Agence Siège =====
   const siegeData = {
     nom: 'Siège',
     codeAgence: 'SIEGE',
     adresse: 'Boulevard Denis Sassou, Brazzaville',
     ville: 'Brazzaville',
+    villeId: villeIdMap['Brazzaville'] || undefined,
     region: 'Centre',
     typeAgence: TypeAgence.MAIN,
     statut: StatutUser.ACTIVE,
@@ -1304,6 +1489,10 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
       await db.insert(agences).values(siegeData);
       results.push({ table: 'agences', action: 'created', count: 1 });
     } else {
+      // Backfill villeId if missing
+      if (!existingSiege.villeId && villeIdMap['Brazzaville']) {
+        await db.update(agences).set({ villeId: villeIdMap['Brazzaville'] }).where(eq(agences.id, existingSiege.id));
+      }
       results.push({ table: 'agences', action: 'skipped', count: 0, details: 'Siège exists' });
     }
   }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Map as MapIcon, Calendar, Clock, Activity, TrendingUp, Users } from 'lucide-react';
+import { MapPin, Navigation, Calendar, Clock, Activity, TrendingUp, Users, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { agentTerrainApi } from '../../lib/api-client';
 import { StatutUser } from '@shared/enum/status-constants';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 
 interface GeoLocation {
   id: string;
@@ -29,6 +30,13 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
   const [liveTracking, setLiveTracking] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
+  // Detail Sheet
+  const [selectedLocation, setSelectedLocation] = useState<GeoLocation | null>(null);
 
   useEffect(() => {
     loadAgents();
@@ -65,6 +73,7 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
 
   const loadLocations = async () => {
     try {
+      setLoading(true);
       const startDate = new Date(selectedDate);
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(selectedDate);
@@ -74,6 +83,7 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
       if (response.ok) {
         const data = await response.json();
         setLocations(data || []);
+        setCurrentPage(1);
       }
     } catch (error) {
       console.error('Erreur:', error);
@@ -82,43 +92,14 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
     }
   };
 
-  const addTestLocation = async () => {
-    if (!selectedAgent) return;
-
-    const testLat = -4.3217 + (Math.random() - 0.5) * 0.1;
-    const testLng = 15.3125 + (Math.random() - 0.5) * 0.1;
-
-    try {
-      const response = await fetch('/api/agent-geolocations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent_id: selectedAgent,
-          latitude: testLat,
-          longitude: testLng,
-          accuracy: Math.random() * 20 + 5,
-          activity_type: ['Check-in', 'Visite', 'Déplacement', 'Check-out'][Math.floor(Math.random() * 4)],
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de l\'ajout');
-      loadLocations();
-    } catch (error: any) {
-      alert('Erreur: ' + error.error);
-    }
-  };
-
   const calculateDistance = (locations: GeoLocation[]) => {
     if (locations.length < 2) return 0;
-
     let totalDistance = 0;
     for (let i = 0; i < locations.length - 1; i++) {
       const lat1 = locations[i].latitude;
       const lon1 = locations[i].longitude;
       const lat2 = locations[i + 1].latitude;
       const lon2 = locations[i + 1].longitude;
-
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -134,217 +115,235 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
   const distance = calculateDistance(locations);
   const checkIns = locations.filter(l => l.activity_type === 'Check-in').length;
   const visites = locations.filter(l => l.activity_type === 'Visite').length;
-  const lastLocation = locations[0];
 
-  const agent = agents.find(a => a.id === selectedAgent);
+  // Pagination Logic
+  const totalPages = Math.ceil(locations.length / ITEMS_PER_PAGE);
+  const paginatedLocations = locations.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
-    <div className="space-y-6">
-      <div className="grid md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <Navigation size={24} />
-            <Activity size={20} />
-          </div>
-          <div className="text-3xl font-bold mb-1">{distance.toFixed(1)} km</div>
-          <div className="text-blue-100 text-sm">Distance Parcourue</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <MapPin size={24} />
-            <TrendingUp size={20} />
-          </div>
-          <div className="text-3xl font-bold mb-1">{checkIns}</div>
-          <div className="text-green-100 text-sm">Check-ins</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <Users size={24} />
-            <Calendar size={20} />
-          </div>
-          <div className="text-3xl font-bold mb-1">{visites}</div>
-          <div className="text-emerald-100 text-sm">Visites</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <Clock size={24} />
-            <Activity size={20} />
-          </div>
-          <div className="text-3xl font-bold mb-1">{locations.length}</div>
-          <div className="text-emerald-100 text-sm">Points GPS</div>
-        </div>
+    <div className="space-y-3">
+      {/* Stats Compact */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <StatCard icon={<Navigation size={14} />} label="Distance" value={`${distance.toFixed(1)} km`} color="blue" />
+        <StatCard icon={<MapPin size={14} />} label="Check-ins" value={checkIns.toString()} color="green" />
+        <StatCard icon={<Users size={14} />} label="Visites" value={visites.toString()} color="emerald" />
+        <StatCard icon={<Clock size={14} />} label="Points GPS" value={locations.length.toString()} color="cyan" />
       </div>
 
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="flex-1">
-            <label className="block text-sm font-semibold text-slate-300 mb-2">Agent</label>
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-            >
-              <option value="">Sélectionner un agent</option>
-              {agents.map(agent => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.nom} {agent.prenom} - {agent.zone_affectation}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Controls Compact */}
+      <div className="flex flex-col sm:flex-row gap-2 p-2 bg-slate-900/50 rounded-xl border border-slate-800">
+        <select
+          value={selectedAgent}
+          onChange={(e) => setSelectedAgent(e.target.value)}
+          className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-cyan-500"
+        >
+          <option value="">Sélectionner un agent...</option>
+          {agents.map(agent => (
+            <option key={agent.id} value={agent.id}>
+              {agent.nom} {agent.prenom}
+            </option>
+          ))}
+        </select>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">Date</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs"
+        />
 
-          <div className="flex items-end gap-2">
-            <button
-              onClick={() => setLiveTracking(!liveTracking)}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                liveTracking
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-slate-700 hover:bg-slate-600 text-white'
-              }`}
-            >
-              {liveTracking ? 'Suivi En Direct' : 'Activer Suivi'}
-            </button>
+        <button
+          onClick={() => setLiveTracking(!liveTracking)}
+          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${
+            liveTracking
+              ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+          }`}
+        >
+          {liveTracking ? '● En Direct' : 'Activer Suivi'}
+        </button>
+      </div>
 
-            <button
-              onClick={addTestLocation}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
-            >
-              Ajouter Point Test
-            </button>
-          </div>
+      {/* Locations List */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between bg-slate-900/30">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Navigation size={16} className="text-blue-400" />
+            Historique des Positions
+          </h3>
+          <span className="text-[10px] text-slate-500 font-medium">{locations.length} points</span>
         </div>
-
-        {agent && lastLocation && (
-          <div className="bg-slate-700/50 rounded-lg p-4 mb-6 border border-slate-600">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
-                  <MapPin size={18} className="text-blue-400" />
-                  Dernière Position
-                </h4>
-                <p className="text-slate-300 text-sm mb-1">
-                  <span className="text-slate-400">Latitude:</span> {lastLocation.latitude.toFixed(6)}
-                </p>
-                <p className="text-slate-300 text-sm mb-1">
-                  <span className="text-slate-400">Longitude:</span> {lastLocation.longitude.toFixed(6)}
-                </p>
-                <p className="text-slate-300 text-sm">
-                  <span className="text-slate-400">Précision:</span> ±{lastLocation.accuracy.toFixed(1)}m
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
-                  <Activity size={18} className="text-green-400" />
-                  Activité Actuelle
-                </h4>
-                <p className="text-slate-300 text-sm mb-1">
-                  <span className="text-slate-400">Type:</span>{' '}
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                    lastLocation.activity_type === 'Check-in' ? 'bg-green-500/20 text-green-400' :
-                    lastLocation.activity_type === 'Visite' ? 'bg-blue-500/20 text-blue-400' :
-                    lastLocation.activity_type === 'Check-out' ? 'bg-blue-500/20 text-blue-400' :
-                    'bg-slate-500/20 text-slate-400'
-                  }`}>
-                    {lastLocation.activity_type}
-                  </span>
-                </p>
-                <p className="text-slate-300 text-sm">
-                  <span className="text-slate-400">Horodatage:</span>{' '}
-                  {new Date(lastLocation.timestamp).toLocaleString('fr-FR')}
-                </p>
-              </div>
-            </div>
+        
+        {loading ? (
+          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500" /></div>
+        ) : locations.length === 0 ? (
+          <div className="text-center py-12 opacity-50">
+            <MapPin size={32} className="mx-auto mb-2 text-slate-500" />
+            <p className="text-sm text-slate-400">Aucune position enregistrée</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-900/50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase">Heure</th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase">Type</th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase hidden sm:table-cell">Lat</th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase hidden sm:table-cell">Lng</th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase hidden md:table-cell">Précision</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {paginatedLocations.map((location) => (
+                  <tr 
+                    key={location.id} 
+                    className="hover:bg-slate-700/30 transition cursor-pointer group"
+                    onClick={() => setSelectedLocation(location)}
+                  >
+                    <td className="px-3 py-2 text-xs text-white font-medium">
+                      {new Date(location.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        location.activity_type === 'Check-in' ? 'bg-green-500/20 text-green-400' :
+                        location.activity_type === 'Visite' ? 'bg-blue-500/20 text-blue-400' :
+                        location.activity_type === 'Check-out' ? 'bg-amber-500/20 text-amber-400' :
+                        'bg-slate-500/20 text-slate-400'
+                      }`}>
+                        {location.activity_type}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-slate-400 font-mono hidden sm:table-cell">{location.latitude.toFixed(4)}</td>
+                    <td className="px-3 py-2 text-xs text-slate-400 font-mono hidden sm:table-cell">{location.longitude.toFixed(4)}</td>
+                    <td className="px-3 py-2 text-xs text-slate-500 hidden md:table-cell">±{location.accuracy.toFixed(0)}m</td>
+                    <td className="px-3 py-2 text-right">
+                      <Eye size={14} className="text-slate-600 group-hover:text-cyan-400 inline-block" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
-        <div className="bg-slate-900/50 rounded-lg p-8 border border-slate-600 text-center">
-          <MapIcon size={64} className="mx-auto text-slate-600 mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">Carte Interactive</h3>
-          <p className="text-slate-400 mb-4">
-            La carte interactive avec Leaflet/Mapbox sera intégrée ici
-          </p>
-          <div className="bg-slate-700/50 rounded p-3 text-sm text-slate-300 text-left max-w-md mx-auto">
-            <p className="font-semibold mb-2">Fonctionnalités prévues :</p>
-            <ul className="space-y-1">
-              <li>• Carte interactive avec marqueurs</li>
-              <li>• Traçage des itinéraires</li>
-              <li>• Zones géographiques</li>
-              <li>• Clusters de points</li>
-              <li>• Export KML/GPX</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div className="p-4 border-b border-slate-700">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Navigation size={20} className="text-blue-400" />
-            Historique des Positions ({locations.length})
-          </h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Heure</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Type</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Latitude</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Longitude</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Précision</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {locations.map((location) => (
-                <tr key={location.id} className="hover:bg-slate-700/50 transition">
-                  <td className="px-6 py-4 text-white">
-                    {new Date(location.timestamp).toLocaleTimeString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      location.activity_type === 'Check-in' ? 'bg-green-500/20 text-green-400' :
-                      location.activity_type === 'Visite' ? 'bg-blue-500/20 text-blue-400' :
-                      location.activity_type === 'Check-out' ? 'bg-blue-500/20 text-blue-400' :
-                      'bg-slate-500/20 text-slate-400'
-                    }`}>
-                      {location.activity_type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-300 font-mono text-sm">
-                    {location.latitude.toFixed(6)}
-                  </td>
-                  <td className="px-6 py-4 text-slate-300 font-mono text-sm">
-                    {location.longitude.toFixed(6)}
-                  </td>
-                  <td className="px-6 py-4 text-slate-300">
-                    ±{location.accuracy.toFixed(1)}m
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {locations.length === 0 && (
-            <div className="text-center py-12">
-              <MapPin size={48} className="mx-auto text-slate-600 mb-4" />
-              <p className="text-slate-400">Aucune position enregistrée pour cette date</p>
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700/50 bg-slate-900/20">
+            <span className="text-[10px] text-slate-500">Page {currentPage} sur {totalPages}</span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
+              >
+                <ChevronLeft size={12} />
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
+              >
+                <ChevronRight size={12} />
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {/* Detail Sheet */}
+      <Sheet open={!!selectedLocation} onOpenChange={(open) => !open && setSelectedLocation(null)}>
+        <SheetContent className="w-full sm:max-w-md bg-slate-950 border-l-slate-800 p-0 overflow-y-auto">
+          {selectedLocation && (
+            <>
+              <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
+                <SheetTitle className="text-white flex items-center gap-2">
+                  <MapPin size={16} className="text-cyan-400" />
+                  Détail Position
+                </SheetTitle>
+                <SheetDescription className="text-slate-400">
+                  {new Date(selectedLocation.timestamp).toLocaleString('fr-FR')}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="p-6 space-y-6">
+                {/* Type Badge */}
+                <div className="flex justify-center">
+                  <span className={`px-4 py-2 rounded-full text-sm font-bold uppercase ${
+                    selectedLocation.activity_type === 'Check-in' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                    selectedLocation.activity_type === 'Visite' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                    selectedLocation.activity_type === 'Check-out' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                    'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+                  }`}>
+                    {selectedLocation.activity_type}
+                  </span>
+                </div>
+
+                {/* Coordinates Card */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                    <Navigation size={12} />
+                    Coordonnées GPS
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <InfoItem label="Latitude" value={selectedLocation.latitude.toFixed(6)} />
+                    <InfoItem label="Longitude" value={selectedLocation.longitude.toFixed(6)} />
+                  </div>
+                  <InfoItem label="Précision" value={`± ${selectedLocation.accuracy.toFixed(1)} mètres`} />
+                </div>
+
+                {/* Meta Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <InfoItem label="Heure" value={new Date(selectedLocation.timestamp).toLocaleTimeString('fr-FR')} />
+                  <InfoItem label="Date" value={new Date(selectedLocation.timestamp).toLocaleDateString('fr-FR')} />
+                </div>
+
+                {/* Open in Maps */}
+                <a
+                  href={`https://www.google.com/maps?q=${selectedLocation.latitude},${selectedLocation.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm text-center transition shadow-lg shadow-blue-900/20"
+                >
+                  Voir sur Google Maps
+                </a>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SUB COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
+    const colorClasses: Record<string, string> = {
+        blue: 'from-blue-500/20 to-blue-600/5 border-blue-500/20 text-blue-400',
+        green: 'from-green-500/20 to-green-600/5 border-green-500/20 text-green-400',
+        emerald: 'from-emerald-500/20 to-emerald-600/5 border-emerald-500/20 text-emerald-400',
+        cyan: 'from-cyan-500/20 to-cyan-600/5 border-cyan-500/20 text-cyan-400',
+    };
+    
+    return (
+        <div className={`rounded-xl p-3 border bg-gradient-to-br ${colorClasses[color] || colorClasses.blue}`}>
+            <div className="flex justify-between items-start mb-1">
+                <div className="p-1.5 rounded-lg bg-white/5">{icon}</div>
+            </div>
+            <div className="text-lg font-bold text-white truncate">{value}</div>
+            <div className="text-[10px] uppercase font-bold opacity-70 tracking-wide">{label}</div>
+        </div>
+    );
+}
+
+function InfoItem({ label, value }: { label: string, value: string }) {
+    return (
+        <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+            <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">{label}</div>
+            <div className="text-sm font-medium text-slate-200 font-mono">{value}</div>
+        </div>
+    );
 }

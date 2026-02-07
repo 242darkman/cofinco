@@ -4,10 +4,10 @@ import {
   User, MapPin, Briefcase, FileText, Camera, ChevronRight,
   ChevronLeft, Save, X, UploadCloud, Check, File as FileIcon
 } from 'lucide-react';
-import { agenceApi, employeApi } from '../../lib/api-client';
+import { agenceApi, employeApi, villeApi } from '../../lib/api-client';
 import { isAdminRole, SystemRole } from '@shared/types/roles';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { StatutAgence } from '@shared/enum/status-constants';
+import { StatutAgence, CLIENT_ORIGIN_OPTIONS } from '@shared/enum/status-constants';
 
 interface CreateClientModalProps {
   isOpen: boolean;
@@ -31,7 +31,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
     telephoneRaw: '', // stored without prefix for input
     telephone: '', // full phone with prefix
     email: '',
-    ville: 'Brazzaville', 
+    ville: 'Brazzaville',
+    villeId: '',
     adresse: '',
     
     // Step 3
@@ -42,6 +43,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
     segment: 'Standard',
     agenceId: '',
     agentReferentId: '',
+    clientOrigin: 'OTHER',
     
     // Step 4 (Docs)
     files: { photo: null, cniRecto: null, cniVerso: null } as any
@@ -53,6 +55,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
   const [agences, setAgences] = useState<{ id: string; nom: string }[]>([]);
   const [typesMarches, setTypesMarches] = useState<{id: string; nom: string}[]>([]);
   const [agentsReferents, setAgentsReferents] = useState<{ id: string; nom: string; prenom: string }[]>([]);
+  const [villesList, setVillesList] = useState<{ id: string; nom: string }[]>([]);
 
   // Load Reference Data
   useEffect(() => {
@@ -63,6 +66,10 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
         // Types Marchés
         const resMarkets = await fetch('/api/types-marches', { credentials: 'include' });
         if (resMarkets.ok) setTypesMarches(await resMarkets.json());
+
+        // Villes
+        const villesData = await villeApi.getAll({ actif: true });
+        setVillesList(villesData);
 
         // Agences (if admin)
         if (isAdmin) {
@@ -115,6 +122,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
       telephone: formData.telephone,
       email: formData.email,
       ville: formData.ville,
+      villeId: formData.villeId || undefined,
       adresseDomicile: formData.adresse, // mapping to correct field
       
       profession: formData.profession,
@@ -126,6 +134,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
       
       agenceId: formData.agenceId || user?.agenceId, // Fallback to user agency if not admin
       agentReferentId: formData.agentReferentId,
+      clientOrigin: formData.clientOrigin,
       
       // TODO: Handle File Uploads securely in real flow
       // For now passing as placeholder or separate upload logic would be needed
@@ -205,7 +214,18 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                 </div>
 
                 <Input label="Email (Optionnel)" type="email" placeholder="client@email.com" value={formData.email} onChange={e => updatedField('email', e.target.value)} />
-                <Input label="Ville / Localité" value={formData.ville} onChange={e => updatedField('ville', e.target.value)} />
+                <Select
+                  label="Ville / Localité"
+                  value={formData.villeId}
+                  onChange={e => {
+                    const selected = villesList.find((v: any) => v.id === e.target.value);
+                    updatedField('villeId', e.target.value);
+                    updatedField('ville', selected?.nom || '');
+                  }}
+                >
+                  <option value="">Sélectionner une ville...</option>
+                  {villesList.map((v: any) => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                </Select>
 
                 <div className="col-span-1 sm:col-span-2">
                    <Input label="Adresse Domicile" placeholder="Quartier, Avenue, N°..." value={formData.adresse} onChange={e => updatedField('adresse', e.target.value)} />
@@ -263,6 +283,9 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                    <option value="Premium">Premium</option>
                    <option value="VIP">VIP</option>
                    <option value="Entreprise">Entreprise</option>
+                </Select>
+                <Select label="Origine Client" value={formData.clientOrigin} onChange={e => updatedField('clientOrigin', e.target.value)}>
+                   {CLIENT_ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </Select>
 
                 <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-800 mt-2">

@@ -59,6 +59,7 @@ export type DomainEventType =
   | "EMPLOYEE_CREATED"
   // Operations terrain
   | "PROSPECTION_CREATED"
+  | "PROSPECT_CONVERTED"
   | "PAIEMENT_TERRAIN_VALIDATED"
   | "CREDIT_INSTALLMENT_LATE"
   | "SYSTEM_JOB_FAILED";

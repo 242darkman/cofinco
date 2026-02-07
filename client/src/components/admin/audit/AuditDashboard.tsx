@@ -43,7 +43,7 @@ export default function AuditDashboard() {
       ]);
 
       const totalLogs = logsData?.length || 0;
-      const totalTransactions = logsData?.filter((l: any) => l.entity_type === 'transaction')?.length || 0;
+      const totalTransactions = logsData?.filter((l: any) => l.entityType === 'transaction')?.length || 0;
       const transactionVolume = logsData?.reduce((sum: number, l: any) => sum + (l.montant || 0), 0) || 0;
 
       const totalAlerts = alertsData?.length || 0;

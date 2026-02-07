@@ -57,23 +57,23 @@ interface ClientAccountsProps {
 // Helper to normalize snake_case to camelCase response
 function normalizeCompte(c: any): CompteBancaire {
   // Convert EN typeCompte from backend to FR for UI display
-  const rawType = c.typeCompte || c.type_compte || '';
+  const rawType = c.typeCompte || '';
   const typeCompte = TYPE_COMPTE_TO_FR[rawType] || rawType;
 
   return {
     id: c.id,
-    clientId: c.clientId || c.client_id,
+    clientId: c.clientId,
     typeCompte: typeCompte as 'Courant' | 'Épargne' | 'Bloqué',
-    numeroCompte: c.numeroCompte || c.numero_compte || '',
-    soldeCourant: c.soldeCourant || c.solde_courant || '0',
-    tauxInteret: c.tauxInteret || c.taux_interet || 0,
-    dateOuverture: c.dateOuverture || c.date_ouverture,
+    numeroCompte: c.numeroCompte || '',
+    soldeCourant: c.soldeCourant || '0',
+    tauxInteret: c.tauxInteret || 0,
+    dateOuverture: c.dateOuverture,
     statut: c.statut || StatutCompte.ACTIVE,
-    blocageActif: c.blocageActif || c.blocage_actif || false,
-    blocageMotif: c.blocageMotif || c.blocage_motif,
-    blocageFin: c.blocageFin || c.blocage_fin,
-    createdAt: c.createdAt || c.created_at,
-    updatedAt: c.updatedAt || c.updated_at,
+    blocageActif: c.blocageActif || false,
+    blocageMotif: c.blocageMotif,
+    blocageFin: c.blocageFin,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
   };
 }
 
@@ -152,7 +152,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
         const userRes = await fetch('/api/auth/me', { credentials: 'include' });
         if (userRes.ok) {
           const userData = await userRes.json();
-          targetAgenceId = userData.agenceId || userData.agence_id;
+          targetAgenceId = userData.agenceId;
         }
       }
 

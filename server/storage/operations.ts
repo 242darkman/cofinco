@@ -243,7 +243,7 @@ export async function getProspectionsByAgent(agentId: string): Promise<Prospecti
     .select()
     .from(prospections)
     .where(and(eq(prospections.agentId, agentId), notDeleted(prospections)))
-    .orderBy(desc(prospections.dateProspection));
+    .orderBy(desc(prospections.createdAt));
 }
 
 export async function getAllProspections(): Promise<Prospection[]> {
@@ -251,7 +251,7 @@ export async function getAllProspections(): Promise<Prospection[]> {
     .select()
     .from(prospections)
     .where(notDeleted(prospections))
-    .orderBy(desc(prospections.dateProspection));
+    .orderBy(desc(prospections.createdAt));
 }
 
 export async function getProspectionsPaginated(
@@ -268,7 +268,7 @@ export async function getProspectionsPaginated(
     .select()
     .from(prospections)
     .where(notDeleted(prospections))
-    .orderBy(desc(prospections.dateProspection))
+    .orderBy(desc(prospections.createdAt))
     .limit(perPage)
     .offset((page - 1) * perPage);
 
@@ -276,22 +276,14 @@ export async function getProspectionsPaginated(
 }
 
 export async function createProspection(insertProspection: InsertProspection): Promise<Prospection> {
-  const [prospection] = await db.insert(prospections).values({
-    ...insertProspection,
-    latitude: insertProspection.latitude ? insertProspection.latitude.toString() : null,
-    longitude: insertProspection.longitude ? insertProspection.longitude.toString() : null
-  }).returning();
+  const [prospection] = await db.insert(prospections).values(insertProspection).returning();
   return prospection;
 }
 
 export async function updateProspection(id: string, updateData: Partial<InsertProspection>): Promise<Prospection | undefined> {
-  const updatePayload: any = { ...updateData };
-  if (updateData.latitude !== undefined) updatePayload.latitude = updateData.latitude ? updateData.latitude.toString() : null;
-  if (updateData.longitude !== undefined) updatePayload.longitude = updateData.longitude ? updateData.longitude.toString() : null;
-
   const [prospection] = await db
     .update(prospections)
-    .set(updatePayload)
+    .set(updateData)
     .where(eq(prospections.id, id))
     .returning();
   return prospection || undefined;

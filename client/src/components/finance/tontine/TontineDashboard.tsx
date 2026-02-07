@@ -76,8 +76,8 @@ export default function TontineDashboard({
         .map((c: any) => ({
           type: 'contribution',
           montant: Number(c.montant),
-          date: c.date_contribution || c.created_at || c.createdAt,
-          nom: c.client?.nom || c.tontine_membres?.clients?.nom || 'Inconnu'
+          date: c.dateContribution || c.createdAt,
+          nom: c.client?.nom || c.tontineMembres?.clients?.nom || 'Inconnu'
         }))
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setRecentActivity(activities);
@@ -180,7 +180,7 @@ export default function TontineDashboard({
           </div>
           {currentCycle ? (
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-white">#{currentCycle.cycleNumber || currentCycle.cycle_number}</span>
+              <span className="text-xl font-bold text-white">#{currentCycle.cycleNumber}</span>
               <Badge variant="success" className="text-[10px]" value="Actif" />
             </div>
           ) : (
@@ -211,19 +211,19 @@ export default function TontineDashboard({
                   </div>
                   <div className="text-white font-bold flex items-center gap-2">
                     <Gift size={16} className="text-emerald-400" />
-                    Tour #{nextTurn.turnNumber || nextTurn.turn_number}
+                    Tour #{nextTurn.turnNumber}
                   </div>
                   <div className="text-slate-400 text-xs mt-0.5">
-                    {nextTurn.dueDate || nextTurn.due_date ? new Date(nextTurn.dueDate || nextTurn.due_date).toLocaleDateString('fr-FR', {
+                    {nextTurn.dueDate ? new Date(nextTurn.dueDate).toLocaleDateString('fr-FR', {
                       day: 'numeric', month: 'short'
                     }) : '-'}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-white font-bold">
-                    {Number(nextTurn.amountExpected || nextTurn.amount_expected || 0).toLocaleString()} FCFA
+                    {Number(nextTurn.amountExpected || 0).toLocaleString()} FCFA
                   </div>
-                  {(nextTurn.isLocked || nextTurn.is_locked) && (
+                  {(nextTurn.isLocked) && (
                     <div className="flex items-center gap-1 text-amber-400 text-[10px] mt-1 justify-end">
                       <Lock size={10} />
                       <span>Verrouillé</span>
@@ -278,10 +278,10 @@ export default function TontineDashboard({
               const status = turn.status || 'SCHEDULED';
               const statusCfg = turnStatusConfig[status] || turnStatusConfig.SCHEDULED;
               const isNext = nextTurn?.id === turn.id;
-              const turnNum = turn.turnNumber || turn.turn_number;
-              const dueDate = turn.dueDate || turn.due_date;
-              const amountExpected = Number(turn.amountExpected || turn.amount_expected || 0);
-              const isLocked = turn.isLocked || turn.is_locked;
+              const turnNum = turn.turnNumber;
+              const dueDate = turn.dueDate;
+              const amountExpected = Number(turn.amountExpected || 0);
+              const isLocked = turn.isLocked;
 
               return (
                 <div
@@ -302,7 +302,7 @@ export default function TontineDashboard({
                     </div>
                     <div>
                       <div className="text-white text-xs font-medium">
-                        {turn.beneficiaryMemberName || turn.beneficiary_member_name || `Tour ${turnNum}`}
+                        {turn.beneficiaryMemberName || `Tour ${turnNum}`}
                       </div>
                       <div className="text-slate-500 text-[10px]">
                         {dueDate ? new Date(dueDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '-'}

@@ -21,7 +21,9 @@ const getTypeCompteLabel = (type: string): string => {
 
 interface Compte {
   id: string;
+  numeroCompte?: string;
   numero_compte: string;
+  typeCompte?: string;
   type_compte: string;
   solde: number;
   statut?: string;
@@ -83,7 +85,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
 
   // Safe escaped values
   const safeClientName = useMemo(() => escapeHtml(compte.clients.nom), [compte.clients.nom]);
-  const safeNumeroCompte = useMemo(() => escapeHtml(compte.numero_compte), [compte.numero_compte]);
+  const safeNumeroCompte = useMemo(() => escapeHtml(compte.numeroCompte), [compte.numeroCompte]);
 
   const validate = useCallback(() => {
     const newErrors: Record<string, string> = {};
@@ -282,7 +284,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               </div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-slate-400 text-sm">Type de compte</span>
-                <span className="text-white">{getTypeCompteLabel(compte.type_compte)}</span>
+                <span className="text-white">{getTypeCompteLabel(compte.typeCompte)}</span>
               </div>
               {isPendingActivation ? (
                 <>

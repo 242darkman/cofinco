@@ -84,9 +84,9 @@ function calculateZoneStats(enquetes: EnqueteCredit[]): ZoneStats[] {
   const zoneMap = new Map<string, EnqueteCredit[]>();
 
   enquetes.forEach(e => {
-    if (e.geo_latitude && e.geo_longitude) {
-      const lat = parseFloat(String(e.geo_latitude));
-      const lng = parseFloat(String(e.geo_longitude));
+    if (e.geoLatitude && e.geoLongitude) {
+      const lat = parseFloat(String(e.geoLatitude));
+      const lng = parseFloat(String(e.geoLongitude));
       // Arrondir pour créer des zones (environ 1km²)
       const zoneKey = `${lat.toFixed(2)}_${lng.toFixed(2)}`;
       if (!zoneMap.has(zoneKey)) {
@@ -99,7 +99,7 @@ function calculateZoneStats(enquetes: EnqueteCredit[]): ZoneStats[] {
   return Array.from(zoneMap.entries())
     .map(([key, items]) => {
       const [latStr, lngStr] = key.split('_');
-      const amounts = items.map(i => i.montant_demande || 0);
+      const amounts = items.map(i => i.montantDemande || 0);
       const totalAmount = amounts.reduce((a, b) => a + b, 0);
 
       return {
@@ -141,7 +141,7 @@ export default function EnqueteZoneAnalytics({
 
   // Filtrer les enquêtes
   const filteredEnquetes = useMemo(() => {
-    let filtered = enquetes.filter(e => e.geo_latitude && e.geo_longitude);
+    let filtered = enquetes.filter(e => e.geoLatitude && e.geoLongitude);
 
     // Filtre par date
     if (dateFilter !== 'all') {
@@ -149,7 +149,7 @@ export default function EnqueteZoneAnalytics({
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - days);
       filtered = filtered.filter(e =>
-        e.date_enquete && new Date(e.date_enquete) >= cutoff
+        e.dateEnquete && new Date(e.dateEnquete) >= cutoff
       );
     }
 
@@ -164,10 +164,10 @@ export default function EnqueteZoneAnalytics({
   // Calculer les positions pour la carte
   const positions = useMemo(() => {
     return filteredEnquetes
-      .filter(e => e.geo_latitude && e.geo_longitude)
+      .filter(e => e.geoLatitude && e.geoLongitude)
       .map(e => [
-        parseFloat(String(e.geo_latitude)),
-        parseFloat(String(e.geo_longitude))
+        parseFloat(String(e.geoLatitude)),
+        parseFloat(String(e.geoLongitude))
       ] as [number, number]);
   }, [filteredEnquetes]);
 
@@ -176,8 +176,8 @@ export default function EnqueteZoneAnalytics({
 
   // Stats globales
   const globalStats = useMemo(() => {
-    const withGeo = filteredEnquetes.filter(e => e.geo_latitude && e.geo_longitude);
-    const totalAmount = filteredEnquetes.reduce((sum, e) => sum + (e.montant_demande || 0), 0);
+    const withGeo = filteredEnquetes.filter(e => e.geoLatitude && e.geoLongitude);
+    const totalAmount = filteredEnquetes.reduce((sum, e) => sum + (e.montantDemande || 0), 0);
 
     return {
       total: filteredEnquetes.length,
@@ -343,9 +343,9 @@ export default function EnqueteZoneAnalytics({
                 }}
               >
                 {filteredEnquetes.map(enquete => {
-                  if (!enquete.geo_latitude || !enquete.geo_longitude) return null;
-                  const lat = parseFloat(String(enquete.geo_latitude));
-                  const lng = parseFloat(String(enquete.geo_longitude));
+                  if (!enquete.geoLatitude || !enquete.geoLongitude) return null;
+                  const lat = parseFloat(String(enquete.geoLatitude));
+                  const lng = parseFloat(String(enquete.geoLongitude));
 
                   return (
                     <Marker
@@ -359,8 +359,8 @@ export default function EnqueteZoneAnalytics({
                             {enquete.clients?.nom} {enquete.clients?.prenom}
                           </div>
                           <div className="text-xs text-gray-600 space-y-0.5">
-                            <div>Activité: {enquete.type_activite}</div>
-                            <div>Montant: {formatMoney(enquete.montant_demande)}</div>
+                            <div>Activité: {enquete.typeActivite}</div>
+                            <div>Montant: {formatMoney(enquete.montantDemande)}</div>
                             <div className="flex items-center gap-1">
                               Statut:
                               <span className={`font-medium ${
@@ -371,8 +371,8 @@ export default function EnqueteZoneAnalytics({
                                 {enquete.statut}
                               </span>
                             </div>
-                            {enquete.date_enquete && (
-                              <div>Date: {new Date(enquete.date_enquete).toLocaleDateString('fr-FR')}</div>
+                            {enquete.dateEnquete && (
+                              <div>Date: {new Date(enquete.dateEnquete).toLocaleDateString('fr-FR')}</div>
                             )}
                           </div>
                         </div>

@@ -20,12 +20,9 @@ import { formatMoney } from '../../lib/format';
 interface Compte {
   id: string;
   numeroCompte: string;
-  numero_compte?: string;
   typeCompte: string;
-  type_compte?: string;
   solde: number | string;
   soldeCourant?: number | string;
-  solde_courant?: number | string;
   // Nested client object from API
   clients?: {
     id?: string;
@@ -37,12 +34,8 @@ interface Compte {
   // Legacy flat fields (for compatibility)
   clientNom?: string;
   clientPrenom?: string;
-  client_nom?: string;
-  client_prenom?: string;
   userNom?: string;
   userPrenom?: string;
-  user_nom?: string;
-  user_prenom?: string;
 }
 
 interface ScheduledTransfer {
@@ -79,15 +72,15 @@ const FREQUENCES: { value: Frequence; label: string; shortLabel: string }[] = [
 
 const getOwnerName = (compte: Compte) => {
   // Check nested clients object first (from API response)
-  const nom = compte.clients?.nom || compte.clientNom || compte.client_nom || compte.userNom || compte.user_nom || '';
-  const prenom = compte.clients?.prenom || compte.clientPrenom || compte.client_prenom || compte.userPrenom || compte.user_prenom || '';
+  const nom = compte.clients?.nom || compte.clientNom || compte.userNom || '';
+  const prenom = compte.clients?.prenom || compte.clientPrenom || compte.userPrenom || '';
   return `${prenom} ${nom}`.trim() || 'Titulaire';
 };
 
-const getNumero = (compte: Compte) => compte.numeroCompte || compte.numero_compte || '';
+const getNumero = (compte: Compte) => compte.numeroCompte || '';
 
 const getSolde = (compte: Compte) => {
-  const solde = compte.soldeCourant || compte.solde_courant || compte.solde || 0;
+  const solde = compte.soldeCourant || compte.solde || 0;
   return Number(solde);
 };
 

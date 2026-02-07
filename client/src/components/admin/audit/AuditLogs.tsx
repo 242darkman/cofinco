@@ -10,20 +10,19 @@ import { loadPDFLibraries } from '@/lib/lazy-export';
 interface AuditLog {
   id: string;
   timestamp?: string;
-  created_at?: string;
   createdAt?: string;
-  user_email?: string;
+  userEmail?: string;
   action?: string;
-  entity_type?: string;
-  entity_id?: string;
+  entityType?: string;
+  entityId?: string;
   resource?: string;
   status?: string;
-  ip_address?: string;
-  error_message?: string;
+  ipAddress?: string;
+  errorMessage?: string;
 }
 
 const formatLogDate = (log: any) => {
-  const value = log?.timestamp ?? log?.created_at ?? log?.createdAt;
+  const value = log?.timestamp ?? log?.createdAt;
   if (!value) {
     return 'N/A';
   }
@@ -94,9 +93,9 @@ export default function AuditLogs() {
   const filteredLogs = logs.filter(log => {
     if (!searchTerm) return true;
     return (
-      log.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(log.entity_type ?? log.resource ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+      String(log.entityType ?? log.resource ?? '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
@@ -113,7 +112,7 @@ export default function AuditLogs() {
     csvContent += `N°${separator}Date/Heure${separator}Utilisateur${separator}Action${separator}Entité${separator}IP${separator}Statut${separator}Message\n`;
     
     filteredLogs.forEach((log, idx) => {
-      csvContent += `${idx + 1}${separator}${formatLogDate(log)}${separator}${log.user_email || 'Système'}${separator}${log.action}${separator}${log.entity_type || log.resource || 'N/A'}${separator}${log.ip_address || '-'}${separator}${ALL_STATUS_LABELS[log.status || ''] || log.status}${separator}${log.error_message || '-'}\n`;
+      csvContent += `${idx + 1}${separator}${formatLogDate(log)}${separator}${log.userEmail || 'Système'}${separator}${log.action}${separator}${log.entityType || log.resource || 'N/A'}${separator}${log.ipAddress || '-'}${separator}${ALL_STATUS_LABELS[log.status || ''] || log.status}${separator}${log.errorMessage || '-'}\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -141,9 +140,9 @@ export default function AuditLogs() {
     const tableData = filteredLogs.slice(0, 50).map((log, idx) => [
       idx + 1,
       formatLogDate(log),
-      log.user_email || 'Système',
+      log.userEmail || 'Système',
       log.action,
-      log.entity_type || log.resource || 'N/A',
+      log.entityType || log.resource || 'N/A',
       log.status
     ]);
 
@@ -166,13 +165,13 @@ export default function AuditLogs() {
       dateExport: new Date().toISOString(),
       statistiques: stats,
       logs: filteredLogs.map(log => ({
-        date: log.timestamp ?? log.created_at ?? log.createdAt,
-        utilisateur: log.user_email,
+        date: log.timestamp ?? log.createdAt,
+        utilisateur: log.userEmail,
         action: log.action,
-        entite: log.entity_type || log.resource || 'N/A',
-        ip: log.ip_address,
+        entite: log.entityType || log.resource || 'N/A',
+        ip: log.ipAddress,
         statut: log.status,
-        message: log.error_message
+        message: log.errorMessage
       }))
     };
     
@@ -390,15 +389,15 @@ export default function AuditLogs() {
                         {formatLogDate(log)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-white font-semibold">{log.user_email || 'Système'}</div>
+                        <div className="text-white font-semibold">{log.userEmail || 'Système'}</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400">
                           {log.action}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{log.entity_type || log.resource || 'N/A'}</td>
-                      <td className="px-4 py-3 text-slate-400 font-mono text-xs">{log.ip_address || '-'}</td>
+                      <td className="px-4 py-3 text-slate-300">{log.entityType || log.resource || 'N/A'}</td>
+                      <td className="px-4 py-3 text-slate-400 font-mono text-xs">{log.ipAddress || '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {getStatusIcon(log.status || '' )}
@@ -408,10 +407,10 @@ export default function AuditLogs() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {log.error_message && (
+                        {log.errorMessage && (
                           <div className="flex items-center gap-2 text-blue-400 text-sm">
                             <AlertTriangle size={16} />
-                            <span className="truncate max-w-xs">{log.error_message}</span>
+                            <span className="truncate max-w-xs">{log.errorMessage}</span>
                           </div>
                         )}
                       </td>

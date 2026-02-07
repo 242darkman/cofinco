@@ -25,11 +25,11 @@ interface DashboardStats {
 
 interface ActivityLog {
   id: string;
-  user_name: string;
+  userName: string;
   action: string;
   details: string;
-  created_at: string;
-  ip_address?: string;
+  createdAt: string;
+  ipAddress?: string;
 }
 
 export default function AdminDashboard() {
@@ -273,11 +273,20 @@ export default function AdminDashboard() {
                      <div key={log.id} className="p-2.5 rounded-lg bg-slate-800/40 border border-slate-700/50 hover:bg-slate-800/80 transition-all group shrink-0">
                         <div className="flex justify-between items-start mb-0.5">
                            <span className="text-[11px] font-bold text-indigo-400 truncate max-w-[120px]">
-                               {log.user_name}
+                               {log.userName}
                            </span>
-                           <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
-                               {format(new Date(log.created_at), 'HH:mm', { locale: fr })}
-                           </span>
+                            <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
+                                {(() => {
+                                  try {
+                                    const date = new Date(log.createdAt);
+                                    return !isNaN(date.getTime()) 
+                                      ? format(date, 'HH:mm', { locale: fr }) 
+                                      : '--:--';
+                                  } catch (e) {
+                                    return '--:--';
+                                  }
+                                })()}
+                            </span>
                         </div>
                         <p className="text-[11px] text-slate-300 font-medium mb-0.5 truncate">
                             {log.action}

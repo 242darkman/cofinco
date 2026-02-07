@@ -58,16 +58,16 @@ export default function DataChangesList({ changes, loading, onSelect, formatTime
                   value={change.operation} 
                   variant={getOperationVariant(change.operation)}
                 />
-                <span className="text-cyan-400 font-semibold truncate">{change.table_name}</span>
+                <span className="text-cyan-400 font-semibold truncate">{change.tableName}</span>
                 <span className="text-slate-400 text-sm whitespace-nowrap">
                   {formatTimestamp(change.timestamp)}
                 </span>
               </div>
               <div className="text-slate-300 text-sm truncate">
-                Par: <span className="text-white font-semibold">{change.user_email || 'Système'}</span>
+                Par: <span className="text-white font-semibold">{change.userEmail || 'Système'}</span>
               </div>
               <div className="text-slate-500 text-xs font-mono truncate">
-                ID: {change.record_id || '—'}
+                ID: {change.recordId || '—'}
               </div>
             </div>
             <GitCompare className="text-slate-500 ml-4 flex-shrink-0" size={20} />

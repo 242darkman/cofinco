@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Target, Users, Banknote, Clock, MapPin, Star, Award, Calendar, CheckCircle, AlertCircle, Phone, Zap, RefreshCw, BookOpen, LayoutDashboard, UserCircle, ChevronDown, Search } from 'lucide-react';
+import { TrendingUp, Target, Users, Banknote, Clock, MapPin, Star, Award, Calendar, CheckCircle, AlertCircle, Phone, Zap, RefreshCw, BookOpen, LayoutDashboard, UserCircle, ChevronDown, Search, UserPlus } from 'lucide-react';
 import Card from '../ui/Card';
 import StatCard from '../ui/StatCard';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui/FeatureHeader';
 import { authService } from '../../lib/auth';
+import { prospectionApi } from '../../lib/api-client';
 
 interface AgentProfile {
   id: string;
@@ -69,6 +70,62 @@ interface AgentDashboardProps {
   agentId?: string;
   selectedAgentId?: string | null;
   onAgentChange?: (agentId: string | null) => void;
+}
+
+function ProspectionKpiSection({ agentId }: { agentId?: string }) {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!agentId) { setLoading(false); return; }
+    setLoading(true);
+    const now = new Date();
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    prospectionApi.getStats(agentId, { period })
+      .then((data) => setStats(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [agentId]);
+
+  if (loading || !stats) return null;
+
+  const prospectsCreated = Number(stats.prospectsCreated || stats.prospects_created || 0);
+  const converted = Number(stats.convertedClients || stats.converted_clients || 0);
+  const conversionRate = Number(stats.conversionRate || stats.conversion_rate || 0);
+  const bonusAmount = Number(stats.bonusAmount || stats.bonus_amount || 0);
+  const toFollowUp = Number(stats.toFollowUp || stats.to_follow_up || 0);
+
+  if (prospectsCreated === 0 && converted === 0 && toFollowUp === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+        <UserPlus size={16} className="text-purple-400" />
+        Prospection
+      </h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Prospects</div>
+          <div className="text-lg font-bold text-white">{prospectsCreated}</div>
+          {toFollowUp > 0 && <div className="text-[10px] text-amber-400 mt-0.5">{toFollowUp} a suivre</div>}
+        </div>
+        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Convertis</div>
+          <div className="text-lg font-bold text-purple-400">{converted}</div>
+        </div>
+        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Taux Conversion</div>
+          <div className="text-lg font-bold text-cyan-400">{conversionRate.toFixed(1)}%</div>
+        </div>
+        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Primes</div>
+          <div className="text-lg font-bold text-emerald-400">
+            {bonusAmount >= 1000 ? `${(bonusAmount / 1000).toFixed(0)}K` : bonusAmount.toLocaleString()} FCFA
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: parentSelectedAgentId, onAgentChange }: AgentDashboardProps) {
@@ -224,11 +281,11 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
       // 3. Filter by period
       const filterDate = new Date(dateFilter);
       const visitesFiltered = visites.filter((v: any) => {
-        const d = new Date(v.dateVisite || v.date_visite);
+        const d = new Date(v.dateVisite);
         return d >= filterDate;
       });
       const paiementsFiltered = paiements.filter((p: any) => {
-        const d = new Date(p.createdAt || p.created_at);
+        const d = new Date(p.createdAt);
         return d >= filterDate;
       });
 
@@ -282,10 +339,10 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
       };
 
       // Portfolio
-      const uniqueClients = new Set(visites.map((v: any) => v.clientId || v.client_id).filter(Boolean));
+      const uniqueClients = new Set(visites.map((v: any) => v.clientId).filter(Boolean));
       const portefeuilleStats = {
         nombreClients: agent.nombreClients || uniqueClients.size,
-        clientsActifs: new Set(visitesFiltered.map((v: any) => v.clientId || v.client_id).filter(Boolean)).size,
+        clientsActifs: new Set(visitesFiltered.map((v: any) => v.clientId).filter(Boolean)).size,
       };
 
       // Performance from all objectifs
@@ -313,15 +370,15 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
       const inProgressFormations = formationsSuivi
         .filter((f: any) => (f.statut || '').toUpperCase() === 'IN_PROGRESS')
         .sort((a: any, b: any) => {
-          const da = a.date_debut || a.dateDebut || '';
-          const db2 = b.date_debut || b.dateDebut || '';
+          const da = a.dateDebut || '';
+          const db2 = b.dateDebut || '';
           return da.localeCompare(db2);
         });
 
       const nextFormation = inProgressFormations[0];
       const formationProchaine = nextFormation ? {
         titre: nextFormation.formation?.titre || nextFormation.titre || 'Formation en cours',
-        dateDebut: nextFormation.date_debut || nextFormation.dateDebut || '',
+        dateDebut: nextFormation.dateDebut || '',
         progression: Number(nextFormation.progression || 0),
       } : null;
 
@@ -342,7 +399,7 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
         {
           label: 'Collectes',
           valeurRealisee: paiementsFiltered.filter((p: any) => {
-            const d = new Date(p.createdAt || p.created_at);
+            const d = new Date(p.createdAt);
             return d.toISOString().split('T')[0] === now.toISOString().split('T')[0];
           }).length,
           valeurObjectif: Math.max(Number(agent.objectifMensuel || 0) > 0 ? Math.ceil(Number(agent.objectifMensuel) / 22) : 5, 1),
@@ -637,6 +694,9 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
           className="p-2.5 sm:p-3"
         />
       </div>
+
+      {/* Prospection KPIs */}
+      <ProspectionKpiSection agentId={agentProfile?.id} />
 
       {/* Performance + Objectifs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">

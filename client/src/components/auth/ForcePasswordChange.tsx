@@ -33,11 +33,11 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
   const passwordRequirements = useMemo(() => {
     if (!securitySettings) return DEFAULT_PASSWORD_REQUIREMENTS;
     return {
-      minLength: securitySettings.password_min_length ?? DEFAULT_PASSWORD_REQUIREMENTS.minLength,
-      requireUppercase: securitySettings.password_require_uppercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireUppercase,
-      requireLowercase: securitySettings.password_require_lowercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireLowercase,
-      requireNumbers: securitySettings.password_require_numbers ?? DEFAULT_PASSWORD_REQUIREMENTS.requireNumbers,
-      requireSpecialChars: securitySettings.password_require_special ?? DEFAULT_PASSWORD_REQUIREMENTS.requireSpecialChars,
+      minLength: securitySettings.passwordMinLength ?? DEFAULT_PASSWORD_REQUIREMENTS.minLength,
+      requireUppercase: securitySettings.passwordRequireUppercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireUppercase,
+      requireLowercase: securitySettings.passwordRequireLowercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireLowercase,
+      requireNumbers: securitySettings.passwordRequireNumbers ?? DEFAULT_PASSWORD_REQUIREMENTS.requireNumbers,
+      requireSpecialChars: securitySettings.passwordRequireSpecial ?? DEFAULT_PASSWORD_REQUIREMENTS.requireSpecialChars,
       specialChars: DEFAULT_PASSWORD_REQUIREMENTS.specialChars
     };
   }, [securitySettings]);

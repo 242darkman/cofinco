@@ -47,15 +47,15 @@ export function CashJournal({
 
     // Trier les sessions par date d'ouverture ASC pour le calcul du solde progressif
     const sortedSessions = [...sessions].sort((a, b) => {
-      const dateA = new Date(a.openedAt || a.opened_at || '');
-      const dateB = new Date(b.openedAt || b.opened_at || '');
+      const dateA = new Date(a.openedAt || '');
+      const dateB = new Date(b.openedAt || '');
       return dateA.getTime() - dateB.getTime();
     });
 
     for (const session of sortedSessions) {
-      const sessionOpenDate = new Date(session.openedAt || session.opened_at || '');
-      const soldeInitial = Number(session.solde_initial || session.soldeInitial || session.montant_ouverture || session.montantOuverture || 0);
-      const caissierName = session.caissier_nom || 'Caissier';
+      const sessionOpenDate = new Date(session.openedAt || '');
+      const soldeInitial = Number(session.soldeInitial || session.montantOuverture || 0);
+      const caissierName = session.caissierNom || 'Caissier';
 
       // Entrée d'ouverture de session
       soldeProgressif = soldeInitial;
@@ -74,17 +74,17 @@ export function CashJournal({
 
       // Récupérer les transactions de cette session, triées par date ASC pour le calcul
       const sessionTransactions = transactions
-        .filter((t) => t.session_id === session.id || t.sessionId === session.id)
+        .filter((t) => t.sessionId === session.id)
         .sort((a, b) => {
-          const dateA = new Date(a.created_at || a.createdAt || '');
-          const dateB = new Date(b.created_at || b.createdAt || '');
+          const dateA = new Date(a.createdAt || '');
+          const dateB = new Date(b.createdAt || '');
           return dateA.getTime() - dateB.getTime();
         });
 
       // Ajouter chaque transaction
       for (const tx of sessionTransactions) {
         const montant = Number(tx.montant);
-        const typeOp = tx.type_operation || tx.typeOperation || '';
+        const typeOp = tx.typeOperation || '';
         const isEntree = isEntreeOperation(typeOp);
 
         if (isEntree) {
@@ -94,14 +94,14 @@ export function CashJournal({
         }
 
         // Récupérer le nom du client - seulement si disponible
-        const hasClient = tx.client_nom || tx.client_prenom;
+        const hasClient = tx.clientNom || tx.clientPrenom;
         const clientName = hasClient
-          ? `${tx.client_prenom || ''} ${tx.client_nom || ''}`.trim()
+          ? `${tx.clientPrenom || ''} ${tx.clientNom || ''}`.trim()
           : undefined; // undefined = client not found/unknown
 
         entries.push({
           id: tx.id,
-          date: new Date(tx.created_at || tx.createdAt || ''),
+          date: new Date(tx.createdAt || ''),
           type: 'OPERATION',
           operationType: typeOp,
           description: tx.description || getOperationLabel(typeOp),
@@ -111,17 +111,17 @@ export function CashJournal({
           sens: isEntree ? 'ENTREE' : 'SORTIE',
           soldeProgressif,
           sessionId: session.id,
-          modePaiement: tx.mode_paiement || tx.modePaiement,
+          modePaiement: tx.modePaiement,
         });
       }
 
       // Entrée de fermeture si la session est fermée
       const sessionStatus = session.computedStatus || session.statut;
-      if (sessionStatus === 'CLOSED' && (session.closedAt || session.closed_at)) {
-        const soldeFinal = Number(session.solde_reel || session.soldeReel || soldeProgressif);
+      if (sessionStatus === 'CLOSED' && session.closedAt) {
+        const soldeFinal = Number(session.soldeReel || soldeProgressif);
         entries.push({
           id: `close-${session.id}`,
-          date: new Date(session.closedAt || session.closed_at || ''),
+          date: new Date(session.closedAt || ''),
           type: 'FERMETURE',
           description: 'Fermeture de session',
           montant: soldeFinal,

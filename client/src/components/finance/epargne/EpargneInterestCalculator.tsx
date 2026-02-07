@@ -8,10 +8,10 @@ import ConfirmDialog from '../../ui/ConfirmDialog';
 
 interface Compte {
   id: string;
-  numero_compte: string;
+  numeroCompte: string;
   solde: number;
-  taux_interet?: number;
-  date_ouverture?: string;
+  tauxInteret?: number;
+  dateOuverture?: string;
   clients: {
     id: string;
     nom: string;
@@ -38,8 +38,8 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
   const [showConfirm, setShowConfirm] = useState(false);
 
   // Default values for optional properties
-  const tauxInteret = compte.taux_interet ?? 0;
-  const dateOuverture = compte.date_ouverture ?? new Date().toISOString();
+  const tauxInteret = compte.tauxInteret ?? 0;
+  const dateOuverture = compte.dateOuverture ?? new Date().toISOString();
 
   // Memoized calculations
   const { interets, nouveauSolde, rendement, joursOuvert } = useMemo(() => {
@@ -99,7 +99,7 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
 
   // Escape client name for XSS protection
   const safeClientName = compte.clients ? escapeHtml(compte.clients.nom) : 'Client inconnu';
-  const safeNumeroCompte = escapeHtml(compte.numero_compte);
+  const safeNumeroCompte = escapeHtml(compte.numeroCompte);
 
   return (
     <div
@@ -148,7 +148,7 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
               </div>
               <div>
                 <div className="text-slate-400 text-sm mb-1">Taux d'intérêt annuel</div>
-                <div className="text-white font-bold">{compte.taux_interet}%</div>
+                <div className="text-white font-bold">{compte.tauxInteret}%</div>
               </div>
               <div>
                 <div className="text-slate-400 text-sm mb-1">Ouvert depuis</div>
@@ -239,7 +239,7 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
                   Formule: Solde × Taux × (Jours / 365)
                 </p>
                 <p className="text-slate-400 mt-1">
-                  = {compte.solde.toLocaleString('fr-FR')} × {compte.taux_interet}% × ({PERIODE_CONFIG[periode].days} / 365)
+                  = {compte.solde.toLocaleString('fr-FR')} × {compte.tauxInteret}% × ({PERIODE_CONFIG[periode].days} / 365)
                 </p>
                 <p className="text-slate-400 mt-1">
                   = <span className="text-white font-bold">{formatMoney(interets)}</span>

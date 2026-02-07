@@ -24,7 +24,7 @@ interface PaiementTerrain {
   methodePaiement: string;
   reference: string;
   referenceExterne?: string;
-  agents_terrain?: { nom: string; prenom: string };
+  agentsTerrain?: { nom: string; prenom: string };
   clients?: { nom: string; prenom: string; telephone: string; photoProfile?: string };
   observations?: string;
   validationOTP?: string;
@@ -304,17 +304,17 @@ export default function AdminValidationTerrain() {
           p.reference?.toLowerCase().includes(search) ||
           p.clients?.nom?.toLowerCase().includes(search) ||
           p.clients?.prenom?.toLowerCase().includes(search) ||
-          p.agents_terrain?.nom?.toLowerCase().includes(search)
+          p.agentsTerrain?.nom?.toLowerCase().includes(search)
         );
       })
     : allPayments;
 
   const totalPages = isSearching
     ? Math.max(1, Math.ceil(filteredData.length / itemsPerPage))
-    : paymentsResponse?.meta?.pagination?.total_pages || 1;
+    : paymentsResponse?.meta?.pagination?.totalPages || 1;
   const totalItems = isSearching
     ? filteredData.length
-    : paymentsResponse?.meta?.pagination?.total_items || 0;
+    : paymentsResponse?.meta?.pagination?.totalItems || 0;
   const paginatedData = isSearching
     ? filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage)
     : filteredData;
@@ -392,7 +392,7 @@ export default function AdminValidationTerrain() {
       key: 'agent',
       label: 'Agent',
       format: (_: any, item: PaiementTerrain) => (
-        <span className="text-sm">{item.agents_terrain ? `${item.agents_terrain.nom} ${item.agents_terrain.prenom}` : 'Inconnu'}</span>
+        <span className="text-sm">{item.agentsTerrain ? `${item.agentsTerrain.nom} ${item.agentsTerrain.prenom}` : 'Inconnu'}</span>
       ),
       hideOnMobile: true
     },
@@ -705,7 +705,7 @@ export default function AdminValidationTerrain() {
                               <div>
                                   <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Agent Collecteur</label>
                                   <p className="font-medium text-slate-800 dark:text-slate-200">
-                                      {detailPayment.agents_terrain ? `${detailPayment.agents_terrain.nom} ${detailPayment.agents_terrain.prenom}` : 'Non spécifié'}
+                                      {detailPayment.agentsTerrain ? `${detailPayment.agentsTerrain.nom} ${detailPayment.agentsTerrain.prenom}` : 'Non spécifié'}
                                   </p>
                               </div>
                               {detailPayment.latitude && detailPayment.longitude && (

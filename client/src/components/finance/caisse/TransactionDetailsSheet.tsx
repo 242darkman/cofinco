@@ -418,7 +418,7 @@ export default function TransactionDetailsSheet({
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2">
                                                                 <span className={`text-xs font-bold ${isReversal ? 'text-red-500 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
-                                                                    {isReversal ? 'Annulation' : (op.type_operation || op.typeOperation || 'Opération')}
+                                                                    {isReversal ? 'Annulation' : (op.typeOperation || 'Opération')}
                                                                 </span>
                                                                 {isCurrent && (
                                                                     <span className="text-[10px] px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 rounded font-medium">
@@ -427,11 +427,11 @@ export default function TransactionDetailsSheet({
                                                                 )}
                                                             </div>
                                                             <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                                                {formatMoney(Number(op.montant), { showCurrency: true })} · {formatDate(op.created_at || op.createdAt, { format: 'datetime' })}
+                                                                {formatMoney(Number(op.montant), { showCurrency: true })} · {formatDate(op.createdAt, { format: 'datetime' })}
                                                             </div>
-                                                            {(op.reversal_reason || op.reversalReason) && (
+                                                            {op.reversalReason && (
                                                                 <div className="text-[10px] text-red-400 mt-0.5 italic">
-                                                                    Motif: {op.reversal_reason || op.reversalReason}
+                                                                    Motif: {op.reversalReason}
                                                                 </div>
                                                             )}
                                                             <div className="text-[10px] text-slate-500 font-mono mt-0.5">

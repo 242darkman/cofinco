@@ -75,11 +75,11 @@ export default function AgentTerrainMap() {
         const rawVisites = Array.isArray(visitesData) ? visitesData : (visitesData.data || []);
         setVisits(rawVisites.filter((v: any) => v.latitude && v.longitude).map((v: any) => ({
           id: v.id,
-          clientNom: v.client_nom || v.clientNom || 'Client',
+          clientNom: v.clientNom || 'Client',
           latitude: Number(v.latitude),
           longitude: Number(v.longitude),
           statut: v.statut || v.status || 'Effectuée',
-          dateVisite: v.date_visite || v.dateVisite || v.created_at || '',
+          dateVisite: v.dateVisite || v.createdAt || '',
         })));
       }
 

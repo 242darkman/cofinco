@@ -5,13 +5,13 @@ import { Card, Badge } from '../ui';
 
 interface ClientAlert {
   id: string;
-  client_id: string;
-  alert_type: 'payment_overdue' | 'document_missing' | 'kyc_pending' | 'credit_late' | 'low_balance';
-  alert_level: 'info' | 'warning' | 'critical';
+  clientId: string;
+  alertType: 'payment_overdue' | 'document_missing' | 'kyc_pending' | 'credit_late' | 'low_balance';
+  alertLevel: 'info' | 'warning' | 'critical';
   message: string;
-  is_resolved: boolean;
-  resolved_at?: string;
-  created_at: string;
+  isResolved: boolean;
+  resolvedAt?: string;
+  createdAt: string;
 }
 
 interface ClientAlertsProps {
@@ -35,7 +35,7 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
       const data: ClientAlert[] = await res.json();
       setAlerts(data.sort((a, b) => {
         const levelOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-        return (levelOrder[a.alert_level] ?? 3) - (levelOrder[b.alert_level] ?? 3);
+        return (levelOrder[a.alertLevel] ?? 3) - (levelOrder[b.alertLevel] ?? 3);
       }));
     } catch (error) {
       console.error('Erreur chargement alertes:', error);
@@ -52,7 +52,7 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
       });
       if (!res.ok) throw new Error('Erreur resolution alerte');
 
-      setAlerts(prev => prev.filter(a => a.alert_type !== alertType));
+      setAlerts(prev => prev.filter(a => a.alertType !== alertType));
       onUpdate?.();
     } catch (error) {
       console.error('Erreur resolution alerte:', error);
@@ -83,9 +83,9 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
     }
   };
 
-  const criticalAlerts = alerts.filter(a => a.alert_level === 'critical');
-  const warningAlerts = alerts.filter(a => a.alert_level === 'warning');
-  const infoAlerts = alerts.filter(a => a.alert_level === 'info');
+  const criticalAlerts = alerts.filter(a => a.alertLevel === 'critical');
+  const warningAlerts = alerts.filter(a => a.alertLevel === 'warning');
+  const infoAlerts = alerts.filter(a => a.alertLevel === 'info');
 
   return (
     <div className="space-y-4">
@@ -138,26 +138,26 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
                <Card key={alert.id} variant="default" padding="sm" className="bg-slate-800/30 hover:border-slate-600 transition-colors">
                  <div className="flex items-start gap-3">
                      <div className={`mt-0.5 p-1.5 rounded-lg ${
-                         alert.alert_level === 'critical' ? 'bg-red-500/10 text-red-400' :
-                         alert.alert_level === 'warning' ? 'bg-amber-500/10 text-amber-400' : 'bg-blue-500/10 text-blue-400'
+                         alert.alertLevel === 'critical' ? 'bg-red-500/10 text-red-400' :
+                         alert.alertLevel === 'warning' ? 'bg-amber-500/10 text-amber-400' : 'bg-blue-500/10 text-blue-400'
                      }`}>
-                         {getAlertIcon(alert.alert_level)}
+                         {getAlertIcon(alert.alertLevel)}
                      </div>
 
                      <div className="flex-1 min-w-0">
                          <div className="flex items-center justify-between mb-1">
                              <div className="flex items-center gap-2">
                                  <Badge
-                                    value={getAlertLabel(alert.alert_level)}
-                                    variant={getAlertVariant(alert.alert_level)}
+                                    value={getAlertLabel(alert.alertLevel)}
+                                    variant={getAlertVariant(alert.alertLevel)}
                                     size="sm"
                                  />
                                  <span className="text-[10px] text-slate-500 uppercase font-semibold hidden sm:inline-block">
-                                     {new Date(alert.created_at).toLocaleDateString()}
+                                     {new Date(alert.createdAt).toLocaleDateString()}
                                  </span>
                              </div>
                              <button
-                                onClick={() => handleResolveAlert(alert.alert_type)}
+                                onClick={() => handleResolveAlert(alert.alertType)}
                                 className="text-slate-400 hover:text-white p-1 hover:bg-slate-700/50 rounded transition"
                                 title="Marquer comme resolu"
                              >
@@ -168,7 +168,7 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
                              {alert.message}
                          </p>
                          <p className="text-[10px] text-slate-500 mt-1 sm:hidden">
-                             {new Date(alert.created_at).toLocaleDateString()}
+                             {new Date(alert.createdAt).toLocaleDateString()}
                          </p>
                      </div>
                  </div>

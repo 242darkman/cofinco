@@ -21,15 +21,15 @@ import { caisseKeys, compteKeys } from '../../../lib/query-keys';
 
 interface Compte {
   id: string;
-  numero_compte: string;
-  type_compte: string;
+  numeroCompte: string;
+  typeCompte: string;
   solde: number;
-  solde_courant?: number;
+  soldeCourant?: number;
   statut: string;
-  client_id: string;
-  created_at?: string;
-  date_ouverture?: string;
-  taux_interet?: number;
+  clientId: string;
+  createdAt?: string;
+  dateOuverture?: string;
+  tauxInteret?: number;
   clients: {
     id: string;
     nom: string;
@@ -200,8 +200,8 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       }
       setActivationAccount({
         id: compte.id,
-        numeroCompte: compte.numero_compte,
-        typeCompte: compte.type_compte,
+        numeroCompte: compte.numeroCompte,
+        typeCompte: compte.typeCompte,
         montantInitial: getAccountBalance(compte),
         client: {
           id: compte.clients.id,
@@ -431,7 +431,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         <AccountActivationModal
           account={activationAccount}
           sessionId={sessionActive.id}
-          caisseName={sessionActive.caisse_nom}
+          caisseName={sessionActive.caisseNom}
           onClose={() => setActivationAccount(null)}
           onSuccess={() => {
             setActivationAccount(null);

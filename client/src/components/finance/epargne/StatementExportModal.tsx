@@ -50,10 +50,10 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
 
         // Header
         const clientName = `${compte.clients?.nom} ${compte.clients?.prenom || ''}`.trim();
-        const compteNum = compte.numero_compte || compte.numeroCompte;
+        const compteNum = compte.numeroCompte || compte.numeroCompte;
         const startY = addPdfLogoHeader(doc, {
           title: 'Relevé de Compte',
-          subtitle: `${clientName} — N° ${compteNum} — ${compte.type_compte || compte.typeCompte}`,
+          subtitle: `${clientName} — N° ${compteNum} — ${compte.typeCompte || compte.typeCompte}`,
           dateRight: `Période: ${format(new Date(startDate), 'dd/MM/yyyy')} au ${format(new Date(endDate), 'dd/MM/yyyy')}`,
         });
 
@@ -63,18 +63,18 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
         end.setHours(23, 59, 59);
         
         const filteredTransactions = transactions.filter(t => {
-          const d = new Date(t.date_transaction);
+          const d = new Date(t.dateTransaction);
           return d >= start && d <= end;
         });
         
         // Table
         const tableBody = filteredTransactions.map(t => [
-          format(new Date(t.date_transaction), 'dd/MM/yyyy HH:mm'),
-          t.type_transaction,
+          format(new Date(t.dateTransaction), 'dd/MM/yyyy HH:mm'),
+          t.typeTransaction,
           t.reference || '-',
           t.description || '-',
           t.montant > 0 ? `+${t.montant.toLocaleString('fr-FR')}` : `${t.montant.toLocaleString('fr-FR')}`,
-          t.solde_apres ? `${t.solde_apres.toLocaleString('fr-FR')}` : '-'
+          t.soldeApres ? `${t.soldeApres.toLocaleString('fr-FR')}` : '-'
         ]);
         
         autoTable(doc, {
@@ -110,7 +110,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
         doc.setTextColor(150);
         doc.text("Ce document est généré électroniquement et ne nécessite pas de signature.", 105, 280, { align: 'center' });
         
-        doc.save(`Releve_${compte.numero_compte || compte.numeroCompte}_${startDate}_${endDate}.pdf`);
+        doc.save(`Releve_${compte.numeroCompte || compte.numeroCompte}_${startDate}_${endDate}.pdf`);
 
       setIsGenerating(false);
       onClose();
@@ -133,7 +133,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
       end.setHours(23, 59, 59);
 
       const filteredTransactions = transactions.filter(t => {
-        const d = new Date(t.date_transaction);
+        const d = new Date(t.dateTransaction);
         return d >= start && d <= end;
       });
 
@@ -142,8 +142,8 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
         ['COFINCO - Relevé de Compte'],
         [],
         ['Client', `${compte.clients?.nom || ''} ${compte.clients?.prenom || ''}`],
-        ['Compte N°', compte.numero_compte || compte.numeroCompte],
-        ['Type', compte.type_compte || compte.typeCompte],
+        ['Compte N°', compte.numeroCompte || compte.numeroCompte],
+        ['Type', compte.typeCompte || compte.typeCompte],
         ['Période', `${format(new Date(startDate), 'dd/MM/yyyy')} au ${format(new Date(endDate), 'dd/MM/yyyy')}`],
         ["Date d'émission", format(new Date(), 'dd/MM/yyyy HH:mm')],
         [],
@@ -154,12 +154,12 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
 
       // Table rows
       const tableRows = filteredTransactions.map(t => [
-        format(new Date(t.date_transaction), 'dd/MM/yyyy HH:mm'),
-        t.type_transaction,
+        format(new Date(t.dateTransaction), 'dd/MM/yyyy HH:mm'),
+        t.typeTransaction,
         t.reference || '-',
         t.description || '-',
         t.montant,
-        t.solde_apres ?? '-',
+        t.soldeApres ?? '-',
       ]);
 
       // Summary
@@ -193,7 +193,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Relevé');
 
-        const filename = `Releve_${compte.numero_compte || compte.numeroCompte}_${startDate}_${endDate}.xlsx`;
+        const filename = `Releve_${compte.numeroCompte || compte.numeroCompte}_${startDate}_${endDate}.xlsx`;
         XLSX.writeFile(wb, filename);
 
       setIsGenerating(false);

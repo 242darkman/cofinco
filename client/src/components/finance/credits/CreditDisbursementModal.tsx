@@ -14,26 +14,26 @@ import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type Di
 
 interface Demande {
   id: string;
-  numero_demande: string;
-  client_id: string;
-  montant_demande: number;
-  montant_approuve?: number | null;
-  duree_valeur: number;
-  duree_unite: 'Jour' | 'Semaine' | 'Mois';
-  nombre_echeances?: number;
-  taux_interet: number;
-  type_credit: string | null;
-  objet_credit: string;
+  numeroDemande: string;
+  clientId: string;
+  montantDemande: number;
+  montantApprouve?: number | null;
+  dureeValeur: number;
+  dureeUnite: 'Jour' | 'Semaine' | 'Mois';
+  nombreEcheances?: number;
+  tauxInteret: number;
+  typeCredit: string | null;
+  objetCredit: string;
   statut: string;
-  frequence_remboursement: string;
-  date_demande: string;
-  created_at?: string;
+  frequenceRemboursement: string;
+  dateDemande: string;
+  createdAt?: string;
   clients: {
     nom: string;
     prenom?: string;
     email?: string;
     phone: string;
-    photo_url?: string;
+    photoUrl?: string;
   };
 }
 
@@ -91,7 +91,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
     return `/api/storage/files/${encodeURIComponent(photoUrl)}`;
   };
 
-  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photo_url), [demande.clients.photo_url]);
+  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photoUrl), [demande.clients.photoUrl]);
 
   // Helper: convert V2 duration to days
   const convertDureeEnJours = (valeur: number, unite: string): number => {
@@ -118,13 +118,13 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
 
   // Calculations
   const { montantTotal, mensualite, nombreEcheancesCalc } = useMemo(() => {
-    const base = demande.montant_approuve || demande.montant_demande;
-    const dureeValeur = demande.duree_valeur || 0;
-    const dureeUnite = demande.duree_unite || 'Mois';
-    const frequence = demande.frequence_remboursement;
+    const base = demande.montantApprouve || demande.montantDemande;
+    const dureeValeur = demande.dureeValeur || 0;
+    const dureeUnite = demande.dureeUnite || 'Mois';
+    const frequence = demande.frequenceRemboursement;
 
-    const nombreEcheances = demande.nombre_echeances || calculerNombreEcheances(frequence, dureeValeur, dureeUnite);
-    const total = base * (1 + demande.taux_interet / 100);
+    const nombreEcheances = demande.nombreEcheances || calculerNombreEcheances(frequence, dureeValeur, dureeUnite);
+    const total = base * (1 + demande.tauxInteret / 100);
     const mens = nombreEcheances > 0 ? total / nombreEcheances : 0;
 
     return {
@@ -149,13 +149,13 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
 
   // Calculer la date de fin du crédit
   const dateFin = useMemo(() => {
-    const joursTotal = convertDureeEnJours(demande.duree_valeur, demande.duree_unite);
+    const joursTotal = convertDureeEnJours(demande.dureeValeur, demande.dureeUnite);
     const date = new Date(dateEffectiveDecaissement);
     date.setDate(date.getDate() + joursTotal);
     return date;
-  }, [dateEffectiveDecaissement, demande.duree_valeur, demande.duree_unite]);
+  }, [dateEffectiveDecaissement, demande.dureeValeur, demande.dureeUnite]);
 
-  const montantDecaissement = demande.montant_approuve || demande.montant_demande;
+  const montantDecaissement = demande.montantApprouve || demande.montantDemande;
 
   // ============================================================================
   // HANDLERS
@@ -266,7 +266,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
       // Props de pré-remplissage
       prefilledDestinationCoffreId: insufficientFundsError.coffreId,
       prefilledMontant: insufficientFundsError.deficit.toString(),
-      prefilledMotif: `Approvisionnement pour décaissement crédit - Demande ${demande.numero_demande} - ${formatClientName(demande.clients.nom, demande.clients.prenom)}`,
+      prefilledMotif: `Approvisionnement pour décaissement crédit - Demande ${demande.numeroDemande} - ${formatClientName(demande.clients.nom, demande.clients.prenom)}`,
     };
 
     return (

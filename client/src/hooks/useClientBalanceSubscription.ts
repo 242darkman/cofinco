@@ -8,6 +8,7 @@
 import { useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
+import { useWebSocket } from './useWebSocket';
 
 interface BalanceUpdatePayload {
   clientId: string;

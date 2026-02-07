@@ -288,6 +288,29 @@ export const PERMISSION_MAPPINGS: Record<string, PermissionMapping> = {
   // Prospection
   'prospection.view': { action: Actions.VIEW, subject: Subjects.PROSPECTION },
   'prospection.create': { action: Actions.CREATE, subject: Subjects.PROSPECTION },
+  'prospection.edit': { action: Actions.EDIT, subject: Subjects.PROSPECTION },
+  'prospection.delete': { action: Actions.DELETE, subject: Subjects.PROSPECTION },
+  'prospection.convert': { action: Actions.CONVERT, subject: Subjects.PROSPECTION },
+  'prospection.export': { action: Actions.EXPORT, subject: Subjects.PROSPECTION },
+
+  // Primes de prospection
+  'prospection.primes.view': { action: Actions.VIEW, subject: Subjects.PROSPECTION_PRIME },
+  'prospection.primes.approve': { action: Actions.APPROVE, subject: Subjects.PROSPECTION_PRIME },
+  'prospection.primes.reject': { action: Actions.REJECT, subject: Subjects.PROSPECTION_PRIME },
+  'prospection.primes.pay': { action: Actions.VALIDATE, subject: Subjects.PROSPECTION_PRIME },
+
+  // Configuration primes prospection
+  'prospection.config.view': { action: Actions.VIEW, subject: Subjects.PROSPECTION_CONFIG },
+  'prospection.config.edit': { action: Actions.EDIT, subject: Subjects.PROSPECTION_CONFIG },
+
+  // Supervision prospection
+  'prospection.supervision.view': { action: Actions.VIEW, subject: Subjects.TERRAIN },
+
+  // Zones commerciales (Arrondissements & Marchés)
+  'zones.view': { action: Actions.VIEW, subject: Subjects.ARRONDISSEMENT },
+  'zones.create': { action: Actions.CREATE, subject: Subjects.ARRONDISSEMENT },
+  'zones.edit': { action: Actions.EDIT, subject: Subjects.ARRONDISSEMENT },
+  'zones.delete': { action: Actions.DELETE, subject: Subjects.ARRONDISSEMENT },
 
   // =====================
   // ADMIN
@@ -716,6 +739,24 @@ export const MODULE_PERMISSION_BUNDLES: Record<string, string[]> = {
   'Prospection': [
     'prospection.view',
     'prospection.create',
+    'prospection.edit',
+    'prospection.delete',
+    'prospection.convert',
+    'prospection.export',
+    'prospection.primes.view',
+    'prospection.primes.approve',
+    'prospection.primes.reject',
+    'prospection.primes.pay',
+    'prospection.config.view',
+    'prospection.config.edit',
+    'prospection.supervision.view',
+  ],
+
+  'Zones Commerciales': [
+    'zones.view',
+    'zones.create',
+    'zones.edit',
+    'zones.delete',
   ],
 
   // === OPÉRATIONS - TRANSFERTS ===

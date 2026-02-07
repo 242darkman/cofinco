@@ -44,13 +44,13 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
         setAgent(agentData);
 
         // Fetch employe data to get photo
-        const employeId = agentData.employeId || agentData.employe_id;
+        const employeId = agentData.employeId;
         if (employeId) {
           try {
             const employeRes = await fetch(`/api/employes/${employeId}`, { credentials: 'include' });
             if (employeRes.ok) {
               const employeData = await employeRes.json();
-              const photo = employeData.user?.photoProfile || employeData.user?.photo_profile || employeData.photoProfile || employeData.photo_profile;
+              const photo = employeData.user?.photoProfile || employeData.photoProfile;
               if (photo) setPhotoUrl(photo);
             }
           } catch {
@@ -72,14 +72,14 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
           visitesTotal: safeVisites.length,
           visitesEffectuees: safeVisites.filter((v: any) => v.statut === 'Effectuée').length,
           visitesPlanifiees: safeVisites.filter((v: any) => v.statut === 'Planifiée').length,
-          collecteTotal: safeVisites.reduce((sum: number, v: any) => sum + (v.montantCollecte || v.montant_collecte || 0), 0),
+          collecteTotal: safeVisites.reduce((sum: number, v: any) => sum + (v.montantCollecte || 0), 0),
           collecteMois: safeVisites
             .filter((v: any) => {
-              const vDate = new Date(v.dateVisite || v.date_visite);
+              const vDate = new Date(v.dateVisite);
               return vDate.getMonth() === currentMonth && vDate.getFullYear() === currentYear;
             })
-            .reduce((sum: number, v: any) => sum + (v.montantCollecte || v.montant_collecte || 0), 0),
-          clientsProspectes: safeVisites.filter((v: any) => v.typeVisite === 'Prospection' || v.type_visite === 'Prospection').length
+            .reduce((sum: number, v: any) => sum + (v.montantCollecte || 0), 0),
+          clientsProspectes: safeVisites.filter((v: any) => v.typeVisite === 'Prospection').length
         };
 
         setStats(calculatedStats);
@@ -95,7 +95,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
     const file = e.target.files?.[0];
     if (!file || !agent) return;
 
-    const employeId = agent.employeId || agent.employe_id;
+    const employeId = agent.employeId;
     if (!employeId) {
       alert('Impossible de mettre à jour la photo: agent non lié à un employé');
       return;
@@ -158,7 +158,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
     ? Math.round((stats.visitesEffectuees / stats.visitesTotal) * 100)
     : 0;
 
-  const objectifMensuel = agent.objectifMensuel || agent.objectif_mensuel || 0;
+  const objectifMensuel = agent.objectifMensuel || 0;
   const objectifAtteint = objectifMensuel > 0
     ? Math.round((stats.collecteMois / objectifMensuel) * 100)
     : 0;
@@ -207,7 +207,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
               </h2>
               <p className="text-xs text-content-muted truncate flex items-center gap-1">
                 <MapPin size={12} />
-                {agent.zoneAffectation || agent.zone_affectation || 'Zone non définie'}
+                {agent.zoneAffectation || 'Zone non définie'}
               </p>
             </div>
           </div>
@@ -266,7 +266,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                     </div>
                     <div className="min-w-0">
                        <p className="text-xs text-content-muted">Zone</p>
-                       <p className="font-medium text-content-primary truncate">{agent.zoneAffectation || agent.zone_affectation || '--'}</p>
+                       <p className="font-medium text-content-primary truncate">{agent.zoneAffectation || '--'}</p>
                     </div>
                   </div>
 
@@ -276,7 +276,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                     </div>
                     <div className="min-w-0">
                        <p className="text-xs text-content-muted">Date d'embauche</p>
-                       <p className="font-medium text-content-primary truncate">{formatDate(agent.dateEmbauche || agent.date_embauche)}</p>
+                       <p className="font-medium text-content-primary truncate">{formatDate(agent.dateEmbauche)}</p>
                     </div>
                   </div>
 
@@ -308,7 +308,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
               <div className="grid grid-cols-2 gap-3">
                 <Card padding="sm" className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20">
                    <div className="text-blue-400 mb-1"><Users size={20} /></div>
-                   <div className="text-2xl font-bold text-content-primary">{agent.nombreClients || agent.nombre_clients || 0}</div>
+                   <div className="text-2xl font-bold text-content-primary">{agent.nombreClients || 0}</div>
                    <div className="text-xs text-content-muted">Clients Portefeuille</div>
                 </Card>
                 <Card padding="sm" className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 border-emerald-500/20">
@@ -335,18 +335,18 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                           <p className="font-semibold text-content-primary">{visite.clients?.nom || visite.clientNom || 'Client'}</p>
                           <div className="flex items-center gap-1 text-xs text-content-muted mt-0.5">
                              <Calendar size={10} />
-                             {formatDate(visite.dateVisite || visite.date_visite)}
+                             {formatDate(visite.dateVisite)}
                           </div>
                        </div>
                        <Badge value={visite.statut} size="sm" />
                     </div>
                     <div className="flex items-center justify-between text-xs border-t border-edge pt-2 mt-2">
                        <span className="px-2 py-0.5 rounded bg-surface-elevated border border-edge text-content-secondary">
-                          {visite.typeVisite || visite.type_visite}
+                          {visite.typeVisite}
                        </span>
-                       {(visite.montantCollecte || visite.montant_collecte) > 0 && (
+                       {(visite.montantCollecte) > 0 && (
                           <span className="font-mono font-bold text-status-success">
-                             {(visite.montantCollecte || visite.montant_collecte).toLocaleString()} F
+                             {(visite.montantCollecte).toLocaleString()} F
                           </span>
                        )}
                     </div>

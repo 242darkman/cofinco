@@ -50,7 +50,7 @@ import { requireAuth } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
 import { attachAbility, requireAbility, requireDisbursement, hasAbility, Actions, Subjects } from "../authorization";
 import { logAudit } from "../audit";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
+import { normalizeKeysDeep, coerceValueToSchema } from "./utils";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { generateCreditReminderSchedule } from "../services/notifications/credit-reminder-service";
 import { db } from "../db";
@@ -86,7 +86,7 @@ export function registerFinanceRoutes(app: Express) {
     if (req.query.actif === 'true') filter.actif = true;
     
     const plans = await storage.getAllCreditPlans(filter);
-    res.json(addSnakeCaseAliasesDeep(plans));
+    res.json(plans);
   });
 
   app.post("/api/credit-plans", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), requireAgenceAccess(), async (req, res) => {
@@ -97,14 +97,14 @@ export function registerFinanceRoutes(app: Express) {
     
     const parsed = insertCreditPlanSchema.parse(data);
     const plan = await storage.createCreditPlan(parsed);
-    res.status(201).json(addSnakeCaseAliasesDeep(plan));
+    res.status(201).json(plan);
   });
 
   app.patch("/api/credit-plans/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), async (req, res) => {
     const data = normalizeKeysDeep(req.body) as any;
     const plan = await storage.updateCreditPlan(req.params.id, data);
     if (!plan) return res.status(404).json({ message: "Plan non trouvé" });
-    res.json(addSnakeCaseAliasesDeep(plan));
+    res.json(plan);
   });
 
   app.delete("/api/credit-plans/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), async (req, res) => {
@@ -134,7 +134,7 @@ export function registerFinanceRoutes(app: Express) {
     const result = await storage.getAllCredits(filter, options);
 
     res.json({
-      data: addSnakeCaseAliasesDeep(result.data),
+      data: result.data,
       pagination: {
         total: result.total,
         page: result.page,
@@ -191,7 +191,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'credit_new', id: credit.id } });
        }
 
-       res.status(201).json(addSnakeCaseAliasesDeep(credit));
+       res.status(201).json(credit);
      } catch (e) {
        res.status(400).json({ message: "Invalid data" });
      }
@@ -462,7 +462,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.status(201).json({
         success: true,
-        credit: addSnakeCaseAliasesDeep(credit),
+        credit: credit,
         compteCourant: (estProgramme || disbursementChannel === 'CASH') ? null : {
           id: compteCourant.id,
           numero: compteCourant.numeroCompte,
@@ -516,7 +516,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json({
         success: true,
         data: pendingDisbursements.map(item => ({
-          ...(addSnakeCaseAliasesDeep(item.credit) as Record<string, unknown>),
+          ...(item.credit as Record<string, unknown>),
           client: item.client
         })),
         count: pendingDisbursements.length
@@ -628,7 +628,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json({
         success: true,
-        credit: addSnakeCaseAliasesDeep(result.credit),
+        credit: result.credit,
         mouvement: result.mouvement,
         echeances: result.echeances,
         message: `Crédit ${result.credit.numeroCredit} décaissé et activé avec succès.`
@@ -723,7 +723,7 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json({
         success: true,
-        credit: addSnakeCaseAliasesDeep(updatedCredit),
+        credit: updatedCredit,
         message: `Décaissement du crédit ${credit.numeroCredit} annulé.`
       });
 
@@ -927,14 +927,14 @@ export function registerFinanceRoutes(app: Express) {
         }
       }
       
-      res.json(addSnakeCaseAliasesDeep(credit));
+      res.json(credit);
   });
 
   // --- ECHEANCES CREDIT ---
   
   app.get("/api/credits/:id/echeances", requireAuth, requireAgenceAccess(), async (req, res) => {
     const echeances = await storage.getEcheancesByCredit(req.params.id);
-    res.json(addSnakeCaseAliasesDeep(echeances));
+    res.json(echeances);
   });
 
   app.get("/api/credits/:id/echeances/prochaine", requireAuth, requireAgenceAccess(), async (req, res) => {
@@ -943,7 +943,7 @@ export function registerFinanceRoutes(app: Express) {
     if (!echeance) return res.json(null);
     
     // Enrichir avec des infos utiles pour le frontend si besoin
-    res.json(addSnakeCaseAliasesDeep(echeance));
+    res.json(echeance);
   });
 
   app.post("/api/credits/:id/generate-schedule", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CREDIT), async (req, res) => {
@@ -1008,7 +1008,7 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       const created = await storage.createEcheances(schedule);
-      res.json(addSnakeCaseAliasesDeep(created));
+      res.json(created);
 
     } catch (error: any) {
       logger.error({ err: error }, "Error generating schedule");
@@ -1086,7 +1086,7 @@ export function registerFinanceRoutes(app: Express) {
 
       const demandes = await storage.getAllDemandes(filter);
 
-      res.json(addSnakeCaseAliasesDeep(demandes));
+      res.json(demandes);
   });
 
   // Create demande credit (roles: admin, chef, credit, superviseur, terrain)
@@ -1198,7 +1198,7 @@ export function registerFinanceRoutes(app: Express) {
         timestamp: new Date(),
       });
 
-      res.json(addSnakeCaseAliasesDeep(demande));
+      res.json(demande);
   });
 
   app.patch("/api/demandes-credit/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
@@ -1339,7 +1339,7 @@ export function registerFinanceRoutes(app: Express) {
            }
       }
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur mise à jour demande crédit');
 
@@ -1382,7 +1382,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_cancelled', id: req.params.id } });
       }
 
-      res.json(addSnakeCaseAliasesDeep(demande));
+      res.json(demande);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur annulation demande crédit');
 
@@ -1441,7 +1441,7 @@ export function registerFinanceRoutes(app: Express) {
         timestamp: new Date(),
       });
 
-      res.json({ success: true, demande: addSnakeCaseAliasesDeep(updated) });
+      res.json({ success: true, demande: updated });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur démarrage enquête');
       res.status(500).json({ message: error.message || "Erreur lors du démarrage de l'enquête" });
@@ -1482,7 +1482,7 @@ export function registerFinanceRoutes(app: Express) {
         newStatut: StatutDemande.PENDING_APPROVAL,
       }, "success", "medium");
 
-      res.json({ success: true, demande: addSnakeCaseAliasesDeep(updated) });
+      res.json({ success: true, demande: updated });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur validation enquête');
       res.status(500).json({ message: error.message || "Erreur lors de la validation de l'enquête" });
@@ -1574,7 +1574,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ 
         success: true,
         message: "Demande rejetée avec succès",
-        demande: addSnakeCaseAliasesDeep(updated)
+        demande: updated
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur rejet commission');
@@ -1625,7 +1625,7 @@ export function registerFinanceRoutes(app: Express) {
               // Retourner le payment intent pour le suivi côté frontend
               return res.json({
                   paymentPending: true,
-                  paymentIntent: addSnakeCaseAliasesDeep(paymentIntent),
+                  paymentIntent: paymentIntent,
                   message: `Veuillez confirmer le paiement de ${data.montant} FCFA sur votre téléphone ${provider}`
               });
           }
@@ -1685,7 +1685,7 @@ export function registerFinanceRoutes(app: Express) {
               }
           }
 
-          res.json(addSnakeCaseAliasesDeep(result));
+          res.json(result);
       } catch (error: any) {
           logger.error({ err: error }, 'Erreur paiement frais');
           res.status(400).json({ message: error.message });
@@ -1787,7 +1787,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json({
         success: true,
         message: "Demande de remboursement créée avec succès",
-        refund: addSnakeCaseAliasesDeep(refundRequest)
+        refund: refundRequest
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur création remboursement');
@@ -1816,7 +1816,7 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       res.json({
-        refund: addSnakeCaseAliasesDeep({
+        refund: {
           id: activeRefund.id,
           statut: activeRefund.statut,
           montantRemboursable: Number(activeRefund.montantRemboursable),
@@ -1824,7 +1824,7 @@ export function registerFinanceRoutes(app: Express) {
           paymentMethod: activeRefund.paymentMethod,
           paidAt: activeRefund.paidAt,
           createdAt: activeRefund.createdAt
-        })
+        }
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur récupération statut remboursement');
@@ -1836,7 +1836,7 @@ export function registerFinanceRoutes(app: Express) {
       const enquetes = await storage.getEnqueteByDemandeId(req.params.id);
       if (!enquetes || enquetes.length === 0) return res.status(404).json({ message: "Enquête non trouvée" });
       // Return the most recent enquête for this demande
-      res.json(addSnakeCaseAliasesDeep(enquetes[0]));
+      res.json(enquetes[0]);
   });
 
   // Obtenir le détail du scoring pour une demande
@@ -2038,7 +2038,7 @@ export function registerFinanceRoutes(app: Express) {
       // or we can handle it here.
       // But standard pattern is:
       const enquetes = await storage.getAllEnquetes();
-      res.json(addSnakeCaseAliasesDeep(enquetes));
+      res.json(enquetes);
   });
 
   app.post("/api/enquetes-credit", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.DEMANDE_CREDIT), async (req, res) => {
@@ -2072,7 +2072,7 @@ export function registerFinanceRoutes(app: Express) {
           // Note: Domain event CREDIT_INVESTIGATION_ASSIGNED est maintenant envoyé
           // lors du démarrage de l'enquête (start-investigation endpoint)
 
-          res.json(addSnakeCaseAliasesDeep(enquete));
+          res.json(enquete);
       } catch (error: any) {
           logger.error({ err: error }, 'Enquete create error');
           res.status(500).json({
@@ -2131,7 +2131,7 @@ export function registerFinanceRoutes(app: Express) {
           }
       }
 
-      res.json(addSnakeCaseAliasesDeep(updatedEnquete));
+      res.json(updatedEnquete);
   });
 
   // Remboursements avec allocation FIFO automatique
@@ -2177,14 +2177,14 @@ export function registerFinanceRoutes(app: Express) {
         }
 
         // Retourner la réponse enrichie avec les allocations
-        res.json(addSnakeCaseAliasesDeep({
+        res.json({
           ...result.remboursement,
           mouvement_id: result.mouvement.id,
           allocations: result.allocationResult.allocations,
           overpayment_amount: result.allocationResult.overpaymentAmount,
           total_allocated: result.allocationResult.totalAllocated,
           credit_balance: result.allocationResult.creditBalance
-        }));
+        });
       } catch (error: any) {
         logger.error({ err: error }, 'Error creating remboursement with allocation');
         res.status(400).json({ message: error.message || 'Erreur lors du remboursement' });
@@ -2193,7 +2193,7 @@ export function registerFinanceRoutes(app: Express) {
 
   app.get("/api/credits/:id/remboursements", requireAuth, async (req, res) => {
       const rembs = await storage.getRemboursementsByCredit(req.params.id);
-      res.json(addSnakeCaseAliasesDeep(rembs));
+      res.json(rembs);
   });
 
   // Récupérer les allocations d'un remboursement
@@ -2201,7 +2201,7 @@ export function registerFinanceRoutes(app: Express) {
       try {
         const { getRepaymentAllocations } = await import("../services/repayment-allocation-service");
         const allocations = await getRepaymentAllocations(req.params.id);
-        res.json(addSnakeCaseAliasesDeep(allocations));
+        res.json(allocations);
       } catch (error: any) {
         logger.error({ err: error }, 'Error fetching repayment allocations');
         res.status(500).json({ message: error.message || 'Erreur lors de la récupération des allocations' });
@@ -2236,7 +2236,7 @@ export function registerFinanceRoutes(app: Express) {
           "high"
         );
 
-        res.json(addSnakeCaseAliasesDeep(result));
+        res.json(result);
       } catch (error: any) {
         logger.error({ err: error }, 'Error reversing repayment');
         res.status(500).json({ message: error.message || 'Erreur lors de l\'extourne du remboursement' });
@@ -2335,7 +2335,7 @@ export function registerFinanceRoutes(app: Express) {
          };
       }));
 
-      res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
+      res.json(enrichedCaisses);
   });
 
   app.get("/api/caisses", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
@@ -2408,7 +2408,7 @@ export function registerFinanceRoutes(app: Express) {
          };
       }));
 
-      res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
+      res.json(enrichedCaisses);
   });
 
   app.post("/api/caisses/:id/assign", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), requireAgenceAccess(), async (req, res) => {
@@ -2442,7 +2442,7 @@ export function registerFinanceRoutes(app: Express) {
 
       const parsed = insertCaisseSchema.parse(data);
       const caisse = await storage.createCaisse(parsed);
-      res.status(201).json(addSnakeCaseAliasesDeep(caisse));
+      res.status(201).json(caisse);
   });
 
   app.delete("/api/caisses/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
@@ -2468,7 +2468,7 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/sessions-caisse/active", requireAuth, async (req, res) => {
       const user = req.session.user!;
       const session = await storage.getActiveSessionForUser(user.id);
-      res.json(addSnakeCaseAliasesDeep(session || null));
+      res.json(session || null);
   });
 
   /**
@@ -2480,7 +2480,7 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/sessions-caisse/my-caisses", requireAuth, async (req, res) => {
     const user = req.session.user!;
     const caisses = await storage.getUserAssignedCaissesWithBalance(user.id);
-    res.json(addSnakeCaseAliasesDeep(caisses));
+    res.json(caisses);
   });
 
   app.get("/api/sessions-caisse", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE_SESSION), requireAgenceIdAccess(), async (req, res) => {
@@ -2494,7 +2494,7 @@ export function registerFinanceRoutes(app: Express) {
       };
       
       const sessions = await storage.getAllSessionsCaisse(filter);
-      res.json(addSnakeCaseAliasesDeep(sessions));
+      res.json(sessions);
   });
 
   /**
@@ -2511,7 +2511,7 @@ export function registerFinanceRoutes(app: Express) {
     }
 
     const sessions = await sessionClosingService.getClosingSessionsForAgence(agenceId);
-    res.json(addSnakeCaseAliasesDeep(sessions));
+    res.json(sessions);
   });
 
   /**
@@ -2522,7 +2522,7 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/sessions-caisse/pending", requireAuth, async (req, res) => {
     const user = req.session.user!;
     const session = await sessionOpeningService.getPendingSession(user.id);
-    res.json(addSnakeCaseAliasesDeep(session || null));
+    res.json(session || null);
   });
 
   /**
@@ -2532,7 +2532,7 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/sessions-caisse/risky", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_SESSION), async (req, res) => {
       try {
           const riskySessions = await sessionService.getRiskySessions();
-          res.json(addSnakeCaseAliasesDeep(riskySessions));
+          res.json(riskySessions);
       } catch (error: any) {
           logger.error({ err: error }, 'Erreur récupération sessions à risque');
           res.status(500).json({ message: error.message });
@@ -2547,7 +2547,7 @@ export function registerFinanceRoutes(app: Express) {
       try {
           const threshold = req.query.threshold ? Number(req.query.threshold) : undefined;
           const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
-          res.json(addSnakeCaseAliasesDeep(sessionsWithEcarts));
+          res.json(sessionsWithEcarts);
       } catch (error: any) {
           logger.error({ err: error }, 'Erreur récupération écarts');
           res.status(500).json({ message: error.message });
@@ -2591,13 +2591,13 @@ export function registerFinanceRoutes(app: Express) {
       if (!session) return res.status(404).json({ message: "Session introuvable" });
       
       const operations = await storage.getOperationsBySession(req.params.id);
-      res.json(addSnakeCaseAliasesDeep({ ...session, operations }));
+      res.json({ ...session, operations });
   });
 
   app.get("/api/sessions-caisse/caissier/:id", requireAuth, async (req, res) => {
       try {
           const sessions = await storage.getSessionsByCaissier(req.params.id);
-          res.json(addSnakeCaseAliasesDeep(sessions));
+          res.json(sessions);
       } catch (error: any) {
           res.status(500).json({ message: error.message });
       }
@@ -2675,7 +2675,7 @@ export function registerFinanceRoutes(app: Express) {
           "low"
       );
 
-      res.json(addSnakeCaseAliasesDeep(result.session));
+      res.json(result.session);
   });
 
   // Clôture de session
@@ -2753,7 +2753,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
       }
 
-      res.json(addSnakeCaseAliasesDeep(closedSession));
+      res.json(closedSession);
   });
 
   // ============================================================================
@@ -2819,7 +2819,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
       }
 
-      res.json(addSnakeCaseAliasesDeep(result.session));
+      res.json(result.session);
   });
 
   // ============================================================================
@@ -2827,7 +2827,7 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/caisses/status", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE), async (req, res) => {
     const agenceId = req.query.agenceId as string;
     const caisses = await storage.getCaissesWithStatus(agenceId);
-    res.json(addSnakeCaseAliasesDeep(caisses));
+    res.json(caisses);
   });
 
   // Opérations caisse du jour — toutes les opérations de la CAISSE pour aujourd'hui
@@ -2854,7 +2854,7 @@ export function registerFinanceRoutes(app: Express) {
         // Retourner les opérations du jour pour cette CAISSE (toutes sessions confondues)
         const operations = await storage.getOperationsCaisseToday(caisseId);
 
-        res.json(addSnakeCaseAliasesDeep(operations));
+        res.json(operations);
       } catch (error: any) {
         logger.error({ err: error }, 'Erreur récupération opérations du jour');
         res.status(500).json({ message: error.message });
@@ -2871,7 +2871,7 @@ export function registerFinanceRoutes(app: Express) {
         }
 
         const operations = await storage.getOperationsBySession(sessionId);
-        res.json(addSnakeCaseAliasesDeep(operations));
+        res.json(operations);
       } catch (error: any) {
         logger.error({ err: error }, 'Erreur récupération opérations par session');
         res.status(500).json({ message: error.message });
@@ -3012,7 +3012,7 @@ export function registerFinanceRoutes(app: Express) {
                 logger.error({ err }, 'Post-operation side-effects error');
             }
 
-            res.json(addSnakeCaseAliasesDeep(operation));
+            res.json(operation);
 
         } else {
             // Fallback for Operations WITHOUT Account impact (e.g. "Divers", "Frais divers" not linked to account)
@@ -3027,7 +3027,7 @@ export function registerFinanceRoutes(app: Express) {
                 idempotencyKey: parsed.idempotencyKey || undefined
             }, user.id);
 
-            res.json(addSnakeCaseAliasesDeep(operation));
+            res.json(operation);
         }
 
       } catch (error: any) {
@@ -3055,7 +3055,7 @@ export function registerFinanceRoutes(app: Express) {
                     wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
                 }
              }
-             res.json(addSnakeCaseAliasesDeep(updated));
+             res.json(updated);
       } catch (error: any) {
          logger.error({ err: error }, 'Error updating operation');
          res.status(400).json({ message: error.message || "Erreur lors de la mise à jour" });
@@ -3075,7 +3075,7 @@ export function registerFinanceRoutes(app: Express) {
       // Especially crucial for automated repayment toggle
 
       const updated = await storage.updateCredit(req.params.id, data as any);
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur mise à jour crédit');
 
@@ -3096,7 +3096,7 @@ export function registerFinanceRoutes(app: Express) {
   // Factures - Basic logic
   app.get("/api/factures", requireAuth, async (req, res) => {
       const factures = await storage.getAllFactures();
-      res.json(addSnakeCaseAliasesDeep(factures));
+      res.json(factures);
   });
 
   // Get single facture with lines and client info
@@ -3122,12 +3122,12 @@ export function registerFinanceRoutes(app: Express) {
         modele = await storage.getModeleFacture(facture.modeleId);
       }
 
-      res.json(addSnakeCaseAliasesDeep({
+      res.json({
         ...facture,
         lignes,
         client,
         modele
-      }));
+      });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur récupération facture');
       res.status(500).json({ message: error.message || "Erreur lors de la récupération de la facture" });
@@ -3139,13 +3139,13 @@ export function registerFinanceRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertFactureSchema.parse(data);
       const facture = await storage.createFacture(parsed);
-      res.json(addSnakeCaseAliasesDeep(facture));
+      res.json(facture);
   });
   // Caisse Transferts (Treasury)
   app.get("/api/caisse-transferts", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
     const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
     const transfers = await storage.getCaisseTransferts(agenceFilter?.agenceId);
-    res.json(addSnakeCaseAliasesDeep(transfers));
+    res.json(transfers);
   });
 
   // Initier un transfert
@@ -3202,7 +3202,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { type: 'transfert_new', id: transfert.id } });
       }
 
-      res.status(201).json(addSnakeCaseAliasesDeep(transfert));
+      res.status(201).json(transfert);
     } catch (e: any) {
       res.status(400).json({ message: e.message || "Erreur création transfert" });
     }
@@ -3260,7 +3260,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { type: 'transfert_validated', id } });
       }
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
   });
   
   // Annuler un transfert
@@ -3284,7 +3284,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { type: 'transfert_cancelled', id } });
       }
       
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
   });
 
   // ============================================================================
@@ -3309,7 +3309,7 @@ export function registerFinanceRoutes(app: Express) {
       if (limit) filter.limit = parseInt(limit as string, 10);
 
       const mouvements = await storage.getMouvementsFinanciers(filter);
-      res.json(addSnakeCaseAliasesDeep(mouvements));
+      res.json(mouvements);
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching mouvements');
       res.status(500).json({ message: error.message || 'Erreur serveur' });
@@ -3325,7 +3325,7 @@ export function registerFinanceRoutes(app: Express) {
         compteId: req.params.id,
         limit: 100
       });
-      res.json(addSnakeCaseAliasesDeep(mouvements));
+      res.json(mouvements);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -3340,7 +3340,7 @@ export function registerFinanceRoutes(app: Express) {
         creditId: req.params.id,
         limit: 100
       });
-      res.json(addSnakeCaseAliasesDeep(mouvements));
+      res.json(mouvements);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -3355,7 +3355,7 @@ export function registerFinanceRoutes(app: Express) {
         sessionCaisseId: req.params.id,
         limit: 100
       });
-      res.json(addSnakeCaseAliasesDeep(mouvements));
+      res.json(mouvements);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -3401,7 +3401,7 @@ export function registerFinanceRoutes(app: Express) {
 
       
       const results = await query.orderBy(desc(creditRefundRequests.createdAt));
-      res.json(addSnakeCaseAliasesDeep(results));
+      res.json(results);
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching refunds');
       res.status(500).json({ message: error.message });
@@ -3443,7 +3443,7 @@ export function registerFinanceRoutes(app: Express) {
      try {
         const refund = await storage.getCreditRefundRequest(req.params.id);
         if (!refund) return res.status(404).json({ message: "Refund request not found" });
-        res.json(addSnakeCaseAliasesDeep(refund));
+        res.json(refund);
      } catch (error: any) {
         res.status(500).json({ message: error.message });
      }
@@ -3500,7 +3500,7 @@ export function registerFinanceRoutes(app: Express) {
          });
        }
 
-       res.json(addSnakeCaseAliasesDeep(updated));
+       res.json(updated);
      } catch (error: any) {
        res.status(500).json({ message: error.message });
      }
@@ -3562,7 +3562,7 @@ export function registerFinanceRoutes(app: Express) {
 
           const updated = await storage.getCreditRefundRequest(refundId);
           return res.json({
-             ...(addSnakeCaseAliasesDeep(updated) as Record<string, unknown>),
+             ...(updated as Record<string, unknown>),
              message: method === 'CASH'
                 ? 'Remboursement en attente de validation caisse. Le caissier doit confirmer le paiement.'
                 : 'Remboursement Mobile Money en attente de validation caisse.'
@@ -3735,7 +3735,7 @@ export function registerFinanceRoutes(app: Express) {
          });
        }
 
-       res.json(addSnakeCaseAliasesDeep(updated));
+       res.json(updated);
 
     } catch (error: any) {
        logger.error({ err: error }, 'Payment error');
@@ -3875,7 +3875,7 @@ export function registerFinanceRoutes(app: Express) {
        }
 
        res.json({
-          ...(addSnakeCaseAliasesDeep(updated) as Record<string, unknown>),
+          ...(updated as Record<string, unknown>),
           message: 'Paiement validé avec succès. Le remboursement a été effectué.'
        });
 
@@ -3908,7 +3908,7 @@ export function registerFinanceRoutes(app: Express) {
        .where(and(...conditions))
        .orderBy(desc(creditRefundRequests.updatedAt));
 
-       res.json(addSnakeCaseAliasesDeep(results));
+       res.json(results);
     } catch (error: any) {
        res.status(500).json({ message: error.message });
     }
@@ -4092,10 +4092,10 @@ export function registerFinanceRoutes(app: Express) {
       "low"
     );
 
-    res.status(201).json(addSnakeCaseAliasesDeep({
+    res.status(201).json({
       session: result.session,
       transfert: result.transfert,
-    }));
+    });
   });
 
   /**
@@ -4173,9 +4173,9 @@ export function registerFinanceRoutes(app: Express) {
       "low"
     );
 
-    res.status(201).json(addSnakeCaseAliasesDeep({
+    res.status(201).json({
       session: result.session,
-    }));
+    });
   });
 
   /**
@@ -4231,7 +4231,7 @@ export function registerFinanceRoutes(app: Express) {
       "low"
     );
 
-    res.json(addSnakeCaseAliasesDeep(result.session));
+    res.json(result.session);
   });
 
   /**
@@ -4325,7 +4325,7 @@ export function registerFinanceRoutes(app: Express) {
       "medium"
     );
 
-    res.json(addSnakeCaseAliasesDeep(result.session));
+    res.json(result.session);
   });
 
   /**
@@ -4383,12 +4383,12 @@ export function registerFinanceRoutes(app: Express) {
       "medium"
     );
 
-    res.json(addSnakeCaseAliasesDeep({
+    res.json({
       session: result.session,
       soldeTheorique: result.soldeTheorique,
       montantPhysique: result.montantPhysique,
       ecart: result.ecart,
-    }));
+    });
   });
 
   /**
@@ -4462,10 +4462,10 @@ export function registerFinanceRoutes(app: Express) {
       "high"
     );
 
-    res.json(addSnakeCaseAliasesDeep({
+    res.json({
       session: result.session,
       transfert: result.transfert,
-    }));
+    });
   });
 
   /**
@@ -4509,7 +4509,7 @@ export function registerFinanceRoutes(app: Express) {
       "medium"
     );
 
-    res.json(addSnakeCaseAliasesDeep(result.session));
+    res.json(result.session);
   });
 
   /**
@@ -4596,7 +4596,7 @@ export function registerFinanceRoutes(app: Express) {
       const agenceId = req.query.agenceId as string | undefined;
 
       const status = await accessControlService.checkCaisseAccess(caisseId, agenceId);
-      res.json(addSnakeCaseAliasesDeep(status));
+      res.json(status);
     } catch (error: any) {
       logger.error({ err: error }, 'Error checking caisse access');
       res.status(500).json({ message: error.message });
@@ -4614,7 +4614,7 @@ export function registerFinanceRoutes(app: Express) {
       const agenceId = (req.query.agenceId as string | undefined) || user.agenceId;
 
       const status = await accessControlService.checkUserAuthorization(user.id, caisseId, agenceId);
-      res.json(addSnakeCaseAliasesDeep(status));
+      res.json(status);
     } catch (error: any) {
       logger.error({ err: error }, 'Error checking authorization');
       res.status(500).json({ message: error.message });
@@ -4657,10 +4657,10 @@ export function registerFinanceRoutes(app: Express) {
         "medium"
       );
 
-      res.json(addSnakeCaseAliasesDeep({
+      res.json({
         success: true,
         authorization: result.authorization,
-      }));
+      });
     } catch (error: any) {
       logger.error({ err: error }, 'Error validating access code');
       res.status(500).json({ success: false, error: error.message });
@@ -4807,13 +4807,13 @@ export function registerFinanceRoutes(app: Express) {
         "high"
       );
 
-      res.json(addSnakeCaseAliasesDeep({
+      res.json({
         success: true,
         code: result.code, // Returned only at creation time
         codeId: result.codeId,
         expiresAt,
         notificationSent: !!(data.sendNotification && data.assignedToUserId),
-      }));
+      });
     } catch (error: any) {
       logger.error({ err: error }, 'Error generating access code');
       res.status(500).json({ error: error.message });
@@ -4834,7 +4834,7 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       const codes = await accessControlService.getActiveCodesForAgence(agenceId);
-      res.json(addSnakeCaseAliasesDeep(codes));
+      res.json(codes);
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching access codes');
       res.status(500).json({ error: error.message });
@@ -4880,7 +4880,7 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       const authorizations = await accessControlService.getActiveAuthorizationsForAgence(agenceId);
-      res.json(addSnakeCaseAliasesDeep(authorizations));
+      res.json(authorizations);
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching authorizations');
       res.status(500).json({ error: error.message });
@@ -4985,7 +4985,7 @@ export function registerFinanceRoutes(app: Express) {
         "medium"
       );
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       logger.error({ err: error }, 'Error updating operating hours');
       res.status(500).json({ error: error.message });

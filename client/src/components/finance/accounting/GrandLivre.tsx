@@ -289,7 +289,7 @@ export default function GrandLivre() {
                         <option value="">Selectionner un compte...</option>
                         {comptes.map(c => (
                           <option key={c.id} value={c.id}>
-                            {c.numero_compte} - {c.intitule}
+                            {c.numeroCompte} - {c.intitule}
                           </option>
                         ))}
                     </select>

@@ -10,20 +10,20 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 interface UserSession {
   id: string;
-  user_id: string;
-  user_name: string;
-  user_email: string;
-  user_role: string;
-  ip_address?: string;
-  user_agent?: string;
-  device_type?: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceType?: string;
   browser?: string;
   os?: string;
   location?: string;
-  login_at: string;
-  last_activity: string;
+  loginAt: string;
+  lastActivity: string;
   status: 'active' | 'idle' | 'expired';
-  session_duration: number;
+  sessionDuration: number;
 }
 
 export default function AdminSessionsManager() {
@@ -48,20 +48,20 @@ export default function AdminSessionsManager() {
       // Transform session data from new active_sessions table
       const sessionsArray: UserSession[] = (activeSessions || []).map((session: any) => ({
         id: session.id,
-        user_id: session.userId,
-        user_name: session.user?.nom ? `${session.user.prenom || ''} ${session.user.nom}`.trim() : 'Utilisateur',
-        user_email: session.user?.email || '',
-        user_role: session.user?.role || 'N/A',
-        ip_address: session.ipAddress || '',
-        user_agent: session.userAgent || '',
-        device_type: session.deviceType || 'Desktop',
+        userId: session.userId,
+        userName: session.user?.nom ? `${session.user.prenom || ''} ${session.user.nom}`.trim() : 'Utilisateur',
+        userEmail: session.user?.email || '',
+        userRole: session.user?.role || 'N/A',
+        ipAddress: session.ipAddress || '',
+        userAgent: session.userAgent || '',
+        deviceType: session.deviceType || 'Desktop',
         browser: session.browser,
         os: session.os,
         location: session.location || session.user?.agence || '',
-        login_at: session.loginAt,
-        last_activity: session.lastActivity,
+        loginAt: session.loginAt,
+        lastActivity: session.lastActivity,
         status: session.status || 'active',
-        session_duration: session.sessionDuration || 0
+        sessionDuration: session.sessionDuration || 0
       }));
 
       setSessions(sessionsArray);
@@ -98,12 +98,12 @@ export default function AdminSessionsManager() {
   const terminateSession = useCallback((session: UserSession) => {
     openConfirm({
       title: 'Déconnecter cet utilisateur ?',
-      message: `Êtes-vous sûr de vouloir déconnecter ${session.user_name} ? L'utilisateur sera immédiatement déconnecté.`,
+      message: `Êtes-vous sûr de vouloir déconnecter ${session.userName} ? L'utilisateur sera immédiatement déconnecté.`,
       variant: 'danger',
       confirmText: 'Déconnecter',
       onConfirm: async () => {
         try {
-          await sessionApi.terminate(session.user_id);
+          await sessionApi.terminate(session.userId);
           toast.success('Session terminée avec succès');
           loadSessions();
         } catch (error) {
@@ -121,10 +121,10 @@ export default function AdminSessionsManager() {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
-      s.user_name.toLowerCase().includes(query) ||
-      s.user_email.toLowerCase().includes(query) ||
-      s.user_role.toLowerCase().includes(query) ||
-      (s.ip_address && s.ip_address.toLowerCase().includes(query))
+      s.userName.toLowerCase().includes(query) ||
+      s.userEmail.toLowerCase().includes(query) ||
+      s.userRole.toLowerCase().includes(query) ||
+      (s.ipAddress && s.ipAddress.toLowerCase().includes(query))
     );
   });
 
@@ -250,10 +250,10 @@ export default function AdminSessionsManager() {
                 label: 'Utilisateur',
                 primary: true,
                 format: (_, session) => {
-                  const style = getRoleBadgeStyle(session.user_role);
+                  const style = getRoleBadgeStyle(session.userRole);
                   return (
                     <div className="flex flex-col gap-1">
-                      <span className="font-semibold text-content-primary">{session.user_name}</span>
+                      <span className="font-semibold text-content-primary">{session.userName}</span>
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-medium border whitespace-nowrap w-fit transition-colors ${style.classes}`}>
                         {style.label}
                       </span>
@@ -274,15 +274,15 @@ export default function AdminSessionsManager() {
                  key: 'context',
                  label: 'Contexte',
                  format: (_, session) => {
-                   const Icon = getDeviceIcon(session.device_type);
+                   const Icon = getDeviceIcon(session.deviceType);
                    return (
                      <div className="flex flex-col text-xs">
                         <div className="flex items-center gap-2 text-content-secondary">
                           <Icon size={14} className="text-content-muted" />
-                          <span>{session.browser || session.device_type || 'Desktop'}</span>
+                          <span>{session.browser || session.deviceType || 'Desktop'}</span>
                           {session.os && <span className="text-content-muted">• {session.os}</span>}
                         </div>
-                        <span className="text-content-muted text-[10px]">{session.ip_address || 'IP Masquée'}</span>
+                        <span className="text-content-muted text-[10px]">{session.ipAddress || 'IP Masquée'}</span>
                      </div>
                    );
                  }
@@ -293,10 +293,10 @@ export default function AdminSessionsManager() {
                 format: (_, session) => (
                   <div className="flex flex-col text-xs">
                      <span className="text-content-primary flex items-center gap-1">
-                       <Clock size={12} className="text-content-muted" /> {formatDuration(session.session_duration)}
+                       <Clock size={12} className="text-content-muted" /> {formatDuration(session.sessionDuration)}
                      </span>
                      <span className="text-content-muted text-[10px]">
-                       Dernière: {new Date(session.last_activity).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                       Dernière: {new Date(session.lastActivity).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                      </span>
                   </div>
                 )

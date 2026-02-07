@@ -126,9 +126,6 @@ export const isPlainObject = (value: unknown): value is Record<string, unknown> 
 export const toCamelCaseKey = (key: string) =>
   key.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
 
-export const toSnakeCaseKey = (key: string) =>
-  key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
-
 export const normalizeKeysDeep = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map((entry) => normalizeKeysDeep(entry));
@@ -144,24 +141,6 @@ export const normalizeKeysDeep = (value: unknown): unknown => {
   return normalized;
 };
 
-export const addSnakeCaseAliasesDeep = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((entry) => addSnakeCaseAliasesDeep(entry));
-  }
-  if (!isPlainObject(value)) {
-    return value;
-  }
-  const expanded: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    const transformed = addSnakeCaseAliasesDeep(entry);
-    expanded[key] = transformed;
-    const snakeKey = key.includes("_") ? key : toSnakeCaseKey(key);
-    if (snakeKey !== key && !(snakeKey in expanded)) {
-      expanded[snakeKey] = transformed;
-    }
-  }
-  return expanded;
-};
 
 export const unwrapSchema = (schema: z.ZodTypeAny): z.ZodTypeAny => {
   let current = schema;
@@ -277,9 +256,9 @@ export const paginateResponse = <T>(
     meta: {
       pagination: {
         page: safePage,
-        per_page: perPage,
-        total_items: totalItems,
-        total_pages: totalPages,
+        perPage,
+        totalItems,
+        totalPages,
       },
       filters: options.filters || {},
     },

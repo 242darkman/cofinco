@@ -496,9 +496,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
   const clients = useMemo(() => {
     if (!selectedAgent?.agenceId) return allClients;
-    const agentAgenceId = selectedAgent.agenceId || selectedAgent.agence_id;
+    const agentAgenceId = selectedAgent.agenceId;
     return allClients.filter(c => {
-      const clientAgenceId = c.agenceId || c.agence_id;
+      const clientAgenceId = c.agenceId;
       return clientAgenceId === agentAgenceId;
     });
   }, [allClients, selectedAgent?.agenceId]);
@@ -685,7 +685,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       const compteSelectionne = paiementData.compteId
         ? clientComptes.find((compte: any) => compte.id === paiementData.compteId)
         : null;
-      const numeroCompte = maskAccountNumber(compteSelectionne?.numeroCompte || selectedClient?.numero_compte);
+      const numeroCompte = maskAccountNumber(compteSelectionne?.numeroCompte || selectedClient?.numeroCompte);
 
       if (paiementData.type_paiement === TypeOperationTerrain.TONTINE_CONTRIBUTION && selectedTontine) {
         const miseParTour = Number(selectedTontine.tontine.montantCotisation || 0);
@@ -713,7 +713,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           prenom: selectedClient.prenom,
           email: selectedClient.email,
           telephone: selectedClient.phone || selectedClient.telephone,
-          numeroCompte: numeroCompte || selectedClient.numero_compte
+          numeroCompte: numeroCompte || selectedClient.numeroCompte
         },
         agent: { nom: agentName, prenom: '' },
         details,
@@ -763,7 +763,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     const provider = paiementData.methode_paiement === 'MTN Mobile Money' ? 'MTN' : 'AIRTEL';
 
     const agent = agents.find(a => a.id === paiementData.agent_id);
-    const agenceId = agent?.agenceId || agent?.agence_id;
+    const agenceId = agent?.agenceId;
 
     if (!agenceId) {
       throw new Error("L'agent n'est pas rattaché à une agence");
@@ -835,7 +835,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     const compteSelectionne = formData.compte_id
       ? clientComptes.find((compte: any) => compte.id === formData.compte_id)
       : null;
-    const numeroCompte = maskAccountNumber(compteSelectionne?.numeroCompte || selectedClient?.numero_compte);
+    const numeroCompte = maskAccountNumber(compteSelectionne?.numeroCompte || selectedClient?.numeroCompte);
 
     if (formData.type_paiement === TypeOperationTerrain.TONTINE_CONTRIBUTION && selectedTontine) {
       const miseParTour = Number(selectedTontine.tontine.montantCotisation || 0);
@@ -867,7 +867,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         prenom: selectedClient?.prenom || '',
         email: selectedClient?.email,
         telephone: formData.numero_telephone || selectedClient?.phone,
-        numeroCompte: numeroCompte || selectedClient?.numero_compte,
+        numeroCompte: numeroCompte || selectedClient?.numeroCompte,
       },
       agent: { nom: agentName, prenom: '' },
       details,

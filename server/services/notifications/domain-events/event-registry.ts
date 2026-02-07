@@ -44,6 +44,7 @@ import {
   handleUserPasswordChanged,
   handleEmployeeCreated,
   handleProspectionCreated,
+  handleProspectConverted,
   handlePaiementTerrainValidated,
   handleHrSanctionCreated,
   handleHrSanctionNotified,
@@ -104,6 +105,7 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
   HR_SANCTION_NOTIFIED: handleHrSanctionNotified,
   HR_SANCTION_FINALIZED: handleHrSanctionFinalized,
   PROSPECTION_CREATED: handleProspectionCreated,
+  PROSPECT_CONVERTED: handleProspectConverted,
   PAIEMENT_TERRAIN_VALIDATED: handlePaiementTerrainValidated,
   CREDIT_INSTALLMENT_LATE: handleCreditInstallmentLate,
   SYSTEM_JOB_FAILED: handleSystemJobFailed,
@@ -172,6 +174,7 @@ const domainEventToWsType: Record<string, string> = {
 
   // Operations terrain → OPERATIONS_UPDATE
   PROSPECTION_CREATED: "OPERATIONS_UPDATE",
+  PROSPECT_CONVERTED: "OPERATIONS_UPDATE",
   PAIEMENT_TERRAIN_VALIDATED: "OPERATIONS_UPDATE",
 
   // System events → SYSTEM_UPDATE

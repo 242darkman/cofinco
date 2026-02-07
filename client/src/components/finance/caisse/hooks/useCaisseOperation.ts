@@ -20,15 +20,10 @@ export type OperationPhase = 'INPUT' | 'CONFIRMING' | 'RESULT';
 export interface AccountInfo {
   id: string;
   typeCompte?: string;
-  type_compte?: string;
   numeroCompte?: string;
-  numero_compte?: string;
   soldeCourant?: string | number;
-  solde_courant?: string | number;
   blocageActif?: boolean;
-  blocage_actif?: boolean;
   blocageMotif?: string;
-  blocage_motif?: string;
   statut?: string;
 }
 
@@ -77,7 +72,7 @@ const TYPE_COMPTE_LABELS: Record<string, string> = {
 };
 
 export function getAccountType(account: AccountInfo): string {
-  return account.typeCompte || account.type_compte || 'CURRENT';
+  return account.typeCompte || 'CURRENT';
 }
 
 export function getAccountLabel(account: AccountInfo): string {
@@ -85,19 +80,19 @@ export function getAccountLabel(account: AccountInfo): string {
 }
 
 export function getAccountNumber(account: AccountInfo): string {
-  return account.numeroCompte || account.numero_compte || '';
+  return account.numeroCompte || '';
 }
 
 export function getAccountBalance(account: AccountInfo): number {
-  return Number(account.soldeCourant || account.solde_courant || 0);
+  return Number(account.soldeCourant || 0);
 }
 
 export function isAccountBlocked(account: AccountInfo): boolean {
-  return !!(account.blocageActif || account.blocage_actif);
+  return !!account.blocageActif;
 }
 
 export function getBlockReason(account: AccountInfo): string {
-  return account.blocageMotif || account.blocage_motif || '';
+  return account.blocageMotif || '';
 }
 
 export function canOperateOnAccount(

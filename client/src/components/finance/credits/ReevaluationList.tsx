@@ -33,7 +33,6 @@ interface Reevaluation {
   client?: {
     nom: string;
     prenom?: string;
-    photo_url?: string;
     photoUrl?: string;
     photoProfile?: string;
   };
@@ -241,7 +240,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                   <div className="flex items-center gap-3 w-[200px] shrink-0">
                     <div className="shrink-0 relative">
                       {(() => {
-                        const photoUrl = reeval.client?.photoUrl || reeval.client?.photo_url || reeval.client?.photoProfile;
+                        const photoUrl = reeval.client?.photoUrl || reeval.client?.photoProfile;
                         const initials = `${reeval.client?.nom?.[0] || ''}${reeval.client?.prenom?.[0] || ''}`.toUpperCase() || 'C';
 
                         if (photoUrl) {

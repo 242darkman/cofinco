@@ -41,28 +41,25 @@ export default function ClosureReportButton({
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      // Normalize session fields (camelCase vs snake_case)
+      // Normalize session fields
       const soldeOuverture = Number(
-        session.montant_ouverture ||
-        (session as any).montantOuverture ||
-        session.solde_initial ||
+        session.montantOuverture ||
+        session.soldeInitial ||
         0
       );
       const soldeTheorique = Number(
-        session.montant_fermeture_theorique ||
-        (session as any).montantFermetureTheorique ||
-        session.solde_theorique ||
+        session.montantFermetureTheorique ||
+        session.soldeTheorique ||
         0
       );
       const soldePhysique = Number(
-        session.montant_physique ||
-        (session as any).montantPhysique ||
-        session.solde_reel ||
+        session.montantPhysique ||
+        session.soldeReel ||
         0
       ) || calculateBilletageTotal(billetage);
 
-      const openedAt = session.openedAt || session.opened_at || new Date().toISOString();
-      const closedAt = session.closedAt || session.closed_at || new Date().toISOString();
+      const openedAt = session.openedAt || new Date().toISOString();
+      const closedAt = session.closedAt || new Date().toISOString();
 
       // Calculate totals from operations if available
       let totalEntrees = 0;
@@ -70,7 +67,7 @@ export default function ClosureReportButton({
       if ((session as any).operations && Array.isArray((session as any).operations)) {
         for (const op of (session as any).operations) {
           const montant = Number(op.montant || 0);
-          const type = (op.type_operation || '').toLowerCase();
+          const type = (op.typeOperation || '').toLowerCase();
           if (type.includes('retrait') || type.includes('sortie') || type.includes('disbursement')) {
             totalSorties += montant;
           } else {
@@ -85,11 +82,11 @@ export default function ClosureReportButton({
 
       const reportData: ClosureReportData = {
         sessionId: session.id,
-        caisseNom: session.caisse_nom || (session as any).caisseNom || 'Caisse',
-        agenceNom: session.agence_nom || (session as any).agenceNom || 'Agence',
-        agenceCode: session.agence_code || (session as any).agenceCode,
-        caissierNom: session.caissier_nom || (session as any).caissierNom || 'Caissier',
-        caissierId: session.caissier_id || (session as any).caissierId || '',
+        caisseNom: session.caisseNom || 'Caisse',
+        agenceNom: session.agenceNom || 'Agence',
+        agenceCode: session.agenceCode,
+        caissierNom: session.caissierNom || 'Caissier',
+        caissierId: session.caissierId || '',
         openedAt,
         closedAt,
         soldeOuverture,

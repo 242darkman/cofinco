@@ -12,9 +12,9 @@ interface Declaration {
   id: string;
   mois: number;
   annee: number;
-  tva_collectee: number;
-  tva_deductible: number;
-  tva_a_payer: number;
+  tvaCollectee: number;
+  tvaDeductible: number;
+  tvaAPayer: number;
   statut: StatutDeclarationTVAType;
 }
 
@@ -95,17 +95,17 @@ export default function DeclarationTVA() {
       )
     },
     { 
-      key: 'tva_collectee', 
+      key: 'tvaCollectee',
       label: 'Collectée', 
       format: (val: number) => <span className="text-xs font-mono text-blue-400">{val.toLocaleString()}</span> 
     },
     { 
-      key: 'tva_deductible', 
+      key: 'tvaDeductible',
       label: 'Déductible', 
       format: (val: number) => <span className="text-xs font-mono text-emerald-400">{val.toLocaleString()}</span> 
     },
     { 
-      key: 'tva_a_payer', 
+      key: 'tvaAPayer', 
       label: 'Net à Payer', 
       format: (val: number) => <span className="text-xs font-bold text-white">{val.toLocaleString()}</span> 
     },
@@ -155,7 +155,7 @@ export default function DeclarationTVA() {
               <p className="text-slate-500 text-[9px]">{latest ? `${moisNoms[latest.mois - 1]} ${latest.annee}` : 'Aucune donnée'}</p>
             </div>
           </div>
-          <p className="text-lg font-bold text-white mb-1">{latest ? formatMoney(latest.tva_collectee) : '-'}</p>
+          <p className="text-lg font-bold text-white mb-1">{latest ? formatMoney(latest.tvaCollectee) : '-'}</p>
           <div className="w-full bg-slate-800 rounded-full h-1">
              <div className="h-1 bg-blue-500 rounded-full w-3/4"></div>
           </div>
@@ -172,7 +172,7 @@ export default function DeclarationTVA() {
               <p className="text-slate-500 text-[9px]">{latest ? `${moisNoms[latest.mois - 1]} ${latest.annee}` : 'Aucune donnée'}</p>
             </div>
           </div>
-          <p className="text-lg font-bold text-white mb-1">{latest ? formatMoney(latest.tva_deductible) : '-'}</p>
+          <p className="text-lg font-bold text-white mb-1">{latest ? formatMoney(latest.tvaDeductible) : '-'}</p>
           <div className="w-full bg-slate-800 rounded-full h-1">
              <div className="h-1 bg-emerald-500 rounded-full w-1/2"></div>
           </div>
@@ -189,7 +189,7 @@ export default function DeclarationTVA() {
               <p className="text-slate-500 text-[9px]">À régler avant le 15</p>
             </div>
           </div>
-          <p className="text-lg font-bold text-white mb-1">{latest ? formatMoney(latest.tva_a_payer) : '-'}</p>
+          <p className="text-lg font-bold text-white mb-1">{latest ? formatMoney(latest.tvaAPayer) : '-'}</p>
           <div className="flex items-center gap-1 justify-end">
              <Badge value={latest?.statut || 'N/A'} variant="neutral" size="sm" className="text-[9px] px-1.5 h-4" />
           </div>

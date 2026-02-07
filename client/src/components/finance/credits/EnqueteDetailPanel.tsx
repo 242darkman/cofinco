@@ -38,10 +38,10 @@ export default function EnqueteDetailPanel({
   const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   // Parse GPS coordinates
-  const hasGeoData = enquete.geo_latitude && enquete.geo_longitude;
-  const latitude = hasGeoData ? parseFloat(String(enquete.geo_latitude)) : null;
-  const longitude = hasGeoData ? parseFloat(String(enquete.geo_longitude)) : null;
-  const accuracy = enquete.geo_accuracy ? parseFloat(String(enquete.geo_accuracy)) : undefined;
+  const hasGeoData = enquete.geoLatitude && enquete.geoLongitude;
+  const latitude = hasGeoData ? parseFloat(String(enquete.geoLatitude)) : null;
+  const longitude = hasGeoData ? parseFloat(String(enquete.geoLongitude)) : null;
+  const accuracy = enquete.geoAccuracy ? parseFloat(String(enquete.geoAccuracy)) : undefined;
 
   // Client coordinates
   const clientLat = enquete.clients?.latitude ? parseFloat(String(enquete.clients.latitude)) : undefined;
@@ -56,8 +56,8 @@ export default function EnqueteDetailPanel({
 
   // Combine regular photos with geotagged ones
   const allPhotos: GeotaggedPhoto[] = [
-    ...(enquete.photos_geotagged || []),
-    ...(enquete.photos_activite || []).map(url => ({ url }))
+    ...(enquete.photosGeotagged || []),
+    ...(enquete.photosActivite || []).map(url => ({ url }))
   ];
 
   const geotaggedPhotos = allPhotos.filter(p => p.latitude && p.longitude);
@@ -73,8 +73,8 @@ export default function EnqueteDetailPanel({
           <div>
             <h3 className="text-sm font-semibold text-white">Détail Enquête</h3>
             <p className="text-[10px] text-slate-400">
-              {enquete.date_enquete
-                ? new Date(enquete.date_enquete).toLocaleDateString('fr-FR', {
+              {enquete.dateEnquete
+                ? new Date(enquete.dateEnquete).toLocaleDateString('fr-FR', {
                     day: 'numeric',
                     month: 'short',
                     year: 'numeric'
@@ -106,10 +106,10 @@ export default function EnqueteDetailPanel({
               enqueteLatitude={latitude}
               enqueteLongitude={longitude}
               enqueteAccuracy={accuracy}
-              enqueteTimestamp={enquete.geo_timestamp}
+              enqueteTimestamp={enquete.geoTimestamp}
               clientLatitude={clientLat}
               clientLongitude={clientLng}
-              clientAddress={enquete.clients?.adresse_domicile}
+              clientAddress={enquete.clients?.adresseDomicile}
               geotaggedPhotos={geotaggedPhotos}
               height="180px"
               interactive={false}
@@ -161,19 +161,19 @@ export default function EnqueteDetailPanel({
         <InfoCard
           icon={<DollarSign size={12} />}
           label="Montant demandé"
-          value={formatMoney(enquete.montant_demande)}
+          value={formatMoney(enquete.montantDemande)}
           color="blue"
         />
         <InfoCard
           icon={<TrendingUp size={12} />}
           label="Revenus mensuels"
-          value={enquete.revenus_mensuels ? formatMoney(enquete.revenus_mensuels) : '-'}
+          value={enquete.revenusMensuels ? formatMoney(enquete.revenusMensuels) : '-'}
           color="emerald"
         />
         <InfoCard
           icon={<Building size={12} />}
           label="Activité"
-          value={enquete.type_activite || '-'}
+          value={enquete.typeActivite || '-'}
           color="purple"
           truncate
         />

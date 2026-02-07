@@ -15,9 +15,9 @@ interface Client {
   email: string;
   score?: number;
   segment: string;
-  taux_remboursement: number;
-  credit_total: number;
-  photo_url?: string;
+  tauxRemboursement: number;
+  creditTotal: number;
+  photoUrl?: string;
   isEligible?: boolean;
   ineligibilityReason?: string;
   // Champs pour clients éligibles au crédit
@@ -157,8 +157,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     if (!plan) return;
 
     // Pré-remplir le montant si fixe (min == max)
-    const min = parseFloat(plan.montantMin || plan.montant_min);
-    const max = parseFloat(plan.montantMax || plan.montant_max);
+    const min = parseFloat(plan.montantMin);
+    const max = parseFloat(plan.montantMax);
     let fixedMontant = undefined;
 
     if (!isNaN(min) && !isNaN(max) && min === max) {
@@ -166,15 +166,15 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     }
 
     // Normaliser les valeurs françaises vers anglaises (ex: "Jour" -> "DAY", "Journalier" -> "DAILY")
-    const rawDureeUnite = plan.dureeUnite || plan.duree_unite;
-    const rawFrequence = plan.frequenceRemboursement || plan.frequence_remboursement;
+    const rawDureeUnite = plan.dureeUnite;
+    const rawFrequence = plan.frequenceRemboursement;
 
     setFormData(prev => ({
       ...prev,
       credit_plan_id: planId,
-      type_credit: normalizeTypeCredit(plan.typeCredit || plan.type_credit),
-      taux_interet: String(plan.tauxInteret || plan.taux_interet),
-      duree_valeur: String(plan.dureeValeur || plan.duree_valeur),
+      type_credit: normalizeTypeCredit(plan.typeCredit),
+      taux_interet: String(plan.tauxInteret),
+      duree_valeur: String(plan.dureeValeur),
       duree_unite: normalizeDureeUnite(rawDureeUnite),
       frequence_remboursement: normalizeFrequenceRemboursement(rawFrequence),
       objet_credit: plan.description ? `${plan.nom} - ${plan.description}` : prev.objet_credit,
@@ -241,18 +241,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         nom: formatClientName(c.nom, c.prenom),
         email: c.email || '',
         segment: c.segment || 'Standard',
-        taux_remboursement: parseFloat(c.tauxRemboursement || c.taux_remboursement) || 100,
-        credit_total: parseFloat(c.creditTotal || c.credit_total) || 0,
-        photo_url: c.photoUrl || c.photo_url,
-        compteCourantId: c.compteCourantId || c.compte_courant_id,
-        compteCourantNumero: c.compteCourantNumero || c.compte_courant_numero,
-        compteCourantSolde: parseFloat(c.compteCourantSolde || c.compte_courant_solde) || 0,
+        tauxRemboursement: parseFloat(c.tauxRemboursement) || 100,
+        creditTotal: parseFloat(c.creditTotal) || 0,
+        photoUrl: c.photoUrl,
+        compteCourantId: c.compteCourantId,
+        compteCourantNumero: c.compteCourantNumero,
+        compteCourantSolde: parseFloat(c.compteCourantSolde) || 0,
         isEligible: c.isEligible !== undefined ? c.isEligible : true, // Par défaut éligible si vient de /eligible-credit
         ineligibilityReason: c.ineligibilityReason,
         // Revenus du client
-        revenuMensuel: parseFloat(c.revenuMensuel || c.revenu_mensuel) || 0,
-        revenuJournalier: parseFloat(c.revenuJournalier || c.revenu_journalier) || 0,
-        typeRevenu: c.typeRevenu || c.type_revenu || 'Mensuel'
+        revenuMensuel: parseFloat(c.revenuMensuel) || 0,
+        revenuJournalier: parseFloat(c.revenuJournalier) || 0,
+        typeRevenu: c.typeRevenu || 'Mensuel'
       }));
       setClients(enrichedClients);
     } catch (error) {
@@ -339,8 +339,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       newErrors.montant_demande = 'Montant invalide';
     } else if (selectedPlan) {
       const montant = parseFloat(formData.montant_demande);
-      const min = selectedPlan.montantMin || selectedPlan.montant_min;
-      const max = selectedPlan.montantMax || selectedPlan.montant_max;
+      const min = selectedPlan.montantMin;
+      const max = selectedPlan.montantMax;
       
       if (min && montant < min) {
         newErrors.montant_demande = `Le montant minimum pour ce plan est de ${min.toLocaleString()} FCFA`;
@@ -402,11 +402,11 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
       // Utiliser le taux du plan sélectionné s'il existe, sinon le taux proposé
       const tauxFinal = selectedPlan 
-        ? String(selectedPlan.tauxInteret || selectedPlan.taux_interet)
+        ? String(selectedPlan.tauxInteret)
         : formData.taux_interet || suggestedRate.toFixed(1);
       
       // Utiliser les frais de dossier du plan s'ils sont définis
-      const fraisDossierPlan = selectedPlan?.fraisDossier || selectedPlan?.frais_dossier;
+      const fraisDossierPlan = selectedPlan?.fraisDossier;
       const montantFraisEngagement = fraisDossierPlan 
         ? String(fraisDossierPlan)
         : null;
@@ -463,8 +463,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   const clientOptions = useMemo(() => clients.map(client => ({
     value: client.id,
     label: client.nom,
-    subLabel: `Remb: ${client.taux_remboursement}%`,
-    image: getPhotoUrl(client.photo_url),
+    subLabel: `Remb: ${client.tauxRemboursement}%`,
+    image: getPhotoUrl(client.photoUrl),
     disabled: client.isEligible === false,
     disabledReason: client.ineligibilityReason
   })), [clients]);
@@ -850,7 +850,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                       <input 
                         type="text" 
                         className="w-full h-12 bg-slate-900 border border-slate-700 rounded-lg px-4 text-white" 
-                        value={selectedPlan?.fraisDossier || selectedPlan?.frais_dossier || '0'}
+                        value={selectedPlan?.fraisDossier || '0'}
                         readOnly
                       />
                    </div>
@@ -882,10 +882,10 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                              <div className="text-[10px] text-slate-500 font-medium">
                                 Intérêts: <span className="text-slate-300">{Math.round(calculatedData.montantTotal - (parseFloat(formData.montant_demande) || 0)).toLocaleString()}</span>
                              </div>
-                             {(selectedPlan?.fraisDossier || selectedPlan?.frais_dossier) && (
+                             {(selectedPlan?.fraisDossier) && (
                                 <div className="text-[10px] text-slate-500 font-medium">
                                     Frais: <span className="text-slate-300">
-                                        {(selectedPlan?.fraisDossier || selectedPlan?.frais_dossier).toLocaleString()}
+                                        {(selectedPlan?.fraisDossier).toLocaleString()}
                                     </span>
                                 </div>
                              )}

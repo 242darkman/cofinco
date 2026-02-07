@@ -19,9 +19,9 @@ interface HistoryItem {
     type: string;
     sens: 'DEBIT' | 'CREDIT';
     montant: number;
-    source_module: string;
+    sourceModule: string;
     reference: string;
-    reference_externe?: string;
+    referenceExterne?: string;
     statut: string;
     icon: string;
 }
@@ -57,14 +57,14 @@ function getIcon(iconName: string) {
 
 function normalizeHistoryResponse(payload: any): HistoryResponse {
     if (payload?.meta?.pagination) {
-        const { page, per_page, total_items, total_pages } = payload.meta.pagination;
+        const { page, perPage, totalItems, totalPages } = payload.meta.pagination;
         return {
             data: Array.isArray(payload.data) ? payload.data : [],
             pagination: {
                 page: Number(page) || 1,
-                limit: Number(per_page) || 0,
-                total: Number(total_items) || 0,
-                totalPages: Number(total_pages) || 1
+                limit: Number(perPage) || 0,
+                total: Number(totalItems) || 0,
+                totalPages: Number(totalPages) || 1
             }
         };
     }
@@ -202,7 +202,7 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                                 {item.sens === 'CREDIT' ? '+' : '-'}{item.montant.toLocaleString()} F
                             </p>
                             <p className="text-[10px] text-slate-500 uppercase">
-                                {item.source_module}
+                                {item.sourceModule}
                             </p>
                         </div>
                     </div>

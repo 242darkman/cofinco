@@ -20,39 +20,39 @@ import { StatutDemande } from '@shared/enum/status-constants';
 
 interface Demande {
   id: string;
-  numero_demande: string;
-  client_id: string;
-  montant_demande: number;
-  montant_approuve?: number | null;
+  numeroDemande: string;
+  clientId: string;
+  montantDemande: number;
+  montantApprouve?: number | null;
   // V2 duration fields
-  duree_valeur: number;
-  duree_unite: 'Jour' | 'Semaine' | 'Mois';
-  nombre_echeances?: number;
-  taux_interet: number;
-  type_credit: string | null;
-  objet_credit: string;
+  dureeValeur: number;
+  dureeUnite: 'Jour' | 'Semaine' | 'Mois';
+  nombreEcheances?: number;
+  tauxInteret: number;
+  typeCredit: string | null;
+  objetCredit: string;
   statut: string;
-  motif_rejet?: string;
-  revenus_mensuels?: number;
-  type_revenu?: string;
-  revenu_journalier?: number;
-  charges_mensuelles?: number;
-  capacite_remboursement?: number;
-  frequence_remboursement: string;
-  date_demande: string;
-  created_at?: string;
-  frais_engagement_payes?: boolean;
-  montant_frais_engagement?: number;
+  motifRejet?: string;
+  revenusMensuels?: number;
+  typeRevenu?: string;
+  revenuJournalier?: number;
+  chargesMensuelles?: number;
+  capaciteRemboursement?: number;
+  frequenceRemboursement: string;
+  dateDemande: string;
+  createdAt?: string;
+  fraisEngagementPayes?: boolean;
+  montantFraisEngagement?: number;
   clients: {
     nom: string;
     prenom?: string;
     email?: string;
     phone: string;
-    taux_remboursement?: number;
-    credit_total?: number;
-    photo_url?: string;
+    tauxRemboursement?: number;
+    creditTotal?: number;
+    photoUrl?: string;
   };
-  deleted_at?: string | null;
+  deletedAt?: string | null;
 }
 
 interface CreditApprovalModalProps {
@@ -63,9 +63,9 @@ interface CreditApprovalModalProps {
 }
 
 interface Guarantee {
-  type_garantie: string;
+  typeGarantie: string;
   description: string;
-  valeur_estimee: string;
+  valeurEstimee: string;
 }
 
 const GUARANTEE_TYPES = [
@@ -168,7 +168,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   const hasAnyRefund = hasRefundInProgress || hasRefundPaid;
 
   // Fees need to be repaid if a refund was made
-  const feesNeedRepayment = hasRefundPaid && !demande.frais_engagement_payes;
+  const feesNeedRepayment = hasRefundPaid && !demande.fraisEngagementPayes;
 
   // Can request reevaluation if:
   // - rejected (not definitively)
@@ -180,8 +180,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   // - rejected
   // - fees were paid
   // - no refund already exists (or was cancelled/rejected)
-  const canInitiateRefund = isRejected && demande.frais_engagement_payes &&
-                            demande.montant_frais_engagement && demande.montant_frais_engagement > 0 &&
+  const canInitiateRefund = isRejected && demande.fraisEngagementPayes &&
+                            demande.montantFraisEngagement && demande.montantFraisEngagement > 0 &&
                             !hasAnyRefund;
 
   const showActions = (!isFinished && !isRejected && !isCancelled) || isReevaluating;
@@ -211,19 +211,19 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
   // Memoized financial calculations - V2
   const { montantBase, mensualite, nombreEcheancesCalc, tauxEndettement } = useMemo(() => {
-    const base = demande.montant_demande;
-    const rev = demande.revenus_mensuels ?? 0;
+    const base = demande.montantDemande;
+    const rev = demande.revenusMensuels ?? 0;
     
     // V2: Use duree_valeur and duree_unite
-    const dureeValeur = demande.duree_valeur || 0;
-    const dureeUnite = demande.duree_unite || 'Mois';
-    const frequence = demande.frequence_remboursement;
+    const dureeValeur = demande.dureeValeur || 0;
+    const dureeUnite = demande.dureeUnite || 'Mois';
+    const frequence = demande.frequenceRemboursement;
 
     // Calculate number of payments
-    const nombreEcheances = demande.nombre_echeances || calculerNombreEcheances(frequence, dureeValeur, dureeUnite);
+    const nombreEcheances = demande.nombreEcheances || calculerNombreEcheances(frequence, dureeValeur, dureeUnite);
 
     // Simple interest calculation (matching CreditRequestForm)
-    const total = base * (1 + demande.taux_interet / 100);
+    const total = base * (1 + demande.tauxInteret / 100);
     const mens = nombreEcheances > 0 ? total / nombreEcheances : 0;
     
     // Calculate debt ratio (convert to monthly equivalent)
@@ -264,8 +264,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     }
 
     // 2. Residual Income (Max 30 pts)
-    const revenu = demande.revenus_mensuels ?? 0;
-    const charges = demande.charges_mensuelles ?? 0; // Note: charges might need to come from survey if not in demande
+    const revenu = demande.revenusMensuels ?? 0;
+    const charges = demande.chargesMensuelles ?? 0; // Note: charges might need to come from survey if not in demande
     // Using a simple estimate: Residual = Income - Estimated Charges (default 30% if unknown) - New Loan Payment
     const estimatedCharges = charges > 0 ? charges : (revenu * 0.3);
     const resteAVivre = revenu - estimatedCharges - mensualite;
@@ -280,7 +280,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     }
 
     // 3. Reliability (Max 30 pts)
-    const reliability = demande.clients.taux_remboursement ?? 0;
+    const reliability = demande.clients.tauxRemboursement ?? 0;
     if (reliability >= 90) {
         score += 30;
         analysis.push("Historique client excellent.");
@@ -300,7 +300,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
         solvencyColor: color,
         solvencyAnalysis: analysis.join(" ")
     };
-  }, [tauxEndettement, demande.revenus_mensuels, demande.charges_mensuelles, mensualite, demande.clients.taux_remboursement]);
+  }, [tauxEndettement, demande.revenusMensuels, demande.chargesMensuelles, mensualite, demande.clients.tauxRemboursement]);
 
   // Safe escaped values - Use formatClientName for consistent formatting
   const safeClientName = useMemo(() => {
@@ -317,10 +317,10 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     return `/api/storage/files/${encodeURIComponent(photoUrl)}`;
   };
 
-  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photo_url), [demande.clients.photo_url]);
+  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photoUrl), [demande.clients.photoUrl]);
 
   const addGuarantee = useCallback(() => {
-    setGuarantees(prev => [...prev, { type_garantie: 'Hypothèque', description: '', valeur_estimee: '' }]);
+    setGuarantees(prev => [...prev, { typeGarantie: 'Hypothèque', description: '', valeurEstimee: '' }]);
   }, []);
 
   const removeGuarantee = useCallback((index: number) => {
@@ -344,7 +344,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
     if (action === 'reject' && reimbursementAmount) {
          const val = Number(reimbursementAmount);
-         const max = Number(demande.montant_frais_engagement || 0);
+         const max = Number(demande.montantFraisEngagement || 0);
          if (isNaN(val) || val < 0) {
              newErrors.reimbursement = 'Montant invalide';
          } else if (val > max) {
@@ -368,8 +368,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
     // Validate guarantee values
     guarantees.forEach((g, index) => {
-      if (g.valeur_estimee) {
-        const valeur = parseFloat(g.valeur_estimee);
+      if (g.valeurEstimee) {
+        const valeur = parseFloat(g.valeurEstimee);
         const validation = validateAmount(valeur, { min: 0, max: VALIDATION_LIMITS.MAX_CREDIT });
         if (!validation.isValid) {
           newErrors[`guarantee_${index}`] = validation.error || 'Valeur invalide';
@@ -379,7 +379,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [action, commentaire, guarantees, reimbursementAmount, demande.montant_frais_engagement, scheduledDisbursement, disbursementDate]);
+  }, [action, commentaire, guarantees, reimbursementAmount, demande.montantFraisEngagement, scheduledDisbursement, disbursementDate]);
 
   const handleApprove = useCallback(async () => {
     setLoading(true);
@@ -473,7 +473,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     }
 
     const amount = Number(refundAmount);
-    const maxAmount = demande.montant_frais_engagement || 0;
+    const maxAmount = demande.montantFraisEngagement || 0;
 
     if (amount > maxAmount) {
       toast.error(`Le montant ne peut pas dépasser ${formatMoney(maxAmount)}`);
@@ -488,7 +488,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
         credentials: 'include',
         body: JSON.stringify({
           montantRemboursement: amount,
-          motif: demande.motif_rejet || 'Remboursement des frais suite au rejet'
+          motif: demande.motifRejet || 'Remboursement des frais suite au rejet'
         })
       });
 
@@ -510,7 +510,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     } finally {
       setRefundLoading(false);
     }
-  }, [demande.id, demande.montant_frais_engagement, demande.motif_rejet, refundAmount, onSuccess]);
+  }, [demande.id, demande.montantFraisEngagement, demande.motifRejet, refundAmount, onSuccess]);
 
   const getEndettementColor = useCallback((taux: number) => {
     if (taux > 50) return 'text-red-400';
@@ -534,18 +534,18 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                         Analyse Crédit
                         <Badge value={demande.statut} size="sm" />
                     </h2>
-                    <span className="text-slate-400 text-xs font-mono">{demande.numero_demande}</span>
+                    <span className="text-slate-400 text-xs font-mono">{demande.numeroDemande}</span>
                 </div>
                 {/* Status Fees - Compact Pill */}
                 <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${
-                    demande.frais_engagement_payes
+                    demande.fraisEngagementPayes
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                     : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                 }`}>
-                    {demande.frais_engagement_payes ? (
-                        <><CheckCircle size={12} /> Frais Payés: {formatMoney(demande.montant_frais_engagement || 0)}</>
+                    {demande.fraisEngagementPayes ? (
+                        <><CheckCircle size={12} /> Frais Payés: {formatMoney(demande.montantFraisEngagement || 0)}</>
                     ) : (
-                        <><AlertCircle size={12} /> Frais dus: {formatMoney(demande.montant_frais_engagement || 0)}</>
+                        <><AlertCircle size={12} /> Frais dus: {formatMoney(demande.montantFraisEngagement || 0)}</>
                     )}
                 </div>
                 {/* Refund Status Pill */}
@@ -589,15 +589,15 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
                         <DollarSign size={14} className="text-blue-400" /> Montant Demandé
                     </div>
-                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.montant_demande)}</div>
+                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.montantDemande)}</div>
                 </div>
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-purple-500/50 transition-colors">
                     <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
                         <Wallet size={14} className="text-purple-400" />
-                        {['Journalier', 'DAILY'].includes(demande.frequence_remboursement) ? 'Échéance Journalière' :
-                         ['Hebdomadaire', 'WEEKLY'].includes(demande.frequence_remboursement) ? 'Échéance Hebdo' :
-                         ['Bimensuel', 'BIMONTHLY'].includes(demande.frequence_remboursement) ? 'Échéance Bimensuelle' :
-                         ['Trimestriel', 'QUARTERLY'].includes(demande.frequence_remboursement) ? 'Échéance Trimestrielle' :
+                        {['Journalier', 'DAILY'].includes(demande.frequenceRemboursement) ? 'Échéance Journalière' :
+                         ['Hebdomadaire', 'WEEKLY'].includes(demande.frequenceRemboursement) ? 'Échéance Hebdo' :
+                         ['Bimensuel', 'BIMONTHLY'].includes(demande.frequenceRemboursement) ? 'Échéance Bimensuelle' :
+                         ['Trimestriel', 'QUARTERLY'].includes(demande.frequenceRemboursement) ? 'Échéance Trimestrielle' :
                          'Mensualité Est'}
                     </div>
                     <div className="text-lg md:text-xl font-bold text-white">{formatMoney(mensualite)}</div>
@@ -606,7 +606,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
                         <PiggyBank size={14} className="text-emerald-400" /> Revenus Net
                     </div>
-                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.revenus_mensuels ?? 0)}</div>
+                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.revenusMensuels ?? 0)}</div>
                 </div>
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-amber-500/50 transition-colors">
                     <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
@@ -654,11 +654,11 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                             <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-2 text-center">
                                 <div>
                                     <div className="text-[10px] text-slate-500 uppercase tracking-wider">Score Remb.</div>
-                                    <div className="text-emerald-400 font-bold">{demande.clients.taux_remboursement ?? 0}%</div>
+                                    <div className="text-emerald-400 font-bold">{demande.clients.tauxRemboursement ?? 0}%</div>
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-slate-500 uppercase tracking-wider">En cours</div>
-                                    <div className="text-white font-bold text-xs">{formatMoney(demande.clients.credit_total ?? 0)}</div>
+                                    <div className="text-white font-bold text-xs">{formatMoney(demande.clients.creditTotal ?? 0)}</div>
                                 </div>
                             </div>
                         </div>
@@ -670,7 +670,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                              <Briefcase size={14} /> Objet du crédit
                          </div>
                          <p className="text-slate-300 text-sm leading-relaxed italic">
-                             "{escapeHtml(demande.objet_credit)}"
+                             "{escapeHtml(demande.objetCredit)}"
                          </p>
                     </div>
 
@@ -712,19 +712,19 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 <div className="text-xs text-slate-500 mb-1">Date Demande</div>
                                 <div className="text-sm text-white font-medium flex items-center gap-1">
                                     <Calendar size={12} className="text-slate-600" />
-                                    {new Date(demande.created_at || demande.date_demande).toLocaleDateString('fr-FR')}
+                                    {new Date(demande.createdAt || demande.dateDemande).toLocaleDateString('fr-FR')}
                                 </div>
                             </div>
                             <div>
                                 <div className="text-xs text-slate-500 mb-1">Durée</div>
                                 <div className="text-sm text-white font-medium">
-                                    {demande.duree_valeur} <span className="text-slate-400 lowercase">
-                                        {['Jour', 'day', 'Day', 'JOUR', 'DAY'].includes(demande.duree_unite)
-                                            ? (demande.duree_valeur === 1 ? 'jour' : 'jours') :
-                                         ['Semaine', 'week', 'Week', 'SEMAINE', 'WEEK'].includes(demande.duree_unite)
-                                            ? (demande.duree_valeur === 1 ? 'semaine' : 'semaines') :
-                                         ['Mois', 'month', 'Month', 'MOIS', 'MONTH'].includes(demande.duree_unite)
-                                            ? 'mois' : demande.duree_unite}
+                                    {demande.dureeValeur} <span className="text-slate-400 lowercase">
+                                        {['Jour', 'day', 'Day', 'JOUR', 'DAY'].includes(demande.dureeUnite)
+                                            ? (demande.dureeValeur === 1 ? 'jour' : 'jours') :
+                                         ['Semaine', 'week', 'Week', 'SEMAINE', 'WEEK'].includes(demande.dureeUnite)
+                                            ? (demande.dureeValeur === 1 ? 'semaine' : 'semaines') :
+                                         ['Mois', 'month', 'Month', 'MOIS', 'MONTH'].includes(demande.dureeUnite)
+                                            ? 'mois' : demande.dureeUnite}
                                     </span>
                                 </div>
                             </div>
@@ -732,23 +732,23 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 <div className="text-xs text-slate-500 mb-1">Nb Échéances</div>
                                 <div className="text-sm text-white font-medium">
                                     {nombreEcheancesCalc} <span className="text-slate-400 text-xs">
-                                        ({demande.frequence_remboursement === 'DAILY' ? 'Journalier' : 
-                                          demande.frequence_remboursement === 'WEEKLY' ? 'Hebdomadaire' : 
-                                          demande.frequence_remboursement === 'MONTHLY' ? 'Mensuel' : 
-                                          demande.frequence_remboursement})
+                                        ({demande.frequenceRemboursement === 'DAILY' ? 'Journalier' : 
+                                          demande.frequenceRemboursement === 'WEEKLY' ? 'Hebdomadaire' : 
+                                          demande.frequenceRemboursement === 'MONTHLY' ? 'Mensuel' : 
+                                          demande.frequenceRemboursement})
                                     </span>
                                 </div>
                             </div>
                             <div>
                                 <div className="text-xs text-slate-500 mb-1">Taux Intérêt</div>
-                                <div className="text-sm text-white font-medium">{demande.taux_interet}%</div>
+                                <div className="text-sm text-white font-medium">{demande.tauxInteret}%</div>
                             </div>
                             <div>
                                 <div className="text-xs text-slate-500 mb-1">Type Crédit</div>
                                 <div className="text-sm text-white font-medium truncate">
-                                    {demande.type_credit === 'PERSONAL' ? 'Personnel' : 
-                                     demande.type_credit === 'BUSINESS' ? 'Business' : 
-                                     (demande.type_credit || 'Standard')}
+                                    {demande.typeCredit === 'PERSONAL' ? 'Personnel' : 
+                                     demande.typeCredit === 'BUSINESS' ? 'Business' : 
+                                     (demande.typeCredit || 'Standard')}
                                 </div>
                             </div>
                         </div>
@@ -779,7 +779,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                  <div>
                                                      <div className="text-sm text-white font-medium">Enquête #{enquetes.length - idx}</div>
                                                      <div className="text-[10px] text-slate-400">
-                                                         {new Date(enquete.created_at).toLocaleDateString()} - Agent {enquete.created_by_name || 'Terrain'}
+                                                         {new Date(enquete.createdAt).toLocaleDateString()} - Agent {enquete.createdByName || 'Terrain'}
                                                      </div>
                                                  </div>
                                              </div>
@@ -794,21 +794,21 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                      <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
                                                          <div className="text-xs text-slate-500">Revenus Estimés</div>
                                                          <div className="text-emerald-400 font-bold">
-                                                            {formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0)}
+                                                            {formatMoney(enquete.revenuMensuel || 0)}
                                                          </div>
                                                      </div>
                                                      <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
                                                          <div className="text-xs text-slate-500">Charges</div>
                                                          <div className="text-white font-bold">
-                                                             {formatMoney(enquete.charges_mensuelles || enquete.chargesMensuelles || 0)}
+                                                             {formatMoney(enquete.chargesMensuelles || 0)}
                                                          </div>
                                                      </div>
                                                      <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
                                                          <div className="text-xs text-slate-500">Capacité Remb.</div>
                                                          <div className="text-purple-400 font-bold">
                                                              {formatMoney(
-                                                                 (enquete.capacite_remboursement || enquete.capaciteRemboursement) 
-                                                                 ?? Math.max(0, (enquete.revenu_mensuel || enquete.revenuMensuel || 0) - (enquete.charges_mensuelles || enquete.chargesMensuelles || 0))
+                                                                 (enquete.capaciteRemboursement) 
+                                                                 ?? Math.max(0, (enquete.revenuMensuel || 0) - (enquete.chargesMensuelles || 0))
                                                              )}
                                                          </div>
                                                      </div>
@@ -819,42 +819,42 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                      <div className="space-y-2">
                                                          <div>
                                                              <span className="text-slate-500">Activité:</span>{' '}
-                                                             <span className="text-white">{enquete.type_activite || enquete.typeActivite || 'N/A'}</span>
+                                                             <span className="text-white">{enquete.typeActivite || 'N/A'}</span>
                                                          </div>
                                                          <div>
                                                              <span className="text-slate-500">Catégorie:</span>{' '}
-                                                             <span className="text-amber-400">{enquete.categorie_activite || enquete.categorieActivite || 'N/A'}</span>
+                                                             <span className="text-amber-400">{enquete.categorieActivite || 'N/A'}</span>
                                                          </div>
                                                           <div>
                                                              <span className="text-slate-500">Ancienneté:</span>{' '}
-                                                             <span className="text-white">{enquete.anciennete_activite || enquete.ancienneteActivite} mois</span>
+                                                             <span className="text-white">{enquete.ancienneteActivite} mois</span>
                                                          </div>
                                                      </div>
                                                      <div className="space-y-2">
                                                           <div>
                                                              <span className="text-slate-500">Habitation:</span>{' '}
-                                                             <span className="text-white">{enquete.type_habitation || enquete.typeHabitation || 'N/A'}</span>
+                                                             <span className="text-white">{enquete.typeHabitation || 'N/A'}</span>
                                                          </div>
                                                          <div>
                                                              <span className="text-slate-500">Pers. à charge:</span>{' '}
-                                                             <span className="text-white">{enquete.personnes_charge ?? enquete.personnesCharge ?? 0}</span>
+                                                             <span className="text-white">{enquete.personnesCharge ?? 0}</span>
                                                          </div>
                                                          <div>
                                                              <span className="text-slate-500">Autres prêts:</span>{' '}
-                                                             <span className="text-white">{formatMoney(enquete.autre_prets || enquete.autrePrets || 0)}</span>
+                                                             <span className="text-white">{formatMoney(enquete.autrePrets || 0)}</span>
                                                          </div>
                                                      </div>
                                                  </div>
 
                                                  {/* Analysis & Comments - RESTORED EVALUATION */}
                                                  <div className="space-y-2">
-                                                     {enquete.evaluation_activite && (
+                                                     {enquete.evaluationActivite && (
                                                          <div className="bg-slate-900/50 p-3 rounded border border-slate-700/50">
                                                              <span className="text-slate-500 block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
                                                                 <Briefcase size={12} className="text-amber-400" /> Analyse de l'Activité
                                                              </span>
                                                              <p className="text-slate-300 text-sm leading-relaxed">
-                                                                 {enquete.evaluation_activite}
+                                                                 {enquete.evaluationActivite}
                                                              </p>
                                                          </div>
                                                      )}
@@ -870,10 +870,10 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                  </div>
                                                  
                                                  {/* Agent */}
-                                                 {enquete.created_by && (
+                                                 {enquete.createdBy && (
                                                      <div className="flex items-center gap-2 justify-end text-xs text-slate-500">
                                                          <UserCheck size={12} />
-                                                         Vérifié par {enquete.created_by_name || 'Agent Terrain'}
+                                                         Vérifié par {enquete.createdByName || 'Agent Terrain'}
                                                      </div>
                                                  )}
                                              </div>
@@ -947,14 +947,14 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 placeholder="Raison du rejet (Obligatoire)..."
                             />
                             {/* Refund option if fees paid */}
-                            {demande.frais_engagement_payes && demande.montant_frais_engagement && demande.montant_frais_engagement > 0 && (
+                            {demande.fraisEngagementPayes && demande.montantFraisEngagement && demande.montantFraisEngagement > 0 && (
                                 <div className="bg-amber-900/10 p-3 rounded-lg border border-amber-500/30 space-y-3">
                                     <div className="flex items-center justify-between">
                                         <label className="text-sm font-medium text-amber-400 flex items-center gap-2">
                                             <Wallet size={16} /> Remboursement des frais
                                         </label>
                                         <span className="text-xs text-slate-400">
-                                            Payés: {formatMoney(demande.montant_frais_engagement)}
+                                            Payés: {formatMoney(demande.montantFraisEngagement)}
                                         </span>
                                     </div>
 
@@ -973,9 +973,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setReimbursementAmount(String(Math.round(demande.montant_frais_engagement! * 0.5)))}
+                                            onClick={() => setReimbursementAmount(String(Math.round(demande.montantFraisEngagement! * 0.5)))}
                                             className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
-                                                reimbursementAmount === String(Math.round(demande.montant_frais_engagement! * 0.5))
+                                                reimbursementAmount === String(Math.round(demande.montantFraisEngagement! * 0.5))
                                                     ? 'bg-amber-500/20 border-amber-500 text-amber-400'
                                                     : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
                                             }`}
@@ -984,9 +984,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setReimbursementAmount(String(demande.montant_frais_engagement))}
+                                            onClick={() => setReimbursementAmount(String(demande.montantFraisEngagement))}
                                             className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
-                                                reimbursementAmount === String(demande.montant_frais_engagement)
+                                                reimbursementAmount === String(demande.montantFraisEngagement)
                                                     ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
                                                     : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
                                             }`}
@@ -999,7 +999,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                             onChange={(e) => setReimbursementAmount(e.target.value)}
                                             className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-white text-xs text-center focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none"
                                             placeholder="Autre"
-                                            max={demande.montant_frais_engagement}
+                                            max={demande.montantFraisEngagement}
                                         />
                                     </div>
 
@@ -1144,12 +1144,12 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
         <ReevaluationModal
           demande={{
             id: demande.id,
-            numeroDemande: demande.numero_demande,
-            clientId: demande.client_id,
-            montantDemande: String(demande.montant_demande),
-            motifRejet: demande.motif_rejet,
-            dureeValeur: demande.duree_valeur,
-            dureeUnite: demande.duree_unite,
+            numeroDemande: demande.numeroDemande,
+            clientId: demande.clientId,
+            montantDemande: String(demande.montantDemande),
+            motifRejet: demande.motifRejet,
+            dureeValeur: demande.dureeValeur,
+            dureeUnite: demande.dureeUnite,
           }}
           isOpen={showReevaluationModal}
           onClose={() => setShowReevaluationModal(false)}
@@ -1198,7 +1198,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
               {/* Amount info */}
               <div className="bg-slate-700/50 rounded-lg p-3 flex justify-between items-center">
                 <span className="text-slate-400 text-sm">Frais payés</span>
-                <span className="text-white font-bold">{formatMoney(demande.montant_frais_engagement || 0)}</span>
+                <span className="text-white font-bold">{formatMoney(demande.montantFraisEngagement || 0)}</span>
               </div>
 
               {/* Quick selection buttons */}
@@ -1207,9 +1207,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setRefundAmount(String(Math.round((demande.montant_frais_engagement || 0) * 0.5)))}
+                    onClick={() => setRefundAmount(String(Math.round((demande.montantFraisEngagement || 0) * 0.5)))}
                     className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
-                      refundAmount === String(Math.round((demande.montant_frais_engagement || 0) * 0.5))
+                      refundAmount === String(Math.round((demande.montantFraisEngagement || 0) * 0.5))
                         ? 'bg-amber-500/20 border-amber-500 text-amber-400'
                         : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
                     }`}
@@ -1218,9 +1218,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRefundAmount(String(demande.montant_frais_engagement || 0))}
+                    onClick={() => setRefundAmount(String(demande.montantFraisEngagement || 0))}
                     className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
-                      refundAmount === String(demande.montant_frais_engagement || 0)
+                      refundAmount === String(demande.montantFraisEngagement || 0)
                         ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
                         : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
                     }`}
@@ -1233,7 +1233,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     onChange={(e) => setRefundAmount(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm text-center focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none"
                     placeholder="Autre"
-                    max={demande.montant_frais_engagement || 0}
+                    max={demande.montantFraisEngagement || 0}
                   />
                 </div>
               </div>

@@ -248,11 +248,11 @@ export default function CaissePaiementModal({
      const op = formData.type_operation;
      
      if ([TypeOperationCaisse.DEPOSIT_SAVINGS, TypeOperationCaisse.WITHDRAWAL_SAVINGS].includes(op as any)) {
-         return clientAccounts.filter(a => (a.type_compte || a.typeCompte) === 'SAVINGS');
+         return clientAccounts.filter(a => (a.typeCompte) === 'SAVINGS');
      } else if ([TypeOperationCaisse.DEPOSIT_CURRENT, TypeOperationCaisse.WITHDRAWAL_CURRENT].includes(op as any)) {
-         return clientAccounts.filter(a => (a.type_compte || a.typeCompte) === 'CURRENT');
+         return clientAccounts.filter(a => (a.typeCompte) === 'CURRENT');
      } else if ([TypeOperationCaisse.DEPOSIT_BLOCKED, TypeOperationCaisse.WITHDRAWAL_BLOCKED].includes(op as any)) {
-         return clientAccounts.filter(a => (a.type_compte || a.typeCompte) === 'BLOCKED');
+         return clientAccounts.filter(a => (a.typeCompte) === 'BLOCKED');
      }
      return [];
   }, [clientAccounts, formData.type_operation]);
@@ -617,7 +617,7 @@ export default function CaissePaiementModal({
                             <option value="">Sélectionner un compte...</option>
                             {filteredAccounts.map(acc => (
                                 <option key={acc.id} value={acc.id}>
-                                    {acc.numero_compte || acc.numeroCompte} - {getStatusLabel(acc.type_compte || acc.typeCompte, ACCOUNT_TYPE_LABELS)} ({formatMoney(acc.solde || 0)})
+                                    {acc.numeroCompte} - {getStatusLabel(acc.typeCompte, ACCOUNT_TYPE_LABELS)} ({formatMoney(acc.solde || 0)})
                                 </option>
                             ))}
                         </select>

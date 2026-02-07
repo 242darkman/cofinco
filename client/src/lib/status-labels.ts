@@ -58,6 +58,7 @@ import {
   PRIORITE_LABELS,
   // Types & labels
   TYPE_OPERATION_TERRAIN_LABELS,
+  STATUT_PROSPECTION_LABELS,
   TYPE_VISITE_TERRAIN_LABELS,
   TYPE_TACHE_REGULARISATION_LABELS,
   TYPE_MOUVEMENT_COFFRE_LABELS,
@@ -121,6 +122,15 @@ export const CLIENT_STATUS_COLORS: Record<string, string> = {
   INACTIVE: "bg-gray-500/20 text-gray-400 border-gray-500/30",
   SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   DELETED: "bg-red-500/20 text-red-400 border-red-500/30",
+};
+
+// --- Statut Prospection ---
+export const PROSPECTION_STATUS_COLORS: Record<string, string> = {
+  REGISTERED: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  INTERESTED: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  REFUSED: 'bg-red-500/20 text-red-400 border-red-500/30',
+  TO_FOLLOW_UP: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  CONVERTED_TO_CLIENT: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
 };
 
 // --- Segment Client ---
@@ -836,6 +846,7 @@ export const ALL_STATUS_LABELS: Record<string, string> = {
   ...STATUT_ARCHIVE_LABELS,
   ...STATUT_OTP_LABELS,
   ...STATUT_AUDIT_VIREMENT_LABELS,
+  ...STATUT_PROSPECTION_LABELS,
   ...TYPE_OPERATION_TERRAIN_LABELS,
   ...TYPE_VISITE_TERRAIN_LABELS,
   ...TYPE_TACHE_REGULARISATION_LABELS,
@@ -932,6 +943,7 @@ export const ALL_STATUS_COLORS: Record<string, string> = {
   ...ARCHIVE_STATUS_COLORS,
   ...OTP_STATUS_COLORS,
   ...AUDIT_VIREMENT_STATUS_COLORS,
+  ...PROSPECTION_STATUS_COLORS,
 
   // --- Couleurs lowercase (alertes sécurité, audit, etc.) ---
   active: "bg-green-500/20 text-green-400 border-green-500/30",

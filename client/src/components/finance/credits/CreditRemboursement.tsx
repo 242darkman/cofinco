@@ -31,17 +31,17 @@ const PAYMENT_MODES = [
 
 interface Credit {
   id: string;
-  numero_credit: string;
-  client_id: string;
-  montant_principal: number;
-  montant_echeance: number;
-  solde_restant: number;
-  nombre_echeances_payees: number;
-  nombre_echeances_total: number;
-  jours_retard: number;
-  penalites_retard: number;
-  total_paye?: number;
-  total_interets_payes?: number;
+  numeroCredit: string;
+  clientId: string;
+  montantPrincipal: number;
+  montantEcheance: number;
+  soldeRestant: number;
+  nombreEcheancesPayees: number;
+  nombreEcheancesTotal: number;
+  joursRetard: number;
+  penalitesRetard: number;
+  totalPaye?: number;
+  totalInteretsPayes?: number;
   statut?: string;
   clients: {
     nom: string;
@@ -49,21 +49,21 @@ interface Credit {
     email: string;
     phone: string;
     telephone?: string;
-    numero_compte?: string;
+    numeroCompte?: string;
   };
   echeances?: Echeance[];
 }
 
 interface Echeance {
   id: string;
-  numero_echeance: number;
-  date_echeance: string;
-  montant_total: number;
-  montant_principal: number;
-  montant_interet: number;
-  montant_paye: number;
+  numeroEcheance: number;
+  dateEcheance: string;
+  montantTotal: number;
+  montantPrincipal: number;
+  montantInteret: number;
+  montantPaye: number;
   statut: string;
-  jours_retard: number;
+  joursRetard: number;
   penalite: number;
 }
 
@@ -139,7 +139,7 @@ export default function CreditRemboursement() {
       today.setHours(0, 0, 0, 0);
 
       const updatedData = data.map((ech: any) => {
-        const dateEch = new Date(ech.date_echeance);
+        const dateEch = new Date(ech.dateEcheance);
         dateEch.setHours(0, 0, 0, 0);
         const joursRetard = ech.statut === StatutEcheanceCredit.UPCOMING && dateEch < today
           ? Math.floor((today.getTime() - dateEch.getTime()) / (1000 * 60 * 60 * 24))
@@ -149,8 +149,8 @@ export default function CreditRemboursement() {
 
         return {
           ...ech,
-          montant_paye: ech.montant_paye || 0,
-          jours_retard: joursRetard,
+          montantPaye: ech.montantPaye || 0,
+          joursRetard: joursRetard,
           penalite,
           statut: joursRetard > 0 ? StatutEcheanceCredit.LATE : ech.statut
         };
@@ -179,7 +179,7 @@ export default function CreditRemboursement() {
   const calculatePaymentDistribution = useCallback((montant: number) => {
     const unpaidEcheances = echeances
       .filter(e => e.statut !== 'Payé')
-      .sort((a, b) => a.numero_echeance - b.numero_echeance);
+      .sort((a, b) => a.numeroEcheance - b.numeroEcheance);
 
     if (unpaidEcheances.length === 0) return [];
 
@@ -189,19 +189,19 @@ export default function CreditRemboursement() {
     for (const echeance of unpaidEcheances) {
       if (remaining <= 0) break;
 
-      const totalDue = echeance.montant_total + echeance.penalite;
+      const totalDue = echeance.montantTotal + echeance.penalite;
       const payment = Math.min(remaining, totalDue);
 
       const penalitePayment = Math.min(payment, echeance.penalite);
       const principalInteretPayment = payment - penalitePayment;
 
-      const ratioInteret = echeance.montant_interet / echeance.montant_total;
+      const ratioInteret = echeance.montantInteret / echeance.montantTotal;
       const interetPayment = principalInteretPayment * ratioInteret;
       const principalPayment = principalInteretPayment - interetPayment;
 
       distribution.push({
         echeance_id: echeance.id,
-        numero_echeance: echeance.numero_echeance,
+        numero_echeance: echeance.numeroEcheance,
         montant_principal: principalPayment,
         montant_interet: interetPayment,
         penalites: penalitePayment,
@@ -219,7 +219,7 @@ export default function CreditRemboursement() {
   const filteredCredits = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return credits.filter(c =>
-      (c.numero_credit ?? '').toLowerCase().includes(term) ||
+      (c.numeroCredit ?? '').toLowerCase().includes(term) ||
       (c.clients?.nom ?? '').toLowerCase().includes(term)
     );
   }, [credits, searchTerm]);
@@ -228,8 +228,8 @@ export default function CreditRemboursement() {
   const { nextEcheance, montantPrevu } = useMemo(() => {
     const next = echeances.find(e => e.statut !== 'Payé');
     const prevu = next
-      ? next.montant_total + next.penalite
-      : selectedCredit?.montant_echeance || 0;
+      ? next.montantTotal + next.penalite
+      : selectedCredit?.montantEcheance || 0;
     return { nextEcheance: next, montantPrevu: prevu };
   }, [echeances, selectedCredit]);
 
@@ -240,7 +240,7 @@ export default function CreditRemboursement() {
     // Validate amount
     const amountValidation = validateAmount(montant, {
       min: 100,
-      max: Math.min(selectedCredit?.solde_restant || VALIDATION_LIMITS.MAX_CREDIT, VALIDATION_LIMITS.MAX_CREDIT),
+      max: Math.min(selectedCredit?.soldeRestant || VALIDATION_LIMITS.MAX_CREDIT, VALIDATION_LIMITS.MAX_CREDIT),
     });
 
     if (!amountValidation.isValid) {
@@ -290,9 +290,9 @@ export default function CreditRemboursement() {
     try {
       const distribution = calculatePaymentDistribution(montant);
       const penalitesPayees = distribution.reduce((sum, item) => sum + (item.penalites || 0), 0);
-      const echeanceAmount = nextEcheance?.montant_total ?? selectedCredit.montant_echeance ?? montant;
+      const echeanceAmount = nextEcheance?.montantTotal ?? selectedCredit.montantEcheance ?? montant;
 
-      setLastSoldeAvant(selectedCredit.solde_restant);
+      setLastSoldeAvant(selectedCredit.soldeRestant);
       setLastPenaltiesPaid(penalitesPayees);
       setLastEcheanceAmount(echeanceAmount);
 
@@ -363,10 +363,10 @@ export default function CreditRemboursement() {
     if (!selectedCredit) return null;
 
     const soldeAvant =
-      lastSoldeAvant ?? (selectedCredit.solde_restant + lastPaymentAmount);
+      lastSoldeAvant ?? (selectedCredit.soldeRestant + lastPaymentAmount);
     const nouveauSolde = Math.max(soldeAvant - lastPaymentAmount, 0);
     const echeanceAmount =
-      lastEcheanceAmount ?? nextEcheance?.montant_total ?? selectedCredit.montant_echeance ?? lastPaymentAmount;
+      lastEcheanceAmount ?? nextEcheance?.montantTotal ?? selectedCredit.montantEcheance ?? lastPaymentAmount;
 
     return {
       title: 'REÇU DE REMBOURSEMENT',
@@ -384,7 +384,7 @@ export default function CreditRemboursement() {
         nom: formatClientName(selectedCredit.clients.nom, selectedCredit.clients.prenom),
         email: selectedCredit.clients.email,
         telephone: selectedCredit.clients.phone || selectedCredit.clients.telephone,
-        numeroCompte: selectedCredit.clients.numero_compte
+        numeroCompte: selectedCredit.clients.numeroCompte
       },
       agent: {
         nom: 'Agent',
@@ -396,7 +396,7 @@ export default function CreditRemboursement() {
         { label: 'Reste à payer', value: formatMoney(nouveauSolde), isBold: true }
       ],
       items: [{
-        description: `Remboursement Crédit ${selectedCredit.numero_credit}`,
+        description: `Remboursement Crédit ${selectedCredit.numeroCredit}`,
         details: `Solde avant paiement: ${formatMoney(soldeAvant)}`,
         montant: lastPaymentAmount,
         quantite: 1
@@ -563,11 +563,11 @@ export default function CreditRemboursement() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-cyan-400 font-mono font-bold">{credit.numero_credit}</div>
+                      <div className="text-cyan-400 font-mono font-bold">{credit.numeroCredit}</div>
                       <div className="text-white text-sm">{formatClientName(credit.clients?.nom || '', credit.clients?.prenom)}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-white font-bold">{formatMoney(credit.solde_restant)}</div>
+                      <div className="text-white font-bold">{formatMoney(credit.soldeRestant)}</div>
                       <div className="text-xs text-slate-400">Solde restant</div>
                     </div>
                   </div>
@@ -586,7 +586,7 @@ export default function CreditRemboursement() {
           <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-2xl font-bold text-white">{selectedCredit.numero_credit}</h3>
+                <h3 className="text-2xl font-bold text-white">{selectedCredit.numeroCredit}</h3>
                 <p className="text-slate-400 mt-1">{formatClientName(selectedCredit.clients?.nom || '', selectedCredit.clients?.prenom)}</p>
               </div>
               {canCreatePayments && (
@@ -605,28 +605,28 @@ export default function CreditRemboursement() {
               <div className="bg-slate-700/50 rounded-lg p-4">
                 <div className="text-slate-400 text-sm mb-1">Solde Restant</div>
                 <div className="text-xl md:text-2xl font-bold text-white break-words">
-                  {formatMoney(selectedCredit.solde_restant)}
+                  {formatMoney(selectedCredit.soldeRestant)}
                 </div>
               </div>
 
               <div className="bg-slate-700/50 rounded-lg p-4">
                 <div className="text-slate-400 text-sm mb-1">Mensualité</div>
                 <div className="text-xl md:text-2xl font-bold text-green-400 break-words">
-                  {formatMoney(selectedCredit.montant_echeance)}
+                  {formatMoney(selectedCredit.montantEcheance)}
                 </div>
               </div>
 
               <div className="bg-slate-700/50 rounded-lg p-4">
                 <div className="text-slate-400 text-sm mb-1">Échéances</div>
                 <div className="text-2xl font-bold text-cyan-400">
-                  {selectedCredit.nombre_echeances_payees}/{selectedCredit.nombre_echeances_total}
+                  {selectedCredit.nombreEcheancesPayees}/{selectedCredit.nombreEcheancesTotal}
                 </div>
               </div>
 
               <div className="bg-slate-700/50 rounded-lg p-4">
                 <div className="text-slate-400 text-sm mb-1">Pénalités</div>
                 <div className="text-xl md:text-2xl font-bold text-amber-400 break-words">
-                  {formatMoney(selectedCredit.penalites_retard || 0)}
+                  {formatMoney(selectedCredit.penalitesRetard || 0)}
                 </div>
               </div>
             </div>
@@ -651,7 +651,7 @@ export default function CreditRemboursement() {
                     type="number"
                     inputMode="numeric"
                     min="100"
-                    max={selectedCredit.solde_restant}
+                    max={selectedCredit.soldeRestant}
                     value={paymentData.montant}
                     onChange={(e) => handleInputChange('montant', e.target.value)}
                     className={`w-full bg-slate-700 border ${errors.montant ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500`}
@@ -664,7 +664,7 @@ export default function CreditRemboursement() {
                     <p id="montant-error" className="text-red-400 text-xs mt-1" role="alert">{errors.montant}</p>
                   ) : (
                     <p id="montant-help" className="text-xs text-slate-400 mt-1">
-                      Maximum: {formatMoney(selectedCredit.solde_restant)}
+                      Maximum: {formatMoney(selectedCredit.soldeRestant)}
                     </p>
                   )}
                 </div>
@@ -823,7 +823,7 @@ export default function CreditRemboursement() {
                 </div>
               ) : echeances.length > 0 ? (
                 echeances.map(echeance => {
-                  const resteAPayer = echeance.montant_total - echeance.montant_paye + echeance.penalite;
+                  const resteAPayer = echeance.montantTotal - echeance.montantPaye + echeance.penalite;
                   return (
                   <div
                     key={echeance.id}
@@ -840,13 +840,13 @@ export default function CreditRemboursement() {
                           }`}
                           aria-hidden="true"
                         >
-                          {echeance.statut === StatutEcheanceCredit.PAID ? <Check size={20} /> : echeance.numero_echeance}
+                          {echeance.statut === StatutEcheanceCredit.PAID ? <Check size={20} /> : echeance.numeroEcheance}
                         </div>
 
                         <div>
-                          <div className="text-white font-semibold">Échéance #{echeance.numero_echeance}</div>
+                          <div className="text-white font-semibold">Échéance #{echeance.numeroEcheance}</div>
                           <div className="text-sm text-slate-400">
-                            {new Date(echeance.date_echeance).toLocaleDateString('fr-FR')}
+                            {new Date(echeance.dateEcheance).toLocaleDateString('fr-FR')}
                           </div>
                           <div className="text-xs text-cyan-400 mt-0.5">Remboursement Crédit</div>
                         </div>
@@ -856,8 +856,8 @@ export default function CreditRemboursement() {
                         {/* Montant Payé */}
                         <div className="text-center min-w-[80px]">
                           <div className="text-xs text-slate-500 mb-0.5">Payé</div>
-                          <div className={`font-semibold ${echeance.montant_paye > 0 ? 'text-green-400' : 'text-slate-500'}`}>
-                            {formatMoney(echeance.montant_paye)}
+                          <div className={`font-semibold ${echeance.montantPaye > 0 ? 'text-green-400' : 'text-slate-500'}`}>
+                            {formatMoney(echeance.montantPaye)}
                           </div>
                         </div>
 
@@ -869,15 +869,15 @@ export default function CreditRemboursement() {
                           </div>
                         </div>
 
-                        {echeance.jours_retard > 0 && (
+                        {echeance.joursRetard > 0 && (
                           <div className="flex items-center gap-1 text-red-400 text-sm">
                             <AlertTriangle size={14} aria-hidden="true" />
-                            <span>{echeance.jours_retard}j · +{formatMoney(echeance.penalite)}</span>
+                            <span>{echeance.joursRetard}j · +{formatMoney(echeance.penalite)}</span>
                           </div>
                         )}
 
                         <div className="text-right min-w-[100px]">
-                          <div className="text-white font-bold">{formatMoney(echeance.montant_total)}</div>
+                          <div className="text-white font-bold">{formatMoney(echeance.montantTotal)}</div>
                           <div className={`text-xs ${
                             echeance.statut === StatutEcheanceCredit.PAID ? 'text-green-400' :
                             echeance.statut === StatutEcheanceCredit.LATE ? 'text-red-400' :
@@ -916,7 +916,7 @@ export default function CreditRemboursement() {
       <ConfirmDialog
         isOpen={showConfirmPayment}
         title="Confirmer le remboursement"
-        message={`Vous êtes sur le point d'enregistrer un remboursement de ${formatMoney(parseFloat(paymentData.montant) || 0)} pour le crédit ${selectedCredit?.numero_credit}. Mode de paiement: ${paymentData.mode_paiement}.`}
+        message={`Vous êtes sur le point d'enregistrer un remboursement de ${formatMoney(parseFloat(paymentData.montant) || 0)} pour le crédit ${selectedCredit?.numeroCredit}. Mode de paiement: ${paymentData.mode_paiement}.`}
         confirmText="Confirmer le paiement"
         cancelText="Annuler"
         onConfirm={() => processPayment()}

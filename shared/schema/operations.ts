@@ -128,7 +128,82 @@ export const insertObjectifMensuelSchema = createInsertSchema(objectifsMensuels)
 export type InsertObjectifMensuel = z.infer<typeof insertObjectifMensuelSchema>;
 export type ObjectifMensuel = typeof objectifsMensuels.$inferSelect;
 
-// Prospections
+// ===== Géographie (Départements, Villes, Arrondissements, Marchés) =====
+
+export const departements = pgTable("departements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull().unique(),
+  chefLieu: text("chef_lieu"),
+  actif: boolean("actif").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDepartementSchema = createInsertSchema(departements).omit({ id: true, createdAt: true });
+export type InsertDepartement = z.infer<typeof insertDepartementSchema>;
+export type Departement = typeof departements.$inferSelect;
+
+export const villes = pgTable("villes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  departementId: uuid("departement_id").notNull()
+    .references(() => departements.id, { onDelete: "restrict" }),
+  latitude: numeric("latitude"),
+  longitude: numeric("longitude"),
+  isChefLieu: boolean("is_chef_lieu").notNull().default(false),
+  actif: boolean("actif").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxNom: index("idx_villes_nom").on(t.nom),
+  idxDepartement: index("idx_villes_departement").on(t.departementId),
+  idxActif: index("idx_villes_actif").on(t.actif),
+  uqNomDepartement: uniqueIndex("uq_villes_nom_departement").on(t.nom, t.departementId),
+}));
+
+export const insertVilleSchema = createInsertSchema(villes).omit({ id: true, createdAt: true });
+export type InsertVille = z.infer<typeof insertVilleSchema>;
+export type Ville = typeof villes.$inferSelect;
+
+export const arrondissements = pgTable("arrondissements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  villeId: uuid("ville_id").notNull()
+    .references(() => villes.id, { onDelete: "restrict" }),
+  actif: boolean("actif").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+}, (t) => ({
+  idxNom: index("idx_arrondissements_nom").on(t.nom),
+  idxVille: index("idx_arrondissements_ville").on(t.villeId),
+  idxActif: index("idx_arrondissements_actif").on(t.actif),
+}));
+
+export const insertArrondissementSchema = createInsertSchema(arrondissements).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertArrondissement = z.infer<typeof insertArrondissementSchema>;
+export type Arrondissement = typeof arrondissements.$inferSelect;
+
+export const marches = pgTable("marches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  arrondissementId: uuid("arrondissement_id").notNull()
+    .references(() => arrondissements.id, { onDelete: "restrict" }),
+  nom: text("nom").notNull(),
+  actif: boolean("actif").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+}, (t) => ({
+  idxArrondissement: index("idx_marches_arrondissement").on(t.arrondissementId),
+  idxNom: index("idx_marches_nom").on(t.nom),
+  idxActif: index("idx_marches_actif").on(t.actif),
+  idxArrondissementActif: index("idx_marches_arrondissement_actif").on(t.arrondissementId, t.actif),
+}));
+
+export const insertMarcheSchema = createInsertSchema(marches).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertMarche = z.infer<typeof insertMarcheSchema>;
+export type Marche = typeof marches.$inferSelect;
+
+// ===== Prospections =====
+
 export const prospections = pgTable("prospections", {
   id: uuid("id").primaryKey().defaultRandom(),
   agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id),
@@ -136,44 +211,47 @@ export const prospections = pgTable("prospections", {
   prenomProspect: text("prenom_prospect"),
   telephoneProspect: text("telephone_prospect").notNull(),
   adresseProspect: text("adresse_prospect"),
-  localisation: text("localisation"),
-  latitude: numeric("latitude"), // GPS coordinates
-  longitude: numeric("longitude"),
   typeActivite: text("type_activite"),
   descriptionActivite: text("description_activite"),
   revenuEstime: numeric("revenu_estime"),
   chiffreAffairesMensuel: numeric("chiffre_affaires_mensuel"),
   typeRevenu: text("type_revenu").default("Mensuel"),
   revenuJournalier: numeric("revenu_journalier"),
-  joursTravailMois: integer("jours_travail_mois").default(26),
-  interetCredit: boolean("interet_credit").default(false),
-  montantSouhaite: numeric("montant_souhaite"),
-  objetCredit: text("objet_credit"),
   photoUrl: text("photo_url"),
-  statut: text("statut").notNull().default("NEW"),
+  statut: text("statut").notNull().default("REGISTERED"),
   priorite: text("priorite").default("NORMAL"),
   commentairesAgent: text("commentaires_agent"),
   observations: text("observations"),
-  dateProspection: timestamp("date_prospection").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
-});
+
+  // New prospection fields
+  sexe: text("sexe"), // M or F
+  activitePrincipale: text("activite_principale"),
+  ancienneteActivite: text("anciennete_activite"), // "< 1 an", "1-3 ans", "3-5 ans", "> 5 ans"
+  arrondissementId: uuid("arrondissement_id")
+    .references(() => arrondissements.id, { onDelete: "set null" }),
+  marcheId: uuid("marche_id")
+    .references(() => marches.id, { onDelete: "set null" }),
+  lastActionAt: timestamp("last_action_at").defaultNow(),
+}, (t) => ({
+  idxAgent: index("idx_prospections_agent").on(t.agentId),
+  idxStatut: index("idx_prospections_statut").on(t.statut),
+  idxArrondissement: index("idx_prospections_arrondissement").on(t.arrondissementId),
+  idxMarche: index("idx_prospections_marche").on(t.marcheId),
+  idxTelephone: index("idx_prospections_telephone").on(t.telephoneProspect),
+  idxAgentStatut: index("idx_prospections_agent_statut").on(t.agentId, t.statut),
+  idxCreatedAt: index("idx_prospections_created_at").on(t.createdAt),
+  idxLastAction: index("idx_prospections_last_action").on(t.lastActionAt),
+  idxDeletedAt: index("idx_prospections_deleted_at").on(t.deletedAt),
+}));
 
 export const insertProspectionSchema = createInsertSchema(prospections, {
   // Validate Congo phone format: +242XXXXXXXX or 06/05/04XXXXXXX
   telephoneProspect: z.string().regex(
     /^(\+242|0)[456]\d{7}$/,
     "Format téléphone invalide (ex: 06XXXXXXX ou +242XXXXXXXX)"
-  ),
-  // Validate GPS coordinates if provided
-  latitude: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined) ? undefined : Number(val),
-    z.number().min(-90, "Latitude invalide").max(90, "Latitude invalide").optional()
-  ),
-  longitude: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined) ? undefined : Number(val),
-    z.number().min(-180, "Longitude invalide").max(180, "Longitude invalide").optional()
   ),
 }).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertProspection = z.infer<typeof insertProspectionSchema>;
@@ -681,6 +759,7 @@ export const zones = pgTable("zones", {
   id: uuid("id").primaryKey().defaultRandom(),
   nom: text("nom").notNull(), // e.g., "Poto-Poto"
   ville: text("ville").notNull(), // e.g., "Brazzaville"
+  villeId: uuid("ville_id"), // FK to villes table (nullable for backward compat)
   description: text("description"),
   statut: text("statut").notNull().default("ACTIVE"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -689,3 +768,84 @@ export const zones = pgTable("zones", {
 export const insertZoneSchema = createInsertSchema(zones).omit({ id: true, createdAt: true });
 export type InsertZone = z.infer<typeof insertZoneSchema>;
 export type Zone = typeof zones.$inferSelect;
+
+// ===== Prospection Prime Configuration =====
+
+export const prospectionPrimeConfig = pgTable("prospection_prime_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  typePrime: text("type_prime").notNull().default("FIXED"), // FIXED or VARIABLE
+  montantFixe: numeric("montant_fixe").default("5000"), // Fixed amount per qualified prospect (FCFA)
+  tauxVariable: numeric("taux_variable"), // Variable rate percentage (if VARIABLE)
+  // Qualification rules
+  requireFirstCredit: boolean("require_first_credit").default(false),
+  requireMinRevenu: numeric("require_min_revenu"),
+  actif: boolean("actif").notNull().default(true),
+  effectiveFrom: timestamp("effective_from").defaultNow(),
+  effectiveTo: timestamp("effective_to"),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  idxAgence: index("idx_prospection_prime_config_agence").on(t.agenceId),
+  idxActif: index("idx_prospection_prime_config_actif").on(t.actif),
+}));
+
+export const insertProspectionPrimeConfigSchema = createInsertSchema(prospectionPrimeConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProspectionPrimeConfig = z.infer<typeof insertProspectionPrimeConfigSchema>;
+export type ProspectionPrimeConfig = typeof prospectionPrimeConfig.$inferSelect;
+
+// ===== Prospection Primes (incentives per qualified prospect) =====
+
+export const prospectionPrimes = pgTable("prospection_primes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agentId: uuid("agent_id").notNull()
+    .references(() => agentsTerrain.id, { onDelete: "restrict" }),
+  agenceId: uuid("agence_id")
+    .references(() => agences.id, { onDelete: "set null" }),
+  prospectionId: uuid("prospection_id").notNull()
+    .references(() => prospections.id, { onDelete: "restrict" }),
+  clientId: uuid("client_id"),
+
+  // Prime details
+  montant: numeric("montant").notNull(),
+  typePrime: text("type_prime").notNull().default("FIXED"), // FIXED or VARIABLE
+  periode: varchar("periode", { length: 7 }).notNull(), // YYYY-MM
+
+  // Status workflow: PENDING -> APPROVED -> PAID  (or PENDING -> REJECTED)
+  statut: text("statut").notNull().default("PENDING"),
+
+  // Approval tracking
+  approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  rejectedBy: uuid("rejected_by").references(() => users.id, { onDelete: "set null" }),
+  rejectedAt: timestamp("rejected_at"),
+  rejectionReason: text("rejection_reason"),
+
+  // Payment tracking
+  paidAt: timestamp("paid_at"),
+  mouvementId: uuid("mouvement_id")
+    .references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+  // HR integration
+  avantageEmployeId: integer("avantage_employe_id"),
+
+  observations: text("observations"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+}, (t) => ({
+  idxAgent: index("idx_prospection_primes_agent").on(t.agentId),
+  idxAgence: index("idx_prospection_primes_agence").on(t.agenceId),
+  idxProspection: index("idx_prospection_primes_prospection").on(t.prospectionId),
+  idxStatut: index("idx_prospection_primes_statut").on(t.statut),
+  idxPeriode: index("idx_prospection_primes_periode").on(t.periode),
+  idxAgentPeriode: index("idx_prospection_primes_agent_periode").on(t.agentId, t.periode),
+  idxAgentStatut: index("idx_prospection_primes_agent_statut").on(t.agentId, t.statut),
+  // One prime per converted prospect
+  uqProspection: uniqueIndex("uq_prospection_primes_prospection").on(t.prospectionId),
+}));
+
+export const insertProspectionPrimeSchema = createInsertSchema(prospectionPrimes).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertProspectionPrime = z.infer<typeof insertProspectionPrimeSchema>;
+export type ProspectionPrime = typeof prospectionPrimes.$inferSelect;

@@ -65,6 +65,7 @@ export const clients = pgTable("clients", {
   adresseDomicile: text("adresse_domicile"),
   lieuActivite: text("lieu_activite"),
   ville: text("ville"),
+  villeId: uuid("ville_id"), // FK to villes table (nullable for backward compat)
   pays: text("pays").default("République du Congo"),
 
   // Documents d'identité
@@ -106,6 +107,10 @@ export const clients = pgTable("clients", {
   scoreEngagement: integer("score_engagement").default(0),
   derniereActivite: timestamp("derniere_activite"),
 
+  // Origine et prospection
+  clientOrigin: text("client_origin").notNull().default("OTHER"), // FIELD_PROSPECTION, WALK_IN_AGENCY, REFERRAL, CAMPAIGN, OTHER
+  prospectId: uuid("prospect_id"), // Soft FK to prospections (cross-schema, enforced in application)
+
   // Organisation
   agenceId: uuid("agence_id").references(() => agences.id),
   agentReferentId: uuid("agent_referent_id").references(() => employes.id), // Agent commercial référent
@@ -126,6 +131,9 @@ export const clients = pgTable("clients", {
   // Composite indexes for common query patterns
   idxAgenceSegment: index("idx_clients_agence_segment").on(t.agenceId, t.segment),
   idxAgenceCreatedAt: index("idx_clients_agence_created_at").on(t.agenceId, t.createdAt),
+  // Prospection origin indexes
+  idxClientOrigin: index("idx_clients_client_origin").on(t.clientOrigin),
+  idxProspectId: index("idx_clients_prospect_id").on(t.prospectId),
 }));
 
 export const insertClientSchema = createInsertSchema(clients, {
@@ -174,6 +182,7 @@ export interface ClientWithIdentity extends Client {
   statut: string;
   // Champs enrichis (jointures)
   type_marche_nom?: string | null;
+  agenceNom?: string | null;
   agence_nom?: string | null;
   photoUrl?: string | null;
 }

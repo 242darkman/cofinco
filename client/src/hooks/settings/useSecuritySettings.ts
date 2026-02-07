@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 
 export interface SecuritySetting {
   id: string;
-  password_min_length: number;
-  password_require_uppercase: boolean;
-  password_require_lowercase: boolean;
-  password_require_numbers: boolean;
-  password_require_special: boolean;
+  passwordMinLength: number;
+  passwordRequireUppercase: boolean;
+  passwordRequireLowercase: boolean;
+  passwordRequireNumbers: boolean;
+  passwordRequireSpecial: boolean;
   password_expiry_days: number;
   session_timeout_minutes: number;
   max_login_attempts: number;

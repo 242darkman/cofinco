@@ -101,7 +101,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
 
   const selectClient = (client: any) => {
     setSelectedClient(client);
-    setSearchClient(client.nom_complet || `${client.nom || ''} ${client.prenom || ''}`.trim());
+    setSearchClient(client.nomComplet || `${client.nom || ''} ${client.prenom || ''}`.trim());
     setShowSearchResults(false);
     setSearchResults([]);
   };
@@ -208,20 +208,20 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
           onTabChange={setActiveTab}
           onLogout={onLogout}
           agent={agent ? {
-            nom_complet: agent.user?.nom_complet || '',
-            code_agent: agent.code_agent || '',
-            peut_faire_versements: agent.peut_faire_versements || false,
-            peut_faire_retraits: agent.peut_faire_retraits || false,
-            peut_rembourser_credits: agent.peut_rembourser_credits || false,
-            peut_collecter_epargnes: agent.peut_collecter_epargnes || false,
+            nomComplet: agent.user?.nomComplet || '',
+            codeAgent: agent.codeAgent || '',
+            peutFaireVersements: agent.peutFaireVersements || false,
+            peutFaireRetraits: agent.peutFaireRetraits || false,
+            peutRembourserCredits: agent.peutRembourserCredits || false,
+            peutCollecterEpargnes: agent.peutCollecterEpargnes || false,
           } : null}
         />
       }
       header={
         <AgentHeader
           agent={agent ? {
-            nom_complet: agent.user?.nom_complet || '',
-            code_agent: agent.code_agent || '',
+            nomComplet: agent.user?.nomComplet || '',
+            codeAgent: agent.codeAgent || '',
           } : null}
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           isMobile={isMobile}
@@ -296,7 +296,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                           className="w-full text-left px-4 py-3 hover:bg-slate-700 transition border-b border-slate-700 last:border-b-0"
                         >
                           <p className="text-white font-semibold text-sm">
-                            {client.nom_complet || `${client.nom || ''} ${client.prenom || ''}`.trim()}
+                            {client.nomComplet || `${client.nom || ''} ${client.prenom || ''}`.trim()}
                           </p>
                           <p className="text-slate-400 text-xs">{client.telephone || client.phone || ''}</p>
                         </button>
@@ -307,7 +307,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                     <div className="mt-2 p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center justify-between">
                       <div>
                         <p className="text-green-400 font-semibold">
-                          {selectedClient.nom_complet || `${selectedClient.nom || ''} ${selectedClient.prenom || ''}`.trim()}
+                          {selectedClient.nomComplet || `${selectedClient.nom || ''} ${selectedClient.prenom || ''}`.trim()}
                         </p>
                         <p className="text-sm text-slate-400">{selectedClient.telephone || selectedClient.phone || ''}</p>
                       </div>

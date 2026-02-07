@@ -44,6 +44,8 @@ import PermissionAnalyticsDashboard from './permissions/PermissionAnalyticsDashb
 import RegularizationDashboard from './RegularizationDashboard';
 import AdminClientCredentials from './AdminClientCredentials';
 import AdminProductRates from './AdminProductRates';
+import ZoneManagement from './ZoneManagement';
+import ProspectionPrimeConfig from './ProspectionPrimeConfig';
 
 interface AdminModuleCompletProps {
   activeView?: string;
@@ -280,8 +282,10 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
             >
                {ADMIN_TABS.filter(tab => {
                   if (!tab.permission) return true;
-                  const [module, action] = tab.permission.split('.');
-                  return authService.hasPermission(module, action || 'view');
+                  const parts = tab.permission.split('.');
+                  const module = parts[0];
+                  const action = parts.slice(1).join('.') || 'view';
+                  return authService.hasPermission(module, action);
                 }).map((tab) => {
                   const Icon = iconMap[tab.icon] || Shield;
                   const isActive = activeTab === tab.id;
@@ -363,6 +367,8 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'regularisation' && <RegularizationDashboard />}
                   {activeTab === 'client-credentials' && <AdminClientCredentials />}
                   {activeTab === 'product-rates' && <AdminProductRates />}
+                  {activeTab === 'zones-commerciales' && <ZoneManagement />}
+                  {activeTab === 'primes-config' && <ProspectionPrimeConfig />}
 
                   {activeTab === 'roles' && (
                     <div className="flex flex-col h-full overflow-hidden space-y-2">

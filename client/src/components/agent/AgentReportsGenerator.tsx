@@ -174,68 +174,75 @@ export default function AgentReportsGenerator() {
   const stats = calculateStats();
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+      {/* Header Compact */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Générateur de Rapports</h2>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">Créez des rapports détaillés de votre activité</p>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-white">Générateur de Rapports</h2>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5">Créez des rapports détaillés de votre activité</p>
         </div>
         {reportData && (
           <button
             onClick={downloadReport}
-            className="flex items-center gap-2 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold transition-colors"
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium text-sm transition-colors w-full sm:w-auto"
           >
-            <Download size={20} />
+            <Download size={16} />
             Télécharger
           </button>
         )}
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Configuration du Rapport</h3>
+      {/* Configuration Section - Compact */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/50 p-3 sm:p-4">
+        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
+            <Filter size={16} className="text-cyan-500" />
+            Configuration du Rapport
+        </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4">
           {(['daily', 'weekly', 'monthly', 'custom'] as const).map(type => (
             <button
               key={type}
               onClick={() => setReportType(type)}
-              className={`p-4 rounded-lg border-2 transition-all ${
+              className={`p-2.5 rounded-lg border transition-all text-left group relative overflow-hidden ${
                 reportType === type
-                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20'
-                  : 'border-slate-300 dark:border-slate-600 hover:border-cyan-400'
+                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 ring-1 ring-cyan-500/20'
+                  : 'border-slate-200 dark:border-slate-700 hover:border-cyan-400 dark:hover:border-cyan-500/50'
               }`}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar size={20} className={reportType === type ? 'text-cyan-600' : 'text-slate-400'} />
-                <span className={`font-semibold ${reportType === type ? 'text-cyan-600' : 'text-slate-700 dark:text-slate-300'}`}>
-                  {type === 'daily' ? 'Quotidien' : type === 'weekly' ? 'Hebdomadaire' : type === 'monthly' ? 'Mensuel' : 'Personnalisé'}
-                </span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                    <Calendar size={14} className={reportType === type ? 'text-cyan-600' : 'text-slate-400 group-hover:text-cyan-500'} />
+                    <span className={`text-xs font-semibold ${reportType === type ? 'text-cyan-700 dark:text-cyan-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                    {type === 'daily' ? 'Quotidien' : type === 'weekly' ? 'Hebdo' : type === 'monthly' ? 'Mensuel' : 'Perso'}
+                    </span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 pl-5">
+                    {type === 'daily' ? "Aujourd'hui" : type === 'weekly' ? "7 derniers jours" : type === 'monthly' ? "30 derniers jours" : "Au choix"}
+                </p>
               </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                {type === 'daily' ? "Rapport du jour" : type === 'weekly' ? "7 derniers jours" : type === 'monthly' ? "30 derniers jours" : "Choisir dates"}
-              </p>
             </button>
           ))}
         </div>
 
         {reportType === 'custom' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-3 mb-4 animate-in slide-in-from-top-2 duration-200">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Date de début</label>
+              <label className="block text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">Début</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                className="w-full px-2 py-1.5 rounded text-xs border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Date de fin</label>
+              <label className="block text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">Fin</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                className="w-full px-2 py-1.5 rounded text-xs border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
               />
             </div>
           </div>
@@ -244,79 +251,41 @@ export default function AgentReportsGenerator() {
         <button
           onClick={generateReport}
           disabled={loading}
-          className="w-full px-6 py-3 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full sm:w-auto px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-cyan-900/10 active:scale-[0.98]"
         >
           {loading ? (
             <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Génération en cours...
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+              <span>Génération...</span>
             </>
           ) : (
             <>
-              <FileText size={20} />
-              Générer le Rapport
+              <FileText size={16} />
+              <span>Générer le Rapport</span>
             </>
           )}
         </button>
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="text-blue-500" size={20} />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Heures</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-white">{stats.totalHeures.toFixed(1)}h</div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Banknote className="text-green-500" size={20} />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Collectes</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-white">{stats.nombreCollectes}</div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="text-cyan-500" size={20} />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Montant</span>
-            </div>
-            <div className="text-xl font-bold text-slate-800 dark:text-white">{(stats.totalCollectes / 1000).toFixed(0)}K</div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="text-emerald-500" size={20} />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Recouvré</span>
-            </div>
-            <div className="text-xl font-bold text-slate-800 dark:text-white">{(stats.totalRecouvre / 1000).toFixed(0)}K</div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="text-emerald-500" size={20} />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Visites</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-white">{stats.nombreVisites}</div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="text-blue-500" size={20} />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Dépenses</span>
-            </div>
-            <div className="text-xl font-bold text-slate-800 dark:text-white">{(stats.totalDepenses / 1000).toFixed(0)}K</div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+          <StatCard icon={Clock} label="Heures" value={`${stats.totalHeures.toFixed(1)}h`} color="blue" />
+          <StatCard icon={Banknote} label="Collectes" value={stats.nombreCollectes} color="green" />
+          <StatCard icon={TrendingUp} label="Montant" value={`${(stats.totalCollectes / 1000).toFixed(0)}K`} color="cyan" />
+          <StatCard icon={CheckCircle} label="Recouvré" value={`${(stats.totalRecouvre / 1000).toFixed(0)}K`} color="emerald" />
+          <StatCard icon={Users} label="Visites" value={stats.nombreVisites} color="purple" />
+          <StatCard icon={AlertCircle} label="Dépenses" value={`${(stats.totalDepenses / 1000).toFixed(0)}K`} color="indigo" />
         </div>
       )}
 
       {reportData && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Aperçu du Rapport</h3>
-          <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-6 font-mono text-sm">
-            <pre className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/50 p-3 sm:p-4">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+            <FileText size={16} className="text-slate-400" />
+            Aperçu
+          </h3>
+          <div className="bg-slate-50 dark:bg-slate-950 rounded border border-slate-100 dark:border-slate-800 p-3 overflow-x-auto max-h-[400px] scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+            <pre className="whitespace-pre-wrap text-[10px] sm:text-xs font-mono text-slate-700 dark:text-slate-300 leading-relaxed">
               {generateReportContent()}
             </pre>
           </div>
@@ -324,4 +293,27 @@ export default function AgentReportsGenerator() {
       )}
     </div>
   );
+}
+
+function StatCard({ icon: Icon, label, value, color }: { icon: any, label: string, value: string | number, color: string }) {
+    const colorClasses: Record<string, string> = {
+        blue: 'text-blue-500 bg-blue-500/10',
+        green: 'text-green-500 bg-green-500/10',
+        cyan: 'text-cyan-500 bg-cyan-500/10',
+        emerald: 'text-emerald-500 bg-emerald-500/10',
+        purple: 'text-purple-500 bg-purple-500/10',
+        indigo: 'text-indigo-500 bg-indigo-500/10',
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700/50 p-2.5 sm:p-3 flex flex-col gap-1 shadow-sm">
+            <div className="flex items-center gap-1.5">
+                <div className={`p-1 rounded ${colorClasses[color]}`}>
+                    <Icon size={12} />
+                </div>
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+            </div>
+            <div className="text-lg font-bold text-slate-800 dark:text-white pl-0.5">{value}</div>
+        </div>
+    );
 }

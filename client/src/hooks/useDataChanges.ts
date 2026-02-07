@@ -6,13 +6,13 @@ import { loadPDFLibraries } from '../lib/lazy-export';
 export interface DataChange {
   id: string;
   timestamp?: string;
-  table_name?: string;
-  record_id?: string;
+  tableName?: string;
+  recordId?: string;
   operation: string;
-  user_email?: string;
-  changed_fields: any;
-  old_data: any;
-  new_data: any;
+  userEmail?: string;
+  changedFields: any;
+  oldData: any;
+  newData: any;
 }
 
 export function useDataChanges() {
@@ -47,20 +47,19 @@ export function useDataChanges() {
       const data = await res.json();
       const normalized = (data || []).map((log: any) => ({
         id: log.id,
-        timestamp: log.timestamp ?? log.createdAt ?? log.created_at ?? log.date,
-        table_name: log.table_name ?? log.resource ?? log.table,
-        record_id: log.record_id ?? log.resourceId ?? log.resource_id ?? log.entityId ?? log.id,
+        timestamp: log.timestamp ?? log.createdAt ?? log.date,
+        tableName: log.tableName ?? log.resource ?? log.table,
+        recordId: log.recordId ?? log.resourceId ?? log.entityId ?? log.id,
         operation: normalizeOperation(log.operation ?? log.action),
-        user_email:
-          log.user_email ??
+        userEmail:
           log.userEmail ??
           log.details?.username ??
           log.details?.user ??
           log.details?.email ??
           (log.userId ? `user:${String(log.userId).slice(0, 8)}` : undefined),
-        changed_fields: log.changed_fields ?? log.details?.changes ?? log.details?.changedFields ?? null,
-        old_data: log.old_data ?? log.details?.old ?? log.details?.oldData ?? null,
-        new_data: log.new_data ?? log.details?.new ?? log.details?.newData ?? null,
+        changedFields: log.changedFields ?? log.details?.changes ?? log.details?.changedFields ?? null,
+        oldData: log.oldData ?? log.details?.old ?? log.details?.oldData ?? null,
+        newData: log.newData ?? log.details?.new ?? log.details?.newData ?? null,
       })) as DataChange[];
       setChanges(normalized);
     } catch (error) {
@@ -77,9 +76,9 @@ export function useDataChanges() {
   const filteredChanges = changes.filter(change => {
     if (!searchTerm) return true;
     return (
-      change.table_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      change.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      change.record_id?.toLowerCase().includes(searchTerm.toLowerCase())
+      change.tableName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      change.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      change.recordId?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
@@ -102,7 +101,7 @@ export function useDataChanges() {
     csvContent += `N°${separator}Date/Heure${separator}Table${separator}Opération${separator}Utilisateur${separator}ID Enreg.\n`;
     
     filteredChanges.forEach((ch, idx) => {
-      csvContent += `${idx + 1}${separator}${formatTimestamp(ch.timestamp)}${separator}${ch.table_name || ''}${separator}${ch.operation}${separator}${ch.user_email || 'Système'}${separator}${ch.record_id || ''}\n`;
+      csvContent += `${idx + 1}${separator}${formatTimestamp(ch.timestamp)}${separator}${ch.tableName || ''}${separator}${ch.operation}${separator}${ch.userEmail || 'Système'}${separator}${ch.recordId || ''}\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -129,10 +128,10 @@ export function useDataChanges() {
     const tableData = filteredChanges.slice(0, 50).map((ch, idx) => [
       idx + 1,
       formatTimestamp(ch.timestamp),
-      ch.table_name || '',
+      ch.tableName || '',
       ch.operation,
-      ch.user_email || 'Système',
-      (ch.record_id || '').toString().substring(0, 8) + '...'
+      ch.userEmail || 'Système',
+      (ch.recordId || '').toString().substring(0, 8) + '...'
     ]);
 
     autoTable(doc, {
@@ -154,11 +153,11 @@ export function useDataChanges() {
       totalModifications: filteredChanges.length,
       modifications: filteredChanges.map(ch => ({
         timestamp: ch.timestamp,
-        table: ch.table_name,
+        table: ch.tableName,
         operation: ch.operation,
-        utilisateur: ch.user_email,
-        recordId: ch.record_id,
-        changedFields: ch.changed_fields
+        utilisateur: ch.userEmail,
+        recordId: ch.recordId,
+        changedFields: ch.changedFields
       }))
     };
     

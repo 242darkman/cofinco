@@ -30,7 +30,7 @@ export class ClientService {
 
       let clients: Client[] = [];
       let meta: PaginationMeta = {
-        pagination: { page, per_page: perPage, total_items: 0, total_pages: 1 },
+        pagination: { page, perPage, totalItems: 0, totalPages: 1 },
         filters: {}
       };
 
@@ -50,9 +50,9 @@ export class ClientService {
         meta = {
           pagination: {
             page,
-            per_page: perPage,
-            total_items: clients.length,
-            total_pages: Math.max(1, Math.ceil(clients.length / perPage))
+            perPage,
+            totalItems: clients.length,
+            totalPages: Math.max(1, Math.ceil(clients.length / perPage))
           },
           filters: {}
         };
@@ -84,9 +84,9 @@ export class ClientService {
           meta: {
             pagination: {
               page,
-              per_page: perPage,
-              total_items: total,
-              total_pages: totalPages
+              perPage,
+              totalItems: total,
+              totalPages: totalPages
             },
             filters: meta.filters
           }
@@ -99,7 +99,7 @@ export class ClientService {
       return {
         data: [],
         meta: {
-          pagination: { page: 1, per_page: 20, total_items: 0, total_pages: 1 },
+          pagination: { page: 1, perPage: 20, totalItems: 0, totalPages: 1 },
           filters: {}
         }
       };

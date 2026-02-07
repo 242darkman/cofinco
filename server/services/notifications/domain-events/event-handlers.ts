@@ -1546,6 +1546,15 @@ export async function handleProspectionCreated(data: ProspectionCreatedData) {
   });
 }
 
+export async function handleProspectConverted(data: any) {
+  if (!data.userId) return;
+
+  logNotificationEvent("info", "Domain event: PROSPECT_CONVERTED", {
+    correlationId: `prospect-converted-${data.prospectionId}`,
+    status: "DISPATCHED",
+  });
+}
+
 export async function handlePaiementTerrainValidated(data: PaiementTerrainValidatedData) {
   // Send confirmation to the client whose payment was validated
   if (!data.clientId) return;

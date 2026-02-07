@@ -26,11 +26,11 @@ interface User {
   role?: string;
   statut?: string;
   telephone?: string;
-  created_at: string;
+  createdAt: string;
   last_sign_in_at?: string;
-  active_sessions?: number;
-  last_activity?: string;
-  failed_logins_24h?: number;
+  activeSessions?: number;
+  lastActivity?: string;
+  failedLogins24h?: number;
 }
 
 interface RoleOption {
@@ -59,30 +59,30 @@ interface Permission {
 interface UserSession {
   id: string;
   user_id: string;
-  user_email?: string;
-  ip_address?: string;
+  userEmail?: string;
+  ipAddress?: string;
   user_agent?: string;
   device_type?: string;
   browser?: string;
   os?: string;
   location_city?: string;
   location_country?: string;
-  started_at: string;
+  startedAt: string;
   last_activity_at: string;
-  is_active: boolean;
+  isActive: boolean;
 }
 
 interface AdminStats {
-  total_users: number;
-  active_users: number;
-  inactive_users: number;
-  locked_users: number;
-  active_sessions: number;
-  users_online_now: number;
-  new_users_today: number;
-  new_users_week: number;
-  login_attempts_today: number;
-  failed_logins_today: number;
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  lockedUsers: number;
+  activeSessions: number;
+  usersOnlineNow: number;
+  newUsersToday: number;
+  newUsersWeek: number;
+  loginAttemptsToday: number;
+  failedLoginsToday: number;
 }
 
 export default function AdminGestionAcces() {
@@ -139,13 +139,13 @@ export default function AdminGestionAcces() {
     try {
       const data = await auditApi.getAll({ limit: '100' });
       const activeSessions = data?.filter((log: any) =>
-        log.action_type === 'LOGIN' &&
-        new Date(log.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+        log.actionType === 'LOGIN' &&
+        new Date(log.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000)
       ) || [];
       setSessions(activeSessions.map((s: any) => ({
         ...s,
-        user_email: s.user_email,
-        is_active: true
+        userEmail: s.userEmail,
+        isActive: true
       })));
     } catch (error) {
       // Silent fail - sessions list is supplementary
@@ -157,20 +157,20 @@ export default function AdminGestionAcces() {
       const usersData = await userApi.getAll();
 
       setStats({
-        total_users: usersData.length,
-        active_users: usersData.filter((u: User) => u.statut === StatutUser.ACTIVE).length,
-        inactive_users: usersData.filter((u: User) => u.statut === StatutUser.INACTIVE).length,
-        locked_users: usersData.filter((u: User) => u.statut === StatutUser.SUSPENDED).length,
-        active_sessions: sessions.length,
-        users_online_now: sessions.filter(s => s.is_active).length,
-        new_users_today: usersData.filter((u: User) =>
-          new Date(u.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+        totalUsers: usersData.length,
+        activeUsers: usersData.filter((u: User) => u.statut === StatutUser.ACTIVE).length,
+        inactiveUsers: usersData.filter((u: User) => u.statut === StatutUser.INACTIVE).length,
+        lockedUsers: usersData.filter((u: User) => u.statut === StatutUser.SUSPENDED).length,
+        activeSessions: sessions.length,
+        usersOnlineNow: sessions.filter(s => s.isActive).length,
+        newUsersToday: usersData.filter((u: User) =>
+          new Date(u.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000)
         ).length,
-        new_users_week: usersData.filter((u: User) =>
-          new Date(u.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        newUsersWeek: usersData.filter((u: User) =>
+          new Date(u.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
         ).length,
-        login_attempts_today: 0,
-        failed_logins_today: 0
+        loginAttemptsToday: 0,
+        failedLoginsToday: 0
       });
     } catch (error) {
       // Silent fail - stats are supplementary
@@ -263,8 +263,8 @@ export default function AdminGestionAcces() {
         u.role || '',
         ALL_STATUS_LABELS[u.statut || ''] || u.statut || '',
         u.telephone || '',
-        new Date(u.created_at).toLocaleDateString(),
-        u.active_sessions || 0
+        new Date(u.createdAt).toLocaleDateString(),
+        u.activeSessions || 0
       ].join(','))
     ].join('\n');
 
@@ -355,31 +355,31 @@ export default function AdminGestionAcces() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <StatCard
             title="Utilisateurs"
-            value={stats.total_users}
+            value={stats.totalUsers}
             icon={Users}
             color="primary"
-            trend={`${stats.active_users} actifs`}
+            trend={`${stats.activeUsers} actifs`}
             className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
           />
           <StatCard
             title="En Ligne"
-            value={stats.users_online_now}
+            value={stats.usersOnlineNow}
             icon={UserCheck}
             color="success"
-            trend={`${stats.active_sessions} sessions`}
+            trend={`${stats.activeSessions} sessions`}
             className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
           />
           <StatCard
             title="Nouveaux"
-            value={stats.new_users_today}
+            value={stats.newUsersToday}
             icon={TrendingUp}
             color="primary"
-            trend={`${stats.new_users_week} sem.`}
+            trend={`${stats.newUsersWeek} sem.`}
             className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
           />
           <StatCard
             title="Connexions"
-            value={stats.login_attempts_today}
+            value={stats.loginAttemptsToday}
             icon={Activity}
             color="warning"
             trend="Auj."
@@ -387,10 +387,10 @@ export default function AdminGestionAcces() {
           />
           <StatCard
             title="Échecs"
-            value={stats.failed_logins_today}
+            value={stats.failedLoginsToday}
             icon={AlertTriangle}
             color="danger"
-            trend={`${stats.locked_users} bloqués`}
+            trend={`${stats.lockedUsers} bloqués`}
             className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
           />
         </div>
@@ -545,20 +545,20 @@ export default function AdminGestionAcces() {
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-center">
-                                {user.active_sessions ? (
-                                    <span className="font-mono font-bold text-cyan-400">{user.active_sessions}</span> 
+                                {user.activeSessions ? (
+                                    <span className="font-mono font-bold text-cyan-400">{user.activeSessions}</span> 
                                 ) : (
                                     <span className="text-slate-600">-</span>
                                 )}
                             </td>
                             <td className="px-6 py-4">
-                                <span className="text-slate-400 font-medium text-xs whitespace-nowrap">{formatTimeAgo(user.last_activity)}</span>
+                                <span className="text-slate-400 font-medium text-xs whitespace-nowrap">{formatTimeAgo(user.lastActivity)}</span>
                             </td>
                             <td className="px-6 py-4 text-center">
-                                {(user.failed_logins_24h || 0) > 0 ? (
+                                {(user.failedLogins24h || 0) > 0 ? (
                                 <span className="inline-flex items-center gap-1 text-orange-400 font-bold text-xs bg-orange-500/10 px-2 py-0.5 rounded-full">
                                     <AlertTriangle size={12} />
-                                    {user.failed_logins_24h}
+                                    {user.failedLogins24h}
                                 </span>
                                 ) : (
                                 <span className="text-slate-600">-</span>
@@ -654,11 +654,11 @@ export default function AdminGestionAcces() {
                                 <Monitor size={20} />
                             </div>
                             <div>
-                                <p className="text-white font-bold">{session.user_email}</p>
+                                <p className="text-white font-bold">{session.userEmail}</p>
                                 <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                                    <span className="flex items-center gap-1"><Clock size={12}/> {formatTimeAgo(session.started_at)}</span>
+                                    <span className="flex items-center gap-1"><Clock size={12}/> {formatTimeAgo(session.startedAt)}</span>
                                     <span>•</span>
-                                    <span>{session.ip_address || 'IP Masquée'}</span>
+                                    <span>{session.ipAddress || 'IP Masquée'}</span>
                                 </div>
                             </div>
                         </div>

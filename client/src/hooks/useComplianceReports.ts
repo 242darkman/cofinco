@@ -60,7 +60,7 @@ export function useComplianceReports() {
           }
         ],
         statistiques: {
-          total_ecritures: logs?.filter((l: { entity_type: string }) => l.entity_type === 'ecriture').length || 0,
+          total_ecritures: logs?.filter((l: { entityType: string }) => l.entityType === 'ecriture').length || 0,
           total_logs: logs?.length || 0,
           taux_integrite: '100%',
           derniere_verification: new Date().toLocaleDateString('fr-FR')
@@ -149,13 +149,13 @@ export function useComplianceReports() {
       if (!logsRes.ok) throw new Error('Erreur chargement logs');
       const logs = await logsRes.json();
 
-      const report = logs?.map((log: { timestamp: string; user_email?: string; action: string; entity_type: string; status: string; ip_address?: string; checksum?: string }) => ({
+      const report = logs?.map((log: { timestamp: string; userEmail?: string; action: string; entityType: string; status: string; ipAddress?: string; checksum?: string }) => ({
         Date: new Date(log.timestamp).toLocaleString('fr-FR'),
-        Utilisateur: log.user_email || 'Système',
+        Utilisateur: log.userEmail || 'Système',
         Action: log.action,
-        Entité: log.entity_type,
+        Entité: log.entityType,
         Statut: log.status,
-        IP: log.ip_address || '-',
+        IP: log.ipAddress || '-',
         Checksum: log.checksum?.substring(0, 16) + '...' || '-'
       })) || [];
 

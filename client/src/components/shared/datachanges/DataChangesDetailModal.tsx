@@ -85,7 +85,7 @@ export default function DataChangesDetailModal({ change, onClose, formatTimestam
     <Modal
        isOpen={!!change}
        onClose={onClose}
-       title={`Détails: ${change.operation} sur ${change.table_name}`}
+       title={`Détails: ${change.operation} sur ${change.tableName}`}
        size="xl"
     >
         <div className="space-y-6">
@@ -96,7 +96,7 @@ export default function DataChangesDetailModal({ change, onClose, formatTimestam
             </div>
             <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
               <div className="text-sm text-slate-400 mb-1">Table</div>
-              <div className="text-white font-semibold">{change.table_name}</div>
+              <div className="text-white font-semibold">{change.tableName}</div>
             </div>
             <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
               <div className="text-sm text-slate-400 mb-1">Date</div>
@@ -106,7 +106,7 @@ export default function DataChangesDetailModal({ change, onClose, formatTimestam
 
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
             <div className="text-sm text-slate-400 mb-2">Utilisateur</div>
-            <div className="text-white font-semibold">{change.user_email || 'Système'}</div>
+            <div className="text-white font-semibold">{change.userEmail || 'Système'}</div>
           </div>
 
           <div className="bg-slate-900 rounded-xl p-4 border border-slate-700">
@@ -118,19 +118,19 @@ export default function DataChangesDetailModal({ change, onClose, formatTimestam
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                 <div className="text-blue-400 font-semibold mb-2">Données supprimées</div>
                 <pre className="text-white text-sm bg-slate-950 p-3 rounded overflow-x-auto border border-slate-800">
-                  {JSON.stringify(change.old_data, null, 2)}
+                  {JSON.stringify(change.oldData, null, 2)}
                 </pre>
               </div>
             ) : change.operation === 'INSERT' ? (
               <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
                 <div className="text-green-400 font-semibold mb-2">Données créées</div>
                 <pre className="text-white text-sm bg-slate-950 p-3 rounded overflow-x-auto border border-slate-800">
-                  {JSON.stringify(change.new_data, null, 2)}
+                  {JSON.stringify(change.newData, null, 2)}
                 </pre>
               </div>
             ) : (
               <div className="max-h-[400px] overflow-y-auto pr-2">
-                {renderDiff(change.old_data, change.new_data, change.changed_fields)}
+                {renderDiff(change.oldData, change.newData, change.changedFields)}
               </div>
             )}
           </div>

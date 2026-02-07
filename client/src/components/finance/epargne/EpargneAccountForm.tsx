@@ -34,6 +34,7 @@ interface Client {
 
 interface CompteExistant {
   id: string;
+  numeroCompte?: string;
   numero_compte: string;
   typeCompte?: string;
   type_compte: string;
@@ -192,12 +193,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
    }, [clients, searchQuery]);
    
    const existingAccountsTypes = useMemo(() => 
-     comptesExistants.map(c => normalizeTypeCompte(c.typeCompte || c.type_compte || '')),
+     comptesExistants.map(c => normalizeTypeCompte(c.typeCompte || '')),
    [comptesExistants]);
 
    const eligibleForTransfer = useMemo(() => 
      comptesExistants.some(c => {
-        const type = normalizeTypeCompte(c.typeCompte || c.type_compte || '');
+        const type = normalizeTypeCompte(c.typeCompte || '');
         const solde = typeof c.solde === 'number' ? c.solde : parseFloat(String(c.solde || 0));
         return type === 'CURRENT' && solde > 0;
      }),
@@ -618,8 +619,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                              className="w-full h-10 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white px-3 focus:border-indigo-500 outline-none"
                           >
                              <option value="">Sélectionner le compte source</option>
-                             {comptesExistants.filter(c => normalizeTypeCompte(c.typeCompte || c.type_compte || '') === 'CURRENT').map(c => (
-                                <option key={c.id} value={c.id}>{c.numero_compte} ({formatMoney(parseFloat(String(c.solde)))})</option>
+                             {comptesExistants.filter(c => normalizeTypeCompte(c.typeCompte || '') === 'CURRENT').map(c => (
+                                <option key={c.id} value={c.id}>{c.numeroCompte} ({formatMoney(parseFloat(String(c.solde)))})</option>
                              ))}
                           </select>
                           {errors.compte_source_id && <p className="text-xs text-red-400 ml-1 mt-1">{errors.compte_source_id}</p>}

@@ -295,7 +295,7 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
       const ancienSolde = compte ? parseMoney(compte.solde) : 0;
       const nouveauSolde =
         direction === 'Dépôt' ? ancienSolde + amountValue : ancienSolde - amountValue;
-      numeroCompte = maskAccountNumber(compte?.numeroCompte || selectedClient.numero_compte);
+      numeroCompte = maskAccountNumber(compte?.numeroCompte || selectedClient.numeroCompte);
       details.push({ label: 'Ancien Solde', value: formatMoney(ancienSolde) });
       details.push({
         label: 'Mouvement',
@@ -540,7 +540,7 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                             <h3 className="font-bold text-white truncate">{selectedClient.nom} {selectedClient.prenom}</h3>
-                            <p className="text-slate-400 text-sm truncate">{selectedClient.telephone} • {selectedClient.numero_compte || 'Sans compte'}</p>
+                            <p className="text-slate-400 text-sm truncate">{selectedClient.telephone} • {selectedClient.numeroCompte || 'Sans compte'}</p>
                         </div>
                     </div>
 

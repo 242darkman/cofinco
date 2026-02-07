@@ -15,7 +15,7 @@ interface StatsResponse {
   period: string;
   currency: string;
   trend: 'positive' | 'negative' | 'neutral';
-  data_points: StatPoint[];
+  dataPoints: StatPoint[];
 }
 
 interface AccountStatsChartProps {
@@ -127,8 +127,8 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
   const isBalance = filter === 'ALL';
   const dataKey = config.dataKey as keyof StatPoint;
   
-  const minValue = data?.data_points?.reduce((min, p) => Math.min(min, (p[dataKey] as number) || 0), Infinity) || 0;
-  const maxValue = data?.data_points?.reduce((max, p) => Math.max(max, (p[dataKey] as number) || 0), -Infinity) || 0;
+  const minValue = data?.dataPoints?.reduce((min, p) => Math.min(min, (p[dataKey] as number) || 0), Infinity) || 0;
+  const maxValue = data?.dataPoints?.reduce((max, p) => Math.max(max, (p[dataKey] as number) || 0), -Infinity) || 0;
   
   const isFlat = minValue === maxValue;
 
@@ -175,7 +175,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
         )}
         
         <ResponsiveContainer width="100%" height="100%">
-          <ChartComponent data={data?.data_points || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartComponent data={data?.dataPoints || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
              {isBalance && (
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

@@ -35,20 +35,17 @@ type StatutMembreTontineValue = typeof StatutMembreTontine[keyof typeof StatutMe
 
 interface TontineMembre {
   id: string;
-  tontine_id: string;
-  client_id: string;
-  position_ordre: number;
+  tontineId: string;
+  clientId: string;
+  positionOrdre: number;
   position?: number;
   status: StatutMembreTontineValue | string;
   statut?: StatutMembreTontineValue | string;
-  montant_total_contribue: number;
+  montantTotalContribue: number;
   totalCotisations?: string;
-  a_recu_benefice: boolean;
-  aRecuBenefice?: boolean;
-  date_benefice: string | null;
-  dateBenefice?: string | null;
-  date_adhesion: string;
-  dateAdhesion?: string;
+  aRecuBenefice: boolean;
+  dateBenefice: string | null;
+  dateAdhesion: string;
   client: Client;
   // Nouvelles stats calculées par le backend
   toursPayes?: number;
@@ -225,7 +222,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
   const filteredClients = useMemo(() => {
     const query = sanitizeInput(searchQuery).toLowerCase();
     return clients.filter((client) => {
-      const alreadyMember = membres.some((m) => m.client_id === client.id);
+      const alreadyMember = membres.some((m) => m.clientId === client.id);
       if (alreadyMember) return false;
 
       if (!query) return true;
@@ -265,15 +262,15 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
   // Export members data
   const buildExportData = useCallback(() => {
     return membres.map((m) => ({
-      'Position': m.position_ordre,
+      'Position': m.positionOrdre,
       'Nom': formatClientName(m.client?.nom, m.client?.prenom),
       'Statut': getStatutLabel(m.status || m.statut || StatutMembreTontine.ACTIVE),
-      'Total cotisé (FCFA)': Number(m.totalCotisations || m.montant_total_contribue || 0),
+      'Total cotisé (FCFA)': Number(m.totalCotisations || m.montantTotalContribue || 0),
       'Tours payés': m.toursPayes ?? '-',
       'Tours restants': m.toursRestants ?? '-',
       'Restant (FCFA)': m.montantRestant ?? 0,
-      'Bénéfice reçu': m.a_recu_benefice ? 'Oui' : 'Non',
-      "Date d'adhésion": new Date(m.date_adhesion || m.dateAdhesion || '').toLocaleDateString('fr-FR'),
+      'Bénéfice reçu': m.aRecuBenefice ? 'Oui' : 'Non',
+      "Date d'adhésion": new Date(m.dateAdhesion || '').toLocaleDateString('fr-FR'),
     }));
   }, [membres, getStatutLabel]);
 
@@ -299,7 +296,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
      setConfigMember(membre);
      setLoadingAccounts(true);
      try {
-         const accounts = await compteEpargneApi.getByClient(membre.client_id);
+         const accounts = await compteEpargneApi.getByClient(membre.clientId);
          setMemberAccounts(accounts || []);
      } catch(e) {
          console.error("Error loading accounts", e);
@@ -417,12 +414,12 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                           loading="lazy"
                         />
                       ) : (
-                        <span aria-label={`Position ${membre.position_ordre}`}>
-                          #{membre.position_ordre}
+                        <span aria-label={`Position ${membre.positionOrdre}`}>
+                          #{membre.positionOrdre}
                         </span>
                       )}
                     </div>
-                    {membre.a_recu_benefice && (
+                    {membre.aRecuBenefice && (
                       <div
                         className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white p-0.5 rounded-full border border-slate-800"
                         title="A reçu le bénéfice"
@@ -447,7 +444,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                             {getStatutLabel(membre.status || membre.statut || StatutMembreTontine.ACTIVE)}
                           </span>
                           <span className="text-slate-500">
-                            {new Date(membre.date_adhesion || membre.dateAdhesion || '').toLocaleDateString('fr-FR')}
+                            {new Date(membre.dateAdhesion || '').toLocaleDateString('fr-FR')}
                           </span>
                           {/* Status Badge Mobile-First */}
                           <MemberStatusBadge membre={membre} tourActuel={membre.tourActuel || 1} />
@@ -484,7 +481,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                       <div className="flex flex-col">
                         <span className="text-slate-500">Total cotisé</span>
                         <span className="font-bold text-green-400">
-                          {Number(membre.totalCotisations || membre.montant_total_contribue || 0).toLocaleString('fr-FR')} FCFA
+                          {Number(membre.totalCotisations || membre.montantTotalContribue || 0).toLocaleString('fr-FR')} FCFA
                         </span>
                       </div>
                       <div className="flex flex-col text-right">

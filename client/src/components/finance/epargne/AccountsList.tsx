@@ -27,15 +27,15 @@ const getTypeCompteLabel = (type: string): string => {
 
 interface Compte {
   id: string;
-  numero_compte: string;
-  type_compte: string;
+  numeroCompte: string;
+  typeCompte: string;
   solde: number;
-  solde_courant?: number;
+  soldeCourant?: number;
   statut: string;
-  client_id: string;
-  created_at?: string;
-  date_ouverture?: string;
-  taux_interet?: number;
+  clientId: string;
+  createdAt?: string;
+  dateOuverture?: string;
+  tauxInteret?: number;
   clients: {
     id: string;
     nom: string;
@@ -122,9 +122,9 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
                 <div className="min-w-0">
                     <h3 className="text-slate-900 dark:text-white font-medium text-xs truncate">{clientName}</h3>
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-500 font-mono tracking-wide">{account.numero_compte}</span>
+                        <span className="text-[10px] text-slate-500 font-mono tracking-wide">{account.numeroCompte}</span>
                         <span className="text-[9px] text-slate-500 border border-slate-200 dark:border-slate-700/50 px-1 rounded bg-slate-100 dark:bg-slate-800/50">
-                          {getTypeCompteLabel(account.type_compte)}
+                          {getTypeCompteLabel(account.typeCompte)}
                         </span>
                     </div>
                 </div>
@@ -158,8 +158,8 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
             return (
               <div className="flex flex-col items-end">
                 <div className="font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight text-xs">{realBalance.toLocaleString('fr-FR')} <span className="text-[9px] text-slate-400">FCFA</span></div>
-                {type === TypeCompte.SAVINGS && (account.taux_interet || 0) > 0 && (
-                  <div className="text-[9px] text-slate-400">Taux: {account.taux_interet}%</div>
+                {type === TypeCompte.SAVINGS && (account.tauxInteret || 0) > 0 && (
+                  <div className="text-[9px] text-slate-400">Taux: {account.tauxInteret}%</div>
                 )}
               </div>
             );

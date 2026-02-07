@@ -13,20 +13,20 @@ interface ClientDetailsProps {
 
 interface AnalyticsData {
     summary: {
-      total_savings: number;
-      total_credit_due: number;
-      active_loans_count: number;
-      fidelity_points: number;
-      repayment_rate: number;
+      totalSavings: number;
+      totalCreditDue: number;
+      activeLoansCount: number;
+      fidelityPoints: number;
+      repaymentRate: number;
     };
     distribution: {
       label: string;
       value: number;
       color: string;
     }[];
-    monthly_trend: {
-      savings_growth: string;
-      credit_evolution: string;
+    monthlyTrend: {
+      savingsGrowth: string;
+      creditEvolution: string;
     };
   }
 
@@ -56,7 +56,7 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
         );
     }
 
-    const { summary, distribution, monthly_trend } = analytics;
+    const { summary, distribution, monthlyTrend } = analytics;
 
   return (
     <>
@@ -99,10 +99,10 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex flex-col justify-between">
                  <div>
                      <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Points Fidélité</p>
-                     <p className="text-2xl font-bold text-cyan-400">{summary.fidelity_points.toLocaleString()}</p>
+                     <p className="text-2xl font-bold text-cyan-400">{summary.fidelityPoints.toLocaleString()}</p>
                  </div>
                  <div className="mt-1 text-xs font-medium text-slate-400">
-                     {summary.repayment_rate}% remboursement
+                     {summary.repaymentRate}% remboursement
                  </div>
              </div>
          </div>
@@ -123,9 +123,9 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
                 <div>
                     <p className="text-[10px] uppercase text-slate-500 mb-0.5 flex items-center gap-2">
                         Crédits En Cours
-                        {summary.total_credit_due > 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>}
+                        {summary.totalCreditDue > 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>}
                     </p>
-                    <p className="text-base font-bold text-white">{summary.total_credit_due.toLocaleString()} FCFA</p>
+                    <p className="text-base font-bold text-white">{summary.totalCreditDue.toLocaleString()} FCFA</p>
                 </div>
                 {/* Trend / Chevron */}
                 <div className="flex items-center gap-2">
@@ -141,14 +141,14 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
             >
                 <div>
                      <p className="text-[10px] uppercase text-slate-500 mb-0.5">Total des comptes</p>
-                     <p className="text-base font-bold text-white">{summary.total_savings.toLocaleString()} FCFA</p>
+                     <p className="text-base font-bold text-white">{summary.totalSavings.toLocaleString()} FCFA</p>
                 </div>
                  {/* Trend / Chevron */}
                  <div className="flex items-center gap-3">
-                   {monthly_trend.savings_growth.startsWith('+') && (
+                   {monthlyTrend.savingsGrowth.startsWith('+') && (
                        <div className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">
                            <TrendingUp size={10} className="mr-1" />
-                           {monthly_trend.savings_growth}
+                           {monthlyTrend.savingsGrowth}
                        </div>
                    )}
                    <ChevronRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
@@ -196,14 +196,14 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
                 </div>
                )}
 
-               {client.agence_nom && (
+               {client.agenceNom && (
                 <div className="bg-slate-800/30 rounded-lg p-2.5 border border-slate-700/30 flex items-center gap-3">
                     <div className="bg-slate-700/50 p-1.5 rounded-md">
                             <Building2 size={14} className="text-blue-400" />
                     </div>
                     <div className="overflow-hidden">
                         <p className="text-[10px] text-slate-500 uppercase">Agence Affiliée</p>
-                        <p className="text-sm font-medium text-slate-200 truncate">{client.agence_nom}</p>
+                        <p className="text-sm font-medium text-slate-200 truncate">{client.agenceNom}</p>
                     </div>
                 </div>
                )}
@@ -220,7 +220,7 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
           <div className="space-y-4 pt-2">
              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 text-center">
                  <p className="text-sm text-slate-400 mb-1">Total Consolidé</p>
-                 <p className="text-3xl font-bold text-white">{summary.total_savings.toLocaleString()} <span className="text-base font-normal text-slate-500">FCFA</span></p>
+                 <p className="text-3xl font-bold text-white">{summary.totalSavings.toLocaleString()} <span className="text-base font-normal text-slate-500">FCFA</span></p>
              </div>
 
              <div className="space-y-2">

@@ -6,12 +6,12 @@ import { ReceiptTemplate } from '../ui/printable/ReceiptTemplate';
 
 interface ClientActivity {
   id: number;
-  client_id: string;
-  activity_type: string;
-  activity_description: string;
+  clientId: string;
+  activityType: string;
+  activityDescription: string;
   amount?: number;
   metadata?: Record<string, unknown>;
-  created_at: string;
+  createdAt: string;
 }
 
 interface ClientHistoryProps {
@@ -104,51 +104,51 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
   };
 
   const handleReprint = (activity: ClientActivity) => {
-      const isPayment = ['payment', 'epargne', 'tontine', 'credit'].includes(activity.activity_type);
+      const isPayment = ['payment', 'epargne', 'tontine', 'credit'].includes(activity.activityType);
       if (!isPayment || !activity.amount || !clientDetails) return;
 
       print({
-          title: `REÇU - ${getActivityLabel(activity.activity_type).toUpperCase()}`,
+          title: `REÇU - ${getActivityLabel(activity.activityType).toUpperCase()}`,
           reference: (activity.metadata?.reference as string) || `ACT-${activity.id}`,
-          date: new Date(activity.created_at),
-          type: activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1),
+          date: new Date(activity.createdAt),
+          type: activity.activityType.charAt(0).toUpperCase() + activity.activityType.slice(1),
           client: {
               nom: clientDetails.nom,
               prenom: clientDetails.prenom,
               email: clientDetails.email,
               telephone: clientDetails.phone || clientDetails.telephone,
-              numeroCompte: clientDetails.numero_compte
+              numeroCompte: clientDetails.numeroCompte
           },
           agent: {
               nom: 'Agent', // Activity log might not have agent name readily available without extra fetch
               prenom: 'Guichet'
           },
           items: [{
-              description: activity.activity_description,
+              description: activity.activityDescription,
               details: (activity.metadata?.notes as string) || '',
               montant: activity.amount,
               quantite: 1
           }],
           total: activity.amount,
-          modePaiement: (activity.metadata?.mode_paiement as string) || 'Espèces' // Fallback
+          modePaiement: (activity.metadata?.modePaiement as string) || 'Espèces'
       });
   };
 
   const filteredActivities = filter === 'all'
     ? activities
-    : activities.filter(a => a.activity_type === filter);
+    : activities.filter(a => a.activityType === filter);
 
-  const activityTypes = Array.from(new Set(activities.map(a => a.activity_type)));
+  const activityTypes = Array.from(new Set(activities.map(a => a.activityType)));
 
   // Calculate Stats
   const now = new Date();
   const activitiesThisMonth = activities.filter(a => {
-      const date = new Date(a.created_at);
+      const date = new Date(a.createdAt);
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
   }).length;
   
   const activitiesThisWeek = activities.filter(a => {
-      const date = new Date(a.created_at);
+      const date = new Date(a.createdAt);
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       return date >= weekAgo;
   }).length;
@@ -215,35 +215,35 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
               <div key={activity.id} className="flex items-start gap-2 p-1.5 rounded hover:bg-slate-700/30 transition-colors group">
                 {/* Dot */}
                 <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                  activity.activity_type === 'credit' ? 'bg-blue-500' :
-                  activity.activity_type === 'epargne' ? 'bg-emerald-500' :
-                  activity.activity_type === 'payment' ? 'bg-green-500' :
-                  activity.activity_type === 'tontine' ? 'bg-amber-500' : 'bg-slate-500'
+                  activity.activityType === 'credit' ? 'bg-blue-500' :
+                  activity.activityType === 'epargne' ? 'bg-emerald-500' :
+                  activity.activityType === 'payment' ? 'bg-green-500' :
+                  activity.activityType === 'tontine' ? 'bg-amber-500' : 'bg-slate-500'
                 }`} />
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <Badge value={getActivityLabel(activity.activity_type)} size="sm" variant={getActivityVariant(activity.activity_type)} icon={getActivityIcon(activity.activity_type)} />
+                      <Badge value={getActivityLabel(activity.activityType)} size="sm" variant={getActivityVariant(activity.activityType)} icon={getActivityIcon(activity.activityType)} />
                       {activity.amount && activity.amount > 0 && (
-                        <span className={`text-[11px] font-bold font-mono ${['payment', 'epargne'].includes(activity.activity_type) ? 'text-emerald-400' : 'text-slate-300'}`}>
+                        <span className={`text-[11px] font-bold font-mono ${['payment', 'epargne'].includes(activity.activityType) ? 'text-emerald-400' : 'text-slate-300'}`}>
                           {activity.amount.toLocaleString()} F
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-[9px] text-slate-500">
-                        {new Date(activity.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        {new Date(activity.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                       </span>
-                      {activity.amount && activity.amount > 0 && ['payment', 'epargne', 'tontine', 'credit'].includes(activity.activity_type) && (
+                      {activity.amount && activity.amount > 0 && ['payment', 'epargne', 'tontine', 'credit'].includes(activity.activityType) && (
                         <button onClick={() => handleReprint(activity)} className="p-0.5 hover:bg-slate-600 rounded text-slate-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition" title="Imprimer" disabled={isPrinting}>
                           <Printer size={10} />
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 truncate mt-0.5">{activity.activity_description}</p>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">{activity.activityDescription}</p>
                 </div>
               </div>
             ))}

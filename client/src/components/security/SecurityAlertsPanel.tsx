@@ -14,16 +14,16 @@ import { loadPDFLibraries } from '@/lib/lazy-export';
 
 interface SecurityAlert {
   id: string;
-  alert_type: string;
+  alertType: string;
   severity: string;
-  user_email: string;
+  userEmail: string;
   description: string;
   details: any;
-  ip_address: string;
+  ipAddress: string;
   status: string;
-  created_at: string;
-  resolved_at: string;
-  resolution_notes: string;
+  createdAt: string;
+  resolvedAt: string;
+  resolutionNotes: string;
 }
 
 export default function SecurityAlertsPanel() {
@@ -114,7 +114,7 @@ export default function SecurityAlertsPanel() {
     csvContent += `N°${separator}Date${separator}Type${separator}Sévérité${separator}Statut${separator}Utilisateur${separator}IP\n`;
     
     alerts.forEach((alert, idx) => {
-      csvContent += `${idx + 1}${separator}${new Date(alert.created_at).toLocaleString('fr-FR')}${separator}${getTypeLabel(alert.alert_type)}${separator}${ALL_STATUS_LABELS[alert.severity] || alert.severity}${separator}${ALL_STATUS_LABELS[alert.status] || alert.status}${separator}${alert.user_email || 'N/A'}${separator}${alert.ip_address || '-'}\n`;
+      csvContent += `${idx + 1}${separator}${new Date(alert.createdAt).toLocaleString('fr-FR')}${separator}${getTypeLabel(alert.alertType)}${separator}${ALL_STATUS_LABELS[alert.severity] || alert.severity}${separator}${ALL_STATUS_LABELS[alert.status] || alert.status}${separator}${alert.userEmail || 'N/A'}${separator}${alert.ipAddress || '-'}\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -143,11 +143,11 @@ export default function SecurityAlertsPanel() {
 
     const tableData = alerts.slice(0, 50).map((alert, idx) => [
       idx + 1,
-      new Date(alert.created_at).toLocaleString('fr-FR'),
-      getTypeLabel(alert.alert_type),
+      new Date(alert.createdAt).toLocaleString('fr-FR'),
+      getTypeLabel(alert.alertType),
       alert.severity.toUpperCase(),
       alert.status,
-      alert.user_email || 'N/A'
+      alert.userEmail || 'N/A'
     ]);
 
     autoTable(doc, {
@@ -175,16 +175,16 @@ export default function SecurityAlertsPanel() {
       },
       alertes: alerts.map(alert => ({
         id: alert.id,
-        type: alert.alert_type,
-        typeLibelle: getTypeLabel(alert.alert_type),
+        type: alert.alertType,
+        typeLibelle: getTypeLabel(alert.alertType),
         severite: alert.severity,
         statut: alert.status,
-        utilisateur: alert.user_email,
-        ip: alert.ip_address,
+        utilisateur: alert.userEmail,
+        ip: alert.ipAddress,
         description: alert.description,
-        dateCreation: alert.created_at,
-        dateResolution: alert.resolved_at,
-        notes: alert.resolution_notes
+        dateCreation: alert.createdAt,
+        dateResolution: alert.resolvedAt,
+        notes: alert.resolutionNotes
       }))
     };
     
@@ -346,24 +346,24 @@ export default function SecurityAlertsPanel() {
                             }
                         />
                         <span className="text-slate-400 text-xs">
-                          {new Date(alert.created_at).toLocaleString('fr-FR')}
+                          {new Date(alert.createdAt).toLocaleString('fr-FR')}
                         </span>
                         {alert.status === 'active' && (
                           <Badge value="ACTIVE" variant="primary" className="animate-pulse" />
                         )}
                       </div>
                       <div className="text-white font-bold text-base mb-1">
-                        {getTypeLabel(alert.alert_type)}
+                        {getTypeLabel(alert.alertType)}
                       </div>
                       <div className="text-slate-300 text-sm mb-2">{alert.description}</div>
-                      {alert.user_email && (
+                      {alert.userEmail && (
                         <div className="text-xs text-slate-400">
-                          Utilisateur: <span className="text-cyan-400">{alert.user_email}</span>
+                          Utilisateur: <span className="text-cyan-400">{alert.userEmail}</span>
                         </div>
                       )}
-                      {alert.ip_address && (
+                      {alert.ipAddress && (
                         <div className="text-xs text-slate-400">
-                          IP: <span className="text-cyan-400 font-mono">{alert.ip_address}</span>
+                          IP: <span className="text-cyan-400 font-mono">{alert.ipAddress}</span>
                         </div>
                       )}
                     </div>
@@ -393,7 +393,7 @@ export default function SecurityAlertsPanel() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="text-sm text-slate-400 mb-1">Type</div>
-                    <div className="text-white font-semibold">{getTypeLabel(selectedAlert.alert_type)}</div>
+                    <div className="text-white font-semibold">{getTypeLabel(selectedAlert.alertType)}</div>
                   </div>
                   <div>
                     <div className="text-sm text-slate-400 mb-1">Sévérité</div>
@@ -408,7 +408,7 @@ export default function SecurityAlertsPanel() {
                   </div>
                   <div>
                     <div className="text-sm text-slate-400 mb-1">Date</div>
-                    <div className="text-white">{new Date(selectedAlert.created_at).toLocaleString('fr-FR')}</div>
+                    <div className="text-white">{new Date(selectedAlert.createdAt).toLocaleString('fr-FR')}</div>
                   </div>
                   <div>
                     <div className="text-sm text-slate-400 mb-1">Statut</div>
@@ -487,12 +487,12 @@ export default function SecurityAlertsPanel() {
                 </div>
               )}
 
-              {selectedAlert.resolution_notes && (
+              {selectedAlert.resolutionNotes && (
                 <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
                   <div className="text-sm text-green-400 mb-2">Notes de Résolution</div>
-                  <div className="text-white">{selectedAlert.resolution_notes}</div>
+                  <div className="text-white">{selectedAlert.resolutionNotes}</div>
                   <div className="text-sm text-slate-400 mt-2">
-                    Résolu le: {new Date(selectedAlert.resolved_at).toLocaleString('fr-FR')}
+                    Résolu le: {new Date(selectedAlert.resolvedAt).toLocaleString('fr-FR')}
                   </div>
                 </div>
               )}

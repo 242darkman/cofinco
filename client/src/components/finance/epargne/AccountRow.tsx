@@ -90,9 +90,9 @@ const AccountRow: React.FC<AccountRowProps> = ({ account, onManage, onTransactio
             </div>
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-slate-500 font-mono tracking-wide">{account.numero_compte}</span>
+            <span className="text-xs text-slate-500 font-mono tracking-wide">{account.numeroCompte}</span>
             <span className="hidden sm:inline-flex text-[10px] text-slate-600 border border-slate-700/50 px-1.5 rounded bg-slate-800/50">
-               {getTypeCompteLabel(account.type_compte || account.typeCompte || '')}
+               {getTypeCompteLabel(account.typeCompte || '')}
             </span>
           </div>
         </div>

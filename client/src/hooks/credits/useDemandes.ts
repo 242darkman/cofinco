@@ -10,10 +10,15 @@ export interface DemandeCredit {
   numero_demande: string;
   client_id: string;
   date_demande: string;
+  createdAt?: string;
   created_at?: string;
+  updatedAt?: string;
   updated_at?: string;
+  deletedAt?: string | null;
   deleted_at?: string | null;
-  montant_demande: number;
+  montantDemande: number;
+  montant_demande?: number;
+  montantApprouve?: number | null;
   montant_approuve?: number | null;
   duree_mois: number;
   taux_interet: number;
@@ -22,6 +27,7 @@ export interface DemandeCredit {
   score_credit: number | null;
   revenus_mensuels?: number;
   charges_mensuelles?: number;
+  objetCredit?: string;
   objet_credit?: string;
   description_activite?: string;
   clients?: {

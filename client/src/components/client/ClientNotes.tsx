@@ -8,7 +8,7 @@ interface ClientNote {
   client_id: string;
   note: string;
   priority: 'Basse' | 'Moyenne' | 'Haute';
-  created_at: string;
+  createdAt: string;
 }
 
 interface ClientNotesProps {
@@ -41,7 +41,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
       const client = await res.json();
       const clientNotes = client.notes || [];
       setNotes(clientNotes.sort((a: ClientNote, b: ClientNote) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ));
     } catch (error) {
       console.error('Erreur chargement notes:', error);
@@ -59,7 +59,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
         client_id: clientId,
         note: newNote.note,
         priority: newNote.priority,
-        created_at: new Date().toISOString()
+        createdAt: new Date().toISOString()
       };
 
       const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
@@ -255,7 +255,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                 icon={getPriorityIcon(note.priority)}
                              />
                              <span className="text-[10px] text-slate-500">
-                                {new Date(note.created_at).toLocaleDateString('fr-FR', {
+                                {new Date(note.createdAt).toLocaleDateString('fr-FR', {
                                     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                                 })}
                              </span>

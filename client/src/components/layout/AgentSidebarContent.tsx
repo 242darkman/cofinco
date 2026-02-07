@@ -10,12 +10,12 @@ interface AgentSidebarContentProps {
   onTabChange: (tab: 'versement' | 'retrait' | 'remboursement' | 'epargne') => void;
   onLogout: () => void;
   agent: {
-    nom_complet: string;
-    code_agent: string;
-    peut_faire_versements: boolean;
-    peut_faire_retraits: boolean;
-    peut_rembourser_credits: boolean;
-    peut_collecter_epargnes: boolean;
+    nomComplet: string;
+    codeAgent: string;
+    peutFaireVersements: boolean;
+    peutFaireRetraits: boolean;
+    peutRembourserCredits: boolean;
+    peutCollecterEpargnes: boolean;
   } | null;
 }
 
@@ -49,10 +49,10 @@ export default function AgentSidebarContent({
   const canPerformTab = (tab: 'versement' | 'retrait' | 'remboursement' | 'epargne') => {
     if (!agent) return false;
     switch (tab) {
-      case 'versement': return agent.peut_faire_versements;
-      case 'retrait': return agent.peut_faire_retraits;
-      case 'remboursement': return agent.peut_rembourser_credits;
-      case 'epargne': return agent.peut_collecter_epargnes;
+      case 'versement': return agent.peutFaireVersements;
+      case 'retrait': return agent.peutFaireRetraits;
+      case 'remboursement': return agent.peutRembourserCredits;
+      case 'epargne': return agent.peutCollecterEpargnes;
     }
   };
 
@@ -78,8 +78,8 @@ export default function AgentSidebarContent({
               />
             </div>
             <div className="mt-2 text-center">
-              <p className="text-sm font-semibold text-white">{agent?.nom_complet || 'Agent'}</p>
-              <p className="text-xs text-slate-400">{agent?.code_agent || ''}</p>
+              <p className="text-sm font-semibold text-white">{agent?.nomComplet || 'Agent'}</p>
+              <p className="text-xs text-slate-400">{agent?.codeAgent || ''}</p>
             </div>
           </div>
         )}

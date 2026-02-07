@@ -138,7 +138,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
   // Priorité: 1) Backend (après gel), 2) Prop calculée, 3) Fallbacks
   const soldeTheorique = useMemo(() => {
     // 1. Si déjà calculé par le backend (après gel = étape 2+)
-    const fromBackend = toNumber(session?.montant_fermeture_theorique || session?.montantFermetureTheorique);
+    const fromBackend = toNumber(session?.montantFermetureTheorique);
     if (fromBackend > 0) return fromBackend;
 
     // 2. Utiliser le solde calculé passé en prop (montantOuverture + entrées - sorties)
@@ -148,11 +148,11 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
     }
 
     // 3. Fallback: solde_theorique de la session
-    const soldeTheoriqueField = toNumber(session?.solde_theorique);
+    const soldeTheoriqueField = toNumber(session?.soldeTheorique);
     if (soldeTheoriqueField > 0) return soldeTheoriqueField;
 
     // 4. Dernier fallback: montant d'ouverture
-    return toNumber((session as any)?.montant_ouverture || (session as any)?.montantOuverture || session?.solde_initial || 0);
+    return toNumber(session?.montantOuverture || session?.soldeInitial || 0);
   }, [session, soldeTheoriqueCalcule]);
 
   const soldeCalcule = useMemo(() => {
@@ -381,7 +381,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
   // Fetch Mobile Money reconciliation data
   const fetchMmReconciliation = useCallback(async () => {
-    if (!session.agenceId && !(session as any).agence_id) return;
+    if (!session.agenceId) return;
 
     setLoadingMmReconciliation(true);
     try {
@@ -423,7 +423,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
   useEffect(() => {
     if (step === 'count') {
       setLoadingTemplates(true);
-      sessionCaisseApi.getDenominationTemplates(session.caisseId || session.caisse_id)
+      sessionCaisseApi.getDenominationTemplates(session.caisseId)
         .then((templates: DenominationTemplate[]) => {
           setDenominationTemplates(templates || []);
         })
@@ -432,7 +432,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
         })
         .finally(() => setLoadingTemplates(false));
     }
-  }, [step, session.caisseId, session.caisse_id]);
+  }, [step, session.caisseId]);
 
   // Apply a denomination template
   const handleApplyTemplate = useCallback((template: DenominationTemplate) => {
@@ -518,7 +518,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
       await sessionCaisseApi.createDenominationTemplate({
         nom: templateName.trim(),
         description: templateDescription.trim() || undefined,
-        caisseId: session.caisseId || session.caisse_id,
+        caisseId: session.caisseId,
         billetage: templateBilletage,
         totalCalcule: String(soldeCalcule),
         typeTemplate: 'GENERAL',
@@ -530,7 +530,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
       setTemplateDescription('');
 
       // Refresh templates
-      const templates = await sessionCaisseApi.getDenominationTemplates(session.caisseId || session.caisse_id);
+      const templates = await sessionCaisseApi.getDenominationTemplates(session.caisseId);
       setDenominationTemplates(templates || []);
     } catch (err: any) {
       const errorMessage = handleApiError(err, 'Erreur lors de la sauvegarde du modèle');
@@ -623,8 +623,8 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">Session ouverte depuis</span>
                   <span className="text-slate-300">
-                    {session.openedAt || session.opened_at
-                      ? new Date(session.openedAt || session.opened_at!).toLocaleString('fr-FR')
+                    {session.openedAt
+                      ? new Date(session.openedAt).toLocaleString('fr-FR')
                       : '-'}
                   </span>
                 </div>

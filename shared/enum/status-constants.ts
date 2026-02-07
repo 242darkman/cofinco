@@ -43,6 +43,115 @@ export const STATUT_AGENCE_LABELS: Record<StatutAgenceType, string> = {
 };
 
 // ============================================
+// STATUT PROSPECTION (Prospect workflow)
+// ============================================
+
+export const StatutProspection = {
+  REGISTERED: "REGISTERED",
+  INTERESTED: "INTERESTED",
+  REFUSED: "REFUSED",
+  TO_FOLLOW_UP: "TO_FOLLOW_UP",
+  CONVERTED_TO_CLIENT: "CONVERTED_TO_CLIENT",
+} as const;
+
+export type StatutProspectionType = (typeof StatutProspection)[keyof typeof StatutProspection];
+
+/** Labels FR pour l'UI des statuts de prospection */
+export const STATUT_PROSPECTION_LABELS: Record<StatutProspectionType, string> = {
+  [StatutProspection.REGISTERED]: "Enregistré",
+  [StatutProspection.INTERESTED]: "Intéressé",
+  [StatutProspection.REFUSED]: "Refusé",
+  [StatutProspection.TO_FOLLOW_UP]: "À suivre",
+  [StatutProspection.CONVERTED_TO_CLIENT]: "Converti en client",
+};
+
+/** Options de statut pour les selects de l'UI */
+export const STATUT_PROSPECTION_OPTIONS = Object.entries(STATUT_PROSPECTION_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+/** Transitions de statut valides pour la prospection */
+export const PROSPECTION_STATUS_TRANSITIONS: Record<StatutProspectionType, StatutProspectionType[]> = {
+  [StatutProspection.REGISTERED]: [StatutProspection.INTERESTED, StatutProspection.REFUSED, StatutProspection.TO_FOLLOW_UP],
+  [StatutProspection.INTERESTED]: [StatutProspection.TO_FOLLOW_UP, StatutProspection.REFUSED],
+  [StatutProspection.TO_FOLLOW_UP]: [StatutProspection.INTERESTED, StatutProspection.REFUSED],
+  [StatutProspection.REFUSED]: [],
+  [StatutProspection.CONVERTED_TO_CLIENT]: [],
+};
+
+// ============================================
+// ORIGINE CLIENT (Client acquisition channel)
+// ============================================
+
+export const ClientOrigin = {
+  FIELD_PROSPECTION: "FIELD_PROSPECTION",
+  WALK_IN_AGENCY: "WALK_IN_AGENCY",
+  REFERRAL: "REFERRAL",
+  CAMPAIGN: "CAMPAIGN",
+  OTHER: "OTHER",
+} as const;
+
+export type ClientOriginType = (typeof ClientOrigin)[keyof typeof ClientOrigin];
+
+/** Labels FR pour l'UI des origines client */
+export const CLIENT_ORIGIN_LABELS: Record<ClientOriginType, string> = {
+  [ClientOrigin.FIELD_PROSPECTION]: "Prospection terrain",
+  [ClientOrigin.WALK_IN_AGENCY]: "Visite agence",
+  [ClientOrigin.REFERRAL]: "Parrainage",
+  [ClientOrigin.CAMPAIGN]: "Campagne",
+  [ClientOrigin.OTHER]: "Autre",
+};
+
+/** Options d'origine pour les selects de l'UI */
+export const CLIENT_ORIGIN_OPTIONS = Object.entries(CLIENT_ORIGIN_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// STATUT PRIME PROSPECTION (Incentive workflow)
+// ============================================
+
+export const StatutPrimeProspection = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+  PAID: "PAID",
+} as const;
+
+export type StatutPrimeProspectionType = (typeof StatutPrimeProspection)[keyof typeof StatutPrimeProspection];
+
+/** Labels FR pour l'UI des statuts de prime */
+export const STATUT_PRIME_PROSPECTION_LABELS: Record<StatutPrimeProspectionType, string> = {
+  [StatutPrimeProspection.PENDING]: "En attente",
+  [StatutPrimeProspection.APPROVED]: "Approuvée",
+  [StatutPrimeProspection.REJECTED]: "Rejetée",
+  [StatutPrimeProspection.PAID]: "Payée",
+};
+
+/** Options de statut prime pour les selects de l'UI */
+export const STATUT_PRIME_PROSPECTION_OPTIONS = Object.entries(STATUT_PRIME_PROSPECTION_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// ANCIENNETE ACTIVITE (Activity seniority options)
+// ============================================
+
+export const AncienneteActivite = {
+  LESS_THAN_1_YEAR: "< 1 an",
+  ONE_TO_THREE_YEARS: "1-3 ans",
+  THREE_TO_FIVE_YEARS: "3-5 ans",
+  MORE_THAN_5_YEARS: "> 5 ans",
+} as const;
+
+export type AncienneteActiviteType = (typeof AncienneteActivite)[keyof typeof AncienneteActivite];
+
+/** Options d'ancienneté pour les selects de l'UI */
+export const ANCIENNETE_ACTIVITE_OPTIONS = Object.values(AncienneteActivite).map(
+  (value) => ({ value, label: value })
+);
+
+// ============================================
 // STATUT COMPTE (Comptes bancaires)
 // ============================================
 

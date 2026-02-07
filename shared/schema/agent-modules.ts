@@ -9,8 +9,7 @@
  * - agent_incidents: Incident reporting and resolution
  * - agent_materiel: Equipment inventory tracking
  * - agent_communications: Internal messaging (Info/Alerte/Instruction)
- * - agent_formations_catalogue: Training catalog
- * - agent_formations_suivi: Agent training progress tracking
+ * - agent_communications: Internal messaging (Info/Alerte/Instruction)
  */
 
 import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, index, jsonb } from "drizzle-orm/pg-core";
@@ -177,7 +176,9 @@ export const agentIncidents = pgTable("agent_incidents", {
   index("idx_agent_incidents_agence").on(table.agenceId),
 ]);
 
-export const insertAgentIncidentSchema = createInsertSchema(agentIncidents).omit({
+export const insertAgentIncidentSchema = createInsertSchema(agentIncidents, {
+  piecesJointes: z.array(z.string()).optional(),
+}).omit({
   id: true, createdAt: true, updatedAt: true, deletedAt: true,
 });
 export type InsertAgentIncident = z.infer<typeof insertAgentIncidentSchema>;
@@ -212,7 +213,13 @@ export const agentMateriel = pgTable("agent_materiel", {
   index("idx_agent_materiel_agence").on(table.agenceId),
 ]);
 
-export const insertAgentMaterielSchema = createInsertSchema(agentMateriel).omit({
+export const insertAgentMaterielSchema = createInsertSchema(agentMateriel, {
+  historiqueMaintenances: z.array(z.object({
+    date: z.string(),
+    description: z.string(),
+    cout: z.number(),
+  })).optional(),
+}).omit({
   id: true, createdAt: true, updatedAt: true, deletedAt: true,
 });
 export type InsertAgentMateriel = z.infer<typeof insertAgentMaterielSchema>;
@@ -249,60 +256,7 @@ export const insertAgentCommunicationSchema = createInsertSchema(agentCommunicat
 export type InsertAgentCommunication = z.infer<typeof insertAgentCommunicationSchema>;
 export type AgentCommunication = typeof agentCommunications.$inferSelect;
 
-// ══════════════════════════════════════════════════════════════════════════════
-// AGENT FORMATIONS CATALOGUE
-// ══════════════════════════════════════════════════════════════════════════════
 
-export const agentFormationsCatalogue = pgTable("agent_formations_catalogue", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  titre: text("titre").notNull(),
-  description: text("description").default(""),
-  typeFormation: text("type_formation").notNull().default("Continue"),
-  dureeHeures: integer("duree_heures").notNull().default(1),
-  contenuUrl: text("contenu_url").default(""),
-  obligatoire: boolean("obligatoire").notNull().default(false),
-  agenceId: uuid("agence_id").references(() => agences.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  deletedAt: timestamp("deleted_at"),
-}, (table) => [
-  index("idx_agent_formations_cat_type").on(table.typeFormation),
-  index("idx_agent_formations_cat_agence").on(table.agenceId),
-]);
-
-export const insertAgentFormationCatalogueSchema = createInsertSchema(agentFormationsCatalogue).omit({
-  id: true, createdAt: true, updatedAt: true, deletedAt: true,
-});
-export type InsertAgentFormationCatalogue = z.infer<typeof insertAgentFormationCatalogueSchema>;
-export type AgentFormationCatalogue = typeof agentFormationsCatalogue.$inferSelect;
-
-// ══════════════════════════════════════════════════════════════════════════════
-// AGENT FORMATIONS SUIVI (Progress tracking)
-// ══════════════════════════════════════════════════════════════════════════════
-
-export const agentFormationsSuivi = pgTable("agent_formations_suivi", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id, { onDelete: "cascade" }),
-  formationId: uuid("formation_id").notNull().references(() => agentFormationsCatalogue.id, { onDelete: "cascade" }),
-  dateDebut: text("date_debut"),
-  dateFin: text("date_fin"),
-  progression: integer("progression").notNull().default(0), // 0-100
-  statut: text("statut").notNull().default("IN_PROGRESS"),
-  score: integer("score"), // 0-100
-  certificatUrl: text("certificat_url").default(""),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  deletedAt: timestamp("deleted_at"),
-}, (table) => [
-  index("idx_agent_formations_suivi_agent").on(table.agentId),
-  index("idx_agent_formations_suivi_formation").on(table.formationId),
-]);
-
-export const insertAgentFormationSuiviSchema = createInsertSchema(agentFormationsSuivi).omit({
-  id: true, createdAt: true, updatedAt: true, deletedAt: true,
-});
-export type InsertAgentFormationSuivi = z.infer<typeof insertAgentFormationSuiviSchema>;
-export type AgentFormationSuivi = typeof agentFormationsSuivi.$inferSelect;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // RELATIONS
@@ -342,12 +296,4 @@ export const agentCommunicationsRelations = relations(agentCommunications, ({ on
   agence: one(agences, { fields: [agentCommunications.agenceId], references: [agences.id] }),
 }));
 
-export const agentFormationsCatalogueRelations = relations(agentFormationsCatalogue, ({ one, many }) => ({
-  agence: one(agences, { fields: [agentFormationsCatalogue.agenceId], references: [agences.id] }),
-  suivis: many(agentFormationsSuivi),
-}));
 
-export const agentFormationsSuiviRelations = relations(agentFormationsSuivi, ({ one }) => ({
-  agent: one(agentsTerrain, { fields: [agentFormationsSuivi.agentId], references: [agentsTerrain.id] }),
-  formation: one(agentFormationsCatalogue, { fields: [agentFormationsSuivi.formationId], references: [agentFormationsCatalogue.id] }),
-}));

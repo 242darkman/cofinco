@@ -25,7 +25,7 @@ export interface TransactionItem {
   reference: string;
   amount: number;
   type: string;
-  type_operation?: string;
+  typeOperation?: string;
   status: OperationStatus | string;
   date: string | Date;
   description?: string;
@@ -35,8 +35,8 @@ export interface TransactionItem {
     accountNumber?: string;
   };
   agent?: string;
-  mode_paiement?: string;
-  created_at?: string;
+  modePaiement?: string;
+  createdAt?: string;
 }
 
 export interface TransactionsListProps {
@@ -137,10 +137,10 @@ function MobileTransactionRow({
   const tx = transactions[index];
   if (!tx) return null;
 
-  const isCredit = isEntree(tx.type_operation || tx.type);
+  const isCredit = isEntree(tx.typeOperation || tx.type);
   const statusConfig = getStatusConfig(tx.status);
   const StatusIcon = statusConfig.icon;
-  const dateObj = new Date(tx.created_at || tx.date);
+  const dateObj = new Date(tx.createdAt || tx.date);
   const timeStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const dateStr = dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 
@@ -170,7 +170,7 @@ function MobileTransactionRow({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white truncate">
-                {formatDescription(tx.description || tx.type_operation || tx.type)}
+                {formatDescription(tx.description || tx.typeOperation || tx.type)}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-slate-500">{timeStr}</span>
@@ -310,10 +310,10 @@ export default function TransactionsList({
         ) : (
           <div className="divide-y divide-edge">
             {displayedTransactions.map((tx) => {
-              const isCredit = isEntree(tx.type_operation || tx.type);
+              const isCredit = isEntree(tx.typeOperation || tx.type);
               const statusConfig = getStatusConfig(tx.status);
               const StatusIcon = statusConfig.icon;
-              const dateObj = new Date(tx.created_at || tx.date);
+              const dateObj = new Date(tx.createdAt || tx.date);
               const timeStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
               const dateStr = dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 
@@ -341,7 +341,7 @@ export default function TransactionsList({
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-white truncate">
-                            {formatDescription(tx.description || tx.type_operation || tx.type)}
+                            {formatDescription(tx.description || tx.typeOperation || tx.type)}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-slate-500">{timeStr}</span>
@@ -383,9 +383,9 @@ export default function TransactionsList({
           </thead>
           <tbody className="divide-y divide-edge">
             {displayedTransactions.map((tx) => {
-              const isCredit = isEntree(tx.type_operation || tx.type);
+              const isCredit = isEntree(tx.typeOperation || tx.type);
               const statusConfig = getStatusConfig(tx.status);
-              const dateObj = new Date(tx.created_at || tx.date);
+              const dateObj = new Date(tx.createdAt || tx.date);
 
               return (
                 <tr
@@ -415,7 +415,7 @@ export default function TransactionsList({
                         {isCredit ? <ArrowDownLeft size={compactMode ? 10 : 12} /> : <ArrowUpRight size={compactMode ? 10 : 12} />}
                       </div>
                       <span className="text-xs font-medium text-white group-hover:text-cyan-400 transition-colors truncate max-w-[150px] block">
-                        {formatDescription(tx.description || tx.type_operation || tx.type)}
+                        {formatDescription(tx.description || tx.typeOperation || tx.type)}
                       </span>
                     </div>
                   </td>

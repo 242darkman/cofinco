@@ -16,7 +16,7 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { requireAgenceAccess } from "../middleware";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { normalizeKeysDeep } from "./utils";
 import { getWsInstance } from "../ws-server";
 import tontineProductionService from "../services/tontine-production-service";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
@@ -34,7 +34,7 @@ export function registerTontineRoutes(app: Express) {
       const filter = agenceFilter ? { agenceId: agenceFilter.agenceId } : {};
       const tontines = await storage.getAllTontines(filter);
 
-      res.json(addSnakeCaseAliasesDeep(tontines));
+      res.json(tontines);
   });
 
   // Create tontine (roles: admin, chef, superviseur)
@@ -63,7 +63,7 @@ export function registerTontineRoutes(app: Express) {
           wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'tontine_new', id: tontine.id } });
       }
 
-      res.json(addSnakeCaseAliasesDeep(tontine));
+      res.json(tontine);
   });
 
   app.get("/api/tontines/:id", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
@@ -80,7 +80,7 @@ export function registerTontineRoutes(app: Express) {
         // TODO: Vérifier l'agence via la table employes si nécessaire
       }
 
-      res.json(addSnakeCaseAliasesDeep(tontine));
+      res.json(tontine);
   });
 
   // Update tontine (roles: admin, chef, superviseur)
@@ -109,7 +109,7 @@ export function registerTontineRoutes(app: Express) {
           wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'tontine_updated', id: req.params.id } });
       }
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
   });
 
   // Delete tontine (roles: admin, chef)
@@ -123,7 +123,7 @@ export function registerTontineRoutes(app: Express) {
 
   app.get("/api/tontines/:id/membres", requireAuth, async (req, res) => {
       const membres = await storage.getMembresTontine(req.params.id);
-      res.json(addSnakeCaseAliasesDeep(membres));
+      res.json(membres);
   });
 
   // Add membre to tontine (roles: admin, chef, superviseur)
@@ -163,7 +163,7 @@ export function registerTontineRoutes(app: Express) {
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(membre));
+      res.json(membre);
   });
 
   // Remove membre from tontine
@@ -181,12 +181,12 @@ export function registerTontineRoutes(app: Express) {
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
       const updated = await storage.updateMembreTontine(req.params.membreId, data as any);
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
   });
 
   app.get("/api/tontines/:id/contributions", requireAuth, async (req, res) => {
       const contribs = await storage.getContributionsByTontine(req.params.id);
-      res.json(addSnakeCaseAliasesDeep(contribs));
+      res.json(contribs);
   });
 
   // Create contribution tontine (roles: admin, chef, caisse, superviseur)
@@ -238,7 +238,7 @@ export function registerTontineRoutes(app: Express) {
           });
         }
 
-        res.json(addSnakeCaseAliasesDeep(contrib));
+        res.json(contrib);
       } catch (e: any) {
         logger.error({ err: e }, 'Erreur contribution tontine');
         res.status(400).json({ message: e.message || "Erreur lors de l'enregistrement de la contribution" });
@@ -248,13 +248,13 @@ export function registerTontineRoutes(app: Express) {
   // Get tontines for a specific client (their memberships)
   app.get("/api/clients/:id/tontines", requireAuth, async (req, res) => {
     const tontines = await storage.getTontinesByClient(req.params.id);
-    res.json(addSnakeCaseAliasesDeep(tontines));
+    res.json(tontines);
   });
 
   // Tontine Rules
   app.get("/api/tontines/:id/regles", requireAuth, async (req, res) => {
     const regles = await storage.getTontineRegles(req.params.id);
-    res.json(addSnakeCaseAliasesDeep(regles));
+    res.json(regles);
   });
 
   app.post("/api/tontine-regles", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req, res) => {
@@ -268,7 +268,7 @@ export function registerTontineRoutes(app: Express) {
         wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_new', tontineId: parsed.tontineId } });
     }
 
-    res.json(addSnakeCaseAliasesDeep(regle));
+    res.json(regle);
   });
 
   app.patch("/api/tontine-regles/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
@@ -281,7 +281,7 @@ export function registerTontineRoutes(app: Express) {
         wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_updated', id: req.params.id } });
     }
 
-    res.json(addSnakeCaseAliasesDeep(updated));
+    res.json(updated);
   });
 
   app.delete("/api/tontine-regles/:id", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.TONTINE), async (req, res) => {
@@ -292,7 +292,7 @@ export function registerTontineRoutes(app: Express) {
   // Tontine Penalites
   app.get("/api/tontines/:id/penalites", requireAuth, async (req, res) => {
     const penalites = await storage.getTontinePenalites(req.params.id);
-    res.json(addSnakeCaseAliasesDeep(penalites));
+    res.json(penalites);
   });
 
   app.patch("/api/tontine-penalites/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
@@ -306,7 +306,7 @@ export function registerTontineRoutes(app: Express) {
         wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'penalite_updated', id: req.params.id } });
     }
 
-    res.json(addSnakeCaseAliasesDeep(updated));
+    res.json(updated);
   });
 
   /**
@@ -556,7 +556,7 @@ export function registerTontineRoutes(app: Express) {
   // Tontine Plans
   app.get("/api/tontine-plans", requireAuth, async (req, res) => {
     const plans = await storage.getAllTontinePlans();
-    res.json(addSnakeCaseAliasesDeep(plans));
+    res.json(plans);
   });
 
   app.post("/api/tontine-plans", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req, res) => {
@@ -564,7 +564,7 @@ export function registerTontineRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertTontinePlanSchema.parse(data);
       const plan = await storage.createTontinePlan(parsed);
-      res.json(addSnakeCaseAliasesDeep(plan));
+      res.json(plan);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -579,7 +579,7 @@ export function registerTontineRoutes(app: Express) {
   app.patch("/api/tontine-plans/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const updated = await storage.updateTontinePlan(req.params.id, data as any);
-    res.json(addSnakeCaseAliasesDeep(updated));
+    res.json(updated);
   });
 
   app.delete("/api/tontine-plans/:id", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.TONTINE), async (req, res) => {
@@ -602,7 +602,7 @@ export function registerTontineRoutes(app: Express) {
         .where(eq(tontineCycles.tontineId, req.params.id))
         .orderBy(desc(tontineCycles.cycleNumber));
 
-      res.json(addSnakeCaseAliasesDeep(cycles));
+      res.json(cycles);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur chargement cycles');
       res.status(500).json({ message: error.message || "Erreur chargement cycles" });
@@ -674,7 +674,7 @@ export function registerTontineRoutes(app: Express) {
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(result));
+      res.json(result);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur génération cycle');
       res.status(400).json({ message: error.message || "Erreur génération cycle" });
@@ -697,7 +697,7 @@ export function registerTontineRoutes(app: Express) {
         return res.status(404).json({ message: "Cycle non trouvé" });
       }
 
-      res.json(addSnakeCaseAliasesDeep(cycle));
+      res.json(cycle);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur chargement cycle');
       res.status(500).json({ message: error.message || "Erreur chargement cycle" });
@@ -732,7 +732,7 @@ export function registerTontineRoutes(app: Express) {
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur clôture cycle');
       res.status(400).json({ message: error.message || "Erreur clôture cycle" });
@@ -753,7 +753,7 @@ export function registerTontineRoutes(app: Express) {
         ))
         .orderBy(asc(tontineTurns.turnNumber));
 
-      res.json(addSnakeCaseAliasesDeep(turns));
+      res.json(turns);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur chargement tours');
       res.status(500).json({ message: error.message || "Erreur chargement tours" });
@@ -803,7 +803,7 @@ export function registerTontineRoutes(app: Express) {
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(result));
+      res.json(result);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur réorganisation tours');
       res.status(400).json({ message: error.message || "Erreur réorganisation tours" });
@@ -822,7 +822,7 @@ export function registerTontineRoutes(app: Express) {
         ))
         .orderBy(desc(tontineTurnAudit.changedAt));
 
-      res.json(addSnakeCaseAliasesDeep(audits));
+      res.json(audits);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur chargement audit');
       res.status(500).json({ message: error.message || "Erreur chargement audit" });
@@ -843,7 +843,7 @@ export function registerTontineRoutes(app: Express) {
         ))
         .orderBy(asc(tontineSchedules.periodNumber));
 
-      res.json(addSnakeCaseAliasesDeep(schedules));
+      res.json(schedules);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur chargement schedules');
       res.status(500).json({ message: error.message || "Erreur chargement schedules" });
@@ -939,7 +939,7 @@ export function registerTontineRoutes(app: Express) {
         req.params.memberId
       );
 
-      res.json(addSnakeCaseAliasesDeep(result));
+      res.json(result);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur calcul retirable');
       res.status(500).json({ message: error.message || "Erreur calcul retirable" });
@@ -969,7 +969,7 @@ export function registerTontineRoutes(app: Express) {
         filtered = filtered.filter(r => r.status === status);
       }
 
-      res.json(addSnakeCaseAliasesDeep(filtered));
+      res.json(filtered);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur chargement distribution requests');
       res.status(500).json({ message: error.message || "Erreur chargement" });
@@ -1029,7 +1029,7 @@ export function registerTontineRoutes(app: Express) {
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(result));
+      res.json(result);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur création distribution request');
       res.status(400).json({ message: error.message || "Erreur création" });
@@ -1110,7 +1110,7 @@ export function registerTontineRoutes(app: Express) {
         } catch (e) { /* non-blocking */ }
       }
 
-      res.json(addSnakeCaseAliasesDeep(result));
+      res.json(result);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur approbation distribution');
       res.status(400).json({ message: error.message || "Erreur approbation" });
@@ -1145,7 +1145,7 @@ export function registerTontineRoutes(app: Express) {
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(updated));
+      res.json(updated);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur annulation distribution');
       res.status(400).json({ message: error.message || "Erreur annulation" });
@@ -1198,7 +1198,7 @@ export function registerTontineRoutes(app: Express) {
           eq(tontineDistributionRequests.status, 'SUBMITTED')
         ));
 
-      res.json(addSnakeCaseAliasesDeep({
+      res.json({
         tontine,
         currentCycle,
         nextTurn,
@@ -1208,7 +1208,7 @@ export function registerTontineRoutes(app: Express) {
           potDistribue: currentCycle?.potDistributed || "0",
           membresActifs: currentCycle?.membersCount || tontine.membresActuels || 0,
         },
-      }));
+      });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur dashboard tontine');
       res.status(500).json({ message: error.message || "Erreur dashboard" });

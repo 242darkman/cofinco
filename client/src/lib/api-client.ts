@@ -16,9 +16,9 @@ export interface PaginationParams {
 export interface PaginationMeta {
   pagination: {
     page: number;
-    per_page: number;
-    total_items: number;
-    total_pages: number;
+    perPage: number;
+    totalItems: number;
+    totalPages: number;
   };
   filters?: Record<string, unknown>;
 }
@@ -290,7 +290,7 @@ export async function requestAllPages<T>(
   do {
     const response = await requestPaginated<T>(endpoint, { ...params, page, perPage }, options);
     results.push(...(response.data || []));
-    totalPages = response.meta?.pagination?.total_pages ?? 1;
+    totalPages = response.meta?.pagination?.totalPages ?? 1;
     page += 1;
   } while (page <= totalPages);
 
@@ -308,7 +308,7 @@ export async function requestListAll<T>(
 
   if (Array.isArray(payload)) return payload as T[];
   if (payload?.data && Array.isArray(payload.data)) {
-    const totalPages = Number(payload.meta?.pagination?.total_pages ?? 1);
+    const totalPages = Number(payload.meta?.pagination?.totalPages ?? 1);
     if (!Number.isFinite(totalPages) || totalPages <= 1) {
       return payload.data as T[];
     }
@@ -1407,8 +1407,9 @@ export const agentTerrainApi = {
 
 // Prospection API
 export const prospectionApi = {
-  getAll: (params?: { page?: number; perPage?: number }) =>
+  getAll: (params?: { page?: number; perPage?: number; statut?: string; arrondissementId?: string; marcheId?: string; agentId?: string }) =>
     requestPaginated<any>('/prospections', params),
+  getById: (id: string) => request<any>(`/prospections/${id}`),
   create: (data: any) => request<any>('/prospections', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -1417,6 +1418,92 @@ export const prospectionApi = {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
+  convert: (id: string, data?: any) => request<any>(`/prospections/${id}/convert`, {
+    method: 'POST',
+    body: JSON.stringify(data || {}),
+  }),
+  getStats: (agentId: string, params?: { period?: string }) =>
+    request<any>(`/agents/${agentId}/prospection-stats${params?.period ? `?period=${params.period}` : ''}`),
+  getFollowups: (agentId: string) =>
+    request<any[]>(`/agents/${agentId}/prospection-followups`),
+};
+
+// Arrondissements & Marchés API
+export const arrondissementApi = {
+  getAll: (params?: { actif?: boolean; villeId?: string }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<any[]>(`/arrondissements${q ? `?${q}` : ''}`);
+  },
+  create: (data: any) => request<any>('/arrondissements', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id: string, data: any) => request<any>(`/arrondissements/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  delete: (id: string) => request<any>(`/arrondissements/${id}`, { method: 'DELETE' }),
+};
+
+export const marcheApi = {
+  getAll: (params?: { arrondissementId?: string; actif?: boolean }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<any[]>(`/marches${q ? `?${q}` : ''}`);
+  },
+  create: (data: any) => request<any>('/marches', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id: string, data: any) => request<any>(`/marches/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  delete: (id: string) => request<any>(`/marches/${id}`, { method: 'DELETE' }),
+};
+
+// Départements & Villes API
+export const departementApi = {
+  getAll: (params?: { actif?: boolean }) =>
+    request<any[]>(`/departements${params?.actif !== undefined ? `?actif=${params.actif}` : ''}`),
+};
+
+export const villeApi = {
+  getAll: (params?: { departementId?: string; actif?: boolean }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<any[]>(`/villes${q ? `?${q}` : ''}`);
+  },
+  getById: (id: string) => request<any>(`/villes/${id}`),
+};
+
+// Prospection Primes API
+export const prospectionPrimeApi = {
+  getAll: (params?: { page?: number; perPage?: number; agentId?: string; statut?: string; periode?: string; agenceId?: string }) =>
+    requestPaginated<any>('/prospection-primes', params),
+  getById: (id: string) => request<any>(`/prospection-primes/${id}`),
+  approve: (id: string) => request<any>(`/prospection-primes/${id}/approve`, { method: 'POST' }),
+  reject: (id: string, data?: { rejectionReason?: string }) => request<any>(`/prospection-primes/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(data || {}),
+  }),
+  pay: (id: string) => request<any>(`/prospection-primes/${id}/pay`, { method: 'POST' }),
+  getConfig: (params?: { agenceId?: string }) =>
+    request<any[]>(`/prospection-prime-config${params?.agenceId ? `?agence_id=${params.agenceId}` : ''}`),
+  updateConfig: (id: string, data: any) => request<any>(`/prospection-prime-config/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  createConfig: (data: any) => request<any>('/prospection-prime-config', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+};
+
+// Supervision API
+export const supervisionApi = {
+  getProspectionPerformance: (params?: { agenceId?: string; period?: string }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<any>(`/supervision/prospection-performance${q ? `?${q}` : ''}`);
+  },
 };
 
 // Visite Terrain API
@@ -1954,8 +2041,8 @@ export const settingsExtendedApi = {
 // Comptabilité API
 interface CompteResultatResponse {
   exercice: string;
-  charges: Array<{ numero_compte: string; intitule: string; montant: number }>;
-  produits: Array<{ numero_compte: string; intitule: string; montant: number }>;
+  charges: Array<{ numeroCompte: string; intitule: string; montant: number }>;
+  produits: Array<{ numeroCompte: string; intitule: string; montant: number }>;
   totalCharges: number;
   totalProduits: number;
   resultatNet: number;
@@ -1965,83 +2052,83 @@ interface CompteResultatResponse {
 
 interface CompteOHADAApi {
   id: string;
-  numero_compte: string;
+  numeroCompte: string;
   intitule: string;
   classe: number;
-  type_compte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
-  sens_normal: 'Débit' | 'Crédit';
+  typeCompte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
+  sensNormal: 'Débit' | 'Crédit';
   niveau: number;
   actif: boolean;
   description: string;
-  solde_actuel: number;
+  soldeActuel: number;
 }
 
 interface JournalApi {
   id: string;
   code: string;
   intitule: string;
-  type_journal?: string;
+  typeJournal?: string;
   actif?: boolean;
 }
 
 interface EntryDetailsResponse {
   id: string;
-  date_ecriture: string;
-  numero_piece: string;
+  dateEcriture: string;
+  numeroPiece: string;
   libelle: string;
   statut: string;
   journal: { id: string; code: string; intitule: string } | null;
   lignes: Array<{
     id: string;
-    compte_id: string;
-    numero_compte: string;
-    compte_intitule: string;
+    compteId: string;
+    numeroCompte: string;
+    compteIntitule: string;
     libelle: string;
     debit: string;
     credit: string;
-    ref_externe?: string;
+    refExterne?: string;
   }>;
-  total_debit: number;
-  total_credit: number;
-  is_balanced: boolean;
+  totalDebit: number;
+  totalCredit: number;
+  isBalanced: boolean;
 }
 
 interface GlPeriodApi {
   id: string;
-  agence_id: string;
+  agenceId: string;
   year: number;
   month: number;
   status: string;
-  closed_at?: string;
-  closed_by?: string;
+  closedAt?: string;
+  closedBy?: string;
   notes?: string;
 }
 
 interface PostedEntryApi {
   id: string;
-  date_ecriture: string;
-  numero_piece: string;
+  dateEcriture: string;
+  numeroPiece: string;
   libelle: string;
   statut: string;
-  source_type: string;
-  source_id: string;
-  journal_code: string;
-  journal_intitule: string;
+  sourceType: string;
+  sourceId: string;
+  journalCode: string;
+  journalIntitule: string;
 }
 
 export interface DeclarationTVAApi {
   id: string;
   mois: number;
   annee: number;
-  tva_collectee: number;
-  tva_deductible: number;
-  tva_a_payer: number;
-  credit_tva: number;
+  tvaCollectee: number;
+  tvaDeductible: number;
+  tvaAPayer: number;
+  creditTva: number;
   statut: "DRAFT" | "VALIDATED" | "PAID" | "LATE";
-  numero_quittance?: string;
-  date_depot?: string;
-  created_by?: string;
-  created_at?: string;
+  numeroQuittance?: string;
+  dateDepot?: string;
+  createdBy?: string;
+  createdAt?: string;
 }
 
 export const comptabiliteApi = {
@@ -2234,11 +2321,11 @@ export const adminApi = {
     activeRoles: Record<string, number>;
     recentActivity: Array<{
       id: string;
-      user_name: string;
+      userName: string;
       action: string;
       details: string;
-      created_at: string;
-      ip_address?: string;
+      createdAt: string;
+      ipAddress?: string;
     }>;
     systemHealth: {
       database: 'healthy' | 'warning' | 'error';

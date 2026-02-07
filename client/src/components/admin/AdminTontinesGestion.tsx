@@ -13,29 +13,29 @@ interface Tontine {
   id: string;
   nom: string;
   description: string;
-  type_distribution: string;
-  montant_cotisation: number;
+  typeDistribution: string;
+  montantCotisation: number;
   frequence: string;
-  date_debut: string;
-  nombre_membres: number;
-  membres_actuels: number;
+  dateDebut: string;
+  nombreMembres: number;
+  membresActuels: number;
   statut: string;
   regles: any;
 }
 
 interface Membre {
   id: string;
-  tontine_id: string;
-  client_id: string;
+  tontineId: string;
+  clientId: string;
   position: number;
-  est_president?: boolean;
-  est_tresorier?: boolean;
+  estPresident?: boolean;
+  estTresorier?: boolean;
   statut: string;
-  total_cotisations: number;
+  totalCotisations: number;
   client?: {
     nom: string;
     prenom: string;
-    numero_compte: string;
+    numeroCompte: string;
   };
 }
 
@@ -43,7 +43,7 @@ interface Client {
   id: string;
   nom: string;
   prenom: string;
-  numero_compte: string;
+  numeroCompte: string;
   telephone: string;
 }
 
@@ -145,18 +145,18 @@ export default function AdminTontinesGestion() {
 
   const handleEditTontine = (tontine: Tontine) => {
     // Format date for <input type="date"> (YYYY-MM-DD)
-    const formattedDate = tontine.date_debut 
-      ? new Date(tontine.date_debut).toISOString().split('T')[0] 
+    const formattedDate = tontine.dateDebut
+      ? new Date(tontine.dateDebut).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0];
 
     setFormData({
       nom: tontine.nom || '',
       description: tontine.description || '',
-      type_distribution: tontine.type_distribution || 'Rotative',
-      montant_cotisation: tontine.montant_cotisation?.toString() || '',
+      type_distribution: tontine.typeDistribution || 'Rotative',
+      montant_cotisation: tontine.montantCotisation?.toString() || '',
       frequence: tontine.frequence || 'Hebdomadaire',
       date_debut: formattedDate,
-      nombre_membres: tontine.nombre_membres?.toString() || '10',
+      nombre_membres: tontine.nombreMembres?.toString() || '10',
       frais_pourcentage: tontine.regles?.frais_sortie_pourcentage?.toString() || '2',
       montant_par_tour: tontine.regles?.montant_par_tour?.toString() || ''
     });
@@ -180,7 +180,7 @@ export default function AdminTontinesGestion() {
         frequence: formData.frequence,
         date_debut: formData.date_debut,
         nombre_membres: nombreMembres,
-        membres_actuels: editMode ? selectedTontine?.membres_actuels : 0,
+        membres_actuels: editMode ? selectedTontine?.membresActuels : 0,
         statut: 'ACTIVE',
         regles: {
           frais_sortie_pourcentage: parseFloat(formData.frais_pourcentage),
@@ -245,7 +245,7 @@ export default function AdminTontinesGestion() {
       await tontineApi.addMembre(selectedTontine.id, membreData);
 
       await tontineApi.update(selectedTontine.id, {
-        membres_actuels: selectedTontine.membres_actuels + 1
+        membres_actuels: selectedTontine.membresActuels + 1
       });
 
       toast.success('Membre ajouté avec succès');
@@ -273,7 +273,7 @@ export default function AdminTontinesGestion() {
           await tontineApi.deleteMembre(selectedTontine.id, membreId);
 
           await tontineApi.update(selectedTontine.id, {
-            membres_actuels: Math.max(0, selectedTontine.membres_actuels - 1)
+            membres_actuels: Math.max(0, selectedTontine.membresActuels - 1)
           });
 
           toast.success('Membre retiré avec succès');
@@ -308,10 +308,10 @@ export default function AdminTontinesGestion() {
       ...formData,
       nom: formData.nom || plan.nom,
       description: formData.description || plan.description || '',
-      montant_cotisation: plan.montant_cotisation.toString(),
+      montant_cotisation: plan.montantCotisation.toString(),
       frequence: plan.frequence,
-      nombre_membres: plan.nombre_membres.toString(),
-      frais_pourcentage: plan.taux_plateforme.toString()
+      nombre_membres: plan.nombreMembres.toString(),
+      frais_pourcentage: plan.tauxPlateforme.toString()
     });
     toast.info(`Modèle "${plan.nom}" appliqué`);
   };
@@ -422,14 +422,14 @@ export default function AdminTontinesGestion() {
             )
           },
           { 
-            key: 'montant_cotisation', 
+            key: 'montantCotisation',
             label: 'Cotisation (FCFA)', 
             format: (val) => <span className="font-bold text-teal-400">{val?.toLocaleString()}</span> 
           },
           { 
-            key: 'membres_actuels', 
-            label: 'Membres', 
-            format: (val, item) => <span className="text-slate-200">{val || 0}/{item.nombre_membres || 0}</span>
+            key: 'membresActuels',
+            label: 'Membres',
+            format: (val, item) => <span className="text-slate-200">{val || 0}/{item.nombreMembres || 0}</span>
           },
           { 
             key: 'regles.frais_sortie_pourcentage', 
@@ -514,7 +514,7 @@ export default function AdminTontinesGestion() {
                     onChange={(e) => setMembreForm({ ...membreForm, client_id: e.target.value })}
                     options={[
                       { value: '', label: '-- Choisir un client --' },
-                      ...clients.map(c => ({ value: c.id, label: `${c.nom} ${c.prenom} - ${c.numero_compte}` }))
+                      ...clients.map(c => ({ value: c.id, label: `${c.nom} ${c.prenom} - ${c.numeroCompte}` }))
                     ]}
                   />
                 </div>
@@ -582,16 +582,16 @@ export default function AdminTontinesGestion() {
                             <h4 className="font-semibold text-white text-sm truncate">
                               {membre.client?.nom} {membre.client?.prenom}
                             </h4>
-                            {membre.est_president && <Badge value="Président" variant="success" size="sm" />}
-                            {membre.est_tresorier && <Badge value="Trésorier" variant="info" size="sm" />}
+                            {membre.estPresident && <Badge value="Président" variant="success" size="sm" />}
+                            {membre.estTresorier && <Badge value="Trésorier" variant="info" size="sm" />}
                           </div>
-                          <p className="text-xs text-slate-400 truncate">{membre.client?.numero_compte}</p>
+                          <p className="text-xs text-slate-400 truncate">{membre.client?.numeroCompte}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <div className="text-right hidden sm:block">
                           <p className="text-[10px] text-slate-500">Contribué</p>
-                          <p className="font-bold text-teal-400 text-sm">{membre.total_cotisations?.toLocaleString() || 0} FCFA</p>
+                          <p className="font-bold text-teal-400 text-sm">{membre.totalCotisations?.toLocaleString() || 0} FCFA</p>
                         </div>
                         {canManageMembres && (
                           <Button
@@ -649,7 +649,7 @@ export default function AdminTontinesGestion() {
                 onChange={(e) => applyPlan(e.target.value)}
                 options={[
                   { value: '', label: '-- Sélectionner un modèle pour pré-remplir --' },
-                  ...tontinePlans.map(p => ({ value: p.id, label: `${p.nom} (${p.montant_cotisation} FCFA)` }))
+                  ...tontinePlans.map(p => ({ value: p.id, label: `${p.nom} (${p.montantCotisation} FCFA)` }))
                 ]}
               />
             </div>

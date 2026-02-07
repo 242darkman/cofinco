@@ -11,14 +11,14 @@ interface CreditPlan {
   id: string;
   nom: string;
   description: string;
-  type_credit: string;
-  montant_min: number;
-  montant_max: number;
-  taux_interet: number;
-  duree_valeur: number;
-  duree_unite: string;
-  frequence_remboursement: string;
-  frais_dossier: number;
+  typeCredit: string;
+  montantMin: number;
+  montantMax: number;
+  tauxInteret: number;
+  dureeValeur: number;
+  dureeUnite: string;
+  frequenceRemboursement: string;
+  fraisDossier: number;
   conditions: string[];
   actif: boolean;
 }
@@ -102,33 +102,33 @@ export default function AdminCreditPlansGestion({
       )
     },
     { 
-      key: 'type_credit', 
+      key: 'typeCredit',
       label: 'Type', 
       badge: true,
       badgeClassName: 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
     },
     { 
-      key: 'taux_interet', 
+      key: 'tauxInteret',
       label: 'Taux',
       format: (val) => `${val}%` 
     },
     { 
-      key: 'duree_valeur', 
+      key: 'dureeValeur',
       label: 'Durée',
-      format: (val, item) => `${val} ${item.duree_unite || ''}(s)`
+      format: (val, item) => `${val} ${item.dureeUnite || ''}(s)`
     },
     { 
-      key: 'frequence_remboursement', 
+      key: 'frequenceRemboursement',
       label: 'Remboursement' 
     },
     { 
-      key: 'montant_min', 
-      label: 'Limites (FCFA)', 
+      key: 'montantMin',
+      label: 'Limites (FCFA)',
       format: (_, item) => (
         <span className="text-emerald-400 text-xs font-medium">
-          {item.montant_min ? Number(item.montant_min).toLocaleString() : '0'} 
+          {item.montantMin ? Number(item.montantMin).toLocaleString() : '0'}
           {' - '}
-          {item.montant_max ? Number(item.montant_max).toLocaleString() : '∞'}
+          {item.montantMax ? Number(item.montantMax).toLocaleString() : '∞'}
         </span>
       )
     },
@@ -174,14 +174,14 @@ export default function AdminCreditPlansGestion({
     setFormData({
       nom: plan.nom,
       description: plan.description || '',
-      type_credit: plan.type_credit,
-      montant_min: plan.montant_min?.toString() || '',
-      montant_max: plan.montant_max?.toString() || '',
-      taux_interet: plan.taux_interet.toString(),
-      duree_valeur: plan.duree_valeur.toString(),
-      duree_unite: plan.duree_unite,
-      frequence_remboursement: plan.frequence_remboursement,
-      frais_dossier: plan.frais_dossier?.toString() || '',
+      type_credit: plan.typeCredit,
+      montant_min: plan.montantMin?.toString() || '',
+      montant_max: plan.montantMax?.toString() || '',
+      taux_interet: plan.tauxInteret.toString(),
+      duree_valeur: plan.dureeValeur.toString(),
+      duree_unite: plan.dureeUnite,
+      frequence_remboursement: plan.frequenceRemboursement,
+      frais_dossier: plan.fraisDossier?.toString() || '',
       conditions: plan.conditions ? plan.conditions.join('\n') : '',
       actif: plan.actif
     });
@@ -335,23 +335,23 @@ export default function AdminCreditPlansGestion({
                         </td>
                         <td className="px-3 py-2">
                             <span className="inline-flex items-center justify-center w-24 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            {plan.type_credit}
+                            {plan.typeCredit}
                             </span>
                         </td>
                         <td className="px-3 py-2 text-xs text-slate-300">
-                            {plan.taux_interet}%
+                            {plan.tauxInteret}%
                         </td>
                         <td className="px-3 py-2 text-xs text-slate-300">
-                            {formatDuration(plan.duree_valeur, plan.duree_unite)}
+                            {formatDuration(plan.dureeValeur, plan.dureeUnite)}
                         </td>
                         <td className="px-3 py-2 text-xs text-slate-300">
-                            {plan.frequence_remboursement}
+                            {plan.frequenceRemboursement}
                         </td>
                         <td className="px-3 py-2">
                             <span className="text-emerald-400 text-[10px] font-medium">
-                                {plan.montant_min ? Number(plan.montant_min).toLocaleString() : '0'} 
+                                {plan.montantMin ? Number(plan.montantMin).toLocaleString() : '0'} 
                                 {' - '}
-                                {plan.montant_max ? Number(plan.montant_max).toLocaleString() : '∞'}
+                                {plan.montantMax ? Number(plan.montantMax).toLocaleString() : '∞'}
                             </span>
                         </td>
                         <td className="px-3 py-2">

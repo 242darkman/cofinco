@@ -47,9 +47,14 @@ export const formations = pgTable("formations", {
   id: serial("id").primaryKey(),
   titre: varchar("titre").notNull(),
   formateur: varchar("formateur").notNull(),
-  dateDebut: date("date_debut").notNull(),
-  dateFin: date("date_fin"),
+  dateDebut: timestamp("date_debut").notNull(),
+  dateFin: timestamp("date_fin"),
   duree: varchar("duree").notNull(), // Ex: "3 jours", "2 semaines"
+  dureeHeures: integer("duree_heures").default(1),
+  typeFormation: varchar("type_formation").default("Continue"),
+  contenuUrl: text("contenu_url"),
+  obligatoire: boolean("obligatoire").default(false),
+  agenceId: uuid("agence_id").references(() => agences.id),
   lieu: varchar("lieu"),
   description: text("description"),
   programme: text("programme"), // Détail du programme
@@ -62,10 +67,16 @@ export const formations = pgTable("formations", {
 
 // Participants aux formations (relation many-to-many)
 export const formationParticipants = pgTable("formation_participants", {
+  id: uuid("id").primaryKey().defaultRandom(),
   formationId: integer("formation_id").notNull().references(() => formations.id, { onDelete: "cascade" }),
   employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
   employeNom: varchar("employe_nom").notNull(), // Dénormalisé
   dateInscription: timestamp("date_inscription").defaultNow().notNull(),
+  dateDebut: timestamp("date_debut"),
+  dateFin: timestamp("date_fin"),
+  progression: integer("progression").default(0),
+  statut: varchar("statut").default("IN_PROGRESS"),
+  certificatUrl: text("certificat_url"),
   presence: varchar("presence").default("Non noté"), // 'Présent', 'Absent', 'Non noté'
   evaluation: text("evaluation"), // Notes ou feedback post-formation
   scoreEvaluation: integer("score_evaluation"), // 0-100

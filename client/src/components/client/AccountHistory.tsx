@@ -29,9 +29,9 @@ interface Transaction {
   type: string;
   description?: string;
   observations?: string;
-  recu_numero?: string;
+  recuNumero?: string;
   referenceExterne?: string;
-  solde_apres?: string | number;
+  soldeApres?: string | number;
   typePaiement?: string;
   methodePaiement?: string;
   displayDescription?: string;
@@ -135,7 +135,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
     ...t,
     // Priorité: description (libellé bancaire généré par le serveur) > observations > fallbacks
     displayDescription: t.description || t.displayDescription || t.observations || t.typePaiement || t.type || 'Opération',
-    displayRef: t.recu_numero || t.referenceExterne || '-'
+    displayRef: t.recuNumero || t.referenceExterne || '-'
   }));
 
   const filteredTransactions = formattedTransactions.filter(t => {
@@ -163,7 +163,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
         Reference: t.displayRef,
         Sens: t.sens,
         Montant: t.montant,
-        Solde: t.solde_apres || '-'
+        Solde: t.soldeApres || '-'
       }));
 
       const ws = XLSX.utils.json_to_sheet(data);
@@ -201,7 +201,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
         t.displayRef,
         t.sens === 'CREDIT' ? 'Dépôt' : 'Retrait',
         `${formatMoney(t.montant)} FCFA`,
-        t.solde_apres ? `${formatMoney(t.solde_apres)} FCFA` : '-'
+        t.soldeApres ? `${formatMoney(t.soldeApres)} FCFA` : '-'
       ]);
 
       autoTable(doc, {
@@ -365,7 +365,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
                             {t.sens === 'CREDIT' ? '+' : '-'}{formatMoney(t.montant)} <span className="text-xs opacity-50">FCFA</span>
                           </td>
                           <td className="p-4 text-right font-mono text-slate-400 whitespace-nowrap">
-                              {t.solde_apres ? formatMoney(t.solde_apres) : '-'}
+                              {t.soldeApres ? formatMoney(t.soldeApres) : '-'}
                           </td>
                         </tr>
                       ))}

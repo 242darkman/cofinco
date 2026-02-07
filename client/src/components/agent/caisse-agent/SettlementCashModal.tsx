@@ -56,7 +56,7 @@ export default function SettlementCashModal({
 
         // Sélectionner la première par défaut
         if (activeSessions.length > 0) {
-          setDestinationCaisseId(activeSessions[0].caisse_id);
+          setDestinationCaisseId(activeSessions[0].caisseId);
         }
       } catch (error) {
         console.error('Erreur chargement caisses:', error);
@@ -133,8 +133,8 @@ export default function SettlementCashModal({
   };
 
   const caisseOptions = caisses.map((c) => ({
-    value: c.caisse_id,
-    label: `${c.caisse_nom || 'Caisse'} - ${c.caissier_nom || 'Caissier'}`
+    value: c.caisseId,
+    label: `${c.caisseNom || 'Caisse'} - ${c.caissierNom || 'Caissier'}`
   }));
 
   const formatMoney = (amount: number) => {

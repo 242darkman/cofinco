@@ -43,6 +43,9 @@ import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
 import { registerMonitoringRoutes } from "./routes/monitoring";
 import syncRouter from "./routes/sync";
+import { registerZoneManagementRoutes } from "./routes/zone-management";
+import { registerProspectionPrimesRoutes } from "./routes/prospection-primes";
+import { registerVilleRoutes } from "./routes/villes";
 
 const logger = createLogger('Routes');
 
@@ -79,6 +82,9 @@ export function registerRoutes(app: Express): Server {
   registerComptesRoutes(app); // Comptes microfinance (dépôt, retrait, blocage, transfert)
   registerTontineRoutes(app);
   registerOperationsRoutes(app); // Agents, prospection
+  registerZoneManagementRoutes(app); // Arrondissements & Marchés CRUD
+  registerProspectionPrimesRoutes(app); // Prospection primes management
+  registerVilleRoutes(app); // Départements & Villes reference data
   registerAgentModulesRoutes(app); // Agent sub-modules (commissions, planning, objectifs, etc.)
   registerDashboardRoutes(app); // Dashboard statistics
   registerMessagesRoutes(app); // Messaging System (Legacy v1)

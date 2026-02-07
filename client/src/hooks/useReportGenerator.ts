@@ -96,7 +96,7 @@ function buildConfigs(): Record<string, ReportConfig> {
       dateField: 'createdAt',
       getRowValues: (i) => [
         i.nom || '-', i.prenom || '-', i.telephone || '-',
-        i.email || '-', i.agence_nom || '-', translateStatut(i.statut),
+        i.email || '-', i.agenceNom || '-', translateStatut(i.statut),
       ],
       getRawValues(i) { return this.getRowValues(i); },
       getSummary: (data) => {
@@ -115,25 +115,25 @@ function buildConfigs(): Record<string, ReportConfig> {
       dateField: 'createdAt',
       getRowValues: (i) => [
         clientFullName(i),
-        i.numeroCredit || i.numero_credit || '-',
+        i.numeroCredit || '-',
         fmtMoney(i.montant),
         `${Number(i.taux || 0)}%`,
         String(i.duree || '-'),
-        fmtDate(i.dateDebut || i.date_debut),
+        fmtDate(i.dateDebut),
         translateStatut(i.statut),
       ],
       getRawValues: (i) => [
         clientFullName(i),
-        i.numeroCredit || i.numero_credit || '-',
+        i.numeroCredit || '-',
         Number(i.montant || 0),
         Number(i.taux || 0),
         Number(i.duree || 0),
-        fmtDate(i.dateDebut || i.date_debut),
+        fmtDate(i.dateDebut),
         translateStatut(i.statut),
       ],
       getSummary: (data) => {
         const total = data.reduce((s, d) => s + Number(d.montant || 0), 0);
-        const restant = data.reduce((s, d) => s + Number(d.soldeRestant || d.solde_restant || 0), 0);
+        const restant = data.reduce((s, d) => s + Number(d.soldeRestant || 0), 0);
         const enRetard = data.filter(d => d.statut === 'OVERDUE').length;
         return [
           { label: 'Total crédits', value: String(data.length) },
@@ -149,23 +149,23 @@ function buildConfigs(): Record<string, ReportConfig> {
       columns: ['N° Compte', 'Client', 'Solde (FCFA)', 'Type', 'Taux (%)', 'Statut'],
       dateField: 'createdAt',
       getRowValues: (i) => [
-        i.numeroCompte || i.numero_compte || '-',
+        i.numeroCompte || '-',
         clientFullName(i),
-        fmtMoney(i.soldeCourant ?? i.solde_courant ?? i.solde),
-        translateStatut(i.typeCompte || i.type_compte),
-        `${Number(i.produit?.tauxInteret ?? i.produit?.taux_interet ?? 0)}%`,
+        fmtMoney(i.soldeCourant ?? i.solde),
+        translateStatut(i.typeCompte),
+        `${Number(i.produit?.tauxInteret ?? 0)}%`,
         translateStatut(i.statut),
       ],
       getRawValues: (i) => [
-        i.numeroCompte || i.numero_compte || '-',
+        i.numeroCompte || '-',
         clientFullName(i),
-        Number(i.soldeCourant ?? i.solde_courant ?? i.solde ?? 0),
-        translateStatut(i.typeCompte || i.type_compte),
-        Number(i.produit?.tauxInteret ?? i.produit?.taux_interet ?? 0),
+        Number(i.soldeCourant ?? i.solde ?? 0),
+        translateStatut(i.typeCompte),
+        Number(i.produit?.tauxInteret ?? 0),
         translateStatut(i.statut),
       ],
       getSummary: (data) => {
-        const totalSolde = data.reduce((s, d) => s + Number(d.soldeCourant ?? d.solde_courant ?? d.solde ?? 0), 0);
+        const totalSolde = data.reduce((s, d) => s + Number(d.soldeCourant ?? d.solde ?? 0), 0);
         const actifs = data.filter(d => (d.statut || '').toUpperCase() === 'ACTIVE').length;
         return [
           { label: 'Total comptes', value: String(data.length) },
@@ -181,15 +181,15 @@ function buildConfigs(): Record<string, ReportConfig> {
       dateField: 'createdAt',
       getRowValues: (i) => [
         i.nom || '-',
-        i.typeDistribution || i.type_distribution || '-',
-        fmtMoney(i.montantCotisation || i.montant_cotisation),
+        i.typeDistribution || '-',
+        fmtMoney(i.montantCotisation),
         i.frequence || '-',
-        `${i.nombreMembresActuel ?? i.membresActuels ?? i.nombre_membres_actuel ?? 0}/${i.nombreMembres ?? i.nombre_membres ?? '?'}`,
+        `${i.nombreMembresActuel ?? i.membresActuels ?? 0}/${i.nombreMembres ?? '?'}`,
         translateStatut(i.statut),
       ],
       getRawValues(i) { return this.getRowValues(i); },
       getSummary: (data) => {
-        const totalCot = data.reduce((s, d) => s + Number(d.montantCotisation || d.montant_cotisation || 0), 0);
+        const totalCot = data.reduce((s, d) => s + Number(d.montantCotisation || 0), 0);
         const totalM = data.reduce((s, d) => s + Number(d.nombreMembresActuel ?? d.membresActuels ?? 0), 0);
         return [
           { label: 'Total tontines', value: String(data.length) },
@@ -239,7 +239,7 @@ export function useReportGenerator() {
     const start = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null;
     const end = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : null;
     return data.filter((item) => {
-      const raw = item[dateField] || item.createdAt || item.created_at || item.dateDebut || item.date_debut;
+      const raw = item[dateField] || item.createdAt || item.dateDebut;
       if (!raw) return true;
       const d = new Date(raw);
       if (isNaN(d.getTime())) return true;

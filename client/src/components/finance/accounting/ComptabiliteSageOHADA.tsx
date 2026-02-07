@@ -41,15 +41,15 @@ import { comptabiliteKeys } from '../../../lib/query-keys';
 // ============================================
 interface CompteOHADA {
   id: string;
-  numero_compte: string;
+  numeroCompte: string;
   intitule: string;
   classe: number;
-  type_compte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
-  sens_normal: 'Débit' | 'Crédit';
+  typeCompte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
+  sensNormal: 'Débit' | 'Crédit';
   niveau: number;
   actif: boolean;
   description: string;
-  solde_actuel: number;
+  soldeActuel: number;
 }
 
 type TabKey = 'plan' | 'journaux' | 'ecritures' | 'balance' | 'grandlivre' | 'bilan' | 'resultat' | 'tva' | 'tresorerie' | 'tafire' | 'liasse' | 'rapports';
@@ -58,7 +58,7 @@ interface JournalFromApi {
   id: string;
   code: string;
   intitule: string;
-  type_journal?: string;
+  typeJournal?: string;
   actif?: boolean;
 }
 
@@ -73,11 +73,11 @@ interface JournalDisplay {
 interface JournalEntryFromApi {
   id: string;
   date: string;
-  numero_piece: string;
+  numeroPiece: string;
   libelle: string;
-  journal_id: string;
-  total_debit: number;
-  total_credit: number;
+  journalId: string;
+  totalDebit: number;
+  totalCredit: number;
 }
 
 // ============================================
@@ -251,14 +251,14 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
 
   const getComptesByClasse = (classeNumero: number) => {
     let filtered = comptes.filter(c =>
-      c.classe === classeNumero || (c.numero_compte && parseInt(String(c.numero_compte).charAt(0)) === classeNumero)
+      c.classe === classeNumero || (c.numeroCompte && parseInt(String(c.numeroCompte).charAt(0)) === classeNumero)
     );
 
     // Apply search filter
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(c =>
-        c.numero_compte.includes(term) ||
+        c.numeroCompte.includes(term) ||
         c.intitule.toLowerCase().includes(term)
       );
     }
@@ -268,7 +268,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
 
   // Count classes that have accounts
   const classesUtilisees = classesOHADA.filter(cl =>
-    comptes.some(c => c.classe === cl.numero || (c.numero_compte && parseInt(String(c.numero_compte).charAt(0)) === cl.numero))
+    comptes.some(c => c.classe === cl.numero || (c.numeroCompte && parseInt(String(c.numeroCompte).charAt(0)) === cl.numero))
   ).length;
 
   // ============================================
@@ -393,21 +393,21 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
                               key={compte.id} 
                               className="border-b border-slate-700/50 hover:bg-slate-700/30"
                             >
-                              <td className="py-1.5 pr-4 font-mono text-xs text-blue-400">{compte.numero_compte}</td>
+                              <td className="py-1.5 pr-4 font-mono text-xs text-blue-400">{compte.numeroCompte}</td>
                               <td className="py-1.5 pr-4 text-xs">{compte.intitule}</td>
                               <td className="py-1.5 pr-4 hidden md:table-cell">
                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[10px]
-                                  ${compte.type_compte === 'Actif' ? 'bg-blue-500/20 text-blue-400' :
-                                    compte.type_compte === 'Passif' ? 'bg-purple-500/20 text-purple-400' :
-                                    compte.type_compte === 'Charge' ? 'bg-red-500/20 text-red-400' :
+                                  ${compte.typeCompte === 'Actif' ? 'bg-blue-500/20 text-blue-400' :
+                                    compte.typeCompte === 'Passif' ? 'bg-purple-500/20 text-purple-400' :
+                                    compte.typeCompte === 'Charge' ? 'bg-red-500/20 text-red-400' :
                                     'bg-green-500/20 text-green-400'
                                   }`}
                                 >
-                                  {compte.type_compte}
+                                  {compte.typeCompte}
                                 </span>
                               </td>
                               <td className="py-1.5 hidden lg:table-cell text-white font-mono text-[10px]">
-                                {compte.solde_actuel != null ? compte.solde_actuel.toLocaleString() : '-'}
+                                {compte.soldeActuel != null ? compte.soldeActuel.toLocaleString() : '-'}
                               </td>
                             </tr>
                           ))}
@@ -525,16 +525,16 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
                         {entry.date ? new Date(entry.date).toLocaleDateString('fr-FR') : '-'}
                       </td>
                       <td className="py-2 pr-4 font-mono text-cyan-400 hidden sm:table-cell">
-                        {entry.numero_piece || '-'}
+                        {entry.numeroPiece || '-'}
                       </td>
                       <td className="py-2 pr-4 text-white truncate max-w-[200px]">
                         {entry.libelle || '-'}
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-green-400">
-                        {Number(entry.total_debit || 0).toLocaleString()}
+                        {Number(entry.totalDebit || 0).toLocaleString()}
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-cyan-400">
-                        {Number(entry.total_credit || 0).toLocaleString()}
+                        {Number(entry.totalCredit || 0).toLocaleString()}
                       </td>
                       <td className="py-2 text-center hidden md:table-cell">
                         <button
@@ -559,10 +559,10 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
                     <td colSpan={3} className="py-2 px-4 text-right text-xs font-bold text-white">TOTAUX</td>
 
                     <td className="py-2 pr-4 text-right font-mono font-bold text-green-400 text-xs">
-                      {journalEntries.reduce((sum, e) => sum + Number(e.total_debit || 0), 0).toLocaleString()}
+                      {journalEntries.reduce((sum, e) => sum + Number(e.totalDebit || 0), 0).toLocaleString()}
                     </td>
                     <td className="py-2 text-right font-mono font-bold text-cyan-400 text-xs">
-                      {journalEntries.reduce((sum, e) => sum + Number(e.total_credit || 0), 0).toLocaleString()}
+                      {journalEntries.reduce((sum, e) => sum + Number(e.totalCredit || 0), 0).toLocaleString()}
                     </td>
                     <td className="hidden md:table-cell" />
                   </tr>
@@ -1088,7 +1088,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
           {Array.from({ length: 12 }, (_, i) => {
             const month = i + 1;
             const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
-            const periods = periodsData as Array<{ id: string; month: number; status: string; closed_at?: string }> | undefined;
+            const periods = periodsData as Array<{ id: string; month: number; status: string; closedAt?: string }> | undefined;
             const period = periods?.find(p => p.month === month);
             const isClosed = period?.status === 'closed';
 

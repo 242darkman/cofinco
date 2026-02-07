@@ -28,6 +28,7 @@ export interface SessionCaisse {
   
   solde_reel?: number;
   soldeReel?: number;
+  montantFermetureDeclare?: number;
   montant_fermeture_declare?: number;
   
   ecart?: number;
@@ -38,12 +39,16 @@ export interface SessionCaisse {
   
   // Metadata
   observations: string;
+  caissierNom?: string;
   caissier_nom?: string;
+  caisseNom?: string;
   caisse_nom?: string;
   caisse_id?: string;
   caisseId?: string;
   agence_id?: string;
   agenceId?: string;
+  agenceNom?: string;
+  agenceCode?: string;
 
   // Opening workflow fields
   montant_demande?: number;
@@ -94,7 +99,10 @@ export interface CaisseTransaction {
   description: string;
   created_at: string;
   createdAt?: string;
+  clientNom?: string;
   client_nom?: string;
+  clientPrenom?: string;
   client_prenom?: string;
+  clientTelephone?: string;
   client_telephone?: string;
 }

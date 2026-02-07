@@ -5,21 +5,21 @@ import { authService } from '../../lib/auth';
 
 interface Notification {
   id: string;
-  type_notification: string;
-  compte_id: string;
-  client_id: string;
+  typeNotification: string;
+  compteId: string;
+  clientId: string;
   titre: string;
   message: string;
-  mode_paiement: string;
+  modePaiement: string;
   montant: number;
-  reference_externe: string;
+  referenceExterne: string;
   priorite: 'Basse' | 'Normal' | 'Haute' | 'Urgente';
   statut: 'Non lue' | 'Lue' | 'Traitée' | 'Archivée';
-  created_at: string;
-  client_nom?: string;
-  client_phone?: string;
-  numero_compte?: string;
-  type_compte?: string;
+  createdAt: string;
+  clientNom?: string;
+  clientPhone?: string;
+  numeroCompte?: string;
+  typeCompte?: string;
 }
 
 interface NotificationsCaisseProps {
@@ -88,11 +88,11 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
   };
 
   const validerPaiementCompte = async (notif: Notification) => {
-    if (!confirm(`Confirmer la réception du paiement de ${(notif.montant || 0).toLocaleString()} FCFA par ${notif.mode_paiement} ?`)) return;
+    if (!confirm(`Confirmer la réception du paiement de ${(notif.montant || 0).toLocaleString()} FCFA par ${notif.modePaiement} ?`)) return;
 
     try {
       // 1. Activer le compte
-      await fetch(`/api/comptes-bancaires/${notif.compte_id}`, {
+      await fetch(`/api/comptes-bancaires/${notif.compteId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paiement_valide: true, solde: notif.montant, statut: 'ACTIVE' })
@@ -103,20 +103,20 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          compte_id: notif.compte_id,
+          compte_id: notif.compteId,
           type_transaction: 'Dépôt',
           montant: notif.montant,
           solde_avant: 0,
           solde_apres: notif.montant,
-          mode_paiement: notif.mode_paiement,
-          reference_paiement: notif.reference_externe,
+          mode_paiement: notif.modePaiement,
+          reference_paiement: notif.referenceExterne,
           description: 'Dépôt initial - Ouverture de compte',
           effectue_par: user?.id,
           statut: 'VALIDATED'
         })
       });
 
-      await traiterNotification(notif.id, `Paiement validé - ${notif.mode_paiement}`);
+      await traiterNotification(notif.id, `Paiement validé - ${notif.modePaiement}`);
       alert('Paiement validé avec succès ! Compte actif.');
     } catch (error: any) {
       alert(`Erreur: ${error.error}`);
@@ -174,11 +174,11 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getPriorityColor(notif.priorite)}`}>
                       {notif.priorite}
                     </span>
-                    <span className="text-xs text-slate-400">{new Date(notif.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs text-slate-400">{new Date(notif.createdAt).toLocaleDateString()}</span>
                  </div>
                  <p className="text-sm font-semibold text-white truncate">{notif.titre}</p>
                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs text-slate-400 truncate max-w-[120px]">{notif.client_nom}</span>
+                    <span className="text-xs text-slate-400 truncate max-w-[120px]">{notif.clientNom}</span>
                     <span className="text-sm font-mono text-green-400">{(notif.montant || 0).toLocaleString()} FCFA</span>
                  </div>
                </div>
@@ -241,14 +241,14 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
                              </span>
                              {notif.statut === 'Non lue' && <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>}
                              <span className="text-xs text-slate-500 flex items-center gap-1">
-                                <Clock size={12}/> {new Date(notif.created_at).toLocaleString()}
+                                <Clock size={12}/> {new Date(notif.createdAt).toLocaleString()}
                              </span>
                           </div>
                           <h4 className="font-bold text-white text-lg mb-1">{notif.titre}</h4>
                           <div className="flex flex-wrap gap-4 text-sm text-slate-400">
-                             <span className="flex items-center gap-1"><User size={14}/> {notif.client_nom}</span>
-                             <span className="flex items-center gap-1"><PhoneIcon size={14}/> {notif.client_phone}</span>
-                             <span className="flex items-center gap-1"><CreditCard size={14}/> {notif.numero_compte}</span>
+                             <span className="flex items-center gap-1"><User size={14}/> {notif.clientNom}</span>
+                             <span className="flex items-center gap-1"><PhoneIcon size={14}/> {notif.clientPhone}</span>
+                             <span className="flex items-center gap-1"><CreditCard size={14}/> {notif.numeroCompte}</span>
                           </div>
                        </div>
                        
@@ -322,13 +322,13 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
                  <div className="grid grid-cols-2 gap-4">
                     <div>
                        <p className="text-xs text-slate-500 uppercase">Client</p>
-                       <p className="font-semibold text-white">{selectedNotif.client_nom}</p>
-                       <p className="text-sm text-slate-400">{selectedNotif.client_phone}</p>
+                       <p className="font-semibold text-white">{selectedNotif.clientNom}</p>
+                       <p className="text-sm text-slate-400">{selectedNotif.clientPhone}</p>
                     </div>
                     <div>
                        <p className="text-xs text-slate-500 uppercase">Compte</p>
-                       <p className="font-semibold text-white">{selectedNotif.numero_compte}</p>
-                       <p className="text-sm text-slate-400">{selectedNotif.type_compte}</p>
+                       <p className="font-semibold text-white">{selectedNotif.numeroCompte}</p>
+                       <p className="text-sm text-slate-400">{selectedNotif.typeCompte}</p>
                     </div>
                  </div>
 

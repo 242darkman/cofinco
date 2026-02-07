@@ -24,7 +24,7 @@ import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { requireAgenceAccess, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { normalizeKeysDeep } from "./utils";
 import { z } from "zod";
 import comptesService, { CompteError } from "../services/comptes";
 import { createVirementProgramme, executeCompteTransfer } from "../services/compte-transfers";
@@ -296,7 +296,7 @@ export function registerComptesRoutes(app: Express) {
           }
         }
 
-        res.status(201).json(addSnakeCaseAliasesDeep(result));
+        res.status(201).json(result);
       } catch (error: any) {
         if (error instanceof CompteError) {
           return res.status(400).json({
@@ -541,7 +541,7 @@ export function registerComptesRoutes(app: Express) {
         kycStatus = 'INCOMPLETE';
       }
 
-      res.json(addSnakeCaseAliasesDeep({
+      res.json({
         clientId,
         kycStatus,
         canActivate: allRequiredPresent, // Allow if docs present (even if not yet verified)
@@ -565,7 +565,7 @@ export function registerComptesRoutes(app: Express) {
           missingRequired: missingRequired.length,
           missingRecommended: missingRecommended.length,
         },
-      }));
+      });
     } catch (error) {
       logger.error({ err: error }, 'Erreur KYC status');
       res.status(500).json({ error: "Erreur lors de la vérification KYC" });
@@ -590,7 +590,7 @@ export function registerComptesRoutes(app: Express) {
         ? await db.select().from(produitsCompte).where(whereClause)
         : await db.select().from(produitsCompte);
 
-      res.json(addSnakeCaseAliasesDeep(produits));
+      res.json(produits);
     } catch (error: any) {
       logger.error({ err: error }, 'Error listing produits compte');
       res.status(500).json({ message: error.message });
@@ -639,7 +639,7 @@ export function registerComptesRoutes(app: Express) {
           after: updateData,
         }, 'success', 'high');
 
-        res.json(addSnakeCaseAliasesDeep(updated));
+        res.json(updated);
       } catch (error: any) {
         logger.error({ err: error }, 'Error updating produit compte');
         res.status(500).json({ error: error.message });
@@ -700,10 +700,10 @@ export function registerComptesRoutes(app: Express) {
           });
 
           return res.status(201).json(
-            addSnakeCaseAliasesDeep({
+            {
               scheduled: true,
               schedule,
-            })
+            }
           );
         }
 
@@ -948,7 +948,7 @@ export function registerComptesRoutes(app: Express) {
           .offset(offset);
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             data: schedules,
             pagination: {
               page,
@@ -956,7 +956,7 @@ export function registerComptesRoutes(app: Express) {
               total: Number(countResult?.count || 0),
               totalPages: Math.ceil(Number(countResult?.count || 0) / limit),
             },
-          })
+          }
         );
       } catch (error: any) {
         logger.error({ err: error }, 'Error listing scheduled transfers');
@@ -1084,7 +1084,7 @@ export function registerComptesRoutes(app: Express) {
           });
         }
 
-        res.json(addSnakeCaseAliasesDeep(updated));
+        res.json(updated);
       } catch (error: any) {
         if (error.name === "ZodError") {
           return res.status(400).json({
@@ -1339,11 +1339,11 @@ export function registerComptesRoutes(app: Express) {
 
         const history = await getScheduledTransferHistory(req.params.id, limit);
 
-        res.json(addSnakeCaseAliasesDeep({
+        res.json({
           scheduleId: req.params.id,
           runs: history,
           count: history.length,
-        }));
+        });
       } catch (error: any) {
         logger.error({ err: error }, 'Error fetching scheduled transfer history');
         res.status(500).json({ message: error.message || "Erreur chargement historique" });
@@ -1422,7 +1422,7 @@ export function registerComptesRoutes(app: Express) {
           produit: compte.produit || null,
         }));
 
-        res.json(addSnakeCaseAliasesDeep(comptesTransformed));
+        res.json(comptesTransformed);
       } catch (error: any) {
         logger.error({ err: error }, 'Error listing comptes bloques');
         res.status(500).json({ message: error.message });
@@ -1483,7 +1483,7 @@ export function registerComptesRoutes(app: Express) {
           description: compte.blocageMotif || null // Use blocageMotif as description
         };
 
-        res.json(addSnakeCaseAliasesDeep(transformed));
+        res.json(transformed);
       } catch (error: any) {
         logger.error({ err: error }, 'Error getting compte bloque detail');
         res.status(500).json({ message: error.message });
@@ -1539,7 +1539,7 @@ export function registerComptesRoutes(app: Express) {
       const depositCheck = comptesService.canDeposit(compte);
 
       res.json(
-        addSnakeCaseAliasesDeep({
+        {
           ...compte,
           clients: clientData,
           permissions: {
@@ -1548,7 +1548,7 @@ export function registerComptesRoutes(app: Express) {
             canDeposit: depositCheck.allowed,
             depositBlockedReason: depositCheck.reason,
           },
-        })
+        }
       );
     } catch (error: any) {
       logger.error({ err: error }, 'Error getting compte');
@@ -1651,12 +1651,12 @@ export function registerComptesRoutes(app: Express) {
         }
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             transaction: result.transaction,
             mouvement_id: result.mouvement.id,
             facture: result.facture || null,
             message: "Dépôt effectué avec succès",
-          })
+          }
         );
       } catch (error: any) {
         if (error instanceof CompteError) {
@@ -1764,7 +1764,7 @@ export function registerComptesRoutes(app: Express) {
               });
             }
 
-            res.json(addSnakeCaseAliasesDeep(result));
+            res.json(result);
         } catch (error: any) {
              logger.error({ err: error }, 'Error depot initial');
              const message = error.message || "Erreur serveur";
@@ -2002,12 +2002,12 @@ export function registerComptesRoutes(app: Express) {
         }
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             transaction: result.transaction,
             mouvement_id: result.mouvement.id,
             facture: result.facture || null,
             message: "Retrait effectué avec succès",
-          })
+          }
         );
       } catch (error: any) {
         if (error instanceof CompteError) {
@@ -2087,10 +2087,10 @@ export function registerComptesRoutes(app: Express) {
         });
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             ...compte,
             message: "Compte bloqué avec succès",
-          })
+          }
         );
       } catch (error: any) {
         if (error instanceof CompteError) {
@@ -2165,10 +2165,10 @@ export function registerComptesRoutes(app: Express) {
         }
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             ...compte,
             message: "Compte débloqué avec succès",
-          })
+          }
         );
       } catch (error: any) {
         if (error instanceof CompteError) {
@@ -2222,10 +2222,10 @@ export function registerComptesRoutes(app: Express) {
         );
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             ...compte,
             message: "Compte transféré avec succès",
-          })
+          }
         );
       } catch (error: any) {
         if (error instanceof CompteError) {
@@ -2251,7 +2251,7 @@ export function registerComptesRoutes(app: Express) {
         const historique = await comptesService.getCompteAgenceHistorique(
           req.params.id
         );
-        res.json(addSnakeCaseAliasesDeep(historique));
+        res.json(historique);
       } catch (error: any) {
         logger.error({ err: error }, 'Error getting historique agences');
         res.status(500).json({ message: error.message });
@@ -2276,7 +2276,7 @@ export function registerComptesRoutes(app: Express) {
         cursor
       );
       res.json({
-        data: addSnakeCaseAliasesDeep(result.data),
+        data: result.data,
         nextCursor: result.nextCursor,
         hasMore: result.hasMore,
       });
@@ -2293,7 +2293,7 @@ export function registerComptesRoutes(app: Express) {
   app.get("/api/clients/:id/portfolio", requireAuth, async (req, res) => {
     try {
       const portfolio = await comptesService.getClientPortfolio(req.params.id);
-      res.json(addSnakeCaseAliasesDeep(portfolio));
+      res.json(portfolio);
     } catch (error: any) {
       logger.error({ err: error }, 'Error getting portfolio');
       res.status(500).json({ message: error.message });
@@ -2345,10 +2345,10 @@ export function registerComptesRoutes(app: Express) {
         });
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             ...compte,
             message: "Compte clôturé avec succès",
-          })
+          }
         );
       } catch (error: any) {
         if (error instanceof CompteError) {
@@ -2445,11 +2445,11 @@ export function registerComptesRoutes(app: Express) {
         }
 
         res.json(
-          addSnakeCaseAliasesDeep({
+          {
             transaction: result.transaction,
             mouvement_id: result.mouvement.id,
             message: "Intérêts crédités avec succès",
-          })
+          }
         );
       } catch (error: any) {
         if (error instanceof CompteError) {
@@ -2617,8 +2617,8 @@ export function registerComptesRoutes(app: Express) {
 
         res.json({
           success: true,
-          reversal: addSnakeCaseAliasesDeep(result.reversalOperation),
-          original: addSnakeCaseAliasesDeep(result.originalOperation),
+          reversal: result.reversalOperation,
+          original: result.originalOperation,
           message: "Operation annulee avec succes",
         });
       } catch (error: unknown) {
@@ -2685,7 +2685,7 @@ export function registerComptesRoutes(app: Express) {
           )
           .orderBy(operationsCaisse.createdAt);
 
-        res.json(chain.map(addSnakeCaseAliasesDeep));
+        res.json(chain);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Erreur interne";
         logger.error({ err: error }, 'Error fetching operation chain');

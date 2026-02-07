@@ -35,7 +35,7 @@ const frequencyOptions = [
   { value: 'monthly', label: 'Mensuel' },
 ];
 
-const formatAccountNumber = (compte: Compte) => compte.numero_compte || compte.numeroCompte || '';
+const formatAccountNumber = (compte: Compte) => compte.numeroCompte || '';
 
 const formatClientName = (compte: Compte) =>
   compte.clients ? `${compte.clients.nom} ${compte.clients.prenom || ''}`.trim() : 'Client';
@@ -78,11 +78,11 @@ export default function TransactionFlow() {
   );
 
   const sourceConfig = sourceAccount ? getAccountUiConfig(sourceAccount, 'staff') : null;
-  const sourceClientId = sourceAccount?.client_id || sourceAccount?.clientId;
+  const sourceClientId = sourceAccount?.clientId;
 
   const ownAccounts = useMemo(() => {
     if (!sourceClientId) return [];
-    return accounts.filter((account) => (account.client_id || account.clientId) === sourceClientId);
+    return accounts.filter((account) => account.clientId === sourceClientId);
   }, [accounts, sourceClientId]);
 
   useEffect(() => {

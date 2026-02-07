@@ -158,15 +158,15 @@ function buildJournalEntries(sessions: SessionCaisse[], transactions: CaisseTran
   let soldeProgressif = 0;
 
   const sortedSessions = [...sessions].sort((a, b) => {
-    const dateA = new Date(a.openedAt || a.opened_at || '');
-    const dateB = new Date(b.openedAt || b.opened_at || '');
+    const dateA = new Date(a.openedAt || '');
+    const dateB = new Date(b.openedAt || '');
     return dateA.getTime() - dateB.getTime();
   });
 
   for (const session of sortedSessions) {
-    const sessionOpenDate = new Date(session.openedAt || session.opened_at || '');
-    const soldeInitial = Number(session.solde_initial || session.soldeInitial || session.montant_ouverture || 0);
-    const caissierName = session.caissier_nom || 'Caissier';
+    const sessionOpenDate = new Date(session.openedAt || '');
+    const soldeInitial = Number(session.soldeInitial || session.montantOuverture || 0);
+    const caissierName = session.caissierNom || 'Caissier';
 
     soldeProgressif = soldeInitial;
     entries.push({
@@ -182,27 +182,27 @@ function buildJournalEntries(sessions: SessionCaisse[], transactions: CaisseTran
     });
 
     const sessionTransactions = transactions
-      .filter((t) => t.session_id === session.id || t.sessionId === session.id)
+      .filter((t) => t.sessionId === session.id)
       .sort((a, b) => {
-        const dateA = new Date(a.created_at || a.createdAt || '');
-        const dateB = new Date(b.created_at || b.createdAt || '');
+        const dateA = new Date(a.createdAt || '');
+        const dateB = new Date(b.createdAt || '');
         return dateA.getTime() - dateB.getTime();
       });
 
     for (const tx of sessionTransactions) {
       const montant = Number(tx.montant);
-      const typeOp = tx.type_operation || tx.typeOperation || '';
+      const typeOp = tx.typeOperation || '';
       const isEntree = isEntreeOperation(typeOp);
 
       if (isEntree) soldeProgressif += montant;
       else soldeProgressif -= montant;
 
-      const hasClient = tx.client_nom || tx.client_prenom;
-      const clientName = hasClient ? `${tx.client_prenom || ''} ${tx.client_nom || ''}`.trim() : undefined;
+      const hasClient = tx.clientNom || tx.clientPrenom;
+      const clientName = hasClient ? `${tx.clientPrenom || ''} ${tx.clientNom || ''}`.trim() : undefined;
 
       entries.push({
         id: tx.id,
-        date: new Date(tx.created_at || tx.createdAt || ''),
+        date: new Date(tx.createdAt || ''),
         type: 'OPERATION',
         operationType: typeOp,
         description: tx.description || getOperationLabel(typeOp),
@@ -215,11 +215,11 @@ function buildJournalEntries(sessions: SessionCaisse[], transactions: CaisseTran
     }
 
     const sessionStatus = session.computedStatus || computeSessionStatus(session);
-    if (sessionStatus === 'CLOSED' && (session.closedAt || session.closed_at)) {
-      const soldeFinal = Number(session.solde_reel || session.soldeReel || soldeProgressif);
+    if (sessionStatus === 'CLOSED' && (session.closedAt)) {
+      const soldeFinal = Number(session.soldeReel || soldeProgressif);
       entries.push({
         id: `close-${session.id}`,
-        date: new Date(session.closedAt || session.closed_at || ''),
+        date: new Date(session.closedAt || ''),
         type: 'FERMETURE',
         description: 'Fermeture de session',
         montant: soldeFinal,
@@ -393,11 +393,11 @@ export function exportSynthesePDF(
 
   // Calculate metrics
   const totalEntrees = transactions
-    .filter(t => isEntreeOperation(t.type_operation || t.typeOperation || ''))
+    .filter(t => isEntreeOperation(t.typeOperation || ''))
     .reduce((sum, t) => sum + Number(t.montant), 0);
 
   const totalSorties = transactions
-    .filter(t => !isEntreeOperation(t.type_operation || t.typeOperation || ''))
+    .filter(t => !isEntreeOperation(t.typeOperation || ''))
     .reduce((sum, t) => sum + Number(t.montant), 0);
 
   const soldeNet = totalEntrees - totalSorties;
@@ -510,7 +510,7 @@ export function exportSynthesePDF(
 
   const byType: Record<string, { count: number; total: number }> = {};
   for (const tx of transactions) {
-    const type = getOperationLabel(tx.type_operation || tx.typeOperation);
+    const type = getOperationLabel(tx.typeOperation);
     if (!byType[type]) byType[type] = { count: 0, total: 0 };
     byType[type].count++;
     byType[type].total += Number(tx.montant);
@@ -554,10 +554,10 @@ export function exportSyntheseExcel(
 
   // Sheet 1: KPIs
   const totalEntrees = transactions
-    .filter(t => isEntreeOperation(t.type_operation || t.typeOperation || ''))
+    .filter(t => isEntreeOperation(t.typeOperation || ''))
     .reduce((sum, t) => sum + Number(t.montant), 0);
   const totalSorties = transactions
-    .filter(t => !isEntreeOperation(t.type_operation || t.typeOperation || ''))
+    .filter(t => !isEntreeOperation(t.typeOperation || ''))
     .reduce((sum, t) => sum + Number(t.montant), 0);
 
   const kpiData = [
@@ -574,7 +574,7 @@ export function exportSyntheseExcel(
   // Sheet 2: Par type
   const byType: Record<string, { count: number; total: number }> = {};
   for (const tx of transactions) {
-    const type = getOperationLabel(tx.type_operation || tx.typeOperation);
+    const type = getOperationLabel(tx.typeOperation);
     if (!byType[type]) byType[type] = { count: 0, total: 0 };
     byType[type].count++;
     byType[type].total += Number(tx.montant);
@@ -592,9 +592,9 @@ export function exportSyntheseExcel(
   // Sheet 3: Par jour
   const byDay: Record<string, { entrees: number; sorties: number; count: number }> = {};
   for (const tx of transactions) {
-    const date = formatDate(tx.created_at || tx.createdAt || '');
+    const date = formatDate(tx.createdAt || '');
     if (!byDay[date]) byDay[date] = { entrees: 0, sorties: 0, count: 0 };
-    const isEntree = isEntreeOperation(tx.type_operation || tx.typeOperation || '');
+    const isEntree = isEntreeOperation(tx.typeOperation || '');
     if (isEntree) byDay[date].entrees += Number(tx.montant);
     else byDay[date].sorties += Number(tx.montant);
     byDay[date].count++;
@@ -637,10 +637,10 @@ function buildDiscrepancies(sessions: SessionCaisse[]): DiscrepancyEntry[] {
     })
     .map(session => {
       const soldeTheorique = Number(
-        session.solde_theorique || session.soldeTheorique || session.montant_fermeture_theorique || 0
+        session.soldeTheorique || session.montantFermetureTheorique || 0
       );
       const soldeReel = Number(
-        session.solde_reel || session.soldeReel || session.montant_fermeture_declare || 0
+        session.soldeReel || session.montantFermetureDeclare || 0
       );
       const ecart = Number(session.ecart || 0) || (soldeReel - soldeTheorique);
       const ecartPercent = soldeTheorique !== 0 ? (ecart / soldeTheorique) * 100 : 0;
@@ -650,14 +650,14 @@ function buildDiscrepancies(sessions: SessionCaisse[]): DiscrepancyEntry[] {
       if (Math.abs(ecart) > 5000) status = 'critical';
 
       return {
-        date: new Date(session.closedAt || session.closed_at || session.openedAt || session.opened_at || ''),
-        caissier: session.caissier_nom || 'Non renseigné',
+        date: new Date(session.closedAt || session.openedAt || ''),
+        caissier: session.caissierNom || 'Non renseigné',
         soldeTheorique,
         soldeReel,
         ecart,
         ecartPercent,
         status,
-        justification: session.ecart_justification || session.ecartJustification,
+        justification: session.ecartJustification,
       };
     })
     .sort((a, b) => Math.abs(b.ecart) - Math.abs(a.ecart));

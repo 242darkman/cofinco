@@ -6,9 +6,9 @@ import { toast, handleApiError } from '../../../lib/toast';
 
 interface Compte {
   id: string;
-  numero_compte: string;
+  numeroCompte: string;
   intitule: string;
-  sens_normal: 'Débit' | 'Crédit';
+  sensNormal: 'Débit' | 'Crédit';
 }
 
 interface Journal {
@@ -82,7 +82,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
   useEffect(() => {
     if (searchTerm) {
       const filtered = comptes.filter(c =>
-        c.numero_compte.includes(searchTerm) ||
+        c.numeroCompte.includes(searchTerm) ||
         c.intitule.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredComptes(filtered);
@@ -109,7 +109,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
 
   const selectCompte = (index: number, compte: Compte) => {
     updateLigne(index, 'compte_id', compte.id);
-    updateLigne(index, 'numero_compte', compte.numero_compte);
+    updateLigne(index, 'numero_compte', compte.numeroCompte);
     updateLigne(index, 'intitule', compte.intitule);
     setShowCompteSearch(null);
     setSearchTerm('');
@@ -373,7 +373,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
                             onClick={() => selectCompte(index, compte)}
                             className="w-full px-3 py-2 text-left hover:bg-slate-600 flex items-center gap-2 text-xs transition-colors"
                           >
-                            <span className="text-cyan-400 font-mono font-bold">{compte.numero_compte}</span>
+                            <span className="text-cyan-400 font-mono font-bold">{compte.numeroCompte}</span>
                             <span className="text-white truncate">{compte.intitule}</span>
                           </button>
                         ))}

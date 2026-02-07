@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 
 interface CompteResultatLine {
-  numero_compte: string;
+  numeroCompte: string;
   intitule: string;
   montant: number;
 }
@@ -55,7 +55,7 @@ export default function CompteResultat() {
 
       // Feuille Charges
       const chargesData = charges.map(c => ({
-        'N° Compte': c.numero_compte,
+        'N° Compte': c.numeroCompte,
         'Intitulé': c.intitule,
         'Montant': c.montant
       }));
@@ -63,7 +63,7 @@ export default function CompteResultat() {
 
       // Feuille Produits
       const produitsData = produits.map(c => ({
-        'N° Compte': c.numero_compte,
+        'N° Compte': c.numeroCompte,
         'Intitulé': c.intitule,
         'Montant': c.montant
       }));
@@ -124,7 +124,7 @@ export default function CompteResultat() {
       doc.setFontSize(9);
       doc.setTextColor(0);
       produits.slice(0, 10).forEach((p) => {
-        doc.text(p.numero_compte, 25, y);
+        doc.text(p.numeroCompte, 25, y);
         doc.text(p.intitule.substring(0, 50), 45, y);
         doc.text((p.montant || 0).toLocaleString('fr-FR'), 160, y, { align: 'right' });
         y += 6;
@@ -147,7 +147,7 @@ export default function CompteResultat() {
       doc.setFontSize(9);
       doc.setTextColor(0);
       charges.slice(0, 10).forEach((c) => {
-        doc.text(c.numero_compte, 25, y);
+        doc.text(c.numeroCompte, 25, y);
         doc.text(c.intitule.substring(0, 50), 45, y);
         doc.text((c.montant || 0).toLocaleString('fr-FR'), 160, y, { align: 'right' });
         y += 6;
@@ -184,7 +184,7 @@ export default function CompteResultat() {
 
   const columns = [
     { 
-      key: 'numero_compte', 
+      key: 'numeroCompte',
       label: 'Compte', 
       primary: true,
       format: (val: string) => <span className="font-mono text-xs text-cyan-400 font-bold">{val}</span>
@@ -412,8 +412,8 @@ export default function CompteResultat() {
                            <BarChart
                               layout="vertical"
                               data={[
-                                 ...charges.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#ef4444' })),
-                                 ...produits.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#22c55e' })),
+                                 ...charges.slice(0, 3).map(c => ({ name: c.numeroCompte, montant: c.montant, fill: '#ef4444' })),
+                                 ...produits.slice(0, 3).map(c => ({ name: c.numeroCompte, montant: c.montant, fill: '#22c55e' })),
                               ].sort((a, b) => b.montant - a.montant).slice(0, 5)}
                               margin={{ left: 5, right: 5 }}
                            >
@@ -426,8 +426,8 @@ export default function CompteResultat() {
                               />
                               <Bar dataKey="montant" radius={[0, 4, 4, 0]}>
                                  {[
-                                    ...charges.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#ef4444' })),
-                                    ...produits.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#22c55e' })),
+                                    ...charges.slice(0, 3).map(c => ({ name: c.numeroCompte, montant: c.montant, fill: '#ef4444' })),
+                                    ...produits.slice(0, 3).map(c => ({ name: c.numeroCompte, montant: c.montant, fill: '#22c55e' })),
                                  ].sort((a, b) => b.montant - a.montant).slice(0, 5).map((entry, i) => (
                                     <Cell key={i} fill={entry.fill} />
                                  ))}

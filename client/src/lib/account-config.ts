@@ -5,21 +5,15 @@ import { StatutCompte } from '@shared/enum/status-constants';
 export type AccountType = 'Courant' | 'Épargne' | 'Bloqué';
 
 export interface AccountLike {
-  type_compte?: string | null;
   typeCompte?: string | null;
   statut?: string | null;
-  blocage_actif?: boolean | null;
   blocageActif?: boolean | null;
-  taux_interet?: number | string | null;
   tauxInteret?: number | string | null;
   solde?: number | string | null;
-  solde_courant?: number | string | null;
   soldeCourant?: number | string | null;
   produit?: {
     tauxInteret?: number | string | null;
-    taux_interet?: number | string | null;
     typeCompte?: string | null;
-    type_compte?: string | null;
   } | null;
 }
 
@@ -58,22 +52,20 @@ const TYPE_STYLES: Record<AccountType, { icon: LucideIcon; badgeClassName: strin
 };
 
 export function getAccountType(account: AccountLike): AccountType {
-  const rawType = String(account.type_compte || account.typeCompte || '').toLowerCase();
+  const rawType = String(account.typeCompte || '').toLowerCase();
   if (rawType.includes('épargne') || rawType.includes('epargne')) return 'Épargne';
   if (rawType.includes('bloq')) return 'Bloqué';
   return 'Courant';
 }
 
 export function getAccountBalance(account: AccountLike): number {
-  const value = account.solde ?? account.soldeCourant ?? account.solde_courant ?? 0;
+  const value = account.solde ?? account.soldeCourant ?? 0;
   return Number(value) || 0;
 }
 
 export function getAccountInterestRate(account: AccountLike): number {
   const raw =
     account.produit?.tauxInteret ??
-    account.produit?.taux_interet ??
-    account.taux_interet ??
     account.tauxInteret ??
     0;
   return Number(raw) || 0;
@@ -84,7 +76,7 @@ import { getStatusLabel, getStatusColor, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_C
 export function getAccountUiConfig(account: AccountLike, role: AccountViewRole = 'client'): AccountUiConfig {
   const type = getAccountType(account);
   const status = String(account.statut || StatutCompte.ACTIVE);
-  const isLocked = type === 'Bloqué' || account.blocageActif === true || account.blocage_actif === true;
+  const isLocked = type === 'Bloqué' || account.blocageActif === true;
   const isActive = status === StatutCompte.ACTIVE;
   const isPendingActivation = status === StatutCompte.PENDING_ACTIVATION;
 

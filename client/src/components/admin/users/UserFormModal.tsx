@@ -83,11 +83,11 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
   const passwordRequirements = useMemo(() => {
     if (!securitySettings) return DEFAULT_PASSWORD_RULES;
     return {
-      minLength: securitySettings.password_min_length ?? DEFAULT_PASSWORD_RULES.minLength,
-      requireUppercase: securitySettings.password_require_uppercase ?? DEFAULT_PASSWORD_RULES.requireUppercase,
-      requireLowercase: securitySettings.password_require_lowercase ?? DEFAULT_PASSWORD_RULES.requireLowercase,
-      requireNumbers: securitySettings.password_require_numbers ?? DEFAULT_PASSWORD_RULES.requireNumbers,
-      requireSpecialChars: securitySettings.password_require_special ?? DEFAULT_PASSWORD_RULES.requireSpecialChars,
+      minLength: securitySettings.passwordMinLength ?? DEFAULT_PASSWORD_RULES.minLength,
+      requireUppercase: securitySettings.passwordRequireUppercase ?? DEFAULT_PASSWORD_RULES.requireUppercase,
+      requireLowercase: securitySettings.passwordRequireLowercase ?? DEFAULT_PASSWORD_RULES.requireLowercase,
+      requireNumbers: securitySettings.passwordRequireNumbers ?? DEFAULT_PASSWORD_RULES.requireNumbers,
+      requireSpecialChars: securitySettings.passwordRequireSpecial ?? DEFAULT_PASSWORD_RULES.requireSpecialChars,
     };
   }, [securitySettings]);
 
@@ -139,7 +139,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         telephone: initialData.telephone || initialData.phone || '',
         role: normalizeRoleValue(initialData.role),
         statut: initialData.statut || StatutUser.ACTIVE,
-        photoProfile: initialData.photoProfile || initialData.photo_profile || ''
+        photoProfile: initialData.photoProfile || ''
       });
       setErrors({});
     } else {

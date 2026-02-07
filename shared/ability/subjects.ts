@@ -93,6 +93,10 @@ export const Subjects = {
   // Terrain Module Entities
   VISITE: 'Visite',
   INCIDENT: 'Incident',
+  PROSPECTION_PRIME: 'ProspectionPrime',
+  ARRONDISSEMENT: 'Arrondissement',
+  MARCHE: 'Marche',
+  PROSPECTION_CONFIG: 'ProspectionConfig',
 
   // Communication Module Entities
   COMMUNICATION: 'Communication',
@@ -182,6 +186,10 @@ export const ENTITY_SUBJECTS = [
   Subjects.PAIE,
   Subjects.DECLARATION_TVA,
   Subjects.INVOICE,
+  Subjects.PROSPECTION_PRIME,
+  Subjects.ARRONDISSEMENT,
+  Subjects.MARCHE,
+  Subjects.PROSPECTION_CONFIG,
 ] as const;
 
 // Human-readable labels for UI
@@ -258,6 +266,10 @@ export const SUBJECT_LABELS: Record<Subject, string> = {
   // Terrain Module Entities
   [Subjects.VISITE]: 'Visite',
   [Subjects.INCIDENT]: 'Incident',
+  [Subjects.PROSPECTION_PRIME]: 'Prime de prospection',
+  [Subjects.ARRONDISSEMENT]: 'Arrondissement',
+  [Subjects.MARCHE]: 'Marché',
+  [Subjects.PROSPECTION_CONFIG]: 'Configuration prospection',
   // Communication Module Entities
   [Subjects.COMMUNICATION]: 'Communication',
   [Subjects.MESSAGE]: 'Message',
@@ -300,5 +312,5 @@ export const MODULE_ENTITY_MAP: Record<string, Subject[]> = {
   ],
   [Subjects.ADMIN]: [Subjects.USER, Subjects.AGENCE, Subjects.SESSION, Subjects.AUDIT_LOG],
   [Subjects.RBAC]: [Subjects.ROLE, Subjects.PERMISSION],
-  [Subjects.TERRAIN]: [Subjects.AGENT_TERRAIN, Subjects.OPERATION_TERRAIN],
+  [Subjects.TERRAIN]: [Subjects.AGENT_TERRAIN, Subjects.OPERATION_TERRAIN, Subjects.PROSPECTION, Subjects.PROSPECTION_PRIME, Subjects.ARRONDISSEMENT, Subjects.MARCHE, Subjects.PROSPECTION_CONFIG],
 };

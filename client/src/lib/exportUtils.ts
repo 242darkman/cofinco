@@ -236,7 +236,7 @@ export const generateAuditReport = (logs: any[], title: string) => {
       acc[log.status] = (acc[log.status] || 0) + 1;
       return acc;
     }, {}),
-    uniqueUsers: new Set(logs.map(l => l.user_email)).size,
+    uniqueUsers: new Set(logs.map(l => l.userEmail)).size,
     timeRange: {
       start: logs[logs.length - 1]?.timestamp,
       end: logs[0]?.timestamp

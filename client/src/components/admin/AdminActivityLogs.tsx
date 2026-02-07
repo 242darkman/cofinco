@@ -11,15 +11,15 @@ interface LogEntry {
   id: string;
   date: string;
   user: string;
-  user_email?: string;
+  userEmail?: string;
   action: string;
   module: string;
   details: any;
   status: 'success' | 'error' | 'warning';
   ip?: string;
   userAgent?: string;
-  error_message?: string;
-  created_at?: string;
+  errorMessage?: string;
+  createdAt?: string;
 }
 
 interface AdminActivityLogsProps {
@@ -69,15 +69,20 @@ export default function AdminActivityLogs({
         const data = await auditApi.getAll(params);
         const mappedLogs: LogEntry[] = (data || []).map((item: any) => ({
           id: item.id,
-          date: new Date(item.created_at || item.createdAt).toLocaleString('fr-FR'),
-          user: item.user_name || item.userName || item.user_email || 'Système',
-          user_email: item.user_email,
+          date: (() => {
+            try {
+              const d = new Date(item.createdAt);
+              return !isNaN(d.getTime()) ? d.toLocaleString('fr-FR') : 'Date invalide';
+            } catch { return 'Date invalide'; }
+          })(),
+          user: item.userName || item.userEmail || 'Système',
+          userEmail: item.userEmail,
           action: item.action || 'UNKNOWN',
-          module: item.module || item.entity_type || 'SYSTEM',
+          module: item.module || item.entityType || 'SYSTEM',
           details: item.details || {},
           status: item.success === false ? 'error' : 'success',
-          error_message: item.error_message,
-          created_at: item.created_at || item.createdAt,
+          errorMessage: item.errorMessage,
+          createdAt: item.createdAt,
         }));
         setLogs(mappedLogs);
         setTotal(mappedLogs.length);
@@ -91,20 +96,25 @@ export default function AdminActivityLogs({
 
         const mappedLogs: LogEntry[] = response.data.map((item: any) => ({
           id: item.id,
-          date: new Date(item.created_at || item.createdAt).toLocaleString('fr-FR'),
-          user: item.user_name || item.userName || 'Système',
+          date: (() => {
+             try {
+               const d = new Date(item.createdAt);
+               return !isNaN(d.getTime()) ? d.toLocaleString('fr-FR') : 'Date invalide';
+             } catch { return 'Date invalide'; }
+          })(),
+          user: item.userName || 'Système',
           action: item.action || 'UNKNOWN',
-          module: item.module || item.entity_type || 'SYSTEM',
+          module: item.module || item.entityType || 'SYSTEM',
           details: item.details || {},
           status: item.success === false ? 'error' : 'success',
-          ip: item.ip_address || item.ipAddress || 'N/A',
-          userAgent: item.user_agent || item.userAgent || ''
+          ip: item.ipAddress || 'N/A',
+          userAgent: item.userAgent || ''
         }));
 
         setLogs(mappedLogs);
 
         if (response.meta?.pagination) {
-          setTotal(response.meta.pagination.total_items || 0);
+          setTotal(response.meta.pagination.totalItems || 0);
         } else if ((response as any).pagination) {
           setTotal((response as any).pagination.total || 0);
         } else {
@@ -199,7 +209,7 @@ export default function AdminActivityLogs({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <span className="text-white font-bold">{log.user_email || log.user || 'Utilisateur inconnu'}</span>
+                      <span className="text-white font-bold">{log.userEmail || log.user || 'Utilisateur inconnu'}</span>
                       {log.module && (
                         <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">
                           {log.module}
@@ -216,9 +226,9 @@ export default function AdminActivityLogs({
 
                     <div className="text-slate-300 mb-2">{log.action}</div>
 
-                    {log.error_message && (
+                    {log.errorMessage && (
                       <div className="text-sm text-red-400 bg-red-500/10 rounded px-3 py-2">
-                        {log.error_message}
+                        {log.errorMessage}
                       </div>
                     )}
 
@@ -236,7 +246,7 @@ export default function AdminActivityLogs({
 
                   <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
                     <Clock size={14} />
-                    <span>{log.created_at ? formatTimeAgo(log.created_at) : log.date}</span>
+                    <span>{log.createdAt ? formatTimeAgo(log.createdAt) : log.date}</span>
                   </div>
                 </div>
               </div>
