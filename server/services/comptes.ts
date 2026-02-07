@@ -11,6 +11,7 @@
  * - Transfert inter-agence historisé via compte_agences_historique
  */
 
+import { randomInt, randomBytes } from "crypto";
 import { db } from "../db";
 import {
   comptes,
@@ -246,7 +247,7 @@ function generateNumeroCompte(typeCompte: TypeCompte): string {
     [TypeCompteEnum.BLOCKED]: "CB",
   };
   const timestamp = Date.now().toString().slice(-8);
-  const random = Math.floor(Math.random() * 10000)
+  const random = randomInt(0, 10000)
     .toString()
     .padStart(4, "0");
   return `${prefixes[typeCompte]}-${timestamp}-${random}`;
@@ -314,7 +315,7 @@ export async function createCompte(
       const initialDepositTypePaiement = getTypePaiementForCompte(data.typeCompte, true);
 
       // Create mouvement
-      const reference = `EPG-INIT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const reference = `EPG-INIT-${Date.now()}-${randomBytes(4).toString('hex').slice(0, 6).toUpperCase()}`;
       const [mouvement] = await tx
         .insert(mouvementsFinanciers)
         .values({

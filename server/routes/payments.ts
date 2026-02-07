@@ -208,10 +208,7 @@ async function handleMtnWebhook(req: Request, res: Response) {
     result: "success",
   };
 
-  // DEBUG LOGS
-  console.log(">>> [DEBUG] MTN WEBHOOK RECEIVED");
-  console.log("HEADERS:", JSON.stringify(req.headers, null, 2));
-  console.log("BODY:", JSON.stringify(req.body, null, 2));
+  logger.debug({ provider: 'MTN' }, 'Webhook received');
 
   try {
     const signature = (req.headers["x-callback-signature"] as string) || "";
@@ -320,7 +317,7 @@ paymentsRouter.post("/collect", async (req, res) => {
     logger.error({ err: error }, 'Payments collection error');
     res.status(500).json({
       error: "Erreur lors de l'initiation de la collection",
-      message: error instanceof Error ? error.message : "Erreur inconnue",
+      message: "Erreur interne du serveur",
     });
   }
 });
@@ -353,7 +350,7 @@ paymentsRouter.post("/payout", async (req, res) => {
     logger.error({ err: error }, 'Payments payout error');
     res.status(500).json({
       error: "Erreur lors de l'initiation du payout",
-      message: error instanceof Error ? error.message : "Erreur inconnue",
+      message: "Erreur interne du serveur",
     });
   }
 });
@@ -511,7 +508,7 @@ paymentsRouter.post("/:id/cancel", async (req, res) => {
     logger.error({ err: error }, 'Payments cancel error');
     res.status(500).json({
       error: "Erreur lors de l'annulation du paiement",
-      message: error instanceof Error ? error.message : "Erreur inconnue",
+      message: "Erreur interne du serveur",
     });
   }
 });
@@ -730,7 +727,7 @@ paymentsRouter.post("/:id/manual-reconcile", async (req, res) => {
     logger.error({ err: error }, 'Payments manual reconcile error');
     res.status(500).json({
       error: "Erreur lors de la réconciliation manuelle",
-      message: error instanceof Error ? error.message : "Erreur inconnue",
+      message: "Erreur interne du serveur",
     });
   }
 });
@@ -810,7 +807,7 @@ paymentsRouter.get("/provider-balances", async (req, res) => {
     logger.error({ err: error }, 'Payments provider balance check error');
     res.status(500).json({
       error: "Erreur lors de la vérification des soldes",
-      message: error instanceof Error ? error.message : "Erreur inconnue",
+      message: "Erreur interne du serveur",
     });
   }
 });

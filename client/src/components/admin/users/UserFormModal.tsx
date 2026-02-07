@@ -308,32 +308,44 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
 
     // Ensure password meets all requirements
     const minLength = Math.max(passwordRequirements.minLength, 12);
-    let password = '';
+    const allChars = lowercase + uppercase + numbers + special;
+
+    // Use Web Crypto API for secure random character selection
+    const secureChar = (chars: string) => {
+      const array = new Uint32Array(1);
+      crypto.getRandomValues(array);
+      return chars.charAt(array[0] % chars.length);
+    };
 
     // Guarantee at least one of each required character type
+    const chars: string[] = [];
     if (passwordRequirements.requireLowercase) {
-      password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+      chars.push(secureChar(lowercase));
     }
     if (passwordRequirements.requireUppercase) {
-      password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+      chars.push(secureChar(uppercase));
     }
     if (passwordRequirements.requireNumbers) {
-      password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+      chars.push(secureChar(numbers));
     }
     if (passwordRequirements.requireSpecialChars) {
-      password += special.charAt(Math.floor(Math.random() * special.length));
+      chars.push(secureChar(special));
     }
 
     // Fill the rest with random characters from all pools
-    const allChars = lowercase + uppercase + numbers + special;
-    while (password.length < minLength) {
-      password += allChars.charAt(Math.floor(Math.random() * allChars.length));
+    while (chars.length < minLength) {
+      chars.push(secureChar(allChars));
     }
 
-    // Shuffle the password to randomize position of guaranteed characters
-    password = password.split('').sort(() => Math.random() - 0.5).join('');
+    // Cryptographically secure Fisher-Yates shuffle
+    for (let i = chars.length - 1; i > 0; i--) {
+      const array = new Uint32Array(1);
+      crypto.getRandomValues(array);
+      const j = array[0] % (i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
 
-    updateField('password', password);
+    updateField('password', chars.join(''));
     setShowPassword(true);
   };
 

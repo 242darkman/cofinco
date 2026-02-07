@@ -290,7 +290,8 @@ export async function initiateTransfer(request: TransferRequest): Promise<Transf
     request.currency
   );
 
-  const transactionId = `TRF${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  const { randomBytes } = require('crypto');
+  const transactionId = `TRF${Date.now().toString(36).toUpperCase()}${randomBytes(3).toString('hex').slice(0, 4).toUpperCase()}`;
 
   return {
     success: true,

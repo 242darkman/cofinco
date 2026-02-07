@@ -26,7 +26,9 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
 
     try {
       if (method === 'temporary_password') {
-        const tempPassword = 'Temp' + Math.random().toString(36).substring(2, 10) + '!';
+        const array = new Uint8Array(8);
+        crypto.getRandomValues(array);
+        const tempPassword = 'Temp' + Array.from(array, b => b.toString(36)).join('').slice(0, 8) + '!1A';
 
         const response = await fetch(`/api/users/${user.id}/reset-password`, {
           method: 'POST',

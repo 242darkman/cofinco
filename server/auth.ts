@@ -308,10 +308,11 @@ export async function setupAuth(app: Express) {
   sessionStoreType = process.env.REDIS_URL ? 'redis' : 'postgresql';
 
   // Configuration de session robuste
-  const sessionSecret = process.env.SESSION_SECRET || 'cofin-secret-key-change-in-production';
   if (!process.env.SESSION_SECRET && isProduction) {
-    logger.warn('[Session] SESSION_SECRET not set in production - using default (INSECURE!)');
+    logger.error('FATAL: SESSION_SECRET must be set in production. Refusing to start with default secret.');
+    process.exit(1);
   }
+  const sessionSecret = process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-prod';
 
   sessionMiddleware = session({
     store,

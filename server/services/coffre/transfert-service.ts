@@ -592,7 +592,8 @@ export class TransfertCoffreService {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     const time = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+    const { randomInt } = require('crypto');
+    const random = randomInt(0, 1000).toString().padStart(3, "0");
     
     const prefix = type === "COFFRE_VERS_CAISSE" ? "CVC" : "CVF";
     return `${prefix}-${year}${month}${day}-${time}${random}`;

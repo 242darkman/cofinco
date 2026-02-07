@@ -273,7 +273,9 @@ export default function CaissePaiementModal({
 
   const genererReference = useCallback(() => {
     const date = new Date();
-    return `PAY-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const array = new Uint8Array(4);
+    crypto.getRandomValues(array);
+    return `PAY-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Array.from(array, b => b.toString(16).padStart(2, '0')).join('').slice(0, 6).toUpperCase()}`;
   }, []);
 
   const validate = useCallback(() => {

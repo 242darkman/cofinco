@@ -994,7 +994,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     } else if (BUFFERABLE_TYPES.includes(type)) {
       // Buffer message if we're offline and it's a bufferable type
       const bufferedMsg: BufferedMessage = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `${Date.now()}-${Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(36)).join('').slice(0, 9)}`,
         type,
         payload,
         timestamp: Date.now(),

@@ -3,7 +3,7 @@
  * Preview rendered notification content before sending
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Eye,
   MessageSquare,
@@ -15,6 +15,7 @@ import {
   Check,
   AlertTriangle,
 } from 'lucide-react';
+import DOMPurify from 'isomorphic-dompurify';
 import { toast } from '../../../lib/toast';
 
 export interface NotificationTemplate {
@@ -174,7 +175,7 @@ export default function NotificationPreview({
           {template.channel === 'EMAIL' ? (
             <div
               className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: renderContent(template.content) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderContent(template.content)) }}
             />
           ) : (
             <pre className="whitespace-pre-wrap text-sm font-sans">

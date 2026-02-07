@@ -784,7 +784,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       tontineId: paiementData.tontineId || undefined,
       description: paiementData.notes || `Collecte ${paiementData.type_paiement}`,
       observations: paiementData.notes,
-      idempotencyKey: `agent-mm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      idempotencyKey: `agent-mm-${Date.now()}-${Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(36)).join('').slice(0, 9)}`,
     };
 
     try {

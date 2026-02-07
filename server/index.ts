@@ -18,6 +18,7 @@ import {
   hideServerInfo,
   additionalSecurityHeaders,
 } from "./middleware/security";
+import { csrfProtection } from "./middleware/csrf";
 import { startOutboxWorker } from "./services/outbox-worker";
 import { startNotificationWorker } from "./services/notifications/notification-worker";
 import { startReminderProcessor } from "./services/notifications/reminder-processor";
@@ -62,6 +63,9 @@ app.use(helmetConfig);
 
 // 3. Additional security headers (Permissions-Policy, Cache-Control for API)
 app.use(additionalSecurityHeaders);
+
+// 4. CSRF protection (Origin/Referer validation for state-changing requests)
+app.use(csrfProtection);
 
 // ========== COMPRESSION (Gzip/Brotli for slow connections) ==========
 // Reduces payload size by 60-80% - Critical for 3G/slow networks
@@ -302,10 +306,14 @@ app.get("/api/health", async (_req, res) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    // Never expose internal error details to clients in production
+    const isProduction = process.env.NODE_ENV === 'production';
+    const message = isProduction && status >= 500
+      ? "Erreur interne du serveur"
+      : (err.message || "Internal Server Error");
 
+    logger.error({ err, status }, 'Unhandled error');
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after

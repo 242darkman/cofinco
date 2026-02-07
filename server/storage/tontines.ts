@@ -528,8 +528,9 @@ export async function getProchainBeneficiaire(tontineId: string): Promise<any | 
     // Premier membre selon la position
     selected = eligibles[0];
   } else {
-    // Attribution aléatoire
-    const randomIndex = Math.floor(Math.random() * eligibles.length);
+    // Attribution aléatoire (crypto-secure pour fairness)
+    const { randomInt } = require('crypto');
+    const randomIndex = randomInt(0, eligibles.length);
     selected = eligibles[randomIndex];
   }
 
@@ -563,8 +564,9 @@ export async function tirerProchainBeneficiaire(tontineId: string): Promise<any 
 
   if (eligibles.length === 0) return null;
 
-  // Random selection
-  const randomIndex = Math.floor(Math.random() * eligibles.length);
+  // Random selection (crypto-secure pour fairness)
+  const { randomInt } = require('crypto');
+  const randomIndex = randomInt(0, eligibles.length);
   const selected = eligibles[randomIndex];
 
   // Get current tour number

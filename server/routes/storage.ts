@@ -59,9 +59,9 @@ router.get('/files/:key(*)', async (req, res) => {
     return res.status(400).json({ error: 'Invalid file key' });
   }
 
-  // Si c'est une URL externe, rediriger
+  // Reject external URLs — never redirect to user-supplied destinations (open redirect)
   if (key.startsWith('http://') || key.startsWith('https://')) {
-    return res.redirect(key);
+    return res.status(400).json({ error: 'External URLs are not allowed' });
   }
 
   // Déterminer si le fichier est dans le bucket privé ou public
@@ -196,7 +196,7 @@ router.get('/documents/:id/view', requireAuth, async (req, res) => {
     res.json({ url });
   } catch (error: any) {
     logger.error({ err: error }, 'Download URL error');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erreur lors de la récupération du document' });
   }
 });
 
@@ -218,7 +218,7 @@ router.delete('/:key(*)', requireAuth, async (req, res) => {
     res.json({ success: true, deleted });
   } catch (error: any) {
     logger.error({ err: error }, 'Delete error');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -262,6 +262,23 @@ router.post('/entity/upload', requireAuth, upload.single('file'), async (req, re
       return res.status(400).json({ error: `entityType invalide. Valeurs possibles: ${validEntityTypes.join(', ')}` });
     }
 
+    // Authorization check: verify user can upload for this entity
+    const user = (req as any).user as { id: string; role?: string };
+    const normalizedRole = normalizeRole(user?.role);
+    const isPrivileged = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+
+    // Non-privileged users can only upload for their own entity
+    if (!isPrivileged && entityType === 'user' && entityId !== user.id) {
+      return res.status(403).json({ error: 'Vous ne pouvez uploader que pour votre propre profil' });
+    }
+    if (!isPrivileged && entityType === 'client') {
+      // Verify user is linked to this client
+      const [clientRecord] = await db.select({ userId: clients.userId }).from(clients).where(eq(clients.id, entityId));
+      if (!clientRecord || clientRecord.userId !== user.id) {
+        return res.status(403).json({ error: 'Accès refusé à ce client' });
+      }
+    }
+
     // Upload avec organisation par entité
     const key = await StorageService.uploadForEntity(
       req.file,
@@ -284,7 +301,7 @@ router.post('/entity/upload', requireAuth, upload.single('file'), async (req, re
     });
   } catch (error: any) {
     logger.error({ err: error }, 'Entity upload error');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -331,7 +348,7 @@ router.post('/entity/presigned-url', requireAuth, async (req, res) => {
     });
   } catch (error: any) {
     logger.error({ err: error }, 'Entity presigned URL error');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -369,7 +386,7 @@ router.delete('/entity/:entityType/:entityId', requireAuth, async (req, res) => 
     });
   } catch (error: any) {
     logger.error({ err: error }, 'Entity files delete error');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -394,7 +411,7 @@ router.get('/entity/:entityType/:entityId/files', requireAuth, async (req, res) 
     res.json({ entityType, entityId, files });
   } catch (error: any) {
     logger.error({ err: error }, 'Entity files list error');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -424,7 +441,7 @@ router.get('/entity/:entityType/:entityId/count', requireAuth, async (req, res) 
     });
   } catch (error: any) {
     logger.error({ err: error }, 'Entity files count error');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

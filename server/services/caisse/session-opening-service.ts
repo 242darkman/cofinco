@@ -231,10 +231,8 @@ export class SessionOpeningService {
           .returning();
 
         // 7. Créer le transfert COFFRE_VERS_CAISSE
-        const reference = `OUV-${Date.now().toString().slice(-6)}-${Math.random()
-          .toString(36)
-          .slice(2, 5)
-          .toUpperCase()}`;
+        const { randomBytes } = require('crypto');
+        const reference = `OUV-${Date.now().toString().slice(-6)}-${randomBytes(3).toString('hex').slice(0, 3).toUpperCase()}`;
 
         const [transfert] = await tx
           .insert(transfertsCoffreCaisse)

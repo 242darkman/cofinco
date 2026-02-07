@@ -1536,7 +1536,7 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
       email: 'contact@cofin.com',
       sessionTimeout: 15,
       maxLoginAttempts: 3,
-      passwordMinLength: 10,
+      passwordMinLength: 12,
       backupFrequency: 'daily',
       autoBackupEnabled: true,
       notificationEmailEnabled: true,
@@ -1557,7 +1557,7 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
       await db.delete(securitySettings);
     }
     await db.insert(securitySettings).values({
-      passwordMinLength: 10,
+      passwordMinLength: 12,
       passwordRequireUppercase: true,
       passwordRequireLowercase: true,
       passwordRequireNumbers: true,
@@ -3407,11 +3407,11 @@ async function validateProdBootstrap(): Promise<ValidationResult[]> {
     passed: !!sysSettings,
   });
 
-  // 7. securitySettings with passwordMinLength >= 8
+  // 7. securitySettings with passwordMinLength >= 12
   const [secSettings] = await db.select().from(securitySettings);
   results.push({
-    invariant: 'securitySettings.passwordMinLength >= 8',
-    passed: !!secSettings && (secSettings.passwordMinLength ?? 0) >= 8,
+    invariant: 'securitySettings.passwordMinLength >= 12',
+    passed: !!secSettings && (secSettings.passwordMinLength ?? 0) >= 12,
     details: secSettings ? `minLength=${secSettings.passwordMinLength}` : 'NOT FOUND'
   });
 

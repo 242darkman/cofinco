@@ -3,12 +3,13 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth"; // Assuming auth is created
 
-// Helper to generate agency code
+// Helper to generate agency code (crypto-secure)
 function generateAgenceCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let code = "COF";
+  const crypto = require('crypto');
   for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(crypto.randomInt(0, chars.length));
   }
   return code;
 }
@@ -25,7 +26,7 @@ export const systemSettings = pgTable("system_settings", {
   email: text("email"),
   sessionTimeout: integer("session_timeout").default(30),
   maxLoginAttempts: integer("max_login_attempts").default(5),
-  passwordMinLength: integer("password_min_length").default(6),
+  passwordMinLength: integer("password_min_length").default(12),
   backupFrequency: text("backup_frequency").default("DAILY"),
   autoBackupEnabled: boolean("auto_backup_enabled").default(true),
   notificationEmailEnabled: boolean("notification_email_enabled").default(true),
@@ -74,7 +75,7 @@ export type FeatureFlag = typeof featureFlags.$inferSelect;
 // Security Settings table
 export const securitySettings = pgTable("security_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
-  passwordMinLength: integer("password_min_length").default(8),
+  passwordMinLength: integer("password_min_length").default(12),
   passwordRequireUppercase: boolean("password_require_uppercase").default(true),
   passwordRequireLowercase: boolean("password_require_lowercase").default(true),
   passwordRequireNumbers: boolean("password_require_numbers").default(true),

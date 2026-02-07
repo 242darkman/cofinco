@@ -145,8 +145,9 @@ export function registerOtpRoutes(app: Express) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // Generate 6-digit code
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate 6-digit code using cryptographically secure random
+      const crypto = await import('crypto');
+      const otpCode = crypto.randomInt(100000, 1000000).toString();
 
       // 5 minutes expiration
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -167,19 +168,22 @@ export function registerOtpRoutes(app: Express) {
       const parsed2 = insertOtpValidationSchema.parse(otpData);
       const otpRecord = await storage.createOtpValidation(parsed2);
 
-      // Simulate SMS sending (log to console)
-      logger.info({ otpCode, clientPhone, transactionReference }, 'SMS MOCK - Sending OTP');
+      // Simulate SMS sending (log only in non-production)
+      if (process.env.NODE_ENV !== 'production') {
+        logger.info({ clientPhone, transactionReference }, 'SMS MOCK - OTP sent (code hidden)');
+      }
 
       res.json({
         success: true,
         otp_id: otpRecord.id,
         expires_at: expiresAt.toISOString(),
-        otp_code_debug: otpCode // For testing/demo purposes
+        // Only expose debug code in development environments
+        ...(process.env.NODE_ENV !== 'production' ? { otp_code_debug: otpCode } : {}),
       });
 
     } catch (error: any) {
       logger.error({ err: error }, 'OTP Generation Error');
-      res.status(500).json({ error: "impossibleGenererOtp", details: error.message });
+      res.status(500).json({ error: "impossibleGenererOtp" });
     }
   });
 
@@ -219,8 +223,12 @@ export function registerOtpRoutes(app: Express) {
          return res.status(400).json({ error: "maxTentativesAtteint" });
       }
 
-      // Check code
-      if (otpRecord.otpCode !== otpCode) {
+      // Check code using timing-safe comparison to prevent timing attacks
+      const crypto = await import('crypto');
+      const storedBuf = Buffer.from(otpRecord.otpCode || '', 'utf-8');
+      const inputBuf = Buffer.from(otpCode || '', 'utf-8');
+      const isMatch = storedBuf.length === inputBuf.length && crypto.timingSafeEqual(storedBuf, inputBuf);
+      if (!isMatch) {
         const attemptsUsed = (otpRecord.attempts || 0) + 1;
         await storage.updateOtpAttempts(otpRecord.id, attemptsUsed);
         const attemptsLeft = otpRecord.maxAttempts - attemptsUsed;
@@ -244,7 +252,7 @@ export function registerOtpRoutes(app: Express) {
 
     } catch (error: any) {
       logger.error({ err: error }, 'OTP Validation Error');
-      res.status(500).json({ error: "erreurValidation", details: error.message });
+      res.status(500).json({ error: "erreurValidation" });
     }
   });
 }

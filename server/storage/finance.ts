@@ -6,6 +6,8 @@ import {
     dureesSuggerees, mouvementsFinanciers, evenementsOutbox, coffresForts, produitsCompte
   } from "@shared/schema";
 import { createLogger } from "../lib/logger";
+import { randomInt, randomBytes } from "crypto";
+import { D, roundMoney, splitEvenly } from "../lib/money";
 
 const logger = createLogger('Finance');
 
@@ -94,15 +96,19 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     let nombre_echeances_payees = 0;
 
     // Calcul basé sur le soldeRestant stocké (cohérent avec le frontend)
-    const principal = Number(credit.montant) || 0;
-    const taux = Number(credit.taux) || 0;
+    const dPrincipal = D(credit.montant);
+    const principal = dPrincipal.toNumber();
+    const dTaux = D(credit.taux);
     const totalEcheances = credit.duree || 1;
-    const totalWithInterest = principal * (1 + taux / 100);
-    const installmentAmount = totalWithInterest / totalEcheances;
+    const dTotalWithInterest = dPrincipal.times(D(1).plus(dTaux.div(100)));
+    const totalWithInterest = dTotalWithInterest.toNumber();
+    const dInstallmentAmount = dTotalWithInterest.div(totalEcheances);
+    const installmentAmount = dInstallmentAmount.toNumber();
 
     // Utiliser soldeRestant comme source de vérité (comme le frontend)
-    const soldeRestant = Number(credit.soldeRestant) || totalWithInterest;
-    const totalPaid = Math.max(0, totalWithInterest - soldeRestant);
+    const dSoldeRestant = D(credit.soldeRestant).isZero() && !credit.soldeRestant ? dTotalWithInterest : D(credit.soldeRestant);
+    const soldeRestant = dSoldeRestant.toNumber();
+    const totalPaid = Math.max(0, dTotalWithInterest.minus(dSoldeRestant).toNumber());
 
     // Nombre d'échéances complètement payées = montant total payé / montant échéance
     if (installmentAmount > 0) {
@@ -134,7 +140,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         }
 
         // Si crédit totalement remboursé, pas de retard
-        if (totalPaid >= totalWithInterest - 0.01 || nombre_echeances_payees >= totalEcheances) {
+        if (D(totalPaid).gte(dTotalWithInterest.minus(0.01)) || nombre_echeances_payees >= totalEcheances) {
           jours_retard = 0;
         } else {
           // La prochaine échéance due est celle après les échéances déjà payées
@@ -917,7 +923,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
       const prefix = typeCompteEnum === TypeCompte.CURRENT ? 'CC' : 'CE';
       const timestamp = Date.now().toString().slice(-6);
-      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const random = randomInt(0, 10000).toString().padStart(4, '0');
       const numeroCompte = `${prefix}-${timestamp}-${random}`;
 
       // 2. Create Account
@@ -1785,7 +1791,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
             const dateDebut = new Date(credit.dateDebut);
             // Simplified calculation: Monthly payment = Amount / Duration
-            const mensualite = Math.round(Number(credit.montant) / credit.duree); 
+            const mensualite = D(credit.montant).div(credit.duree).toDecimalPlaces(0).toNumber();
 
             // Find next payment date
             let nextDate = new Date(dateDebut);
@@ -2044,7 +2050,7 @@ export async function createOperationCaisseWithLedger(data: {
 
   // Generate reference
   const timestamp = Date.now().toString().slice(-8);
-  const reference = `OP-${timestamp}-${Math.floor(Math.random() * 1000)}`;
+  const reference = `OP-${timestamp}-${randomInt(0, 1000).toString().padStart(3, '0')}`;
 
   // Construire les métadonnées
   const metadata: Record<string, unknown> = {};
@@ -3266,7 +3272,7 @@ export async function createCashTransactionWithLedger(data: {
 
   // Générer la référence unique
   const timestamp = Date.now().toString().slice(-8);
-  const refRandom = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+  const refRandom = randomInt(0, 1000).toString().padStart(3, "0");
   const opReference = `OP-${timestamp}-${refRandom}`;
 
   // Exécution atomique via le ledger
@@ -3640,17 +3646,18 @@ export async function generateCreditSchedule(
 
   // 3. Calculate Schedule
   const startDate = new Date(credit.dateDebut || Date.now());
-  const amount = Number(credit.montant); 
-  const rate = Number(credit.taux) / 100;
+  const dAmount = D(credit.montant);
+  const dRate = D(credit.taux).div(100);
   const duration = credit.duree || 1;
   const frequency = credit.echeance as string;
 
-  // Simple Interest Calculation
-  const totalAmount = amount * (1 + rate);
-  const installmentAmount = totalAmount / duration;
-  const interestTotal = totalAmount - amount;
-  const interestPerInstallment = interestTotal / duration;
-  const capitalPerInstallment = amount / duration;
+  // Simple Interest Calculation (Decimal: exact division + remainder handling)
+  const dTotalAmount = dAmount.times(D(1).plus(dRate));
+  const dInterestTotal = dTotalAmount.minus(dAmount);
+
+  // Split evenly with remainder absorbed by last installment
+  const capitalParts = splitEvenly(dAmount, duration);
+  const interestParts = splitEvenly(dInterestTotal, duration);
 
   const schedule: InsertEcheanceCredit[] = [];
   let currentDate = new Date(startDate);
@@ -3668,13 +3675,16 @@ export async function generateCreditSchedule(
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
 
+    const dCapital = capitalParts[i - 1];
+    const dInterest = interestParts[i - 1];
+
     schedule.push({
       creditId: credit.id,
       numeroEcheance: i,
       dateEcheance: new Date(currentDate),
-      montantCapital: capitalPerInstallment.toFixed(2),
-      montantInteret: interestPerInstallment.toFixed(2),
-      montantTotal: installmentAmount.toFixed(2),
+      montantCapital: roundMoney(dCapital),
+      montantInteret: roundMoney(dInterest),
+      montantTotal: roundMoney(dCapital.plus(dInterest)),
       statut: 'UPCOMING',
       sequence: i
     });

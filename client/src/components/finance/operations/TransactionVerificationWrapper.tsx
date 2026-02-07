@@ -26,8 +26,10 @@ export const useTransactionVerification = () => {
     clientPhone: string,
     metadata?: any
   ): Promise<string> => {
-    // Générer un code de vérification à 6 chiffres
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Générer un code de vérification à 6 chiffres (crypto-secure)
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    const verificationCode = (100000 + (array[0] % 900000)).toString();
 
     try {
       // Créer le code de vérification SMS via API

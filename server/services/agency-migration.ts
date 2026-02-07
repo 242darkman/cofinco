@@ -108,8 +108,9 @@ export class AgencyMigrationService {
    * Génère une référence unique pour la migration
    */
   private generateReference(): string {
+    const { randomBytes } = require('crypto');
     const year = new Date().getFullYear();
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const random = randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
     return `MIG-${year}-${random}`;
   }
 

@@ -207,6 +207,7 @@ function generateUsername(nom: string, prenom?: string): string {
     : nom.toLowerCase().replace(/[^a-z0-9]/g, "");
 
   // Add random suffix to ensure uniqueness
-  const suffix = Math.floor(Math.random() * 9000 + 1000);
+  const { randomInt } = require('crypto');
+  const suffix = randomInt(1000, 10000);
   return `${base}${suffix}`;
 }

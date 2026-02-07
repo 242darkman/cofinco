@@ -59,7 +59,7 @@ export function registerSettingsRoutes(app: Express) {
           email: '',
           session_timeout: 30,
           max_login_attempts: 5,
-          password_min_length: 6,
+          password_min_length: 12,
           backup_frequency: 'daily',
           auto_backup_enabled: true,
           notification_email_enabled: true,
@@ -122,7 +122,7 @@ export function registerSettingsRoutes(app: Express) {
       res.json({ success: true, message: 'Settings updated successfully' });
     } catch (error: any) {
       logger.error({ err: error }, 'Error updating system settings');
-      res.status(500).json({ error: error.message || "Failed to update system settings" });
+      res.status(500).json({ error: "Failed to update system settings" });
     }
   });
 
@@ -132,7 +132,7 @@ export function registerSettingsRoutes(app: Express) {
       const result = await db.query.securitySettings.findFirst();
       if (!result) {
         const defaults = {
-          passwordMinLength: 8,
+          passwordMinLength: 12,
           passwordRequireUppercase: true,
           passwordRequireLowercase: true,
           passwordRequireNumbers: true,

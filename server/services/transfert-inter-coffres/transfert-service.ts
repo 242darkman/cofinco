@@ -46,9 +46,10 @@ export class TransfertInterCoffresService {
    * Génère un numéro de référence unique pour un transfert
    */
   private generateTransfertReference(): string {
+    const { randomBytes } = require('crypto');
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "");
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const random = randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
     return `TIC-${dateStr}-${random}`;
   }
 
@@ -56,13 +57,14 @@ export class TransfertInterCoffresService {
    * Génère un numéro de document unique
    */
   private generateDocumentNumber(type: "BON_TRANSFERT" | "BON_SORTIE" | "BON_ENTREE"): string {
+    const { randomBytes } = require('crypto');
     const prefixes = {
       BON_TRANSFERT: "BT",
       BON_SORTIE: "BS",
       BON_ENTREE: "BE",
     };
     const year = new Date().getFullYear();
-    const random = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const random = randomBytes(3).toString('hex').slice(0, 5).toUpperCase();
     return `${prefixes[type]}-${year}-${random}`;
   }
 

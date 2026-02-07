@@ -715,7 +715,8 @@ export function registerAccountingRoutes(app: Express) {
       }
 
       // Generate unique source ID for manual entries
-      const manualSourceId = `manual-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const { randomBytes } = require('crypto');
+      const manualSourceId = `manual-${Date.now()}-${randomBytes(5).toString('hex').slice(0, 9)}`;
 
       const result = await accountingPostingService.postEntry({
         agenceId,

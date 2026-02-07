@@ -233,7 +233,7 @@ export function setupWebSocket(server: Server) {
            return;
       }
 
-      const sessionSecret = process.env.SESSION_SECRET || 'cofin-secret-key-change-in-production';
+      const sessionSecret = process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-prod';
       const sessionId = unsign(signedSessionId.slice(2), sessionSecret);
 
       if (!sessionId) {

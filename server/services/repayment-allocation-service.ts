@@ -28,6 +28,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 import { StatutEcheanceCredit } from "@shared/enum/status-constants";
 import { createLogger } from "../lib/logger";
 import { getWsInstance } from "../ws-server";
+import { D, roundMoney } from "../lib/money";
 
 const logger = createLogger('RepaymentAllocation');
 
@@ -159,27 +160,30 @@ export async function allocateRepaymentToSchedule(
   for (const echeance of echeances) {
     if (remainingAmount <= 0) break;
 
-    const montantPaye = Number(echeance.montantPaye || 0);
-    const montantTotal = Number(echeance.montantTotal);
-    const montantCapital = Number(echeance.montantCapital);
-    const montantInteret = Number(echeance.montantInteret);
-    
+    const dMontantPaye = D(echeance.montantPaye);
+    const dMontantTotal = D(echeance.montantTotal);
+    const dMontantCapital = D(echeance.montantCapital);
+
     // Montant restant à payer sur cette échéance
-    const montantDu = montantTotal - montantPaye;
-    
-    if (montantDu <= 0) continue; // Échéance déjà payée
+    const dMontantDu = dMontantTotal.minus(dMontantPaye);
+
+    if (dMontantDu.lte(0)) continue; // Échéance déjà payée
 
     // Montant à allouer (minimum entre restant et dû)
-    const montantAAllouer = Math.min(remainingAmount, montantDu);
-    
-    // Répartition proportionnelle capital/intérêt
-    const ratioCapital = montantCapital / montantTotal;
-    const allocatedCapital = Math.round(montantAAllouer * ratioCapital * 100) / 100;
-    const allocatedInterest = montantAAllouer - allocatedCapital;
+    const montantAAllouer = Math.min(remainingAmount, dMontantDu.toNumber());
+    const dMontantAAllouer = D(montantAAllouer);
+
+    // Répartition proportionnelle capital/intérêt (Decimal élimine le drift)
+    const ratioCapital = dMontantCapital.div(dMontantTotal);
+    const dAllocatedCapital = dMontantAAllouer.times(ratioCapital).toDecimalPlaces(2);
+    const allocatedCapital = dAllocatedCapital.toNumber();
+    // Le reste va aux intérêts — élimine les erreurs d'arrondi
+    const allocatedInterest = dMontantAAllouer.minus(dAllocatedCapital).toNumber();
 
     // Mettre à jour l'échéance
-    const nouveauMontantPaye = montantPaye + montantAAllouer;
-    const isPaid = nouveauMontantPaye >= montantTotal;
+    const dNouveauMontantPaye = dMontantPaye.plus(dMontantAAllouer);
+    const nouveauMontantPaye = dNouveauMontantPaye.toNumber();
+    const isPaid = dNouveauMontantPaye.gte(dMontantTotal);
     
     // Calculer le nouveau statut
     let nouveauStatut: string;

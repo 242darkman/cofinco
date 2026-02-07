@@ -4,6 +4,7 @@ import { comptes, produitsCompte, mouvementsFinanciers, evenementsOutbox, transa
 import { eq, and, gt, sql } from "drizzle-orm";
 import { executeWithLedger, updateCompteSolde } from "./ledger";
 import { createLogger } from "../lib/logger";
+import { D, Decimal, roundRate, roundMoney } from "../lib/money";
 
 const logger = createLogger('InterestScheduler');
 import { StatutCompte } from "@shared/enum/status-constants";
@@ -59,27 +60,27 @@ export class InterestSchedulerService {
         // Priorité: Taux du produit, sinon 0 (pas d'intérêt par défaut)
         // Le schema produitsCompte a 'tauxInteret'
         const tauxStr = produit?.tauxInteret;
-        
+
         if (!tauxStr) continue;
-        
-        const taux = parseFloat(tauxStr);
-        if (isNaN(taux) || taux <= 0) continue;
 
-        const solde = parseFloat(compte.soldeCourant || "0");
-        
+        const taux = D(tauxStr);
+        if (taux.isNaN() || taux.lte(0)) continue;
+
+        const solde = D(compte.soldeCourant);
+
         // Calcul Intérêt Journalier: (Solde * Taux/100) / 365
-        const dailyInterest = (solde * (taux / 100)) / 365;
+        const dailyInterest = solde.times(taux.div(100)).div(365);
 
-        if (dailyInterest > 0) {
+        if (dailyInterest.gt(0)) {
             // Mise à jour de accrued_interest
             // On fait un update incrémental pour éviter les race conditions majeures
             await db
                 .update(comptes)
                 .set({
-                    accruedInterest: sql`${comptes.accruedInterest} + ${dailyInterest.toFixed(4)}`
+                    accruedInterest: sql`${comptes.accruedInterest} + ${roundRate(dailyInterest)}`
                 })
                 .where(eq(comptes.id, compte.id));
-            
+
             processed++;
         }
       }
@@ -106,10 +107,11 @@ export class InterestSchedulerService {
       let processed = 0;
 
       for (const compte of accountsToCapitalize) {
-        const montantInteret = parseFloat(compte.accruedInterest || "0");
-        
-        // Arrondir à 2 décimales (inférieur ou normal ?) - Disons normal pour le paiement
-        const montantAcrediter = Math.floor(montantInteret * 100) / 100;
+        const montantInteretD = D(compte.accruedInterest);
+
+        // Arrondir à l'entier inférieur (FCFA n'a pas de centimes)
+        const montantAcrediterD = montantInteretD.toDecimalPlaces(2, Decimal.ROUND_DOWN);
+        const montantAcrediter = montantAcrediterD.toNumber();
 
         if (montantAcrediter <= 0) continue;
 
@@ -158,7 +160,7 @@ export class InterestSchedulerService {
             );
 
             // Domain event: interest capitalized
-            const nouveauSolde = (parseFloat(compte.soldeCourant || "0") + montantAcrediter).toFixed(2);
+            const nouveauSolde = roundMoney(D(compte.soldeCourant).plus(montantAcrediterD));
             dispatchDomainEvent({
               type: "INTEREST_CAPITALIZED",
               data: {

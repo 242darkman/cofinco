@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createLogger } from "../lib/logger";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
+import { D, roundFCFA } from "../lib/money";
 
 const logger = createLogger('Routes:Config');
 import {
@@ -189,16 +190,17 @@ export function registerConfigRoutes(app: Express) {
       let montantTotal = null;
 
       if (montant && taux) {
-        const montantNum = Number(montant);
-        const tauxNum = Number(taux);
-        montantTotal = montantNum * (1 + tauxNum / 100);
-        montantEcheance = nombreEcheances > 0 ? montantTotal / nombreEcheances : 0;
+        const dMontant = D(montant);
+        const dTaux = D(taux);
+        const dTotal = dMontant.times(D(1).plus(dTaux.div(100)));
+        montantTotal = Number(roundFCFA(dTotal));
+        montantEcheance = nombreEcheances > 0 ? Number(roundFCFA(dTotal.div(nombreEcheances))) : 0;
       }
 
       res.json({
         nombreEcheances,
-        montantEcheance: montantEcheance ? Math.round(montantEcheance) : null,
-        montantTotal: montantTotal ? Math.round(montantTotal) : null
+        montantEcheance: montantEcheance || null,
+        montantTotal: montantTotal || null
       });
     } catch (error) {
       logger.error({ err: error }, 'Error calculating echeances');

@@ -108,8 +108,8 @@ async function validateSeed(): Promise<ValidationResult[]> {
   // 6. securitySettings exists with valid passwordMinLength
   const [secSettings] = await db.select().from(securitySettings);
   results.push({
-    invariant: 'securitySettings exists with passwordMinLength >= 8',
-    passed: !!secSettings && secSettings.passwordMinLength >= 8,
+    invariant: 'securitySettings exists with passwordMinLength >= 12',
+    passed: !!secSettings && (secSettings.passwordMinLength ?? 0) >= 12,
     details: secSettings ? `passwordMinLength=${secSettings.passwordMinLength}` : 'NOT FOUND',
     severity: 'critical'
   });

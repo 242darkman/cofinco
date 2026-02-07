@@ -159,6 +159,8 @@ export async function cancelOTP(otpId: string) {
 export function generateTransactionReference(prefix: string = 'TXN'): string {
   const date = new Date();
   const timestamp = date.getTime();
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  const random = (array[0] % 10000).toString().padStart(4, '0');
   return `${prefix}-${timestamp}-${random}`;
 }

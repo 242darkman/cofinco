@@ -235,7 +235,7 @@ export interface PasswordRequirements {
 }
 
 export const DEFAULT_PASSWORD_REQUIREMENTS: PasswordRequirements = {
-  minLength: 8,
+  minLength: 12,
   requireUppercase: true,
   requireLowercase: true,
   requireNumbers: true,

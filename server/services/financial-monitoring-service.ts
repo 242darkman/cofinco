@@ -99,7 +99,8 @@ export const DEFAULT_CONFIG: MonitoringConfig = {
 const activeAlerts: Map<string, MonitoringAlert> = new Map();
 
 function generateAlertId(): string {
-  return `ALT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const { randomBytes } = require('crypto');
+  return `ALT-${Date.now()}-${randomBytes(4).toString('hex').slice(0, 6).toUpperCase()}`;
 }
 
 export function createAlert(

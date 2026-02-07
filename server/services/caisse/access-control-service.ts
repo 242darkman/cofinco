@@ -127,10 +127,11 @@ function getNextOpeningInfo(operatingDays: number[], operatingHoursStart: string
 }
 
 function generateSecurityCode(): string {
+  const crypto = require('crypto') as typeof import('crypto');
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding I, O, 0, 1 for clarity
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(crypto.randomInt(chars.length));
   }
   return code;
 }

@@ -72,6 +72,7 @@ import { countSuggestionService } from "../services/caisse/count-suggestion-serv
 import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_OPERATIONS } from "@shared/config/caisse-operations";
 import { paymentService } from "../services/mobile-money/payment-service";
 import { MethodePaiement } from "@shared/enum/status-constants";
+import { D, roundMoney, splitEvenly } from "../lib/money";
 
 export function registerFinanceRoutes(app: Express) {
   // Credit Plans Routes
@@ -301,7 +302,7 @@ export function registerFinanceRoutes(app: Express) {
         dateDebut: new Date(dateDecaissement),
         dateFin: data.dateFin ? new Date(data.dateFin) : null,
         dateSolvabilite: data.dateSolvabilite ? new Date(data.dateSolvabilite) : null,
-        soldeRestant: data.soldeRestant || (montantDecaissement * (1 + parseFloat(demande.tauxInteret.toString()) / 100)).toString(),
+        soldeRestant: data.soldeRestant || roundMoney(D(montantDecaissement).times(D(1).plus(D(demande.tauxInteret).div(100)))),
         agenceId: compteCourant.agenceId,
         // Nouveaux champs multi-canal
         disbursementChannel: disbursementChannel as any,
@@ -964,26 +965,24 @@ export function registerFinanceRoutes(app: Express) {
 
       // Génération de l'échéancier
       const startDate = new Date(credit.dateDebut || Date.now());
-      const amount = Number(credit.montant); // Principal
-      const rate = Number(credit.taux) / 100; // Taux en % (ex: 10 => 0.10)
+      const dAmount = D(credit.montant); // Principal
+      const dRate = D(credit.taux).div(100); // Taux en % (ex: 10 => 0.10)
       const duration = credit.duree; // Nombre d'échéances
-      
-      // Calcul montant total avec intérêts (Intérêt simple pour l'instant, à adapter selon règles métier)
+
+      // Calcul montant total avec intérêts (Intérêt simple)
       // Formule simple: Total = Principal * (1 + Taux)
-      // Mensualité = Total / Durée
-      const totalAmount = amount * (1 + rate);
-      const installmentAmount = totalAmount / duration;
-      const interestTotal = totalAmount - amount;
-      const interestPerInstallment = interestTotal / duration;
-      const capitalPerInstallment = amount / duration;
+      const dTotalAmount = dAmount.times(D(1).plus(dRate));
+      const dInterestTotal = dTotalAmount.minus(dAmount);
+
+      // Split evenly with remainder absorbed by last installment
+      const capitalParts = splitEvenly(dAmount, duration);
+      const interestParts = splitEvenly(dInterestTotal, duration);
 
       const schedule: any[] = [];
       let currentDate = new Date(startDate);
 
       for (let i = 1; i <= duration; i++) {
         // Avancer la date selon la fréquence
-        // Par défaut on suppose MENSUEL si non précisé ou standard
-        // (Simplification: utiliser date-fns ou logique simple)
         if (credit.echeance === FrequenceRemboursement.WEEKLY) {
           currentDate.setDate(currentDate.getDate() + 7);
         } else if (credit.echeance === FrequenceRemboursement.BI_MONTHLY) {
@@ -995,15 +994,18 @@ export function registerFinanceRoutes(app: Express) {
           currentDate.setMonth(currentDate.getMonth() + 1);
         }
 
+        const dCapital = capitalParts[i - 1];
+        const dInterest = interestParts[i - 1];
+
         schedule.push({
           creditId,
           numeroEcheance: i,
           dateEcheance: new Date(currentDate),
-          montantCapital: capitalPerInstallment.toFixed(2),
-          montantInteret: interestPerInstallment.toFixed(2),
-          montantTotal: installmentAmount.toFixed(2),
+          montantCapital: roundMoney(dCapital),
+          montantInteret: roundMoney(dInterest),
+          montantTotal: roundMoney(dCapital.plus(dInterest)),
           montantPaye: "0",
-          statut: "UPCOMING", // Using string literal matching enum
+          statut: "UPCOMING",
         });
       }
 
@@ -1097,7 +1099,8 @@ export function registerFinanceRoutes(app: Express) {
       if (!data.numeroDemande) {
           // Format: DEM-YYYYMMDD-XXXX
           const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
-          const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+          const { randomInt } = await import('crypto');
+          const randomSuffix = randomInt(1000, 10000).toString();
           data.numeroDemande = `DEM-${dateStr}-${randomSuffix}`;
       }
 

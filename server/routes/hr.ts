@@ -986,7 +986,8 @@ hrRouter.post("/formations/:id/certificates", getAuthUser, attachAbility, requir
 
         // Generate unique certificate number: CERT-YYYY-NNNNNN
         const year = new Date().getFullYear();
-        const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const { randomBytes } = require('crypto');
+        const random = randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
         const numeroCertificat = `CERT-${year}-${random}`;
 
         const [cert] = await db.insert(formationCertificates).values({
@@ -1049,7 +1050,7 @@ hrRouter.post("/formations/:id/certificates/batch", getAuthUser, attachAbility, 
                 formationId,
                 employeId: p.employeId,
                 employeNom: p.employeNom,
-                numeroCertificat: `CERT-${year}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+                numeroCertificat: `CERT-${year}-${require('crypto').randomBytes(4).toString('hex').slice(0, 6).toUpperCase()}`,
                 titre: formation.titre,
                 competences: competences || null,
                 dateExpiration: dateExpiration || null,

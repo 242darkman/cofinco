@@ -212,7 +212,8 @@ export function createRequestLogger(req: any): PinoLogger {
  * Generate a simple request ID
  */
 function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const { randomBytes } = require('crypto');
+  return `req_${Date.now().toString(36)}_${randomBytes(4).toString('hex').slice(0, 6)}`;
 }
 
 /**

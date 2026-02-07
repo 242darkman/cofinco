@@ -205,7 +205,9 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
       confirmLabel: 'Réinitialiser',
       variant: 'info',
       onConfirm: async () => {
-        const tempPassword = `Temp${Math.random().toString(36).slice(2, 8)}!1`;
+        const array = new Uint8Array(6);
+        crypto.getRandomValues(array);
+        const tempPassword = `Temp${Array.from(array, b => b.toString(36)).join('').slice(0, 6)}!1A`;
         const res = await fetch(`/api/users/${employee.userId}/reset-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

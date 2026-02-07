@@ -103,7 +103,7 @@ export function registerReevaluationRoutes(app: Express) {
    * GET /api/demandes/:demandeId/reevaluation-eligibility
    * Quick eligibility check for UI
    */
-  app.get("/api/demandes/:demandeId/reevaluation-eligibility", async (req: Request, res: Response) => {
+  app.get("/api/demandes/:demandeId/reevaluation-eligibility", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { demandeId } = req.params;
 
@@ -127,7 +127,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error checking eligibility');
       res.status(500).json({
         success: false,
-        error: { code: "SERVER_ERROR", message: error.message }
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -196,7 +196,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error creating reevaluation');
       res.status(500).json({ 
         success: false, 
-        error: { code: "SERVER_ERROR", message: error.message } 
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -205,7 +205,7 @@ export function registerReevaluationRoutes(app: Express) {
    * GET /api/demandes/:demandeId/reevaluations
    * List all reevaluations for a demande
    */
-  app.get("/api/demandes/:demandeId/reevaluations", async (req: Request, res: Response) => {
+  app.get("/api/demandes/:demandeId/reevaluations", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { demandeId } = req.params;
       
@@ -219,7 +219,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error fetching reevaluations');
       res.status(500).json({ 
         success: false, 
-        error: { code: "SERVER_ERROR", message: error.message } 
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -228,7 +228,7 @@ export function registerReevaluationRoutes(app: Express) {
    * GET /api/demandes/:demandeId/timeline
    * Get complete timeline for a demande including all reevaluations
    */
-  app.get("/api/demandes/:demandeId/timeline", async (req: Request, res: Response) => {
+  app.get("/api/demandes/:demandeId/timeline", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { demandeId } = req.params;
       
@@ -368,7 +368,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error fetching timeline');
       res.status(500).json({ 
         success: false, 
-        error: { code: "SERVER_ERROR", message: error.message } 
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -409,7 +409,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error fetching reevaluation');
       res.status(500).json({ 
         success: false, 
-        error: { code: "SERVER_ERROR", message: error.message } 
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -453,7 +453,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error validating eligibility');
       res.status(400).json({ 
         success: false, 
-        error: { code: "VALIDATION_FAILED", message: error.message } 
+        error: { code: "VALIDATION_FAILED", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -502,7 +502,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error starting enquete');
       res.status(400).json({ 
         success: false, 
-        error: { code: "ENQUETE_FAILED", message: error.message } 
+        error: { code: "ENQUETE_FAILED", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -571,7 +571,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error submitting to committee');
       res.status(400).json({ 
         success: false, 
-        error: { code: "SUBMISSION_FAILED", message: error.message } 
+        error: { code: "SUBMISSION_FAILED", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -640,7 +640,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error recording decision');
       res.status(400).json({ 
         success: false, 
-        error: { code: "DECISION_FAILED", message: error.message } 
+        error: { code: "DECISION_FAILED", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -683,7 +683,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error cancelling reevaluation');
       res.status(400).json({ 
         success: false, 
-        error: { code: "CANCELLATION_FAILED", message: error.message } 
+        error: { code: "CANCELLATION_FAILED", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -706,7 +706,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error fetching audit logs');
       res.status(500).json({ 
         success: false, 
-        error: { code: "SERVER_ERROR", message: error.message } 
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
       });
     }
   });
@@ -772,7 +772,7 @@ export function registerReevaluationRoutes(app: Express) {
       logger.error({ err: error }, 'Error listing reevaluations');
       res.status(500).json({
         success: false,
-        error: { code: "SERVER_ERROR", message: error.message }
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });

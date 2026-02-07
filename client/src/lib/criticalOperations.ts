@@ -214,7 +214,9 @@ export function shouldBlockOffline(endpoint: string, method: string): boolean {
  */
 export function generateIdempotencyKey(prefix?: string): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 10);
+  const array = new Uint8Array(8);
+  crypto.getRandomValues(array);
+  const random = Array.from(array, b => b.toString(36)).join('').slice(0, 8);
   const key = `${timestamp}-${random}`;
 
   return prefix ? `${prefix}_${key}` : key;

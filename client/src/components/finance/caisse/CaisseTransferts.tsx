@@ -135,7 +135,9 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
   // Génération de référence
   const genererReference = useCallback(() => {
     const date = new Date();
-    return `TRF${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    const array = new Uint8Array(2);
+    crypto.getRandomValues(array);
+    return `TRF${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Array.from(array, b => b.toString(16).padStart(2, '0')).join('').slice(0, 3).toUpperCase()}`;
   }, []);
 
   // Soumission du formulaire

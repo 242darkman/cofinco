@@ -21,6 +21,7 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { MethodePaiement } from "@shared/enum/status-constants";
 import { createLogger } from "../lib/logger";
+import { D, roundMoney } from "../lib/money";
 
 const logger = createLogger('CreditAllocation');
 
@@ -104,12 +105,12 @@ function calculateAccruedInterest(credit: CreditInfo): { interets: number; jours
   }
 
   const joursRetard = Math.floor((now.getTime() - echeance.getTime()) / (1000 * 60 * 60 * 24));
-  const solde = parseFloat(credit.soldeRestant || "0");
-  const tauxAnnuel = parseFloat(credit.taux || "0") / 100;
+  const solde = D(credit.soldeRestant);
+  const tauxAnnuel = D(credit.taux).div(100);
 
-  // Intérêts journaliers
-  const interetsJournaliers = (solde * tauxAnnuel) / 365;
-  const interets = Math.round(interetsJournaliers * joursRetard * 100) / 100;
+  // Intérêts journaliers (Decimal: pas de drift sur la multiplication)
+  const interetsJournaliers = solde.times(tauxAnnuel).div(365);
+  const interets = interetsJournaliers.times(joursRetard).toDecimalPlaces(2).toNumber();
 
   return { interets, joursRetard };
 }
@@ -203,9 +204,9 @@ export async function allocateCreditRepayment(
   principalPaid = remaining;
   remaining = 0;
 
-  // 6. Calculer le nouveau solde
-  const soldeActuel = parseFloat(soldeAvant);
-  const nouveauSolde = Math.max(0, soldeActuel - principalPaid);
+  // 6. Calculer le nouveau solde (Decimal pour la soustraction)
+  const dSoldeActuel = D(soldeAvant);
+  const nouveauSolde = Math.max(0, dSoldeActuel.minus(principalPaid).toNumber());
 
   // 7. Mettre à jour le solde du crédit
   await updateCreditSoldeRestant(tx, creditId, nouveauSolde);
@@ -286,22 +287,22 @@ export async function getCreditAllocationHistory(creditId: string): Promise<{
     .where(eq(loanPaymentAllocations.creditId, creditId))
     .orderBy(desc(loanPaymentAllocations.createdAt));
 
-  // Calculer les totaux
-  let totalPenalites = 0;
-  let totalInterets = 0;
-  let totalPrincipal = 0;
+  // Calculer les totaux (Decimal pour l'accumulation — élimine le drift additif)
+  let dTotalPenalites = D(0);
+  let dTotalInterets = D(0);
+  let dTotalPrincipal = D(0);
 
   for (const alloc of allocations) {
-    totalPenalites += parseFloat(alloc.montantPenalites || "0");
-    totalInterets += parseFloat(alloc.montantInterets || "0");
-    totalPrincipal += parseFloat(alloc.montantPrincipal || "0");
+    dTotalPenalites = dTotalPenalites.plus(D(alloc.montantPenalites));
+    dTotalInterets = dTotalInterets.plus(D(alloc.montantInterets));
+    dTotalPrincipal = dTotalPrincipal.plus(D(alloc.montantPrincipal));
   }
 
   return {
     allocations,
-    totalPenalites,
-    totalInterets,
-    totalPrincipal,
+    totalPenalites: dTotalPenalites.toNumber(),
+    totalInterets: dTotalInterets.toNumber(),
+    totalPrincipal: dTotalPrincipal.toNumber(),
   };
 }
 
@@ -359,8 +360,8 @@ export async function previewCreditAllocation(
   // Le reste au principal
   principal = remaining;
 
-  // Calculer nouveau solde
-  const soldeApres = Math.max(0, parseFloat(soldeActuel) - principal);
+  // Calculer nouveau solde (Decimal pour la soustraction)
+  const soldeApres = Math.max(0, D(soldeActuel).minus(principal).toNumber());
 
   return {
     penalites,

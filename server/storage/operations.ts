@@ -988,7 +988,7 @@ export async function createPaiementTerrainWithLedger(data: {
   const pending = await createPendingPaiementTerrain({
     ...data,
     methodePaiement: "CASH",
-    reference: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    reference: `PAY-${Date.now()}-${require('crypto').randomInt(0, 1000).toString().padStart(3, '0')}`
   } as any, userId);
 
   // 2. Validate immediately

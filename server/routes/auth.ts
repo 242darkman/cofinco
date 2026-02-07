@@ -286,6 +286,19 @@ export function registerAuthRoutes(app: Express) {
         'getEffectiveRole'
       );
 
+      // Step 6: Regenerate session to prevent session fixation attacks
+      logger.debug({ username, step: 'regenerate_session' }, '[Login] Regenerating session');
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) {
+            logger.error({ err }, 'Session regeneration failed during login');
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
       req.session.userId = user.id;
       req.session.user = {
           id: user.id,
@@ -300,7 +313,7 @@ export function registerAuthRoutes(app: Express) {
           mustChangePassword: user.mustChangePassword || false
       };
 
-      // Step 6: Save session with timeout
+      // Save session with timeout
       logger.debug({ username, step: 'save_session' }, '[Login] Saving session');
       try {
         await withTimeout(
@@ -332,9 +345,9 @@ export function registerAuthRoutes(app: Express) {
         }, 'Session limit enforced - old sessions terminated');
       }
 
-      // Create session tracking record with session expiry (24h from now)
+      // Create session tracking record aligned with absolute session timeout (12h workday)
       // Include device fingerprint for stolen cookie detection
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + SESSION_CONFIG.ABSOLUTE_TIMEOUT_MS);
       await createSessionRecord(
         req.sessionID,
         user.id,
@@ -584,8 +597,8 @@ export function registerAuthRoutes(app: Express) {
           mustChangePassword: user.mustChangePassword || false,
         };
 
-        // Create session tracking record
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        // Create session tracking record aligned with absolute session timeout
+        const expiresAt = new Date(Date.now() + SESSION_CONFIG.ABSOLUTE_TIMEOUT_MS);
         const { deviceFingerprint, deviceFingerprintPartial } = req.body || {};
         await createSessionRecord(
           req.sessionID,
