@@ -1077,6 +1077,7 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   lastActivity: timestamp("last_activity").defaultNow(), // Heartbeat - dernière activité
   timeoutAt: timestamp("timeout_at"), // Date d'expiration prévue
   forcedCloseReason: text("forced_close_reason"),
+  closedReason: text("closed_reason").default("manual"), // manual | timeout | admin
 
   // Force close fields (admin override)
   forceClosedBy: uuid("force_closed_by").references(() => users.id, { onDelete: "set null" }),

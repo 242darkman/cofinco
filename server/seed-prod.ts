@@ -61,11 +61,16 @@ import {
   mouvementsFinanciers,
   comptes,
   clients,
+  permissionConditionTemplates,
+  systemFeatureFlags,
+  criticalPermissionPatterns,
 } from '@shared/schema';
 import { departments, jobPositions, employes, payrollConfig } from '@shared/schema';
 import { accountingRules } from '@shared/schema/accounting';
 import { caissesAgent } from '@shared/schema/caisse-agent';
 import { agentsTerrain } from '@shared/schema/operations';
+import { tontineRulesets } from '@shared/schema/tontines';
+import { configEcartCaisse } from '@shared/schema/caisse-closing';
 import { hashPassword } from './auth';
 import { SystemRole } from '@shared/types/roles';
 import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse } from '@shared/enum/status-constants';
@@ -335,6 +340,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '706200', label: 'Intérêts sur découverts', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '7071', label: 'Intérêts sur prêts', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '7073', label: 'Pénalités de retard', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '7078', label: 'Produits pénalités tontines', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708', label: 'Produits accessoires', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708100', label: 'Frais de dossier crédit', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708200', label: 'Frais de tenue de compte', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
@@ -1604,6 +1610,122 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
   }
   results.push({ table: 'featureFlags', action: 'created', count: flagsData.length });
 
+  // System Feature Flags - RBAC related
+  const systemFlagsData = [
+    { flagKey: 'RBAC_SCOPED_OVERRIDES', flagValue: false, description: 'Activer le scope agence pour les overrides utilisateur (off = tout est GLOBAL)', isSystem: true },
+    { flagKey: 'RBAC_REQUIRE_REASON_CRITICAL', flagValue: true, description: 'Exiger une raison pour les permissions critiques', isSystem: true },
+    { flagKey: 'RBAC_AUDIT_LOG_ENABLED', flagValue: true, description: 'Activer l\'audit log RBAC', isSystem: true },
+    { flagKey: 'RBAC_SOFT_REVALIDATE', flagValue: false, description: 'Activer la revalidation soft côté client (focus, reconnect)', isSystem: true },
+  ];
+
+  let systemFlagsCreated = 0;
+  for (const flag of systemFlagsData) {
+    const [existing] = await db.select().from(systemFeatureFlags).where(eq(systemFeatureFlags.flagKey, flag.flagKey));
+    if (!existing) {
+      await db.insert(systemFeatureFlags).values(flag);
+      systemFlagsCreated++;
+    }
+  }
+  results.push({ table: 'systemFeatureFlags', action: 'created', count: systemFlagsCreated, details: `${systemFlagsCreated} new flags (${systemFlagsData.length} total)` });
+  logger.info(`System feature flags: ${systemFlagsCreated} created`);
+
+  // Permission Condition Templates
+  const conditionTemplatesData = [
+    {
+      name: 'amount_limit',
+      description: 'Limite le montant maximal autorisé pour une opération',
+      conditionSchema: { amount: { $lte: '$maxAmount' } },
+      variables: ['maxAmount'],
+      examples: [
+        { description: 'Limite à 1M FCFA', values: { maxAmount: 1000000 } },
+        { description: 'Limite à 5M FCFA', values: { maxAmount: 5000000 } },
+      ],
+      isSystem: true,
+    },
+    {
+      name: 'status_filter',
+      description: 'Limite les actions aux entités ayant certains statuts',
+      conditionSchema: { status: { $in: '$allowedStatuses' } },
+      variables: ['allowedStatuses'],
+      examples: [
+        { description: 'Statuts en attente', values: { allowedStatuses: ['PENDING', 'REVIEW'] } },
+        { description: 'Statuts actifs', values: { allowedStatuses: ['ACTIVE', 'APPROVED'] } },
+      ],
+      isSystem: true,
+    },
+    {
+      name: 'owner_only',
+      description: 'Limite les actions aux entités créées par l\'utilisateur',
+      conditionSchema: { createdBy: '${userId}' },
+      variables: ['userId'],
+      examples: [{ description: 'Propres créations uniquement', values: {} }],
+      isSystem: true,
+    },
+    {
+      name: 'same_agency',
+      description: 'Limite les actions aux entités de la même agence',
+      conditionSchema: { agenceId: '${agenceId}' },
+      variables: ['agenceId'],
+      examples: [{ description: 'Même agence', values: {} }],
+      isSystem: true,
+    },
+    {
+      name: 'time_window',
+      description: 'Limite les actions aux entités créées dans une fenêtre temporelle',
+      conditionSchema: { createdAt: { $gte: '${startDate}', $lte: '${endDate}' } },
+      variables: ['startDate', 'endDate'],
+      examples: [
+        { description: 'Créé aujourd\'hui', values: { startDate: '${startOfDay}', endDate: '${endOfDay}' } },
+        { description: '7 derniers jours', values: { startDate: '${startOfWeek}', endDate: '${now}' } },
+      ],
+      isSystem: true,
+    },
+    {
+      name: 'combined_and',
+      description: 'Combine plusieurs conditions avec AND',
+      conditionSchema: { $and: ['$conditions'] },
+      variables: ['conditions'],
+      examples: [
+        { description: 'Montant < 1M ET statut PENDING', values: { conditions: [{ amount: { $lte: 1000000 } }, { status: 'PENDING' }] } },
+      ],
+      isSystem: true,
+    },
+  ];
+
+  let templatesCreated = 0;
+  for (const template of conditionTemplatesData) {
+    const [existing] = await db.select().from(permissionConditionTemplates).where(eq(permissionConditionTemplates.name, template.name));
+    if (!existing) {
+      await db.insert(permissionConditionTemplates).values(template);
+      templatesCreated++;
+    }
+  }
+  results.push({ table: 'permissionConditionTemplates', action: 'created', count: templatesCreated, details: `${templatesCreated} new templates (${conditionTemplatesData.length} total)` });
+  logger.info(`Permission condition templates: ${templatesCreated} created`);
+
+  // Critical Permission Patterns
+  const criticalPatternsData = [
+    { pattern: 'paiements.%', description: 'Toutes les permissions de paiement', requireReason: true, requireSupervisorApproval: false },
+    { pattern: 'coffre.%', description: 'Toutes les permissions coffre-fort', requireReason: true, requireSupervisorApproval: true },
+    { pattern: 'admin.%', description: 'Toutes les permissions administration', requireReason: true, requireSupervisorApproval: false },
+    { pattern: 'validation.%', description: 'Toutes les permissions de validation', requireReason: true, requireSupervisorApproval: false },
+    { pattern: 'caisse.%', description: 'Toutes les permissions caisse', requireReason: true, requireSupervisorApproval: false },
+    { pattern: 'users.%', description: 'Toutes les permissions utilisateurs', requireReason: true, requireSupervisorApproval: false },
+    { pattern: 'credits.%', description: 'Toutes les permissions crédits', requireReason: true, requireSupervisorApproval: false },
+    { pattern: 'rapports.%', description: 'Toutes les permissions rapports', requireReason: true, requireSupervisorApproval: false },
+  ];
+
+  let patternsCreated = 0;
+  for (const pattern of criticalPatternsData) {
+    const [existing] = await db.select().from(criticalPermissionPatterns).where(eq(criticalPermissionPatterns.pattern, pattern.pattern));
+    if (!existing) {
+      await db.insert(criticalPermissionPatterns).values(pattern);
+      patternsCreated++;
+    }
+  }
+  results.push({ table: 'criticalPermissionPatterns', action: 'created', count: patternsCreated, details: `${patternsCreated} new patterns (${criticalPatternsData.length} total)` });
+  logger.info(`Critical permission patterns: ${patternsCreated} created`);
+
   return results;
 }
 
@@ -1646,6 +1768,39 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
     }
   }
   results.push({ table: 'creditPlans', action: 'created', count: creditPlansData.length });
+
+  // Tontine Rulesets - insert default ruleset
+  const [existingRuleset] = await db.select().from(tontineRulesets).where(eq(tontineRulesets.isDefault, true));
+  if (!existingRuleset) {
+    await db.insert(tontineRulesets).values({
+      name: 'Règles Standard Congo',
+      description: 'Règles par défaut pour les tontines au Congo Brazzaville',
+      isDefault: true,
+      isActive: true,
+      version: 1,
+      rules: {
+        grace_days: 2,
+        late_fee_amount: 500,
+        late_fee_percent: null,
+        max_late_count_before_suspend: 3,
+        max_late_count_before_exclude: 5,
+        allow_partial_distribution: true,
+        distribution_min_threshold_percent: 50,
+        withdrawal_fee_amount: 0,
+        withdrawal_fee_percent: 0,
+        allow_reorder_turns_until: 'BEFORE_TURN_DUE',
+        penalty_deducted_from_payout: true,
+        penalty_as_revenue: false,
+        auto_pay_penalty_priority: true,
+        min_members_to_start: 3,
+        max_advance_tours: 3,
+      },
+    });
+    results.push({ table: 'tontineRulesets', action: 'created', count: 1 });
+    logger.info('Tontine default ruleset created');
+  } else {
+    results.push({ table: 'tontineRulesets', action: 'skipped', count: 0, details: 'exists' });
+  }
 
   // Types Marchés - upsert by nom
   for (const tm of TYPES_MARCHES_DATA) {
@@ -1887,6 +2042,27 @@ async function seedVaultAndTransfersConfig(context: SeedContext, dryRun: boolean
     } else {
       results.push({ table: 'caisses', action: 'skipped', count: 0, details: 'exists' });
     }
+  }
+
+  // Config Ecart Caisse - global default
+  const [existingConfigEcart] = await db.select().from(configEcartCaisse).where(isNull(configEcartCaisse.agenceId));
+  if (!existingConfigEcart) {
+    await db.insert(configEcartCaisse).values({
+      agenceId: null, // Global config
+      seuilAutoApprove: '100',
+      seuilN1Approval: '5000',
+      seuilN2Approval: '50000',
+      rolesApprobateursN1: ['SUPERVISEUR', 'CHEF_CAISSE'],
+      rolesApprobateursN2: ['CHEF_AGENCE', 'DIRECTEUR'],
+      blockCloseUntilApproved: true,
+      allowSelfApprovalIfRole: false,
+      requireDoubleApprovalN2: false,
+      actif: true,
+    });
+    results.push({ table: 'configEcartCaisse', action: 'created', count: 1 });
+    logger.info('Config Ecart Caisse (global) created');
+  } else {
+    results.push({ table: 'configEcartCaisse', action: 'skipped', count: 0, details: 'exists' });
   }
 
   return results;

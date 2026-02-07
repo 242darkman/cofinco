@@ -189,6 +189,8 @@ export const agencyDailyClosure = pgTable("agency_daily_closure", {
   totalMontantVersCoffre: numeric("total_montant_vers_coffre", { precision: 15, scale: 2 }).default("0"),
   totalMontantReporte: numeric("total_montant_reporte", { precision: 15, scale: 2 }).default("0"),
   totalEcarts: numeric("total_ecarts", { precision: 15, scale: 2 }).default("0"),
+  totalEcartsSurplus: numeric("total_ecarts_surplus", { precision: 15, scale: 2 }).default("0"),
+  totalEcartsDeficit: numeric("total_ecarts_deficit", { precision: 15, scale: 2 }).default("0"),
 
   // Workflow validations
   allCaissesClosed: boolean("all_caisses_closed").notNull().default(false),

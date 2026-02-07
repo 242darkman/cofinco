@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique, jsonb, index, inet, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { SystemRole } from "../types/roles";
@@ -639,3 +639,53 @@ export const toggleUserPermissionSchema = z.object({
   data => data.scope === 'GLOBAL' || (data.scope === 'AGENCE' && data.agenceId),
   { message: "agenceId requis si scope=AGENCE" }
 );
+
+// ============================================
+// PERMISSION ANALYTICS
+// ============================================
+
+/**
+ * Table permissionAnalyticsConfig - Configuration du système d'analytics
+ */
+export const permissionAnalyticsConfig = pgTable("permission_analytics_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: varchar("key", { length: 50 }).notNull().unique(),
+  value: jsonb("value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by").references(() => users.id),
+});
+
+export const insertPermissionAnalyticsConfigSchema = createInsertSchema(permissionAnalyticsConfig).omit({ id: true });
+export type InsertPermissionAnalyticsConfig = z.infer<typeof insertPermissionAnalyticsConfigSchema>;
+export type PermissionAnalyticsConfig = typeof permissionAnalyticsConfig.$inferSelect;
+
+/**
+ * Table permissionUsageLogs - Logs des vérifications de permissions (échantillonné)
+ */
+export const permissionUsageLogs = pgTable("permission_usage_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userRole: varchar("user_role", { length: 50 }).notNull(),
+  permissionCode: varchar("permission_code", { length: 100 }).notNull(),
+  action: varchar("action", { length: 50 }).notNull(),
+  subject: varchar("subject", { length: 100 }).notNull(),
+  allowed: boolean("allowed").notNull(),
+  deniedReason: text("denied_reason"),
+  agenceId: uuid("agence_id"), // FK to agences.id managed at SQL level
+  resourceId: uuid("resource_id"),
+  resourceType: varchar("resource_type", { length: 100 }),
+  endpoint: varchar("endpoint", { length: 255 }),
+  ipAddress: inet("ip_address"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxUser: index("idx_pul_user").on(t.userId),
+  idxPerm: index("idx_pul_perm").on(t.permissionCode),
+  idxChecked: index("idx_pul_checked").on(t.checkedAt),
+  idxAllowed: index("idx_pul_allowed").on(t.allowed),
+  idxUserPerm: index("idx_pul_user_perm").on(t.userId, t.permissionCode),
+}));
+
+export const insertPermissionUsageLogSchema = createInsertSchema(permissionUsageLogs).omit({ id: true });
+export type InsertPermissionUsageLog = z.infer<typeof insertPermissionUsageLogSchema>;
+export type PermissionUsageLog = typeof permissionUsageLogs.$inferSelect;
