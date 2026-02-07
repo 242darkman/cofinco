@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../ui';
 import AgentCommissions from './AgentCommissions';
 import AgentPlanning from './AgentPlanning';
@@ -28,6 +28,17 @@ interface AgentOption {
 
 export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
   const [activeModule, setActiveModule] = useState<string>('dashboard');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 200;
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
   const [moduleLoading, setModuleLoading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -138,28 +149,47 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
         </div>
 
         {/* Desktop Horizontal Scroll Menu */}
-        <div className="hidden md:flex flex-1 overflow-x-auto gap-1 no-scrollbar items-center">
-          {modules.map((module) => {
-            const Icon = module.icon;
-            const isActive = activeModule === module.id;
-            return (
-              <button
-                key={module.id}
-                onClick={() => handleModuleChange(module.id)}
-                title={module.name}
-                className={`
-                  relative flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap transition-all border
-                  ${isActive
-                    ? 'bg-cyan-600 border-cyan-500 text-white shadow-md shadow-cyan-900/20'
-                    : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                  }
-                `}
-              >
-                <Icon size={16} />
-                <span className="text-xs font-semibold">{module.name}</span>
-              </button>
-            );
-          })}
+        <div className="hidden md:flex flex-1 items-center gap-1 min-w-0">
+          <button 
+            onClick={() => scroll('left')}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors flex-shrink-0"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          
+          <div 
+            ref={scrollContainerRef}
+            className="flex-1 overflow-x-auto gap-1 no-scrollbar flex items-center scroll-smooth"
+          >
+            {modules.map((module) => {
+              const Icon = module.icon;
+              const isActive = activeModule === module.id;
+              return (
+                <button
+                  key={module.id}
+                  onClick={() => handleModuleChange(module.id)}
+                  title={module.name}
+                  className={`
+                    relative flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap transition-all border shrink-0
+                    ${isActive
+                      ? 'bg-cyan-600 border-cyan-500 text-white shadow-md shadow-cyan-900/20'
+                      : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <Icon size={16} />
+                  <span className="text-xs font-semibold">{module.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button 
+            onClick={() => scroll('right')}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors flex-shrink-0"
+          >
+            <ChevronRight size={16} />
+          </button>
         </div>
 
         {/* Admin/Supervisor Agent Selector */}
