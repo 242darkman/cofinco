@@ -508,11 +508,62 @@ export const statutSessionCaisseEnum = pgEnum("statut_session_caisse_enum", [
 // ============================================
 
 export const statutEnqueteCreditEnum = pgEnum("statut_enquete_credit_enum", [
+  "PENDING_ASSIGNMENT", // En attente d'assignation
+  "ASSIGNED",           // Assignée à un agent
+  "IN_PROGRESS",        // En cours de traitement
+  "SUBMITTED",          // Soumise par l'agent
+  "REVIEWED",           // Révisée par le superviseur
+  "APPROVED",           // Approuvée
+  "REJECTED",           // Rejetée
+  "REDUCED",            // Montant réduit
+  "CLOSED",             // Clôturée
+]);
+
+// ============================================
+// CREDIT INVESTIGATION MODULE
+// ============================================
+
+// Activity types for agent tasks
+export const activityTypeEnum = pgEnum("activity_type_enum", [
+  "PROSPECTION",
+  "CREDIT_INVESTIGATION",
+  "COLLECTION",
+  "CLIENT_VISIT",
+  "DOCUMENT_PICKUP",
+  "OTHER",
+]);
+
+// Activity priority levels
+export const activityPriorityEnum = pgEnum("activity_priority_enum", [
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "URGENT",
+]);
+
+// Activity status
+export const activityStatusEnum = pgEnum("activity_status_enum", [
   "PENDING",
   "IN_PROGRESS",
-  "APPROVED",
-  "REJECTED",
-  "REDUCED",
+  "COMPLETED",
+  "CANCELLED",
+  "OVERDUE",
+]);
+
+// Agent recommendation levels  
+export const agentRecommendationEnum = pgEnum("agent_recommendation_enum", [
+  "APPROVE",
+  "APPROVE_WITH_CAUTION",
+  "REDUCE_AMOUNT",
+  "REJECT",
+]);
+
+// Risk assessment levels
+export const riskLevelEnum = pgEnum("risk_level_enum", [
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "VERY_HIGH",
 ]);
 
 // ============================================

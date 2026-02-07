@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -254,6 +254,13 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   demandeId: uuid("demande_id").references(() => demandesCredit.id),
   montantDemande: numeric("montant_demande").notNull(),
   objetCredit: text("objet_credit").notNull(),
+  
+  // === ASSIGNATION À L'AGENT ===
+  assignedAgentId: uuid("assigned_agent_id").references(() => users.id),
+  assignedAt: timestamp("assigned_at"),
+  assignedBy: uuid("assigned_by").references(() => users.id),
+  dueDate: timestamp("due_date"),
+  priority: text("priority").default("MEDIUM"), // LOW, MEDIUM, HIGH, URGENT
 
   // Activité professionnelle
   categorieActivite: text("categorie_activite"),
@@ -289,12 +296,50 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   capaciteRemboursement: numeric("capacite_remboursement"),
   scoreGlobal: integer("score_global"),
   recommandation: text("recommandation"),
-  statut: statutEnqueteCreditEnum("statut").notNull().default("PENDING"),
+  statut: statutEnqueteCreditEnum("statut").notNull().default("PENDING_ASSIGNMENT"),
   observations: text("observations"),
+  
+  // === RECOMMANDATION AGENT ===
+  agentRecommendation: agentRecommendationEnum("agent_recommendation"),
+  recommendedAmount: numeric("recommended_amount"),
+  riskLevel: riskLevelEnum("risk_level"),
+  riskFactors: text("risk_factors").array(),
+  
+  // === WORKFLOW TIMESTAMPS ===
+  startedAt: timestamp("started_at"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  closedAt: timestamp("closed_at"),
+  
+  // === SUPERVISION ===
+  supervisorNotes: text("supervisor_notes"),
+  requiresAdditionalInvestigation: boolean("requires_additional_investigation").default(false),
+  additionalInvestigationReason: text("additional_investigation_reason"),
+  
+  // === OFFLINE SYNC ===
+  offlineCreated: boolean("offline_created").default(false),
+  offlineSyncedAt: timestamp("offline_synced_at"),
+  deviceId: text("device_id"),
 
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+}, (t) => ({
+  // Index pour recherche par agent assigné
+  idxAssignedAgent: index("idx_enquete_assigned_agent").on(t.assignedAgentId),
+  // Index composite agent + statut (pour dashboard agent)
+  idxAgentStatut: index("idx_enquete_agent_statut").on(t.assignedAgentId, t.statut),
+  // Index pour les enquêtes non assignées
+  idxPendingAssignment: index("idx_enquete_pending_assignment").on(t.statut, t.assignedAgentId),
+  // Index pour le superviseur
+  idxReviewedBy: index("idx_enquete_reviewed_by").on(t.reviewedBy),
+  // Index pour soft delete
+  idxDeletedAt: index("idx_enquete_deleted_at").on(t.deletedAt),
+  // Index pour sync offline
+  idxOfflineSync: index("idx_enquete_offline_sync").on(t.offlineCreated, t.offlineSyncedAt),
+}));
 
 export const insertEnqueteCreditSchema = createInsertSchema(enquetesCredit).omit({ id: true, createdAt: true }).extend({
   geoLatitude: z.coerce.string().optional().nullable(),

@@ -17,3 +17,7 @@ deploy_key.pub
 /ssl_prod_key
 .tmp
 
+# Playwright / E2E artifacts
+playwright-report
+test-results
+.playwright

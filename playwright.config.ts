@@ -1,4 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables from .env file
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 /**
  * Playwright Configuration for Cofinco E2E Tests
@@ -55,7 +64,7 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev',
-      url: 'http://localhost:3000/health',
+      url: 'http://localhost:5000/api/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },

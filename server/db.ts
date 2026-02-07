@@ -1,12 +1,22 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import pg from "pg";
+import fs from "fs";
 import * as schema from "@shared/schema";
 import { dbCircuitBreaker, CircuitState } from "./lib/circuit-breaker";
 
 const { Pool } = pg;
 
 if (!process.env.DATABASE_URL) {
+  console.error('[DB] Environment variables missing. Current NODE_ENV:', process.env.NODE_ENV);
+  // Also check if .env file exists in current directory for debugging
+  try {
+    const hasEnvFile = fs.existsSync('.env');
+    console.error('[DB] .env file exists:', hasEnvFile);
+  } catch (e) {
+    // ignore
+  }
+  
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
   );
@@ -170,43 +180,65 @@ export async function closePool(): Promise<void> {
  * instead of migrations (db:push only syncs tables, not functions).
  */
 export async function ensureCustomFunctions(): Promise<void> {
+  const start = Date.now();
+  console.log('[DB] Ensuring custom SQL functions exist...');
+
+  try {
     // Custom unaccent function (fallback if extension is missing/restricted)
-  // This uses translate() to map accented characters to ASCII
-  await db.execute(sql`
-    CREATE OR REPLACE FUNCTION public.unaccent(text)
-    RETURNS text AS $$
-    BEGIN
-        RETURN translate($1,
-            'âãäåāăąÁÂÃÄÅĀĂĄèééêëēĕėęěÈÉÊËĒĔĖĘĚìíîïìĩīĭÌÍÎÏÌĨĪĬóôõöōŏőÒÓÔÕÖŌŎŐùúûüũūŭůÙÚÛÜŨŪŬŮñÑçÇ',
-            'aaaaaaaAAAAAAAAeeeeeeeeeeEEEEEEEEiiiiiiiiIIIIIIIIoooooooOOOOOOOOuuuuuuuuUUUUUUUUnNcC'
-        );
-    END;
-    $$ LANGUAGE plpgsql IMMUTABLE;
-  `);
+    // This uses translate() to map accented characters to ASCII
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION public.unaccent(text)
+        RETURNS text AS $$
+        BEGIN
+            RETURN translate($1,
+                'âãäåāăąÁÂÃÄÅĀĂĄèééêëēĕėęěÈÉÊËĒĔĖĘĚìíîïìĩīĭÌÍÎÏÌĨĪĬóôõöōŏőÒÓÔÕÖŌŎŐùúûüũūŭůÙÚÛÜŨŪŬŮñÑçÇ',
+                'aaaaaaaAAAAAAAAeeeeeeeeeeEEEEEEEEiiiiiiiiIIIIIIIIoooooooOOOOOOOOuuuuuuuuUUUUUUUUnNcC'
+            );
+        END;
+        $$ LANGUAGE plpgsql IMMUTABLE;
+      `);
+      console.log('[DB] Custom function "unaccent" ensured');
+    } catch (err) {
+      console.warn('[DB] Failed to create "unaccent" function:', err instanceof Error ? err.message : err);
+      // We continue, as this might not be critical or might already exist in a way that caused an error
+    }
 
-  // get_next_piece_number: Generates sequential piece numbers for GL entries
-  // This function is essential for the accounting module
-  await db.execute(sql`
-    CREATE OR REPLACE FUNCTION get_next_piece_number(p_agence_id uuid, p_journal_code text, p_year integer)
-    RETURNS text AS $$
-    DECLARE
-        v_next_number integer;
-        v_piece_number text;
-    BEGIN
-        -- Lock and increment sequence atomically
-        INSERT INTO gl_sequences (agence_id, journal_code, year, last_number)
-        VALUES (p_agence_id, p_journal_code, p_year, 1)
-        ON CONFLICT (agence_id, journal_code, year)
-        DO UPDATE SET
-            last_number = gl_sequences.last_number + 1,
-            updated_at = now()
-        RETURNING last_number INTO v_next_number;
+    // get_next_piece_number: Generates sequential piece numbers for GL entries
+    // This function is essential for the accounting module
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION get_next_piece_number(p_agence_id uuid, p_journal_code text, p_year integer)
+        RETURNS text AS $$
+        DECLARE
+            v_next_number integer;
+            v_piece_number text;
+        BEGIN
+            -- Lock and increment sequence atomically
+            INSERT INTO gl_sequences (agence_id, journal_code, year, last_number)
+            VALUES (p_agence_id, p_journal_code, p_year, 1)
+            ON CONFLICT (agence_id, journal_code, year)
+            DO UPDATE SET
+                last_number = gl_sequences.last_number + 1,
+                updated_at = now()
+            RETURNING last_number INTO v_next_number;
 
-        -- Format: JOURNAL-YYYY-NNNNNN (e.g., CAI-2025-000001)
-        v_piece_number := p_journal_code || '-' || p_year || '-' || LPAD(v_next_number::text, 6, '0');
+            -- Format: JOURNAL-YYYY-NNNNNN (e.g., CAI-2025-000001)
+            v_piece_number := p_journal_code || '-' || p_year || '-' || LPAD(v_next_number::text, 6, '0');
 
-        RETURN v_piece_number;
-    END;
-    $$ LANGUAGE plpgsql;
-  `);
+            RETURN v_piece_number;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] Custom function "get_next_piece_number" ensured');
+    } catch (err) {
+      console.error('[DB] CRITICAL: Failed to create "get_next_piece_number" function:', err instanceof Error ? err.message : err);
+      throw err; // This is critical, so we rethrow
+    }
+
+    console.log(`[DB] Custom functions check completed in ${Date.now() - start}ms`);
+  } catch (error) {
+    console.error('[DB] Error verifying custom functions:', error);
+    throw error;
+  }
 }

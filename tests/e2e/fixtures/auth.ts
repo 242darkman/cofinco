@@ -56,7 +56,7 @@ export async function login(page: Page, user: TestUser): Promise<void> {
   await page.goto('/login');
 
   // Fill login form
-  await page.getByLabel(/email/i).fill(user.email);
+  await page.fill('input[name="username"]', user.email);
   await page.getByLabel(/mot de passe/i).fill(user.password);
 
   // Submit

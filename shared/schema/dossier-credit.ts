@@ -13,14 +13,11 @@ import { users } from "./auth";
 import { clients } from "./clients";
 import { agentsTerrain, prospections, paiementsTerrain } from "./operations";
 import { agences } from "./agences";
-import { demandesCredit, credits } from "./finance";
+import { demandesCredit, credits, type EnqueteCredit } from "./finance";
 
 // Import des enums
 import {
   statutDossierCreditEnum,
-  statutEnqueteCreditAgentEnum,
-  avisEnqueteurEnum,
-  niveauRisqueEnum,
 } from "@shared/enum/enums";
 
 // ============================================================================
@@ -140,104 +137,6 @@ export type InsertDossierCredit = z.infer<typeof insertDossierCreditSchema>;
 export type DossierCredit = typeof dossiersCredit.$inferSelect;
 
 // ============================================================================
-// TABLE: enquetes_credit
-// Enquêtes de terrain pour les demandes de crédit
-// ============================================================================
-
-export const enquetesCreditAgent = pgTable(
-  "enquetes_credit",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    // Reference
-    reference: text("reference").notNull(),
-
-    // Link to dossier
-    dossierId: uuid("dossier_id").notNull().references(() => dossiersCredit.id, { onDelete: "restrict" }),
-
-    // Assigned investigator (can be different from dossier agent)
-    enqueteurId: uuid("enqueteur_id").notNull().references(() => agentsTerrain.id, { onDelete: "restrict" }),
-    assignedBy: uuid("assigned_by").references(() => users.id, { onDelete: "set null" }),
-    assignedAt: timestamp("assigned_at").notNull().defaultNow(),
-
-    // Investigation dates
-    dateVisitePrevue: date("date_visite_prevue"),
-    dateVisiteEffective: date("date_visite_effective"),
-
-    // Location verification
-    latitudeVisite: numeric("latitude_visite"),
-    longitudeVisite: numeric("longitude_visite"),
-    adresseVerifiee: text("adresse_verifiee"),
-    adresseConforme: boolean("adresse_conforme"),
-
-    // Activity verification
-    activiteVerifiee: text("activite_verifiee"),
-    activiteConforme: boolean("activite_conforme"),
-    localType: text("local_type"), // Propre, Loué, Autre
-    ancienneteActivite: text("anciennete_activite"),
-
-    // Revenue assessment
-    revenuConstate: numeric("revenu_constate"),
-    chargesMensuelles: numeric("charges_mensuelles"),
-    capaciteRemboursement: numeric("capacite_remboursement"),
-
-    // Guarantor verification
-    garantVisite: boolean("garant_visite").default(false),
-    garantConforme: boolean("garant_conforme"),
-    garantObservations: text("garant_observations"),
-
-    // Risk assessment
-    niveauRisque: niveauRisqueEnum("niveau_risque"),
-    scoreRisque: integer("score_risque"), // 0-100
-
-    // Photos and documents
-    photos: jsonb("photos").default([]),
-    documentsCollectes: jsonb("documents_collectes").default([]),
-
-    // Investigation result
-    statut: statutEnqueteCreditAgentEnum("statut").notNull().default("ASSIGNED"),
-
-    // Recommendation
-    avisEnqueteur: avisEnqueteurEnum("avis_enqueteur"),
-    montantRecommande: numeric("montant_recommande"),
-    dureeRecommandee: integer("duree_recommandee"),
-    observations: text("observations"),
-
-    // Completion
-    completedAt: timestamp("completed_at"),
-    completedBy: uuid("completed_by").references(() => users.id, { onDelete: "set null" }),
-
-    // Review
-    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
-    reviewedAt: timestamp("reviewed_at"),
-    reviewObservations: text("review_observations"),
-
-    // Audit
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (t) => ({
-    uqReference: uniqueIndex("uq_enquetes_credit_reference").on(t.reference),
-    idxDossier: index("idx_enquetes_credit_dossier").on(t.dossierId),
-    idxEnqueteur: index("idx_enquetes_credit_enqueteur").on(t.enqueteurId),
-    idxStatut: index("idx_enquetes_credit_statut").on(t.statut),
-    idxDate: index("idx_enquetes_credit_date").on(t.assignedAt),
-  }),
-);
-
-export const insertEnqueteCreditAgentSchema = createInsertSchema(enquetesCreditAgent, {
-  // Handle date type explicitly
-  dateVisitePrevue: z.string().optional().nullable(),
-  dateVisiteEffective: z.string().optional().nullable(),
-}).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export type InsertEnqueteCreditAgent = z.infer<typeof insertEnqueteCreditAgentSchema>;
-export type EnqueteCreditAgent = typeof enquetesCreditAgent.$inferSelect;
-
-// ============================================================================
 // TYPES UTILITAIRES
 // ============================================================================
 
@@ -343,5 +242,5 @@ export interface DossierCreditWithRelations extends DossierCredit {
     nomProspect: string;
     telephoneProspect: string;
   } | null;
-  enquete?: EnqueteCreditAgent | null;
+  enquete?: EnqueteCredit | null;
 }

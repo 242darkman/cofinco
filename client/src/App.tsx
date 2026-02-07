@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
+import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast, Toaster } from 'sonner';
 import LoginPage from './components/auth/LoginPage';
@@ -36,6 +37,7 @@ function App() {
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
   const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
   // Show NetworkOverlay only for prolonged offline (not just unstable)
@@ -97,7 +99,7 @@ function App() {
           setCurrentUser(user);
           setIsAuthenticated(true);
           // Précharger la photo de profil au démarrage
-          preloadProfilePhoto(user?.photoProfile);
+          preloadProfilePhoto(user?.photoProfile || undefined);
           // Réinitialiser le message d'expiration si connexion réussie
           setSessionExpiredMessage(null);
         }
@@ -139,10 +141,26 @@ function App() {
 
       // Afficher "Connecté" pendant 3 secondes
       setTimeout(() => {
+        console.log('[App] Login success animation complete. User:', user?.username, 'Role:', user?.role);
         setShowConnectedSuccess(false);
+        // Redirection explicite basée sur le rôle
+        const role = user?.role?.toLowerCase() || '';
+        if (role === 'agent_terrain' || role === 'agent') {
+          console.log('[App] Redirecting to /agent-terrain');
+          setLocation('/agent-terrain');
+        } else {
+          console.log('[App] Redirecting to /');
+          setLocation('/');
+        }
       }, 3000);
     }, 1500);
   };
+  
+  // Debug effect for location change
+  useEffect(() => {
+    // console.log('[App] Location changed:', window.location.pathname); 
+    // Commented out to avoid noise, but useful if needed.
+  }, []);
 
   const handleLogout = () => {
     authService.logout();
