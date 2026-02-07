@@ -64,6 +64,8 @@ import {
 } from '@shared/schema';
 import { departments, jobPositions, employes, payrollConfig } from '@shared/schema';
 import { accountingRules } from '@shared/schema/accounting';
+import { caissesAgent } from '@shared/schema/caisse-agent';
+import { agentsTerrain } from '@shared/schema/operations';
 import { hashPassword } from './auth';
 import { SystemRole } from '@shared/types/roles';
 import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse } from '@shared/enum/status-constants';
@@ -347,6 +349,7 @@ const JOURNAUX_DATA = [
   { code: 'CAISSE', intitule: 'Journal de Caisse', typeJournal: 'Caisse' },
   { code: 'CAI', intitule: 'Journal Caisse (espèces)', typeJournal: 'Caisse' },
   { code: 'BANK', intitule: 'Journal de Banque', typeJournal: 'Banque' },
+  { code: 'BNK', intitule: 'Banque', typeJournal: 'Trésorerie' },
   { code: 'ACHAT', intitule: 'Journal d\'Achats', typeJournal: 'Achats' },
   { code: 'VENTE', intitule: 'Journal de Ventes', typeJournal: 'Ventes' },
   { code: 'OD', intitule: 'Opérations Diverses', typeJournal: 'Opérations Diverses' },
@@ -355,6 +358,8 @@ const JOURNAUX_DATA = [
   { code: 'MAIR', intitule: 'Mobile Money Airtel', typeJournal: 'Mobile Money' },
   { code: 'CRD', intitule: 'Journal des Crédits', typeJournal: 'Crédits' },
   { code: 'EPGN', intitule: 'Journal Épargne', typeJournal: 'Épargne' },
+  { code: 'TON', intitule: 'Tontines', typeJournal: 'Tontines' },
+  { code: 'AN', intitule: 'À Nouveau', typeJournal: 'Reprise' },
 ];
 
 // Accounting Rules — maps (sourceType, eventType) → journal + debit/credit accounts
@@ -2929,6 +2934,159 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
   return results;
 }
 
+// ============================================================================
+// MIGRATION BACKFILLS
+// Seeds extracted from migrations 0009, 0010, 0030, 0034
+// ============================================================================
+
+/**
+ * Seeds extracted from migration files:
+ * - 0009_coffre_fort_workflow.sql: coffres-forts et config par agence
+ * - 0010_caisse_agent_workflow.sql: caisses agent pour agents terrain
+ * - 0030_accounting_gl_enhancement.sql: journaux et plan comptable OHADA
+ * - 0034_rbac_versions.sql: version RBAC (table non implémentée)
+ */
+async function seedMigrationBackfills(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
+  logger.info('Seeding Migration Backfills...');
+  const results: SeedStepResult[] = [];
+
+  if (dryRun) {
+    return [
+      { table: 'caisses (coffres)', action: 'skipped', count: 1, details: 'dry-run' },
+      { table: 'configCoffreFort', action: 'skipped', count: 1, details: 'dry-run' },
+      { table: 'caissesAgent', action: 'skipped', count: 1, details: 'dry-run' },
+    ];
+  }
+
+  // ========================================================================
+  // Migration 0009: Coffres-forts pour chaque agence
+  // ========================================================================
+  const allAgences = await db.select().from(agences);
+  let coffresCreated = 0;
+
+  for (const agence of allAgences) {
+    // Vérifier si un coffre-fort existe déjà pour cette agence
+    const [existingCoffre] = await db.select()
+      .from(caisses)
+      .where(and(
+        eq(caisses.agenceId, agence.id),
+        eq(caisses.type, 'Coffre-Fort')
+      ));
+
+    if (!existingCoffre) {
+      await db.insert(caisses).values({
+        nom: `Coffre-Fort ${agence.nom}`,
+        agenceId: agence.id,
+        type: 'Coffre-Fort',
+        solde: '0',
+        statut: StatutCaisse.OPEN,
+      });
+      coffresCreated++;
+    }
+  }
+
+  if (coffresCreated > 0) {
+    results.push({
+      table: 'caisses (coffres)',
+      action: 'created',
+      count: coffresCreated,
+      details: `${coffresCreated} coffres-forts créés pour les agences`
+    });
+  } else {
+    results.push({ table: 'caisses (coffres)', action: 'skipped', count: 0, details: 'already exist' });
+  }
+
+  // ========================================================================
+  // Migration 0009: Config coffre-fort par défaut pour chaque agence
+  // ========================================================================
+  let configsCreated = 0;
+
+  for (const agence of allAgences) {
+    const [existingConfig] = await db.select()
+      .from(configCoffreFort)
+      .where(eq(configCoffreFort.agenceId, agence.id));
+
+    if (!existingConfig) {
+      await db.insert(configCoffreFort).values({
+        agenceId: agence.id,
+        seuilDoubleValidation: '1000000',
+        separationInitiateurValideur: true,
+        separationValideurExecuteur: false,
+        rolesInitiateurs: ['caissier', 'chef_caisse'],
+        rolesValideurs: ['chef_agence', 'superviseur'],
+        rolesExecuteurs: ['caissier', 'chef_caisse', 'chef_agence'],
+        billetageObligatoire: false,
+        actif: true,
+      });
+      configsCreated++;
+    }
+  }
+
+  if (configsCreated > 0) {
+    results.push({
+      table: 'configCoffreFort',
+      action: 'created',
+      count: configsCreated,
+      details: `${configsCreated} configurations créées`
+    });
+  } else {
+    results.push({ table: 'configCoffreFort', action: 'skipped', count: 0, details: 'already exist' });
+  }
+
+  // ========================================================================
+  // Migration 0010: Caisse agent pour chaque agent terrain existant
+  // ========================================================================
+  const allAgents = await db.select()
+    .from(agentsTerrain)
+    .where(isNull(agentsTerrain.deletedAt));
+
+  let caissesAgentCreated = 0;
+
+  for (const agent of allAgents) {
+    const [existingCaisseAgent] = await db.select()
+      .from(caissesAgent)
+      .where(and(
+        eq(caissesAgent.agentId, agent.id),
+        isNull(caissesAgent.deletedAt)
+      ));
+
+    if (!existingCaisseAgent) {
+      await db.insert(caissesAgent).values({
+        agentId: agent.id,
+        soldeValide: '0',
+        devise: 'XOF',
+        statut: 'ACTIVE',
+      });
+      caissesAgentCreated++;
+    }
+  }
+
+  if (caissesAgentCreated > 0) {
+    results.push({
+      table: 'caissesAgent',
+      action: 'created',
+      count: caissesAgentCreated,
+      details: `${caissesAgentCreated} caisses agent créées`
+    });
+  } else {
+    results.push({ table: 'caissesAgent', action: 'skipped', count: 0, details: 'already exist' });
+  }
+
+  // ========================================================================
+  // Migration 0030: Journaux et Plan Comptable OHADA
+  // Note: Ces données sont déjà dans JOURNAUX_DATA et PLAN_COMPTABLE_DATA
+  // qui sont seedés par seedAccountingBootstrap()
+  // ========================================================================
+
+  // ========================================================================
+  // Migration 0034: RBAC Versions
+  // Note: Table rbac_versions n'existe pas encore dans le schema TypeScript
+  // TODO: Créer le schema et ajouter le seed quand la table sera créée
+  // ========================================================================
+
+  return results;
+}
+
 async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
   logger.info('Seeding Admin User...');
   const results: SeedStepResult[] = [];
@@ -3233,6 +3391,10 @@ async function seedProd() {
     // Notification System
     const notificationResults = await seedNotificationSystem(report.context, DRY_RUN);
     report.steps.push(...notificationResults);
+
+    // Migration Backfills (coffres, caisses agent, etc.)
+    const backfillResults = await seedMigrationBackfills(report.context, DRY_RUN);
+    report.steps.push(...backfillResults);
 
     // Admin User (only in EMPTY or SEEDED)
     if (report.context !== 'PRODUCTION' || FORCE_RESET) {
