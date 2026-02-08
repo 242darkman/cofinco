@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw,
   Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle,
   Target, Banknote, Calendar, AlertTriangle, MessageSquare,
-  ClipboardCheck, ChevronRight, User, Play, Loader2
+  ClipboardCheck, ChevronLeft, ChevronRight, User, Play, Loader2
 } from 'lucide-react';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
@@ -102,6 +102,37 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   // Agent dropdown search
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
+
+  // Agenda pagination
+  const [agendaPage, setAgendaPage] = useState(0);
+  const [agendaPageSize, setAgendaPageSize] = useState(4);
+
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      setAgendaPageSize(w < 400 ? 3 : w < 768 ? 4 : w < 1280 ? 5 : 8);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const allAgendaItems = useMemo(() => {
+    const items: Array<{ type: 'enquete'; data: any } | { type: 'planning'; data: PlanningEntry }> = [];
+    pendingEnquetes.forEach(enq => items.push({ type: 'enquete', data: enq }));
+    todayPlannings.forEach(p => items.push({ type: 'planning', data: p }));
+    return items;
+  }, [pendingEnquetes, todayPlannings]);
+
+  const totalAgendaPages = Math.max(1, Math.ceil(allAgendaItems.length / agendaPageSize));
+  const safeAgendaPage = Math.min(agendaPage, totalAgendaPages - 1);
+  const paginatedAgendaItems = allAgendaItems.slice(
+    safeAgendaPage * agendaPageSize,
+    (safeAgendaPage + 1) * agendaPageSize
+  );
+
+  // Reset page when data changes
+  useEffect(() => { setAgendaPage(0); }, [pendingEnquetes.length, todayPlannings.length]);
 
   // Offline queue
   const { isOnline, pendingCount } = useOfflineQueue();
@@ -620,9 +651,9 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   <Calendar size={11} /> Mon agenda
                 </div>
                 <div className="flex items-center gap-2">
-                  {(todayPlannings.length + pendingEnquetes.length) > 0 && (
+                  {allAgendaItems.length > 0 && (
                     <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
-                      {todayPlannings.length + pendingEnquetes.length}
+                      {allAgendaItems.length}
                     </span>
                   )}
                   <button
@@ -634,130 +665,125 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 </div>
               </div>
 
-              {(todayPlannings.length + pendingEnquetes.length) > 0 ? (
+              {allAgendaItems.length > 0 ? (
                 <div className="divide-y divide-slate-800/60">
-                  {/* Enquêtes assignées - toujours en haut */}
-                  {pendingEnquetes.map((enq: any) => {
-                    const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
-                    const isAssigned = enq.statut === 'ASSIGNED';
-                    const isStarting = startingEnquete === enq.id;
-                    const borderColor =
-                      enq.priority === 'URGENT' ? 'bg-red-500' :
-                      enq.priority === 'HIGH' ? 'bg-amber-500' :
-                      enq.priority === 'MEDIUM' ? 'bg-blue-500' :
-                      'bg-slate-500';
-                    const priorityConf: Record<string, { label: string; color: string }> = {
-                      LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400' },
-                      MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400' },
-                      HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400' },
-                      URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 animate-pulse' },
-                    };
-                    const pConf = priorityConf[enq.priority || 'MEDIUM'] || priorityConf.MEDIUM;
+                  {paginatedAgendaItems.map((item) => {
+                    if (item.type === 'enquete') {
+                      const enq = item.data;
+                      const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
+                      const isAssigned = enq.statut === 'ASSIGNED';
+                      const isStarting = startingEnquete === enq.id;
+                      const borderColor =
+                        enq.priority === 'URGENT' ? 'bg-red-500' :
+                        enq.priority === 'HIGH' ? 'bg-amber-500' :
+                        enq.priority === 'MEDIUM' ? 'bg-blue-500' :
+                        'bg-slate-500';
+                      const priorityConf: Record<string, { label: string; color: string }> = {
+                        LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400' },
+                        MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400' },
+                        HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400' },
+                        URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 animate-pulse' },
+                      };
+                      const pConf = priorityConf[enq.priority || 'MEDIUM'] || priorityConf.MEDIUM;
 
-                    return (
-                      <div
-                        key={`enq-${enq.id}`}
-                        className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-red-950/40' : ''}`}
-                      >
-                        {/* Priority color bar */}
-                        <div className={`w-1 self-stretch rounded-full shrink-0 ${borderColor} ${enq.priority === 'URGENT' ? 'animate-pulse' : ''}`} />
-
-                        {/* Client avatar */}
-                        <div className="w-7 h-7 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-[10px] shrink-0">
-                          {enq.client
-                            ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
-                            : '?'}
-                        </div>
-
-                        {/* Content */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <ClipboardCheck size={10} className="text-amber-400 shrink-0" />
-                            <span className="text-[10px] text-amber-400/80 font-medium">Enquête crédit</span>
-                          </div>
-                          <p className="text-xs font-semibold text-white truncate">
+                      return (
+                        <div
+                          key={`enq-${enq.id}`}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-red-950/40' : ''}`}
+                        >
+                          <div className={`w-1 self-stretch rounded-full shrink-0 ${borderColor} ${enq.priority === 'URGENT' ? 'animate-pulse' : ''}`} />
+                          <div className="w-7 h-7 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-[10px] shrink-0">
                             {enq.client
-                              ? `${enq.client.prenom || ''} ${enq.client.nom || ''}`.trim() || 'Client'
-                              : enq.clientNom || 'Client'}
-                          </p>
-                          <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-                            {enq.montantDemande && (
-                              <span className="text-[10px] text-emerald-400 font-medium">
-                                {Number(enq.montantDemande).toLocaleString('fr-FR')} F
-                              </span>
-                            )}
-                            {enq.dueDate && (
-                              <span className={`text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded ${
-                                isOverdue
-                                  ? 'text-red-400 font-bold bg-red-500/10 border border-red-500/20'
-                                  : 'text-amber-400 font-medium bg-amber-500/10 border border-amber-500/20'
-                              }`}>
-                                {isOverdue ? <AlertTriangle size={9} /> : <Calendar size={9} />}
-                                Échéance : {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                {isOverdue && ' (en retard)'}
-                              </span>
-                            )}
+                              ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
+                              : '?'}
                           </div>
-                        </div>
-
-                        {/* Priority badge + Action */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ${pConf.color}`}>
-                            {pConf.label}
-                          </span>
-                          {isAssigned ? (
-                            <button
-                              onClick={() => handleStartEnquete(enq.id)}
-                              disabled={isStarting}
-                              className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-[9px] font-bold rounded-lg transition-colors"
-                            >
-                              {isStarting ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
-                              Démarrer
-                            </button>
-                          ) : (
-                            <span className="text-[9px] font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
-                              En cours
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <ClipboardCheck size={10} className="text-amber-400 shrink-0" />
+                              <span className="text-[10px] text-amber-400/80 font-medium">Enquête crédit</span>
+                            </div>
+                            <p className="text-xs font-semibold text-white truncate">
+                              {enq.client
+                                ? `${enq.client.prenom || ''} ${enq.client.nom || ''}`.trim() || 'Client'
+                                : enq.clientNom || 'Client'}
+                            </p>
+                            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                              {enq.montantDemande && (
+                                <span className="text-[10px] text-emerald-400 font-medium">
+                                  {Number(enq.montantDemande).toLocaleString('fr-FR')} F
+                                </span>
+                              )}
+                              {enq.dueDate && (
+                                <span className={`text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded ${
+                                  isOverdue
+                                    ? 'text-red-400 font-bold bg-red-500/10 border border-red-500/20'
+                                    : 'text-amber-400 font-medium bg-amber-500/10 border border-amber-500/20'
+                                }`}>
+                                  {isOverdue ? <AlertTriangle size={9} /> : <Calendar size={9} />}
+                                  Échéance : {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  {isOverdue && ' (en retard)'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ${pConf.color}`}>
+                              {pConf.label}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Planning entries */}
-                  {todayPlannings.map((p: PlanningEntry) => (
-                    <div key={p.id} className="flex items-center gap-2.5 px-3 py-2">
-                      <div className="text-[10px] font-mono font-bold text-slate-500 w-10 shrink-0">
-                        {p.heureDebut}
-                      </div>
-                      <div className={`w-1 h-6 rounded-full shrink-0 ${
-                        p.typeActivite === 'Visite' ? 'bg-blue-500' :
-                        p.typeActivite === 'Collecte' ? 'bg-emerald-500' :
-                        p.typeActivite === 'Prospection' ? 'bg-violet-500' :
-                        'bg-slate-600'
-                      }`} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-semibold text-white truncate">
-                          {p.typeActivite}
-                        </div>
-                        {p.zone && (
-                          <div className="text-[10px] text-slate-500 flex items-center gap-1 truncate">
-                            <MapPin size={8} /> {p.zone}
+                            {isAssigned ? (
+                              <button
+                                onClick={() => handleStartEnquete(enq.id)}
+                                disabled={isStarting}
+                                className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-[9px] font-bold rounded-lg transition-colors"
+                              >
+                                {isStarting ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
+                                Démarrer
+                              </button>
+                            ) : (
+                              <span className="text-[9px] font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                                En cours
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                        p.statut === 'COMPLETED' ? 'bg-emerald-500/15 text-emerald-400' :
-                        p.statut === 'IN_PROGRESS' ? 'bg-blue-500/15 text-blue-400' :
-                        p.statut === 'CANCELLED' ? 'bg-red-500/15 text-red-400' :
-                        'bg-slate-700 text-slate-400'
-                      }`}>
-                        {p.statut === 'COMPLETED' ? 'Fait' :
-                         p.statut === 'IN_PROGRESS' ? 'En cours' :
-                         p.statut === 'CANCELLED' ? 'Annule' : 'Prevu'}
-                      </div>
-                    </div>
-                  ))}
+                        </div>
+                      );
+                    } else {
+                      const p = item.data;
+                      return (
+                        <div key={p.id} className="flex items-center gap-2.5 px-3 py-2">
+                          <div className="text-[10px] font-mono font-bold text-slate-500 w-10 shrink-0">
+                            {p.heureDebut}
+                          </div>
+                          <div className={`w-1 h-6 rounded-full shrink-0 ${
+                            p.typeActivite === 'Visite' ? 'bg-blue-500' :
+                            p.typeActivite === 'Collecte' ? 'bg-emerald-500' :
+                            p.typeActivite === 'Prospection' ? 'bg-violet-500' :
+                            'bg-slate-600'
+                          }`} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-white truncate">
+                              {p.typeActivite}
+                            </div>
+                            {p.zone && (
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1 truncate">
+                                <MapPin size={8} /> {p.zone}
+                              </div>
+                            )}
+                          </div>
+                          <div className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                            p.statut === 'COMPLETED' ? 'bg-emerald-500/15 text-emerald-400' :
+                            p.statut === 'IN_PROGRESS' ? 'bg-blue-500/15 text-blue-400' :
+                            p.statut === 'CANCELLED' ? 'bg-red-500/15 text-red-400' :
+                            'bg-slate-700 text-slate-400'
+                          }`}>
+                            {p.statut === 'COMPLETED' ? 'Fait' :
+                             p.statut === 'IN_PROGRESS' ? 'En cours' :
+                             p.statut === 'CANCELLED' ? 'Annule' : 'Prevu'}
+                          </div>
+                        </div>
+                      );
+                    }
+                  })}
                 </div>
               ) : (
                 <div className="px-3 py-4 text-center">
@@ -772,14 +798,25 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 </div>
               )}
 
-              {/* Link to full enquêtes panel if many */}
-              {pendingEnquetes.length > 3 && (
-                <div className="px-3 py-1.5 border-t border-slate-800 text-center">
+              {/* Pagination controls */}
+              {totalAgendaPages > 1 && (
+                <div className="px-3 py-1.5 border-t border-slate-800 flex items-center justify-between">
                   <button
-                    onClick={() => setShowEnquetesPanel(true)}
-                    className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto transition-colors"
+                    onClick={() => setAgendaPage(p => Math.max(0, p - 1))}
+                    disabled={safeAgendaPage === 0}
+                    className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                   >
-                    Voir toutes les enquêtes ({pendingEnquetes.length}) <ChevronRight size={10} />
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-[10px] text-slate-500 font-medium tabular-nums">
+                    {safeAgendaPage + 1} / {totalAgendaPages}
+                  </span>
+                  <button
+                    onClick={() => setAgendaPage(p => Math.min(totalAgendaPages - 1, p + 1))}
+                    disabled={safeAgendaPage >= totalAgendaPages - 1}
+                    className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                  >
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               )}

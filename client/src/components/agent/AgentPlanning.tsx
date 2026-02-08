@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Loader2, Banknote } from 'lucide-react';
 import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
@@ -136,14 +136,25 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
     return map;
   }, [plannings]);
 
-  // Group enquêtes by due date for calendar view
+  // Group enquêtes by date for calendar view
+  // Active enquêtes appear on today (so agents always see them in the current week)
+  // + on their due date if different from today
   const enquetesByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
+    const today = new Date().toISOString().slice(0, 10);
     enquetes.forEach(enq => {
-      if (enq.dueDate) {
-        const dateKey = new Date(enq.dueDate).toISOString().slice(0, 10);
-        if (!map[dateKey]) map[dateKey] = [];
-        map[dateKey].push(enq);
+      const dueDateKey = enq.dueDate ? new Date(enq.dueDate).toISOString().slice(0, 10) : null;
+
+      // Always place active enquêtes on today
+      if (!map[today]) map[today] = [];
+      if (dueDateKey !== today) {
+        map[today].push(enq);
+      }
+
+      // Also place on due date
+      if (dueDateKey) {
+        if (!map[dueDateKey]) map[dueDateKey] = [];
+        map[dueDateKey].push(enq);
       }
     });
     return map;
@@ -151,6 +162,46 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
   // Active enquêtes always shown in list view (they are ongoing tasks, not tied to a specific planning day)
   const activeEnquetes = useMemo(() => enquetes, [enquetes]);
+
+  // Responsive: compact calendar on small screens
+  const [calendarCompact, setCalendarCompact] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  // List view pagination
+  const [listPage, setListPage] = useState(0);
+  const [listPageSize, setListPageSize] = useState(6);
+
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      setListPageSize(w < 400 ? 3 : w < 768 ? 4 : w < 1280 ? 6 : 9);
+      setCalendarCompact(w < 768);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const allListItems = useMemo(() => {
+    const items: Array<{ type: 'enquete'; data: any } | { type: 'planning'; data: Planning }> = [];
+    activeEnquetes.forEach(enq => items.push({ type: 'enquete', data: enq }));
+    plannings.forEach(p => items.push({ type: 'planning', data: p }));
+    return items;
+  }, [activeEnquetes, plannings]);
+
+  const totalListPages = Math.max(1, Math.ceil(allListItems.length / listPageSize));
+  const safeListPage = Math.min(listPage, totalListPages - 1);
+  const paginatedListItems = allListItems.slice(
+    safeListPage * listPageSize,
+    (safeListPage + 1) * listPageSize
+  );
+
+  const pageEnquetes = paginatedListItems.filter(i => i.type === 'enquete');
+  const pagePlannings = paginatedListItems.filter(i => i.type === 'planning');
+
+  // Reset page when data changes
+  useEffect(() => { setListPage(0); }, [activeEnquetes.length, plannings.length, selectedDate]);
 
   const handleSubmit = async (e: React.FormEvent, force = false) => {
     e.preventDefault();
@@ -423,145 +474,276 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                 </h3>
              </div>
              <span className="text-xs text-slate-500 font-medium">
-               {plannings.length + activeEnquetes.length} activités
+               {allListItems.length} activité{allListItems.length > 1 ? 's' : ''}
              </span>
           </div>
           <div className="p-3 space-y-3">
-            {/* Active enquêtes (always visible) */}
-            {activeEnquetes.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
-                  <ClipboardCheck size={11} />
-                  Enquêtes crédit ({activeEnquetes.length})
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {activeEnquetes.map((enq: any) => (
-                    <EnqueteCard
-                      key={enq.id}
-                      enquete={enq}
-                      onStart={onStartEnquete}
-                      starting={startingEnquete === enq.id}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Planning entries */}
             {loading ? (
               <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500" /></div>
-            ) : plannings.length === 0 && activeEnquetes.length === 0 ? (
+            ) : allListItems.length === 0 ? (
               <div className="text-center py-12 opacity-50">
                 <Calendar size={32} className="mx-auto mb-2 text-slate-500" />
                 <p className="text-sm text-slate-400">Aucune activité planifiée</p>
               </div>
-            ) : plannings.length > 0 ? (
+            ) : (
               <>
-                {activeEnquetes.length > 0 && (
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
-                    <Calendar size={11} />
-                    Planning ({plannings.length})
+                {/* Enquêtes on current page */}
+                {pageEnquetes.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
+                      <ClipboardCheck size={11} />
+                      Enquêtes crédit ({activeEnquetes.length})
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {pageEnquetes.map((item) => (
+                        <EnqueteCard
+                          key={item.data.id}
+                          enquete={item.data}
+                          onStart={onStartEnquete}
+                          starting={startingEnquete === item.data.id}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {plannings.map((planning) => (
-                    <PlanningCard
-                      key={planning.id}
-                      planning={planning}
-                      typeColor={typeColor}
-                      onClick={() => setSelectedPlanning(planning)}
-                    />
-                  ))}
-                </div>
+
+                {/* Plannings on current page */}
+                {pagePlannings.length > 0 && (
+                  <div className="space-y-2">
+                    {pageEnquetes.length > 0 && (
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                        <Calendar size={11} />
+                        Planning ({plannings.length})
+                      </div>
+                    )}
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {pagePlannings.map((item) => (
+                        <PlanningCard
+                          key={item.data.id}
+                          planning={item.data}
+                          typeColor={typeColor}
+                          onClick={() => setSelectedPlanning(item.data)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
-            ) : null}
+            )}
           </div>
+
+          {/* Pagination controls */}
+          {totalListPages > 1 && (
+            <div className="px-4 py-2 border-t border-slate-700 flex items-center justify-between bg-slate-900/30">
+              <button
+                onClick={() => setListPage(p => Math.max(0, p - 1))}
+                disabled={safeListPage === 0}
+                className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-700 active:bg-slate-600 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs text-slate-500 font-medium tabular-nums">
+                {safeListPage + 1} / {totalListPages}
+              </span>
+              <button
+                onClick={() => setListPage(p => Math.min(totalListPages - 1, p + 1))}
+                disabled={safeListPage >= totalListPages - 1}
+                className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-700 active:bg-slate-600 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* ═══ CALENDAR VIEW ═══ */}
       {viewMode === 'calendar' && (
         <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-          {/* Week header */}
-          <div className="grid grid-cols-7 border-b border-slate-700 bg-slate-900/30">
-            {weekDays.map(day => (
-              <div
-                key={day.date}
-                className={`text-center py-2 border-r border-slate-700/50 last:border-r-0 ${day.isToday ? 'bg-cyan-500/10' : ''}`}
-              >
-                <div className="text-[10px] font-bold text-slate-500 uppercase">{day.dayName}</div>
-                <div className={`text-xs font-bold ${day.isToday ? 'text-cyan-400' : 'text-white'}`}>
-                  {day.dayNum}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Week body */}
           {loading ? (
             <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" /></div>
-          ) : (
-            <div className="grid grid-cols-7 min-h-[300px]">
+          ) : calendarCompact ? (
+            /* ── COMPACT: vertical day list (POS / mobile) ── */
+            <div className="divide-y divide-slate-700/50">
               {weekDays.map(day => {
                 const dayPlannings = planningsByDate[day.date] || [];
                 const dayEnquetes = enquetesByDate[day.date] || [];
-                const hasItems = dayPlannings.length > 0 || dayEnquetes.length > 0;
+                const allDayItems = [
+                  ...dayEnquetes.map(e => ({ type: 'enquete' as const, data: e })),
+                  ...dayPlannings.map(p => ({ type: 'planning' as const, data: p })),
+                ];
+                const MAX_PILLS = 3;
+
                 return (
                   <div
                     key={day.date}
-                    className={`border-r border-slate-700/50 last:border-r-0 p-1 min-h-[150px] relative group ${
+                    className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-slate-700/30 active:bg-slate-700/50 ${
                       day.isToday ? 'bg-cyan-500/5' : ''
                     }`}
                     onClick={() => { setSelectedDate(day.date); setViewMode('list'); }}
                   >
-                    {!hasItems ? (
-                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Plus size={16} className="text-slate-600" />
-                       </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {/* Enquêtes on their due date */}
-                        {dayEnquetes.map((enq: any) => {
-                          const isOverdue = new Date(enq.dueDate) < new Date();
-                          return (
-                            <div
-                              key={`enq-${enq.id}`}
-                              className={`w-full text-left px-1.5 py-1 rounded border text-[9px] leading-tight shadow-sm ${
-                                isOverdue
-                                  ? 'bg-red-500/20 text-red-300 border-red-500/30'
-                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                              }`}
-                            >
-                              <div className="font-bold truncate flex items-center gap-0.5">
-                                <ClipboardCheck size={8} />
-                                Enquête
-                              </div>
-                              <div className="truncate opacity-80">
-                                {enq.client ? `${enq.client.nom || ''}` : ''}
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {/* Regular plannings */}
-                        {dayPlannings.map(p => (
-                          <button
-                            key={p.id}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedPlanning(p);
-                            }}
-                            className={`w-full text-left px-1.5 py-1 rounded border text-[9px] leading-tight transition-all hover:scale-[1.02] shadow-sm ${typeColor(p.typeActivite)}`}
-                          >
-                            <div className="font-bold truncate">{p.heureDebut}</div>
-                            <div className="truncate opacity-80">{p.typeActivite}</div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Date badge */}
+                    <div
+                      className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0 ${
+                        day.isToday
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-slate-900 text-slate-400 border border-slate-700'
+                      }`}
+                    >
+                      <div className="text-[8px] font-bold uppercase leading-none">{day.dayName}</div>
+                      <div className="text-sm font-bold leading-tight">{day.dayNum}</div>
+                    </div>
+
+                    {/* Events */}
+                    <div className="flex-1 min-w-0">
+                      {allDayItems.length === 0 ? (
+                        <p className="text-[11px] text-slate-600 italic">Aucune activité</p>
+                      ) : (
+                        <div className="flex gap-1.5 flex-wrap">
+                          {allDayItems.slice(0, MAX_PILLS).map((item) => {
+                            if (item.type === 'enquete') {
+                              const enq = item.data;
+                              const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
+                              const clientName = enq.client
+                                ? `${enq.client.prenom || ''} ${enq.client.nom || ''}`.trim()
+                                : '';
+                              return (
+                                <span
+                                  key={`enq-${enq.id}`}
+                                  className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[9px] font-bold border ${
+                                    isOverdue
+                                      ? 'bg-red-500/20 text-red-300 border-red-500/30'
+                                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  }`}
+                                >
+                                  <ClipboardCheck size={8} />
+                                  {clientName ? clientName.split(' ')[0] : 'Enquête'}
+                                </span>
+                              );
+                            } else {
+                              const p = item.data;
+                              return (
+                                <span
+                                  key={p.id}
+                                  className={`px-2 py-0.5 rounded text-[9px] font-bold border ${typeColor(p.typeActivite)}`}
+                                  onClick={(e) => { e.stopPropagation(); setSelectedPlanning(p); }}
+                                >
+                                  {p.heureDebut} {p.typeActivite}
+                                </span>
+                              );
+                            }
+                          })}
+                          {allDayItems.length > MAX_PILLS && (
+                            <span className="text-[9px] font-bold text-cyan-400 self-center">
+                              +{allDayItems.length - MAX_PILLS}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Arrow indicator */}
+                    <ChevronRight size={14} className="text-slate-600 shrink-0" />
                   </div>
                 );
               })}
             </div>
+          ) : (
+            /* ── FULL: 7-column grid (tablet / desktop) ── */
+            <>
+              {/* Week header */}
+              <div className="grid grid-cols-7 border-b border-slate-700 bg-slate-900/30">
+                {weekDays.map(day => (
+                  <div
+                    key={day.date}
+                    className={`text-center py-2 border-r border-slate-700/50 last:border-r-0 ${day.isToday ? 'bg-cyan-500/10' : ''}`}
+                  >
+                    <div className="text-[10px] font-bold text-slate-500 uppercase">{day.dayName}</div>
+                    <div className={`text-xs font-bold ${day.isToday ? 'text-cyan-400' : 'text-white'}`}>
+                      {day.dayNum}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Week body */}
+              <div className="grid grid-cols-7 min-h-[300px]">
+                {weekDays.map(day => {
+                  const dayPlannings = planningsByDate[day.date] || [];
+                  const dayEnquetes = enquetesByDate[day.date] || [];
+                  const allDayItems = [...dayEnquetes.map(e => ({ type: 'enquete' as const, data: e })), ...dayPlannings.map(p => ({ type: 'planning' as const, data: p }))];
+                  const MAX_VISIBLE = 3;
+                  const visibleItems = allDayItems.slice(0, MAX_VISIBLE);
+                  const overflowCount = allDayItems.length - MAX_VISIBLE;
+                  const hasItems = allDayItems.length > 0;
+                  return (
+                    <div
+                      key={day.date}
+                      className={`border-r border-slate-700/50 last:border-r-0 p-1 min-h-[150px] relative group cursor-pointer ${
+                        day.isToday ? 'bg-cyan-500/5' : ''
+                      }`}
+                      onClick={() => { setSelectedDate(day.date); setViewMode('list'); }}
+                    >
+                      {!hasItems ? (
+                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Plus size={16} className="text-slate-600" />
+                         </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {visibleItems.map((item) => {
+                            if (item.type === 'enquete') {
+                              const enq = item.data;
+                              const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
+                              const clientName = enq.client
+                                ? `${enq.client.prenom || ''} ${enq.client.nom || ''}`.trim()
+                                : '';
+                              return (
+                                <div
+                                  key={`enq-${enq.id}`}
+                                  className={`w-full text-left px-1.5 py-1 rounded border text-[9px] leading-tight shadow-sm ${
+                                    isOverdue
+                                      ? 'bg-red-500/20 text-red-300 border-red-500/30'
+                                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  }`}
+                                >
+                                  <div className="font-bold truncate flex items-center gap-0.5">
+                                    <ClipboardCheck size={8} />
+                                    Enquête
+                                  </div>
+                                  {clientName && (
+                                    <div className="truncate opacity-80">{clientName}</div>
+                                  )}
+                                </div>
+                              );
+                            } else {
+                              const p = item.data;
+                              return (
+                                <button
+                                  key={p.id}
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedPlanning(p);
+                                  }}
+                                  className={`w-full text-left px-1.5 py-1 rounded border text-[9px] leading-tight transition-all hover:scale-[1.02] shadow-sm ${typeColor(p.typeActivite)}`}
+                                >
+                                  <div className="font-bold truncate">{p.heureDebut}</div>
+                                  <div className="truncate opacity-80">{p.typeActivite}</div>
+                                </button>
+                              );
+                            }
+                          })}
+                          {overflowCount > 0 && (
+                            <div className="text-[9px] font-bold text-cyan-400 text-center py-0.5 bg-cyan-500/10 rounded border border-cyan-500/20">
+                              +{overflowCount} autre{overflowCount > 1 ? 's' : ''}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
