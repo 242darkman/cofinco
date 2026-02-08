@@ -27,11 +27,14 @@
     "monitor:gl:alert": "node --env-file=.env --import tsx scripts/monitor-gl-strict.ts --alert",
     "cleanup:logs": "node --env-file=.env --import tsx scripts/cleanup-logs.ts",
     "cleanup:logs:dry-run": "node --env-file=.env --import tsx scripts/cleanup-logs.ts --dry-run",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:security": "vitest run tests/security",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug",
-    "playwright:install": "playwright install chromium"
+    "docker:test": "docker compose --profile test run --rm test-unit",
+    "docker:test:e2e": "docker compose --profile test run --rm test-e2e"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.969.0",

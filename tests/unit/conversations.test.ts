@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { db } from '../db';
+import { db } from 'server/db';
 import {
   conversations,
   conversationParticipants,

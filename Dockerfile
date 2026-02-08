@@ -30,6 +30,29 @@ ENTRYPOINT ["sh", "-c"]
 CMD ["npx drizzle-kit push && node --import tsx server/seed-prod.ts"]
 
 # ============================================
+# Stage: TEST — unit + integration tests
+# ============================================
+# Usage: docker compose run --rm test-unit
+FROM deps AS test
+WORKDIR /app
+COPY . .
+ENTRYPOINT ["npx"]
+CMD ["vitest", "run"]
+
+# ============================================
+# Stage: TEST-E2E — Playwright browser tests
+# ============================================
+# Usage: docker compose run --rm test-e2e
+# Uses Debian (not Alpine) because Playwright browsers need glibc
+FROM node:20-bookworm-slim AS test-e2e
+WORKDIR /app
+COPY package.json ./
+RUN npm install && npx playwright install --with-deps chromium
+COPY . .
+ENTRYPOINT ["npx"]
+CMD ["playwright", "test"]
+
+# ============================================
 # Stage 2: Build application
 # ============================================
 FROM node:20-alpine AS build

@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { db } from '../db';
-import { createLogger } from '../lib/logger';
+import { db } from 'server/db';
+import { createLogger } from 'server/lib/logger';
 import {
   comptes,
   transactionsCompte,
@@ -20,7 +20,7 @@ import {
   credits
 } from '@shared/schema';
 import { eq, sql, and, sum, isNull } from 'drizzle-orm';
-import { balanceService } from '../services/balance-service';
+import { balanceService } from 'server/services/balance-service';
 import { RECONCILIATION_THRESHOLDS } from '@shared/types/balances';
 
 const logger = createLogger('BalanceTest');

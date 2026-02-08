@@ -5,7 +5,7 @@ const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 const mockExecute = vi.fn();
 
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
     update: (...args: any[]) => mockUpdate(...args),
@@ -13,7 +13,7 @@ vi.mock('../db', () => ({
   },
 }));
 
-vi.mock('../services/notifications/templates/template-engine', () => ({
+vi.mock('server/services/notifications/templates/template-engine', () => ({
   renderSmsTemplate: vi.fn().mockResolvedValue('Rendered SMS message'),
   renderEmailTemplate: vi.fn().mockResolvedValue({
     subject: 'Test Subject',
@@ -22,15 +22,15 @@ vi.mock('../services/notifications/templates/template-engine', () => ({
   }),
 }));
 
-vi.mock('../services/notifications/policy/routing-policy', () => ({
+vi.mock('server/services/notifications/policy/routing-policy', () => ({
   resolveSmsProviderName: vi.fn().mockResolvedValue('mtn'),
 }));
 
-vi.mock('../services/notifications/policy/rate-limiter', () => ({
+vi.mock('server/services/notifications/policy/rate-limiter', () => ({
   checkChannelQuota: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('../services/notifications/audit/notification-audit', () => ({
+vi.mock('server/services/notifications/audit/notification-audit', () => ({
   logNotificationEvent: vi.fn(),
 }));
 
@@ -38,7 +38,7 @@ import {
   startNotificationWorker,
   stopNotificationWorker,
   isNotificationWorkerRunning,
-} from '../services/notifications/notification-worker';
+} from 'server/services/notifications/notification-worker';
 
 describe('Notification Worker', () => {
   beforeEach(() => {

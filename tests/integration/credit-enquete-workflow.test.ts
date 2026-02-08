@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { db } from '../../server/db';
+import { db } from 'server/db';
 import { 
   demandesCredit, 
   enquetesCredit, 
   credits 
-} from '../../shared/schema/finance';
+} from '@shared/schema/finance';
 import { 
   agentActivities 
-} from '../../shared/schema/agent-activities';
-import { clients } from '../../shared/schema/clients';
-import { users } from '../../shared/schema/auth';
-import { agences } from '../../shared/schema/agences';
+} from '@shared/schema/agent-activities';
+import { clients } from '@shared/schema/clients';
+import { users } from '@shared/schema/auth';
+import { agences } from '@shared/schema/agences';
 import { eq, and, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 

@@ -17,7 +17,7 @@ import {
   CaisseInactiveError,
   CaisseInsufficientFundsError,
   isCoffreCaisseError,
-} from "../services/coffre/coffre-errors";
+} from "server/services/coffre/coffre-errors";
 import {
   assertValidTypePaiement,
   getTypePaiementForCompte,

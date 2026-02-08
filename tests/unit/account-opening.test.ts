@@ -1,7 +1,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import comptesService from '../services/comptes';
-import { db } from '../db';
+import comptesService from 'server/services/comptes';
+import { db } from 'server/db';
 import { transactionsCompte, comptes, factures } from '@shared/schema';
 
 // --- Mocks Setup ---
@@ -36,7 +36,7 @@ const createMockBuilder = (result: any = []) => {
 };
 
 // Mock dependencies
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     query: {
       comptes: { findFirst: vi.fn(), findMany: vi.fn() },
@@ -52,7 +52,7 @@ vi.mock('../db', () => ({
 }));
 
 // Mock Ledger to avoid real financial logic complexity in unit test
-vi.mock('../services/ledger', () => ({
+vi.mock('server/services/ledger', () => ({
   executeWithLedger: vi.fn(async (module, data, callback) => {
     // Simulate ledger execution by calling callback
     mockTx.update.mockReturnValue(createMockBuilder([{}]));

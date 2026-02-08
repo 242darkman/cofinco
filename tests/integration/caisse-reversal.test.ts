@@ -26,14 +26,14 @@ const {
   mockGenerateReference: vi.fn().mockReturnValue('REV-2026-001'),
 }));
 
-vi.mock('../../server/db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn(),
     transaction: vi.fn(async (fn: any) => fn(mockTx)),
   },
 }));
 
-vi.mock('../../server/services/ledger', () => ({
+vi.mock('server/services/ledger', () => ({
   createMouvementFinancier: vi.fn(),
   createOutboxEvent: vi.fn(),
   createMouvementEvents: mockCreateMouvementEvents,
@@ -43,12 +43,12 @@ vi.mock('../../server/services/ledger', () => ({
   emitBalanceUpdates: mockEmitBalanceUpdates,
 }));
 
-vi.mock('../../server/services/notifications/domain-events/event-registry', () => ({
+vi.mock('server/services/notifications/domain-events/event-registry', () => ({
   dispatchDomainEvent: vi.fn(),
 }));
 
-import { db } from '../../server/db';
-import { reverseOperation, ReversalError, canReverseOperation } from '../../server/services/caisse/transaction-reversal-service';
+import { db } from 'server/db';
+import { reverseOperation, ReversalError, canReverseOperation } from 'server/services/caisse/transaction-reversal-service';
 
 // Helper to build mock chain that is both chainable AND thenable (like Drizzle)
 function mockChain(result: any) {

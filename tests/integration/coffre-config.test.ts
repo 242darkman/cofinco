@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { coffreRouter } from '../../server/routes/coffre';
-import { db } from '../../server/db'; // Correct top-level import
+import { coffreRouter } from 'server/routes/coffre';
+import { db } from 'server/db'; // Correct top-level import
 
 // Mock dependencies
-vi.mock('../../server/db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn(),
     update: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('@shared/schema', () => ({
   transfertsCoffreAuditLogs: {},
 }));
 
-vi.mock('../../server/services/coffre/transfert-service', () => {
+vi.mock('server/services/coffre/transfert-service', () => {
   return {
     TransfertCoffreService: class {
       listTransferts = vi.fn();

@@ -2,11 +2,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { hrRouter } from '../../server/routes/hr';
-import { storage } from '../../server/storage';
+import { hrRouter } from 'server/routes/hr';
+import { storage } from 'server/storage';
 
 // MOCK MIDDLEWARE
-vi.mock('../../server/middleware', () => ({
+vi.mock('server/middleware', () => ({
   getAuthUser: (req: any, res: any, next: any) => {
     req.user = { id: 'test-user', role: 'agent' }; 
     next();
@@ -15,12 +15,12 @@ vi.mock('../../server/middleware', () => ({
 }));
 
 // MOCK DB (Required deep dependency)
-vi.mock('../../server/db', () => ({
+vi.mock('server/db', () => ({
   db: { select: vi.fn(), insert: vi.fn() }
 }));
 
 // MOCK STORAGE
-vi.mock('../../server/storage', () => ({
+vi.mock('server/storage', () => ({
   storage: {
     checkIn: vi.fn(),
     checkOut: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('../../server/storage', () => ({
 }));
 
 // MOCK WS SERVER
-vi.mock('../../server/ws-server', () => ({
+vi.mock('server/ws-server', () => ({
   getWsInstance: () => ({
     broadcast: vi.fn()
   })

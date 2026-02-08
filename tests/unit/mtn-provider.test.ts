@@ -13,7 +13,7 @@ const createMockBuilder = (result: any = []) => {
   return builder;
 };
 
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
   },
@@ -23,7 +23,7 @@ vi.mock('../db', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { MtnSmsProvider } from '../services/notifications/providers/sms-mtn.provider';
+import { MtnSmsProvider } from 'server/services/notifications/providers/sms-mtn.provider';
 
 const MTN_SETTINGS = {
   id: '1',

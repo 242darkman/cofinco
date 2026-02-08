@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { processAutomaticCreditRepayments } from '../services/automatic-repayment-service';
-import { db } from '../db';
+import { processAutomaticCreditRepayments } from 'server/services/automatic-repayment-service';
+import { db } from 'server/db';
 
 // Mock dependencies
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     query: {
       credits: {
@@ -35,7 +35,7 @@ const createMockQueryBuilder = (result: any[]) => {
 
 // Mock Ledger functions 
 // Check where they are imported from in service. Usually ./ledger or ../storage/finance
-vi.mock('../services/ledger', () => ({
+vi.mock('server/services/ledger', () => ({
     executeWithLedger: vi.fn(async (module, data, callback) => {
         // Mock implementation that simply executes the callback
         const simpleTx = {

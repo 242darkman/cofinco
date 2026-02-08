@@ -8,7 +8,7 @@ import {
   TONTINE_REMINDER_OFFSETS,
   generateCreditReminders,
   generateTontineReminders,
-} from "../../server/services/schedule-generator";
+} from "server/services/schedule-generator";
 import { FinancialFrequency } from "@shared/enum/status-constants";
 
 // ============================================================================

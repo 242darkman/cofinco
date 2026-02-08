@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { executeScheduledDisbursement, getCreditsWithPendingDisbursement } from '../services/scheduled-disbursements-service';
-import { db } from '../db';
-import * as dbModule from '../db';
+import { executeScheduledDisbursement, getCreditsWithPendingDisbursement } from 'server/services/scheduled-disbursements-service';
+import { db } from 'server/db';
+import * as dbModule from 'server/db';
 
 // Mock the db module
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn(),
     update: vi.fn(),

@@ -8,9 +8,9 @@ import {
   validateReevaluationCreation,
   checkEligibilityQuick,
   CreateReevaluationPayload
-} from '../../server/services/reevaluation-validator';
-import { DemandeCredit, ConfigReevaluation, ReevaluationCredit } from '../../shared/schema/finance';
-import { StatutDemande, StatutReevaluation } from '../../shared/enum/status-constants';
+} from 'server/services/reevaluation-validator';
+import { DemandeCredit, ConfigReevaluation, ReevaluationCredit } from '@shared/schema/finance';
+import { StatutDemande, StatutReevaluation } from '@shared/enum/status-constants';
 import { addDays, subDays } from 'date-fns';
 
 describe('Reevaluation Validation Rules', () => {

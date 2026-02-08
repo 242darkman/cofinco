@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ============================================================================
 
 // Mock the database module before importing the middleware
-vi.mock("../../server/db", () => ({
+vi.mock("server/db", () => ({
   db: {
     select: vi.fn(),
   },
@@ -28,8 +28,8 @@ vi.mock("@shared/schema", () => ({
   },
 }));
 
-import { duplicateDetection } from "../../server/middleware/duplicate-detection";
-import { db } from "../../server/db";
+import { duplicateDetection } from "server/middleware/duplicate-detection";
+import { db } from "server/db";
 import type { Request, Response, NextFunction } from "express";
 
 // Helper to create mock request/response/next

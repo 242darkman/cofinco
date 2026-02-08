@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canTransition } from '../../server/services/coffre/state-machine';
+import { canTransition } from 'server/services/coffre/state-machine';
 
 describe('Coffre-Fort State Machine', () => {
   it('should allow valid transitions', () => {

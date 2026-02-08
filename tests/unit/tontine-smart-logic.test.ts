@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
 
 // Mock des dépendances
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
@@ -37,7 +37,7 @@ vi.mock('../db', () => ({
   }
 }));
 
-vi.mock('../services/ledger', () => ({
+vi.mock('server/services/ledger', () => ({
   executeWithLedger: vi.fn(async (module, data, callback, userId) => {
     const mockMouvement = {
       id: 'mouvement-123',
@@ -66,7 +66,7 @@ vi.mock('../services/ledger', () => ({
 }));
 
 // Import après les mocks
-import { previewPaymentDispatch, getMemberPaymentSummary } from '../services/tontine-logic';
+import { previewPaymentDispatch, getMemberPaymentSummary } from 'server/services/tontine-logic';
 
 describe('Tontine Smart Dispatcher', () => {
 

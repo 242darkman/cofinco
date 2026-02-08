@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { calculateNextTransferDate, executeAutomaticTransfer } from '../services/automatic-transfers-service';
-import { db } from '../db';
+import { calculateNextTransferDate, executeAutomaticTransfer } from 'server/services/automatic-transfers-service';
+import { db } from 'server/db';
 
 // Mock the db module
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn(),
     update: vi.fn(),

@@ -2,12 +2,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { hrRouter } from '../../server/routes/hr';
-import { db } from '../../server/db';
-import { demandesConges } from '../../shared/schema';
+import { hrRouter } from 'server/routes/hr';
+import { db } from 'server/db';
+import { demandesConges } from '@shared/schema';
 
 // MOCK MIDDLEWARE
-vi.mock('../../server/middleware', () => ({
+vi.mock('server/middleware', () => ({
   getAuthUser: (req: any, res: any, next: any) => {
     req.user = { id: 'test-user', role: 'admin' };
     next();
@@ -16,7 +16,7 @@ vi.mock('../../server/middleware', () => ({
 }));
 
 // MOCK DB
-vi.mock('../../server/db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn(),
     insert: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock('../../server/db', () => ({
 }));
 
 // MOCK WS SERVER
-vi.mock('../../server/ws-server', () => ({
+vi.mock('server/ws-server', () => ({
   getWsInstance: () => ({
     broadcast: vi.fn()
   })

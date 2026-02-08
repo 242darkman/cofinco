@@ -5,7 +5,7 @@ import {
   deriveSensFromType,
   getTransactionLabel,
   formatTransactionDescription,
-} from "../../shared/config/transaction-labels";
+} from "@shared/config/transaction-labels";
 
 // ============================================================================
 // CREDIT_TYPES / DEBIT_TYPES Sets

@@ -132,7 +132,7 @@ docker-compose.yml              ← base infrastructure (DB, Redis, MinIO, monit
 docker-compose.override.yml     ← DEV (auto-chargé, hot reload, ports debug)
 docker-compose.staging.yml      ← STAGING (Caddy + app/worker, localhost)
 docker-compose.prod.yml         ← PROD (Caddy + app/worker, public, resource limits)
-Dockerfile                      ← multi-stage (deps → dev → init → build → runtime)
+Dockerfile                      ← multi-stage (deps → dev → init → test → test-e2e → build → runtime)
 .dockerignore                   ← exclut .env, node_modules, .git
 
 .env.dev                        ← defaults DEV pré-remplis
@@ -147,6 +147,13 @@ monitoring/
 ├── loki/loki-config.yml
 ├── promtail/promtail-config.yml
 └── grafana/provisioning/       ← datasources (Prometheus + Loki), dashboards
+
+tests/                          ← tous les tests du projet (49 fichiers)
+├── unit/                       ← 26 tests unitaires (Vitest)
+├── integration/                ← 12 tests d'intégration (Vitest)
+├── e2e/                        ← 6 tests E2E navigateur (Playwright)
+├── security/                   ← 2 tests de régression sécurité (Vitest)
+└── robustness/                 ← 3 tests de robustesse financière (Vitest)
 
 server/                         ← backend Node.js / Express / TypeScript
 client/                         ← frontend React / Vite / TypeScript
@@ -165,14 +172,75 @@ npm run dev              # Serveur dev local (tsx, sans Docker)
 npm run build            # Build production (esbuild + Vite)
 npm run start            # Lancement production
 npm run check            # Type check TypeScript
-npm run test             # Tests unitaires (Vitest)
-npm run test:e2e         # Tests E2E (Playwright)
 
 npm run db:push          # Sync schéma → DB (Drizzle Kit)
 npm run db:seed          # Seeds de référence (production)
 npm run db:seed:dry-run  # Prévisualisation seeds
 npm run audit:integrity  # Audit d'intégrité comptable
 ```
+
+## Tests
+
+Tous les tests sont dans `tests/` et s'exécutent via Docker (aucun Node.js local requis).
+
+### Structure des tests
+
+```
+tests/
+├── unit/           26 tests — logique métier isolée (mocks complets)
+│   ├── caisse-agent/    coffre, caisses, opérations, approbations
+│   └── hr/              congés, paie
+├── integration/    12 tests — API routes, workflows, RBAC
+├── e2e/             6 tests — scénarios navigateur (Playwright + Chromium)
+├── security/        2 tests — régressions sécurité (70+ vérifications)
+└── robustness/      3 tests — précision financière, transactions concurrentes
+```
+
+### Lancer les tests via Docker
+
+```bash
+# ===== Tests unitaires + intégration + sécurité + robustesse =====
+# (Vitest, exécution rapide, mocks complets)
+docker compose --profile test run --rm test-unit
+
+# Filtrer par catégorie :
+docker compose --profile test run --rm test-unit npx vitest run tests/unit
+docker compose --profile test run --rm test-unit npx vitest run tests/integration
+docker compose --profile test run --rm test-unit npx vitest run tests/security
+docker compose --profile test run --rm test-unit npx vitest run tests/robustness
+
+# Filtrer par nom :
+docker compose --profile test run --rm test-unit npx vitest run -t "coffre"
+
+# ===== Tests E2E (navigateur) =====
+# Requiert l'app en cours d'exécution (docker compose up -d)
+docker compose --profile test run --rm test-e2e
+
+# Filtrer par fichier :
+docker compose --profile test run --rm test-e2e npx playwright test tests/e2e/credit-workflow.test.ts
+```
+
+### Frameworks
+
+| Framework | Scope | Config |
+|-----------|-------|--------|
+| **Vitest** | unit, integration, security, robustness | `vitest.config.ts` |
+| **Playwright** | e2e (navigateur Chromium) | `playwright.config.ts` |
+
+### Couverture par domaine
+
+| Domaine | Unit | Integration | E2E | Security |
+|---------|------|-------------|-----|----------|
+| Crédits | schedule, disbursements, reevaluation | workflow enquête, reminders | workflow complet, UI enquête | - |
+| Caisse | guards, state machine, reversals, agents | reversal API, coffre API/config | - | - |
+| Comptabilité | - | repayment allocation | - | précision décimale |
+| RBAC | hardening, permissions | matrice API (403/200) | UI permissions | - |
+| HR | logique congés/paie | attendance, leaves, payroll, recruitment | - | - |
+| Notifications | templates, routing, worker, OTP | pipeline, MTN provider | - | - |
+| Tontines | smart dispatcher | - | - | - |
+| Auth | - | - | login page | CSRF, sessions, OTP, passwords |
+| Sécurité | - | - | - | 70+ régressions (XSS, injection, crypto) |
+| Transactions | labels, reversals, duplicates | - | - | robustesse concurrentielle |
 
 ## Observabilité
 
@@ -198,7 +266,7 @@ docker compose exec pg-backup /backup.sh
 
 Pipeline GitHub Actions ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) :
 
-1. **Test** : `tsc` + `vitest` + `audit:integrity` + `npm audit`
+1. **Test** : `tsc` + `vitest run` + `audit:integrity` + `npm audit`
 2. **Build** : Docker build + push GHCR + scan Trivy
 3. **Deploy** : SSH → pull + rolling restart + health check
 

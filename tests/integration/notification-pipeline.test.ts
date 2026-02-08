@@ -10,7 +10,7 @@ const mockSelectResult: any[] = [];
 const mockUpdateWhere = vi.fn().mockResolvedValue(undefined);
 const mockUpdateSet = vi.fn().mockReturnValue({ where: mockUpdateWhere });
 
-vi.mock('../../server/db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -36,7 +36,7 @@ vi.mock('@shared/schema', () => ({
   },
 }));
 
-vi.mock('../../server/services/notifications/notification-service', () => ({
+vi.mock('server/services/notifications/notification-service', () => ({
   enqueueNotification: (...args: any[]) => mockEnqueueNotification(...args),
 }));
 
@@ -44,8 +44,8 @@ vi.mock('uuid', () => ({
   v4: () => 'test-uuid-0000-0000',
 }));
 
-import { processDueReminders, startReminderProcessor } from '../../server/services/notifications/reminder-processor';
-import { db } from '../../server/db';
+import { processDueReminders, startReminderProcessor } from 'server/services/notifications/reminder-processor';
+import { db } from 'server/db';
 
 describe('Notification Pipeline Integration', () => {
   beforeEach(() => {

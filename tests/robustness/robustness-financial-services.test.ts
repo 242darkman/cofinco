@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { processAutomaticTontineContributions } from '../services/automatic-tontine-service';
-import { executeAutomaticTransfer } from '../services/automatic-transfers-service';
-import { processAutomaticCreditRepayments } from '../services/automatic-repayment-service';
+import { processAutomaticTontineContributions } from 'server/services/automatic-tontine-service';
+import { executeAutomaticTransfer } from 'server/services/automatic-transfers-service';
+import { processAutomaticCreditRepayments } from 'server/services/automatic-repayment-service';
 import { createFactureForDepot } from '../storage/finance';
-import { db } from '../db';
+import { db } from 'server/db';
 import { transactionsCompte, modelesFactures, tontines, versementsAutomatiques } from '@shared/schema';
 
 // --- Mocks Setup ---
@@ -35,7 +35,7 @@ const createMockBuilder = (result: any = []) => {
   return builder;
 };
 
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     query: {
       tontines: { findMany: vi.fn() },
@@ -56,7 +56,7 @@ vi.mock('../db', () => ({
   }
 }));
 
-vi.mock('../services/ledger', () => ({
+vi.mock('server/services/ledger', () => ({
   executeWithLedger: vi.fn(async (module, data, callback) => {
     // Setup generic mock returns for the transaction context
     mockTx.update.mockReturnValue(createMockBuilder([{}]));
@@ -73,7 +73,7 @@ vi.mock('../storage/tontines', () => ({
     createContributionTontineWithLedger: vi.fn(),
 }));
 
-vi.mock('../services/tontine-logic', () => ({
+vi.mock('server/services/tontine-logic', () => ({
     isTourFullyPaid: vi.fn().mockResolvedValue({ isPaid: false, montantRestant: 1000 }),
 }));
 

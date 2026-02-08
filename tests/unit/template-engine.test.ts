@@ -13,7 +13,7 @@ const createMockBuilder = (result: any = []) => {
   return builder;
 };
 
-vi.mock('../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
   },
@@ -23,7 +23,7 @@ import {
   renderSmsTemplate,
   renderEmailTemplate,
   invalidateTemplateCache,
-} from '../services/notifications/templates/template-engine';
+} from 'server/services/notifications/templates/template-engine';
 
 describe('Template Engine', () => {
   beforeEach(() => {

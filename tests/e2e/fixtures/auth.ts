@@ -20,33 +20,33 @@ export interface TestUser {
  */
 export const testUsers: Record<string, TestUser> = {
   admin: {
-    email: 'admin@cofinco.com',
-    password: 'Admin123!',
+    email: 's.administrateur',
+    password: 'Password1234@',
     role: 'ADMIN',
     expectedModules: ['Clients', 'Crédits', 'Caisse', 'Comptabilité', 'Admin'],
     forbiddenModules: [],
   },
   caissier: {
-    email: 'caissier@cofinco.com',
-    password: 'Caissier123!',
+    email: '@g.ngouabi',
+    password: 'Password1234@',
     role: 'CAISSIER',
     expectedModules: ['Clients', 'Caisse'],
     forbiddenModules: ['Admin', 'Comptabilité'],
   },
   agentTerrain: {
-    email: 'agent@cofinco.com',
-    password: 'Agent123!',
+    email: '@e.makosso',
+    password: 'Password1234@',
     role: 'AGENT_TERRAIN',
     expectedModules: ['Clients'],
     forbiddenModules: ['Admin', 'Comptabilité', 'Coffre'],
   },
   comptable: {
-    email: 'comptable@cofinco.com',
-    password: 'Comptable123!',
+    email: '@c.mountou',
+    password: 'Password1234@',
     role: 'COMPTABLE',
     expectedModules: ['Comptabilité'],
     forbiddenModules: ['Admin'],
-  },
+  }
 };
 
 /**

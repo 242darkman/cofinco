@@ -9,10 +9,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { HrService } from '../../services/hr-service';
+import { HrService } from 'server/services/hr-service';
 
 // Mock the database
-vi.mock('../../db', () => ({
+vi.mock('server/db', () => ({
   db: {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),

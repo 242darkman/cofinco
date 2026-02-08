@@ -52,7 +52,6 @@ scrape_configs:
             msg: msg
             time: time
             err: err
-          source: output
       # Fallback: if not JSON, use raw log
       - labels:
           level:
