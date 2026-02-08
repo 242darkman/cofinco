@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { processAutomaticTontineContributions } from 'server/services/automatic-tontine-service';
 import { executeAutomaticTransfer } from 'server/services/automatic-transfers-service';
 import { processAutomaticCreditRepayments } from 'server/services/automatic-repayment-service';
-import { createFactureForDepot } from '../storage/finance';
+import { createFactureForDepot } from 'server/storage/finance';
 import { db } from 'server/db';
 import { transactionsCompte, modelesFactures, tontines, versementsAutomatiques } from '@shared/schema';
 
@@ -69,7 +69,7 @@ vi.mock('server/services/ledger', () => ({
   generateReference: vi.fn().mockReturnValue('REF-TEST'),
 }));
 
-vi.mock('../storage/tontines', () => ({
+vi.mock('server/storage/tontines', () => ({
     createContributionTontineWithLedger: vi.fn(),
 }));
 

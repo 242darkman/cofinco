@@ -15,14 +15,14 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve, join } from "path";
 
-const ROOT = resolve(__dirname, "..");
+const ROOT = resolve(__dirname, "../..");
 const read = (relPath: string) => readFileSync(join(ROOT, relPath), "utf-8");
 
-const migrationService = read("services/agency-migration.ts");
-const settingsRoute = read("routes/settings.ts");
-const agencesRoute = read("routes/agences.ts");
-const wsServer = read("ws-server.ts");
-const migrationSchema = read("../shared/schema/agency_migration.ts");
+const migrationService = read("server/services/agency-migration.ts");
+const settingsRoute = read("server/routes/settings.ts");
+const agencesRoute = read("server/routes/agences.ts");
+const wsServer = read("server/ws-server.ts");
+const migrationSchema = read("shared/schema/agency_migration.ts");
 
 // ============================================================================
 // MIGRATION SERVICE — Treasury Security (Requirement B)

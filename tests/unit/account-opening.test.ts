@@ -65,7 +65,7 @@ vi.mock('server/services/ledger', () => ({
 }));
 
 // Mock finance storage functions used creating invoices
-vi.mock('../storage/finance', () => ({
+vi.mock('server/storage/finance', () => ({
   createFactureForDepotInitial: vi.fn().mockResolvedValue({ id: 'fac-1', reference: 'FAC-INIT' }),
   createFactureForDepot: vi.fn(),
   createFactureForRetrait: vi.fn()

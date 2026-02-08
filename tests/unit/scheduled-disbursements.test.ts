@@ -13,11 +13,11 @@ vi.mock('server/db', () => ({
 }));
 
 // Mock storage/finance
-vi.mock('../storage/finance', () => ({
+vi.mock('server/storage/finance', () => ({
   createDecaissementWithLedger: vi.fn(),
 }));
 
-import { createDecaissementWithLedger } from '../storage/finance';
+import { createDecaissementWithLedger } from 'server/storage/finance';
 
 describe('Scheduled Disbursements Service', () => {
   describe('executeScheduledDisbursement - Validation Tests', () => {

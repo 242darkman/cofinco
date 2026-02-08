@@ -16,7 +16,8 @@ import { D, roundMoney, roundFCFA, roundRate, splitEvenly, isEffectivelyZero } f
 
 const logger = createLogger('SecurityTest');
 
-const ROOT = resolve(__dirname, "..");
+const PROJECT_ROOT = resolve(__dirname, "../..");
+const ROOT = resolve(PROJECT_ROOT, "server");
 
 /**
  * Recursively collect all .ts files under a directory (excluding node_modules, __tests__, .d.ts)
@@ -218,13 +219,13 @@ describe("Session fixation — Session regeneration on login", () => {
 describe("Session secret — No hardcoded fallback in production", () => {
 
   it("auth.ts should crash if SESSION_SECRET is missing in production", () => {
-    const content = readFileSync(join(ROOT, "../server/auth.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "auth.ts"), "utf-8");
     expect(content).toContain("process.exit(1)");
     expect(content).not.toContain("cofin-secret-key-change-in-production");
   });
 
   it("ws-server.ts should not use the old hardcoded secret", () => {
-    const content = readFileSync(join(ROOT, "../server/ws-server.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "ws-server.ts"), "utf-8");
     expect(content).not.toContain("cofin-secret-key-change-in-production");
   });
 });
@@ -316,7 +317,7 @@ describe("XSS prevention — dangerouslySetInnerHTML uses DOMPurify", () => {
 
   it("NotificationPreview should sanitize HTML with DOMPurify", () => {
     const content = readFileSync(
-      resolve(ROOT, "../../client/src/components/admin/notifications/NotificationPreview.tsx"),
+      resolve(PROJECT_ROOT, "client/src/components/admin/notifications/NotificationPreview.tsx"),
       "utf-8"
     );
     expect(content).toContain("DOMPurify");
@@ -331,7 +332,7 @@ describe("XSS prevention — dangerouslySetInnerHTML uses DOMPurify", () => {
 describe("Docker — Non-root execution", () => {
 
   it("Dockerfile should have a USER directive", () => {
-    const content = readFileSync(resolve(ROOT, "../../Dockerfile"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, "Dockerfile"), "utf-8");
     expect(content).toMatch(/^USER\s+\S+/m);
     expect(content).not.toMatch(/USER\s+root/);
   });
@@ -344,7 +345,7 @@ describe("Docker — Non-root execution", () => {
 describe("Docker Compose — No hardcoded passwords", () => {
 
   it("docker-compose.yml should not contain hardcoded default passwords", () => {
-    const content = readFileSync(resolve(ROOT, "../../docker-compose.yml"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, "docker-compose.yml"), "utf-8");
     expect(content).not.toContain("admin123");
     expect(content).not.toContain("minioadmin123");
   });
@@ -357,7 +358,7 @@ describe("Docker Compose — No hardcoded passwords", () => {
 describe("Environment — No real credentials in example files", () => {
 
   it(".env.production.example should not contain real-looking passwords", () => {
-    const content = readFileSync(resolve(ROOT, "../../.env.production.example"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, ".env.production.example"), "utf-8");
     expect(content).not.toMatch(/Admin123/);
     expect(content).not.toMatch(/COFINCO_SECRET_2026/);
   });
@@ -370,7 +371,7 @@ describe("Environment — No real credentials in example files", () => {
 describe("Error handler — Production error sanitization", () => {
 
   it("index.ts global error handler should not expose err.message in production", () => {
-    const content = readFileSync(resolve(ROOT, "../server/index.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "index.ts"), "utf-8");
     // Should check NODE_ENV before exposing error message
     expect(content).toContain("isProduction && status >= 500");
     expect(content).toContain("Erreur interne du serveur");
@@ -405,14 +406,14 @@ describe("Legacy OTP — Timing-safe comparison", () => {
 describe("Password policy — Minimum length >= 12", () => {
 
   it("default password requirements should have minLength >= 12", () => {
-    const content = readFileSync(resolve(ROOT, "../server/audit.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "audit.ts"), "utf-8");
     const match = content.match(/minLength:\s*(\d+)/);
     expect(match).toBeTruthy();
     expect(parseInt(match![1])).toBeGreaterThanOrEqual(12);
   });
 
   it("seed securitySettings should have passwordMinLength >= 12", () => {
-    const content = readFileSync(resolve(ROOT, "../server/seed-prod.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "seed-prod.ts"), "utf-8");
     const matches = content.match(/passwordMinLength:\s*(\d+)/g);
     expect(matches).toBeTruthy();
     for (const m of matches!) {
@@ -443,14 +444,14 @@ describe("Session timeout — Aligned with ABSOLUTE_TIMEOUT_MS", () => {
 describe("CSRF — Origin/Referer validation middleware", () => {
 
   it("CSRF middleware should exist", () => {
-    const content = readFileSync(resolve(ROOT, "../server/middleware/csrf.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "middleware/csrf.ts"), "utf-8");
     expect(content).toContain("csrfProtection");
     expect(content).toContain("Origin");
     expect(content).toContain("Referer");
   });
 
   it("CSRF middleware should be registered in index.ts", () => {
-    const content = readFileSync(resolve(ROOT, "../server/index.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "index.ts"), "utf-8");
     expect(content).toContain("csrfProtection");
   });
 });
@@ -549,7 +550,7 @@ describe("Math.random() elimination — Client-side security code", () => {
   ];
 
   it("should not use Math.random() for passwords, codes, references, or tokens", () => {
-    const clientRoot = resolve(ROOT, "../../client/src");
+    const clientRoot = resolve(PROJECT_ROOT, "client/src");
     const violations: string[] = [];
     for (const relPath of CLIENT_CRITICAL_FILES) {
       const content = readFileSync(join(clientRoot, relPath), "utf-8");
@@ -564,7 +565,7 @@ describe("Math.random() elimination — Client-side security code", () => {
   });
 
   it("client password generation should use crypto.getRandomValues", () => {
-    const clientRoot = resolve(ROOT, "../../client/src");
+    const clientRoot = resolve(PROJECT_ROOT, "client/src");
     const content = readFileSync(join(clientRoot, "components/admin/users/UserFormModal.tsx"), "utf-8");
     expect(content).toContain("crypto.getRandomValues");
     expect(content).not.toMatch(/generatePassword[\s\S]*?Math\.random/);
@@ -578,7 +579,7 @@ describe("Math.random() elimination — Client-side security code", () => {
 describe("Schema — Agency code generation uses crypto", () => {
 
   it("settings.ts should use crypto.randomInt for agency code", () => {
-    const content = readFileSync(resolve(ROOT, "../../shared/schema/settings.ts"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, "shared/schema/settings.ts"), "utf-8");
     const genFn = content.substring(content.indexOf("generateAgenceCode"), content.indexOf("generateAgenceCode") + 300);
     expect(genFn).toContain("crypto.randomInt");
     expect(genFn).not.toContain("Math.random");
@@ -592,12 +593,12 @@ describe("Schema — Agency code generation uses crypto", () => {
 describe("Environment — No default passwords in production template", () => {
 
   it(".env.production.example should not contain ChangeMeInProduction", () => {
-    const content = readFileSync(resolve(ROOT, "../../.env.production.example"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, ".env.production.example"), "utf-8");
     expect(content).not.toContain("ChangeMeInProduction");
   });
 
   it(".env.production.example SESSION_SECRET should be empty", () => {
-    const content = readFileSync(resolve(ROOT, "../../.env.production.example"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, ".env.production.example"), "utf-8");
     expect(content).toMatch(/SESSION_SECRET=\s*$/m);
   });
 });
