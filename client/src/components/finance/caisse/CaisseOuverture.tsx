@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2, Loader2, Send, Package, ArrowRight, Ban, Banknote, Plus } from 'lucide-react';
+import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2, Loader2, Send, Package, ArrowRight, Ban, Banknote, Plus, Eye, EyeOff } from 'lucide-react';
 import { Card, Button, IconButton, LoadingSpinner, Badge } from '../../ui';
 import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -130,6 +130,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
   const [accessCodeError, setAccessCodeError] = useState('');
   // Toggle entre PIN et code d'accès (quand l'utilisateur a un PIN)
   const [useAccessCode, setUseAccessCode] = useState(false);
+  const [showAccessCode, setShowAccessCode] = useState(false);
+  const [showPin, setShowPin] = useState(false);
 
   // Vérifier si l'utilisateur a un PIN configuré au chargement
   useEffect(() => {
@@ -804,17 +806,25 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                         <div className="relative">
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                           <input
-                            type="password"
+                            type={showPin ? 'text' : 'password'}
                             placeholder="••••••"
                             maxLength={6}
                             value={authData.pin}
                             onChange={(e) => setAuthData({ ...authData, pin: e.target.value })}
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-10 py-3 text-white tracking-[0.8em] font-mono text-lg focus:border-emerald-500 outline-none transition-all placeholder-slate-700"
                           />
-                          {authData.pin.length === 6 && (
+                          {authData.pin.length === 6 ? (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
                               <CheckCircle2 size={20} />
                             </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setShowPin(!showPin)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                            >
+                              {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
                           )}
                         </div>
                       )}
@@ -826,8 +836,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                             <div className="relative flex-1">
                               <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
                               <input
-                                type="text"
-                                placeholder="XXXXXXXX"
+                                type={showAccessCode ? 'text' : 'password'}
+                                placeholder="XXXXXX"
                                 maxLength={8}
                                 value={accessCode}
                                 onChange={(e) => {
@@ -837,10 +847,17 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                                 }}
                                 disabled={accessCodeValidated}
                                 autoFocus
-                                className={`w-full bg-slate-900 border rounded-xl pl-10 pr-3 py-3 text-white font-mono tracking-[0.3em] text-lg focus:ring-1 outline-none transition-all placeholder-slate-700 disabled:opacity-50 ${
+                                className={`w-full bg-slate-900 border rounded-xl pl-10 pr-10 py-3 text-white font-mono tracking-[0.3em] text-lg focus:ring-1 outline-none transition-all placeholder-slate-700 disabled:opacity-50 ${
                                   accessCodeValidated ? 'border-emerald-500 focus:ring-emerald-500' : 'border-amber-500/50 focus:border-amber-500 focus:ring-amber-500/20'
                                 }`}
                               />
+                              <button
+                                type="button"
+                                onClick={() => setShowAccessCode(!showAccessCode)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                              >
+                                {showAccessCode ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
                             </div>
                             <button
                               type="button"
