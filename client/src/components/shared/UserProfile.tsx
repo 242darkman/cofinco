@@ -295,6 +295,8 @@ function CaissePinManager({ hasPin, onPinConfigured, canAccessCaisse }: CaissePi
 }
 
 function PinForm({ formData, setFormData, showPassword, setShowPassword, loading, error, onSubmit, onCancel }: PinFormProps) {
+  const [showPin, setShowPin] = useState(false);
+
   return (
     <form onSubmit={onSubmit} className="space-y-2">
       {error && (
@@ -322,27 +324,47 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <input
-          type="password"
-          value={formData.newPin}
-          onChange={(e) => setFormData({ ...formData, newPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-          className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none h-7"
-          placeholder="Nouveau"
-          maxLength={6}
-          inputMode="numeric"
-          required
-        />
-        <input
-          type="password"
-          value={formData.confirmPin}
-          onChange={(e) => setFormData({ ...formData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-          className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none h-7"
-          placeholder="Confirmer"
-          maxLength={6}
-          inputMode="numeric"
-          required
-        />
+        <div className="relative">
+          <input
+            type={showPin ? 'text' : 'password'}
+            value={formData.newPin}
+            onChange={(e) => setFormData({ ...formData, newPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none pr-6 h-7"
+            placeholder="Nouveau"
+            maxLength={6}
+            inputMode="numeric"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPin(!showPin)}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+          >
+            {showPin ? <EyeOff size={10} /> : <Eye size={10} />}
+          </button>
+        </div>
+        <div className="relative">
+          <input
+            type={showPin ? 'text' : 'password'}
+            value={formData.confirmPin}
+            onChange={(e) => setFormData({ ...formData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none pr-6 h-7"
+            placeholder="Confirmer"
+            maxLength={6}
+            inputMode="numeric"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPin(!showPin)}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+          >
+            {showPin ? <EyeOff size={10} /> : <Eye size={10} />}
+          </button>
+        </div>
       </div>
+
+      <p className="text-[9px] text-slate-500">6 chiffres minimum requis</p>
 
       <div className="flex gap-1.5">
         <button

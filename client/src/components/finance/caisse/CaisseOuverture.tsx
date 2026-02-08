@@ -128,6 +128,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
   const [accessCodeValidated, setAccessCodeValidated] = useState(false);
   const [accessCodeLoading, setAccessCodeLoading] = useState(false);
   const [accessCodeError, setAccessCodeError] = useState('');
+  // Toggle entre PIN et code d'accès (quand l'utilisateur a un PIN)
+  const [useAccessCode, setUseAccessCode] = useState(false);
 
   // Vérifier si l'utilisateur a un PIN configuré au chargement
   useEffect(() => {
@@ -266,14 +268,15 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       return;
     }
 
-    // Validation: soit PIN valide, soit code d'accès validé
-    if (!accessCodeValidated) {
-      if (!hasPinConfigured) {
+    // Validation: soit PIN valide, soit code d'accès validé (mutuellement exclusif)
+    if (useAccessCode || !hasPinConfigured) {
+      if (!accessCodeValidated) {
         setError("Veuillez valider un code d'accès pour continuer.");
         setLoading(false);
         return;
       }
-      if (!authData.pin || authData.pin.length < 4) {
+    } else {
+      if (!authData.pin || authData.pin.length < 6) {
         setError("Veuillez entrer votre PIN à 6 chiffres.");
         setLoading(false);
         return;
@@ -287,8 +290,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
     }
 
     try {
-      // 1. Vérifier le PIN (sauf si code d'accès validé)
-      if (!accessCodeValidated) {
+      // 1. Vérifier le PIN (sauf si mode code d'accès)
+      if (!useAccessCode && hasPinConfigured && !accessCodeValidated) {
         const pinRes = await fetch('/api/auth/verify-pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -314,7 +317,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         montantDemande,
         agenceId: selectedAgenceId || currentUser?.agenceId,
         observations,
-        ...(accessCodeValidated && { supervisorOverride: true }),
+        ...((useAccessCode || !hasPinConfigured) && accessCodeValidated && { supervisorOverride: true }),
       });
 
       setSession(result.session);
@@ -444,14 +447,15 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       return;
     }
 
-    // Validation: soit PIN valide, soit code d'accès validé
-    if (!accessCodeValidated) {
-      if (!hasPinConfigured) {
+    // Validation: soit PIN valide, soit code d'accès validé (mutuellement exclusif)
+    if (useAccessCode || !hasPinConfigured) {
+      if (!accessCodeValidated) {
         setError("Veuillez valider un code d'accès pour continuer.");
         setLoading(false);
         return;
       }
-      if (!authData.pin || authData.pin.length < 4) {
+    } else {
+      if (!authData.pin || authData.pin.length < 6) {
         setError("Veuillez entrer votre PIN à 6 chiffres.");
         setLoading(false);
         return;
@@ -459,8 +463,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
     }
 
     try {
-      // 1. Vérifier le PIN (sauf si code d'accès validé)
-      if (!accessCodeValidated) {
+      // 1. Vérifier le PIN (sauf si mode code d'accès)
+      if (!useAccessCode && hasPinConfigured && !accessCodeValidated) {
         const pinRes = await fetch('/api/auth/verify-pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -485,7 +489,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         caisseId: selectedCaisseId,
         agenceId: selectedAgenceId || currentUser?.agenceId,
         observations,
-        ...(accessCodeValidated && { supervisorOverride: true }),
+        ...((useAccessCode || !hasPinConfigured) && accessCodeValidated && { supervisorOverride: true }),
       });
 
       setSession(result.session);
@@ -565,21 +569,21 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         {/* COLONNE DROITE : ACTION (Interactive) */}
         <div className="flex-1 p-6 md:p-8 flex flex-col bg-slate-950 overflow-y-auto">
            
-           <div className="flex justify-between items-start mb-6">
+           <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-xl font-bold text-white">
+                <h2 className="text-lg font-bold text-white">
                   {step === 'auth' && 'Initialisation Caisse'}
                   {step === 'waiting' && 'Vérification en cours...'}
                   {step === 'confirm' && 'Confirmation des fonds'}
                 </h2>
-                <p className="text-sm text-slate-500">
+                <p className="text-xs text-slate-500">
                   {step === 'auth' && 'Sélectionnez votre caisse et le mode d\'ouverture.'}
                   {step === 'waiting' && 'En attente de l\'approbation du responsable.'}
                   {step === 'confirm' && 'Veuillez confirmer le billetage reçu.'}
                 </p>
               </div>
               <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
-                <X size={24}/>
+                <X size={20}/>
               </button>
            </div>
 
@@ -601,43 +605,43 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
            <div className="flex-1">
               {/* PHASE A: Demande de fonds */}
               {step === 'auth' && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* 1. SÉLECTION AGENCE & CAISSE */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {isAdmin && (
-                      <div className="space-y-2">
-                         <label className="text-xs font-bold text-slate-500 uppercase ml-1">Agence</label>
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Agence</label>
                          <div className="relative">
-                            <Monitor className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                            <select 
+                            <Monitor className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                            <select
                               value={selectedAgenceId}
                               onChange={(e) => setSelectedAgenceId(e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-10 py-3 text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-8 py-2.5 text-sm text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
                             >
                               {agences.map(a => <option key={a.id} value={a.id}>{a.nom}</option>)}
                             </select>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                              <span className="text-slate-500">▼</span>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                              <span className="text-slate-500 text-xs">▼</span>
                             </div>
                          </div>
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                       <label className="text-xs font-bold text-slate-500 uppercase ml-1">Sélectionner votre caisse</label>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Sélectionner votre caisse</label>
                        <div className="relative">
-                          <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                          <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                           {loadingCaisses ? (
-                            <div className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-slate-400 flex items-center gap-2">
+                            <div className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-slate-400 flex items-center gap-2">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span className="text-sm">Chargement...</span>
                             </div>
                           ) : (
                             <>
-                              <select 
+                              <select
                                 value={selectedCaisseId}
                                 onChange={(e) => setSelectedCaisseId(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-10 py-3 text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-8 py-2.5 text-sm text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
                               >
                                 <option value="">Choisir une caisse</option>
                                 {caisses.map(c => (
@@ -646,8 +650,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                                   </option>
                                 ))}
                               </select>
-                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <span className="text-slate-500">▼</span>
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <span className="text-slate-500 text-xs">▼</span>
                               </div>
                             </>
                           )}
@@ -657,62 +661,57 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
 
                   {/* CHOIX DU MODE D'OUVERTURE */}
                   {selectedCaisseId && (
-                    <div className={`p-4 ${hasFondsReporte ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-900/50 border-slate-700'} border rounded-xl space-y-4 animate-in slide-in-from-top-2`}>
+                    <div className={`p-3 ${hasFondsReporte ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-900/50 border-slate-700'} border rounded-xl space-y-3 animate-in slide-in-from-top-2`}>
                       {hasFondsReporte && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                            <Banknote className="h-5 w-5 text-amber-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-amber-200">Fonds reporté disponible</p>
-                            <p className="text-xs text-amber-300/70">
-                              Cette caisse contient <span className="font-bold text-amber-200">{formatMoney(soldeExistant)}</span> de la session précédente.
-                            </p>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Banknote className="h-4 w-4 text-amber-400 shrink-0" />
+                          <p className="text-xs text-amber-300/70">
+                            Fonds reporté : <span className="font-bold text-amber-200">{formatMoney(soldeExistant)}</span>
+                          </p>
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setOpeningMode('direct')}
-                          className={`p-3 rounded-xl border text-left transition-all ${
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
                             openingMode === 'direct'
                               ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500'
                               : 'bg-slate-900/50 border-slate-700 hover:border-slate-500'
                           }`}
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <Unlock className={`h-4 w-4 ${openingMode === 'direct' ? 'text-emerald-400' : 'text-slate-400'}`} />
-                            <span className={`text-sm font-semibold ${openingMode === 'direct' ? 'text-emerald-300' : 'text-slate-300'}`}>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <Unlock className={`h-3.5 w-3.5 ${openingMode === 'direct' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            <span className={`text-xs font-semibold ${openingMode === 'direct' ? 'text-emerald-300' : 'text-slate-300'}`}>
                               {hasFondsReporte ? 'Ouverture rapide' : 'Ouverture à vide'}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-[10px] text-slate-400 leading-tight">
                             {hasFondsReporte
-                              ? `Ouvrir avec le fonds existant (${formatMoney(soldeExistant)})`
-                              : 'Ouvrir la caisse à 0 FCFA sans approvisionnement'}
+                              ? `Ouvrir avec le fonds existant`
+                              : 'Ouvrir à 0 FCFA sans approvisionnement'}
                           </p>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setOpeningMode('request')}
-                          className={`p-3 rounded-xl border text-left transition-all ${
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
                             openingMode === 'request'
                               ? 'bg-cyan-500/20 border-cyan-500 ring-1 ring-cyan-500'
                               : 'bg-slate-900/50 border-slate-700 hover:border-slate-500'
                           }`}
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <Plus className={`h-4 w-4 ${openingMode === 'request' ? 'text-cyan-400' : 'text-slate-400'}`} />
-                            <span className={`text-sm font-semibold ${openingMode === 'request' ? 'text-cyan-300' : 'text-slate-300'}`}>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <Plus className={`h-3.5 w-3.5 ${openingMode === 'request' ? 'text-cyan-400' : 'text-slate-400'}`} />
+                            <span className={`text-xs font-semibold ${openingMode === 'request' ? 'text-cyan-300' : 'text-slate-300'}`}>
                               {hasFondsReporte ? 'Avec complément' : 'Demander au coffre'}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-[10px] text-slate-400 leading-tight">
                             {hasFondsReporte
-                              ? 'Demander des fonds supplémentaires au coffre'
+                              ? 'Demander des fonds supplémentaires'
                               : 'Demander un approvisionnement au coffre-fort'}
                           </p>
                         </button>
@@ -757,172 +756,122 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   </div>
                   )}
 
-                  {/* 3. AUTHENTIFICATION DYNAMIQUE (PIN ou Code d'accès) */}
+                  {/* 3. AUTHENTIFICATION (PIN ou Code d'accès — mutuellement exclusif) */}
                   {checkingPinStatus ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                    <div className="flex items-center justify-center py-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
                       <span className="ml-2 text-xs text-slate-500">Vérification...</span>
                     </div>
-                  ) : hasPinConfigured ? (
-                    <>
-                      {/* Utilisateur avec PIN configuré - Afficher champ PIN */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-slate-500 uppercase ml-1">Code PIN Agent</label>
-                          {accessCodeValidated && (
-                            <span className="text-[10px] text-emerald-400 font-medium">Bypass activé</span>
-                          )}
+                  ) : (
+                    <div className="space-y-2">
+                      {/* Toggle PIN / Code d'accès */}
+                      {hasPinConfigured ? (
+                        <div className="flex items-center bg-slate-800/50 rounded-lg p-0.5 border border-slate-700/50">
+                          <button
+                            type="button"
+                            onClick={() => { setUseAccessCode(false); setAccessCode(''); setAccessCodeValidated(false); setAccessCodeError(''); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                              !useAccessCode
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Lock size={12} />
+                            Code PIN
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setUseAccessCode(true); setAuthData({ pin: '' }); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                              useAccessCode
+                                ? 'bg-amber-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <KeyRound size={12} />
+                            Code d'accès
+                          </button>
                         </div>
+                      ) : (
+                        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <p className="text-[10px] text-amber-300">PIN non configuré — utilisez un code d'accès admin.</p>
+                        </div>
+                      )}
+
+                      {/* Champ PIN */}
+                      {hasPinConfigured && !useAccessCode && (
                         <div className="relative">
-                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                           <input
                             type="password"
-                            placeholder={accessCodeValidated ? "Non requis" : "••••••"}
+                            placeholder="••••••"
                             maxLength={6}
                             value={authData.pin}
                             onChange={(e) => setAuthData({ ...authData, pin: e.target.value })}
-                            disabled={accessCodeValidated}
-                            className={`w-full bg-slate-900 border border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-white tracking-[1em] font-mono text-xl focus:border-emerald-500 outline-none transition-all placeholder-slate-800 ${accessCodeValidated ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-10 py-3 text-white tracking-[0.8em] font-mono text-lg focus:border-emerald-500 outline-none transition-all placeholder-slate-700"
                           />
-                          {authData.pin.length === 6 && !accessCodeValidated && (
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
-                              <CheckCircle2 size={24} />
+                          {authData.pin.length === 6 && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                              <CheckCircle2 size={20} />
                             </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Champ Code d'accès */}
+                      {(useAccessCode || !hasPinConfigured) && (
+                        <>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
+                              <input
+                                type="text"
+                                placeholder="XXXXXXXX"
+                                maxLength={8}
+                                value={accessCode}
+                                onChange={(e) => {
+                                  setAccessCode(e.target.value.toUpperCase());
+                                  setAccessCodeValidated(false);
+                                  setAccessCodeError('');
+                                }}
+                                disabled={accessCodeValidated}
+                                autoFocus
+                                className={`w-full bg-slate-900 border rounded-xl pl-10 pr-3 py-3 text-white font-mono tracking-[0.3em] text-lg focus:ring-1 outline-none transition-all placeholder-slate-700 disabled:opacity-50 ${
+                                  accessCodeValidated ? 'border-emerald-500 focus:ring-emerald-500' : 'border-amber-500/50 focus:border-amber-500 focus:ring-amber-500/20'
+                                }`}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleValidateAccessCode}
+                              disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
+                              className="px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-1.5"
+                            >
+                              {accessCodeLoading ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : accessCodeValidated ? (
+                                <Check size={14} />
+                              ) : (
+                                'Valider'
+                              )}
+                            </button>
+                          </div>
+                          {accessCodeError && (
+                            <p className="text-[10px] text-red-400 flex items-center gap-1">
+                              <AlertCircle size={11} />
+                              {accessCodeError}
+                            </p>
                           )}
                           {accessCodeValidated && (
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
-                              <Shield size={24} />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Option code d'accès (fallback) */}
-                      <div className="border-t border-slate-800 pt-3">
-                        <p className="text-[10px] text-slate-600 mb-2">
-                          Pas accès à votre PIN ? Utilisez un code d'accès fourni par l'admin.
-                        </p>
-                        <div className="relative flex gap-2">
-                          <div className="relative flex-1">
-                            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                            <input
-                              type="text"
-                              placeholder="Code d'accès (8 car.)"
-                              maxLength={8}
-                              value={accessCode}
-                              onChange={(e) => {
-                                setAccessCode(e.target.value.toUpperCase());
-                                setAccessCodeValidated(false);
-                                setAccessCodeError('');
-                              }}
-                              disabled={accessCodeValidated}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-white font-mono tracking-widest text-sm focus:border-amber-500 outline-none transition-all placeholder-slate-700 disabled:opacity-50"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleValidateAccessCode}
-                            disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
-                            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
-                          >
-                            {accessCodeLoading ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : accessCodeValidated ? (
-                              <Check size={14} />
-                            ) : (
-                              'Valider'
-                            )}
-                          </button>
-                        </div>
-                        {accessCodeError && (
-                          <p className="text-xs text-red-400 flex items-center gap-1 mt-1">
-                            <AlertCircle size={12} />
-                            {accessCodeError}
-                          </p>
-                        )}
-                        {accessCodeValidated && (
-                          <p className="text-xs text-emerald-400 flex items-center gap-1 mt-1">
-                            <CheckCircle2 size={12} />
-                            Code validé - Vous pouvez continuer sans PIN
-                          </p>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Utilisateur SANS PIN configuré - Afficher uniquement code d'accès */}
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-3">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs font-semibold text-amber-300">PIN non configuré</p>
-                            <p className="text-[10px] text-amber-300/70 mt-0.5">
-                              Vous n'avez pas encore défini de PIN. Utilisez un code d'accès pour ouvrir la session, puis configurez votre PIN dans Paramètres &gt; Sécurité.
+                            <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                              <CheckCircle2 size={11} />
+                              Code validé — vous pouvez ouvrir la session
                             </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-amber-400 uppercase ml-1 flex items-center gap-2">
-                          <KeyRound size={14} />
-                          Code d'accès requis
-                        </label>
-                        <div className="relative flex gap-2">
-                          <div className="relative flex-1">
-                            <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
-                            <input
-                              type="text"
-                              placeholder="XXXXXXXX"
-                              maxLength={8}
-                              value={accessCode}
-                              onChange={(e) => {
-                                setAccessCode(e.target.value.toUpperCase());
-                                setAccessCodeValidated(false);
-                                setAccessCodeError('');
-                              }}
-                              disabled={accessCodeValidated}
-                              autoFocus
-                              className={`w-full bg-slate-900 border rounded-xl pl-10 pr-3 py-3.5 text-white font-mono tracking-[0.3em] text-lg focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder-slate-700 disabled:opacity-50 ${
-                                accessCodeValidated ? 'border-emerald-500' : 'border-amber-500/50 focus:border-amber-500'
-                              }`}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleValidateAccessCode}
-                            disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
-                            className="px-5 py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2"
-                          >
-                            {accessCodeLoading ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : accessCodeValidated ? (
-                              <>
-                                <Check size={16} />
-                                Validé
-                              </>
-                            ) : (
-                              'Valider'
-                            )}
-                          </button>
-                        </div>
-                        {accessCodeError && (
-                          <p className="text-xs text-red-400 flex items-center gap-1">
-                            <AlertCircle size={12} />
-                            {accessCodeError}
-                          </p>
-                        )}
-                        {accessCodeValidated && (
-                          <p className="text-xs text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 size={12} />
-                            Code d'accès validé - Vous pouvez ouvrir la session
-                          </p>
-                        )}
-                        <p className="text-[10px] text-slate-600">
-                          Demandez ce code à votre administrateur ou chef d'agence.
-                        </p>
-                      </div>
-                    </>
+                          )}
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -1029,7 +978,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
            </div>
 
            {/* FOOTER ACTION */}
-           <div className="mt-auto pt-6 border-t border-slate-800">
+           <div className="mt-auto pt-4 border-t border-slate-800">
               {step === 'auth' && (
                 <button
                   onClick={openingMode === 'direct' ? handleDirectOpening : handleRequestOpening}
@@ -1037,9 +986,9 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                     loading ||
                     checkingPinStatus ||
                     !selectedCaisseId ||
-                    (!accessCodeValidated && (hasPinConfigured ? authData.pin.length < 4 : true))
+                    (useAccessCode || !hasPinConfigured ? !accessCodeValidated : authData.pin.length < 6)
                   }
-                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:bg-slate-800 disabled:text-slate-500 ${
+                  className={`w-full py-3 rounded-xl font-bold text-base shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:bg-slate-800 disabled:text-slate-500 ${
                     openingMode === 'direct'
                       ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20 text-white'
                       : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20 text-white'

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { KeyRound, Shield, Check, X, AlertTriangle, Sparkles } from 'lucide-react';
+import { KeyRound, Shield, Check, X, AlertTriangle, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { Button, Modal } from '../../ui';
 import { userApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -122,7 +122,7 @@ function AnimatedCheckmark() {
 }
 
 // Individual PIN digit display
-function PinDigit({ value, isFilled, isActive }: { value: string; isFilled: boolean; isActive: boolean }) {
+function PinDigit({ value, isFilled, isActive, showDigit }: { value: string; isFilled: boolean; isActive: boolean; showDigit: boolean }) {
   return (
     <motion.div
       className={`
@@ -138,7 +138,7 @@ function PinDigit({ value, isFilled, isActive }: { value: string; isFilled: bool
       animate={isFilled ? { scale: [1, 1.1, 1] } : {}}
       transition={{ duration: 0.15 }}
     >
-      {isFilled ? '●' : ''}
+      {isFilled ? (showDigit ? value : '●') : ''}
     </motion.div>
   );
 }
@@ -150,6 +150,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
   const [error, setError] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [activeField, setActiveField] = useState<'pin' | 'confirm'>('pin');
+  const [showPin, setShowPin] = useState(false);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -288,9 +289,19 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
             {/* PIN Input */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Nouveau PIN (6 chiffres)
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-slate-300">
+                    Nouveau PIN (6 chiffres)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
+                  >
+                    {showPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                    <span>{showPin ? 'Masquer' : 'Afficher'}</span>
+                  </button>
+                </div>
                 <div className="flex justify-center gap-2 mb-2">
                   {Array.from({ length: 6 }, (_, i) => (
                     <PinDigit
@@ -298,6 +309,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                       value={pin[i] || ''}
                       isFilled={i < pin.length}
                       isActive={activeField === 'pin' && i === pin.length}
+                      showDigit={showPin}
                     />
                   ))}
                 </div>
@@ -368,7 +380,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                       animate={i < confirmPin.length ? { scale: [1, 1.1, 1] } : {}}
                       transition={{ duration: 0.15 }}
                     >
-                      {i < confirmPin.length ? '●' : ''}
+                      {i < confirmPin.length ? (showPin ? confirmPin[i] : '●') : ''}
                     </motion.div>
                   ))}
                 </div>
@@ -422,6 +434,8 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                 </AnimatePresence>
               </div>
             </div>
+
+            <p className="text-xs text-slate-500 text-center">6 chiffres minimum requis</p>
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-2">
