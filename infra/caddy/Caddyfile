@@ -1,0 +1,87 @@
+# ==========================================================
+# Cofinco — Caddy Reverse Proxy
+# ==========================================================
+# DEV  : DOMAIN=localhost → self-signed TLS (auto)
+# PROD : DOMAIN=cofin.co  → Let's Encrypt TLS (auto)
+# Same Caddyfile, same behavior, different env var.
+# ==========================================================
+
+{
+	email {$ACME_EMAIL:admin@cofinco.local}
+}
+
+{$DOMAIN:localhost} {
+	# Security headers (complement to app-level Helmet)
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+	}
+
+	# API routes → app instances (health-based LB)
+	handle /api/* {
+		reverse_proxy app:5000 {
+			lb_policy least_conn
+			health_uri /api/health
+			health_interval 15s
+			health_timeout 5s
+			health_status 200
+
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+				read_timeout 120s
+				write_timeout 120s
+			}
+
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# WebSocket → sticky sessions (cookie-based affinity)
+	handle /ws {
+		reverse_proxy app:5000 {
+			lb_policy cookie
+
+			transport http {
+				dial_timeout 5s
+				read_timeout 0
+				write_timeout 0
+			}
+
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# Grafana sub-path (prod: via Caddy, dev: direct port)
+	handle_path /grafana/* {
+		reverse_proxy grafana:3000
+	}
+
+	# Everything else (SPA + static assets)
+	handle {
+		reverse_proxy app:5000 {
+			lb_policy least_conn
+			health_uri /api/health
+			health_interval 15s
+
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# Caddy metrics (scraped by Prometheus)
+:2019 {
+	metrics /metrics
+}

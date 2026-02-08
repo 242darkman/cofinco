@@ -1,0 +1,163 @@
+# ==========================================================
+# Cofinco — DEV OVERLAY (chargé automatiquement)
+# ==========================================================
+# Hot reload complet dans Docker :
+#   - Backend : tsx watch (restart auto sur modif *.ts)
+#   - Frontend : Vite HMR (via middleware Express)
+#
+# Usage : docker compose up -d
+#         docker compose --profile admin up -d  (+ outils admin)
+#
+# Instance unique — pas de séparation app/worker en dev.
+# DISABLE_CRON_JOBS=false → tout tourne dans un seul conteneur.
+# ==========================================================
+
+services:
+  # ==========================================
+  # APPLICATION — hot reload dev
+  # ==========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: "5000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@pgbouncer:6432/${POSTGRES_DB:?}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?OTP_HMAC_SECRET is required}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-dev@cofinco.local}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-COFIN-DEV}
+      SMTP_SECURE: "false"
+      MTN_SMS_CLIENT_ID: ${MTN_SMS_CLIENT_ID:-}
+      MTN_SMS_CLIENT_SECRET: ${MTN_SMS_CLIENT_SECRET:-}
+      MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFIN}
+      MTN_SMS_WEBHOOK_SECRET: ${MTN_SMS_WEBHOOK_SECRET:-}
+      MTN_SMS_TOKEN_URL: ${MTN_SMS_TOKEN_URL:-}
+      MTN_SMS_BASE_URL: ${MTN_SMS_BASE_URL:-}
+      LOG_LEVEL: debug
+      APP_VERSION: dev
+      DISABLE_CRON_JOBS: "false"
+      BALANCE_RECONCILIATION_INTERVAL_MINUTES: ${BALANCE_RECONCILIATION_INTERVAL_MINUTES:-60}
+      ENABLE_BALANCE_AUTO_CORRECTION: ${ENABLE_BALANCE_AUTO_CORRECTION:-false}
+    volumes:
+      # Source code mounted from host → hot reload
+      - .:/app
+      # Preserve container's node_modules (don't overlay with host's)
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+    networks:
+      - cofin_internal
+
+  # ==========================================
+  # INFRASTRUCTURE — ports exposés pour debug
+  # ==========================================
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  minio:
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+
+  prometheus:
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=3d'
+      - '--web.enable-lifecycle'
+
+  loki:
+    ports:
+      - "127.0.0.1:3100:3100"
+
+  grafana:
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+
+  alertmanager:
+    ports:
+      - "127.0.0.1:9093:9093"
+
+  # ==========================================
+  # DEV-ONLY — Admin tools (profile: admin)
+  # ==========================================
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    profiles: ["admin"]
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    networks:
+      - cofin_internal
+
+  pgadmin:
+    image: dpage/pgadmin4:8.9
+    profiles: ["admin"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@cofinco.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - cofin_pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cofin_internal
+
+  redisinsight:
+    image: redis/redisinsight:2.50.0
+    profiles: ["admin"]
+    ports:
+      - "127.0.0.1:5540:5540"
+    volumes:
+      - redisinsight_data:/db
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - cofin_internal
+
+volumes:
+  cofin_pgadmin_data:
+  redisinsight_data:

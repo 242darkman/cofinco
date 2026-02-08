@@ -236,73 +236,84 @@ app.get("/api/health", async (_req, res) => {
 
   const httpServer = registerRoutes(app);
 
-  // Start the outbox worker for reliable real-time event publishing
-  startOutboxWorker();
-  logger.info('Outbox real-time event worker started');
+  // ============================================================
+  // CRON JOBS & BACKGROUND WORKERS
+  // When DISABLE_CRON_JOBS=true, this instance runs as a pure
+  // API server (stateless, horizontally scalable).
+  // A dedicated "worker" instance runs with DISABLE_CRON_JOBS=false.
+  // ============================================================
+  const cronDisabled = process.env.DISABLE_CRON_JOBS === 'true';
 
-  // Start the notification delivery worker (SMS/Email queue processor)
-  startNotificationWorker();
-  logger.info('Notification delivery worker started');
+  if (cronDisabled) {
+    logger.warn('DISABLE_CRON_JOBS=true — running as stateless API server (no cron jobs, no background workers)');
+  } else {
+    // Start the outbox worker for reliable real-time event publishing
+    startOutboxWorker();
+    logger.info('Outbox real-time event worker started');
 
-  // Start the reminder processor (polls notification_schedules for due reminders)
-  startReminderProcessor(60_000); // Every 60 seconds
-  logger.info('Scheduled reminder processor started');
+    // Start the notification delivery worker (SMS/Email queue processor)
+    startNotificationWorker();
+    logger.info('Notification delivery worker started');
 
-  // Verify SMTP email provider connectivity
-  const smtpProvider = new SmtpEmailProvider();
-  smtpProvider.verify().then(({ ok, message }) => {
-    if (ok) {
-      logger.info({ provider: 'SMTP' }, message);
-    } else {
-      logger.warn({ provider: 'SMTP' }, message);
-    }
-  });
+    // Start the reminder processor (polls notification_schedules for due reminders)
+    startReminderProcessor(60_000); // Every 60 seconds
+    logger.info('Scheduled reminder processor started');
 
-  // Start the caisse session cleanup cron job (closes expired sessions, monitors risky ones)
-  startSessionCleanupCron();
-  logger.info('Caisse session cleanup job started');
+    // Verify SMTP email provider connectivity
+    const smtpProvider = new SmtpEmailProvider();
+    smtpProvider.verify().then(({ ok, message }) => {
+      if (ok) {
+        logger.info({ provider: 'SMTP' }, message);
+      } else {
+        logger.warn({ provider: 'SMTP' }, message);
+      }
+    });
 
-  // Start the automatic transfers cron job (daily at 2 AM)
-  startAutomaticTransfersCron();
-  startScheduledAccountTransfersCron();
-  logger.info('Automatic transfers job started');
+    // Start the caisse session cleanup cron job (closes expired sessions, monitors risky ones)
+    startSessionCleanupCron();
+    logger.info('Caisse session cleanup job started');
 
-  // Start the scheduled disbursements cron job (daily at 9 AM)
-  startScheduledDisbursementsCron();
-  startAutomaticRepaymentsCron();
-  startCreditStatusUpdateCron();
-  startScheduledMigrationsCron();
-  startPaymentReconciliationCron();
-  startTempPermissionExpiryCron();
-  startBalanceReconciliationCron();
-  startReconciliationReportCron();
-  startTreasuryReconciliationCron();
-  startAccessCodeCleanupCron();
+    // Start the automatic transfers cron job (daily at 2 AM)
+    startAutomaticTransfersCron();
+    startScheduledAccountTransfersCron();
+    logger.info('Automatic transfers job started');
 
-  // Start GL Reconciliation Monitoring (hourly check)
-  scheduleGlReconciliationMonitoring(60);
-  logger.info('GL reconciliation monitoring started (hourly)');
+    // Start the scheduled disbursements cron job (daily at 9 AM)
+    startScheduledDisbursementsCron();
+    startAutomaticRepaymentsCron();
+    startCreditStatusUpdateCron();
+    startScheduledMigrationsCron();
+    startPaymentReconciliationCron();
+    startTempPermissionExpiryCron();
+    startBalanceReconciliationCron();
+    startReconciliationReportCron();
+    startTreasuryReconciliationCron();
+    startAccessCodeCleanupCron();
 
-  // Start GL Auto-Fix (daily at 3 AM - semi-automatic correction for small discrepancies)
-  scheduleAutoFix();
-  logger.warn('⚠️  GL auto-fix enabled: automatically corrects discrepancies < 10k FCFA (daily at 3 AM)');
+    // Start GL Reconciliation Monitoring (hourly check)
+    scheduleGlReconciliationMonitoring(60);
+    logger.info('GL reconciliation monitoring started (hourly)');
 
-  // Start Late Installments Job (toutes les heures pour marquer les échéances en retard)
-  const lateInstallmentsJob = startLateInstallmentsJob();
-  lateInstallmentsJob.start();
-  logger.info('Late installments marking job started (hourly)');
+    // Start GL Auto-Fix (daily at 3 AM - semi-automatic correction for small discrepancies)
+    scheduleAutoFix();
+    logger.warn('GL auto-fix enabled: automatically corrects discrepancies < 10k FCFA (daily at 3 AM)');
 
-  logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments');
+    // Start Late Installments Job (toutes les heures pour marquer les échéances en retard)
+    const lateInstallmentsJob = startLateInstallmentsJob();
+    lateInstallmentsJob.start();
+    logger.info('Late installments marking job started (hourly)');
 
-  // Start Account Cleanup Cron
-  const { accountCleanup } = await import("./services/account-cleanup");
-  accountCleanup.start();
-  logger.info('Account cleanup job started');
+    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments');
 
-  // Initialize Interest Scheduler (Daily Accrual & Monthly Capitalization)
-  // Auto-starts jobs in constructor
-  const { interestScheduler } = await import("./services/interest-scheduler");
-  logger.info('Interest Scheduler initialized');
+    // Start Account Cleanup Cron
+    const { accountCleanup } = await import("./services/account-cleanup");
+    accountCleanup.start();
+    logger.info('Account cleanup job started');
+
+    // Initialize Interest Scheduler (Daily Accrual & Monthly Capitalization)
+    const { interestScheduler } = await import("./services/interest-scheduler");
+    logger.info('Interest Scheduler initialized');
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

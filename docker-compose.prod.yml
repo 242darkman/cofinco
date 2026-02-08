@@ -1,0 +1,221 @@
+# ==========================================================
+# Cofinco — PROD OVERLAY
+# ==========================================================
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --scale app=3
+# ==========================================================
+
+x-app-env: &app-env
+  NODE_ENV: production
+  PORT: "5000"
+  DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@pgbouncer:6432/${POSTGRES_DB:?}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+  SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+  OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?OTP_HMAC_SECRET is required}
+  MINIO_ENDPOINT: minio
+  MINIO_PORT: "9000"
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+  SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  MTN_SMS_CLIENT_ID: ${MTN_SMS_CLIENT_ID:-}
+  MTN_SMS_CLIENT_SECRET: ${MTN_SMS_CLIENT_SECRET:-}
+  MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFIN}
+  MTN_SMS_WEBHOOK_SECRET: ${MTN_SMS_WEBHOOK_SECRET:-}
+  MTN_SMS_TOKEN_URL: ${MTN_SMS_TOKEN_URL:-}
+  MTN_SMS_BASE_URL: ${MTN_SMS_BASE_URL:-}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  APP_VERSION: ${APP_VERSION:-latest}
+  BALANCE_RECONCILIATION_INTERVAL_MINUTES: ${BALANCE_RECONCILIATION_INTERVAL_MINUTES:-60}
+  ENABLE_BALANCE_AUTO_CORRECTION: ${ENABLE_BALANCE_AUTO_CORRECTION:-false}
+
+x-healthcheck-app: &healthcheck-app
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+  interval: 30s
+  timeout: 5s
+  start_period: 15s
+  retries: 3
+
+services:
+  # ==========================================
+  # REVERSE PROXY — Caddy (TLS Let's Encrypt)
+  # ==========================================
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - cofin_public
+      - cofin_internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  # ==========================================
+  # APPLICATION — stateless API (scalable)
+  # ==========================================
+  app:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-cofinco}:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      DISABLE_CRON_JOBS: "true"
+    expose:
+      - "5000"
+    healthcheck: *healthcheck-app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+    networks:
+      - cofin_internal
+    deploy:
+      replicas: ${APP_REPLICAS:-2}
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "{{.Name}}"
+
+  # ==========================================
+  # WORKER — cron jobs + background workers
+  # Single instance only — NEVER scale this
+  # ==========================================
+  worker:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-cofinco}:${APP_VERSION:-latest}
+    container_name: cofinco-worker
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      DISABLE_CRON_JOBS: "false"
+    expose:
+      - "5000"
+    healthcheck: *healthcheck-app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+    networks:
+      - cofin_internal
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # ==========================================
+  # INFRA — production overrides
+  # ==========================================
+  db:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+        reservations:
+          memory: 256M
+
+  pgbouncer:
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.5"
+
+  minio:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  prometheus:
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  loki:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  grafana:
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      GF_SERVER_ROOT_URL: "https://${DOMAIN:-localhost}/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  alertmanager:
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+
+# Enforce internal network in prod
+networks:
+  cofin_internal:
+    internal: true

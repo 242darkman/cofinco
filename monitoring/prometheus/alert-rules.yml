@@ -1,0 +1,198 @@
+# ==========================================================
+# Prometheus Alert Rules - Cofinco Platform
+# ==========================================================
+
+groups:
+  # ==========================================
+  # Application Health
+  # ==========================================
+  - name: cofinco_app
+    interval: 30s
+    rules:
+      - alert: AppDown
+        expr: up{job="cofinco-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cofinco application is down"
+          description: "The Cofinco application has been unreachable for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "High HTTP 5xx error rate ({{ $value | humanizePercentage }})"
+          description: "More than 5% of HTTP requests are returning 5xx errors."
+
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "High P95 latency ({{ $value }}s)"
+          description: "95th percentile HTTP response time exceeds 2 seconds."
+
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Very high P99 latency ({{ $value }}s)"
+          description: "99th percentile HTTP response time exceeds 5 seconds."
+
+      - alert: HighActiveConnections
+        expr: http_active_connections > 500
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: "High number of active connections ({{ $value }})"
+          description: "More than 500 active HTTP connections."
+
+  # ==========================================
+  # WebSocket
+  # ==========================================
+  - name: cofinco_websocket
+    interval: 30s
+    rules:
+      - alert: WebSocketConnectionsHigh
+        expr: cofinco_websocket_connections > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High WebSocket connections ({{ $value }})"
+          description: "More than 1000 concurrent WebSocket connections."
+
+  # ==========================================
+  # Database
+  # ==========================================
+  - name: cofinco_database
+    interval: 30s
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is unreachable."
+
+      - alert: PostgresHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "High PostgreSQL connections ({{ $value }})"
+          description: "PostgreSQL active connections exceed 80 (near default 100 limit)."
+
+      - alert: PostgresSlowQueries
+        expr: histogram_quantile(0.95, sum(rate(cofinco_db_query_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries (P95: {{ $value }}s)"
+          description: "95th percentile DB query time exceeds 1 second."
+
+      - alert: PostgresDeadlocks
+        expr: rate(pg_stat_database_deadlocks[5m]) > 0
+        for: 1m
+        labels:
+          severity: high
+        annotations:
+          summary: "PostgreSQL deadlocks detected"
+          description: "Database deadlocks are occurring."
+
+  # ==========================================
+  # Redis
+  # ==========================================
+  - name: cofinco_redis
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis session store is unreachable."
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage high ({{ $value | humanizePercentage }})"
+          description: "Redis memory usage exceeds 85% of configured max."
+
+  # ==========================================
+  # Business Metrics
+  # ==========================================
+  - name: cofinco_business
+    interval: 60s
+    rules:
+      - alert: GLDiscrepancyDetected
+        expr: cofinco_monitoring_alerts_active > 0
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "GL reconciliation discrepancy detected"
+          description: "General Ledger reconciliation has found {{ $value }} active discrepancies."
+
+      - alert: HighPendingCredits
+        expr: cofinco_credit_requests_pending > 50
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of pending credit requests ({{ $value }})"
+          description: "More than 50 credit requests pending for over 30 minutes."
+
+  # ==========================================
+  # System Resources
+  # ==========================================
+  - name: cofinco_system
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes > 512 * 1024 * 1024
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage ({{ $value | humanize1024 }}B)"
+          description: "Node.js process memory exceeds 512MB."
+
+      - alert: EventLoopLag
+        expr: nodejs_eventloop_lag_seconds > 0.5
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "High event loop lag ({{ $value }}s)"
+          description: "Node.js event loop lag exceeds 500ms, indicating CPU saturation."
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage ({{ $value | humanizePercentage }})"
+          description: "Node.js process is using more than 80% CPU."

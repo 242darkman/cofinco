@@ -1,0 +1,53 @@
+# Version control
+.git
+.gitignore
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.production.example
+
+# Dependencies (rebuilt in Docker)
+node_modules
+
+# Build output (rebuilt in Docker)
+dist
+
+# Development
+.tmp
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+*.md
+!package.json
+
+# Tests
+coverage
+playwright-report
+test-results
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+
+# CI/CD
+.github
+
+# Monitoring config (mounted as volumes, not baked)
+monitoring
+
+# Infrastructure
+infra
+k8s
+docker-compose*.yml
+Dockerfile*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs

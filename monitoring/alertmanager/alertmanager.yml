@@ -1,0 +1,76 @@
+# ==========================================================
+# Alertmanager Configuration
+# ==========================================================
+# Configure receivers (email, Slack, etc.) for alert notifications
+# ==========================================================
+
+global:
+  resolve_timeout: 5m
+  # Uncomment and configure for email notifications:
+  # smtp_smarthost: 'pro.turbo-smtp.com:587'
+  # smtp_from: 'alerts@cofin.co'
+  # smtp_auth_username: ''
+  # smtp_auth_password: ''
+  # smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default'
+
+  routes:
+    # Critical alerts: notify immediately
+    - match:
+        severity: critical
+      receiver: 'critical'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # High severity: notify within 1 minute
+    - match:
+        severity: high
+      receiver: 'high'
+      group_wait: 30s
+      repeat_interval: 2h
+
+receivers:
+  - name: 'default'
+    # Uncomment to receive via email:
+    # email_configs:
+    #   - to: 'devops@cofin.co'
+    #     send_resolved: true
+
+  - name: 'critical'
+    # Uncomment to receive critical alerts:
+    # email_configs:
+    #   - to: 'oncall@cofin.co'
+    #     send_resolved: true
+    # Uncomment for Slack:
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/...'
+    #     channel: '#cofinco-alerts'
+    #     title: '{{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+    #     send_resolved: true
+
+  - name: 'high'
+    # Same as critical but with lower urgency
+    # email_configs:
+    #   - to: 'devops@cofin.co'
+    #     send_resolved: true
+
+inhibit_rules:
+  # If AppDown fires, suppress HighErrorRate and HighLatency
+  - source_matchers:
+      - alertname = "AppDown"
+    target_matchers:
+      - alertname =~ "HighErrorRate|HighLatency.*"
+    equal: ['instance']
+
+  # If PostgresDown fires, suppress related DB alerts
+  - source_matchers:
+      - alertname = "PostgresDown"
+    target_matchers:
+      - alertname =~ "PostgresHighConnections|PostgresSlowQueries|PostgresDeadlocks"

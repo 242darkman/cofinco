@@ -5,30 +5,49 @@ global:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
+        - targets: ['alertmanager:9093']
 
-rule_files: []
+rule_files:
+  - /etc/prometheus/alert-rules.yml
 
 scrape_configs:
-  # Prometheus lui-même
+  # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # Application COFINCO (exposer /metrics dans votre app)
+  # Cofinco Application (stateless API instances)
   - job_name: 'cofinco-app'
-    static_configs:
-      - targets: ['host.docker.internal:5000']  # Votre serveur Node.js
+    dns_sd_configs:
+      - names: ['app']
+        type: A
+        port: 5000
+        refresh_interval: 10s
     metrics_path: /api/metrics
     scrape_interval: 30s
     scrape_timeout: 10s
 
-  # PostgreSQL (via postgres_exporter si vous l'ajoutez)
-  # - job_name: 'postgres'
-  #   static_configs:
-  #     - targets: ['postgres-exporter:9187']
+  # Cofinco Worker (cron/background single instance)
+  - job_name: 'cofinco-worker'
+    static_configs:
+      - targets: ['worker:5000']
+    metrics_path: /api/metrics
+    scrape_interval: 30s
 
-  # Redis (via redis_exporter si vous l'ajoutez)
-  # - job_name: 'redis'
-  #   static_configs:
-  #     - targets: ['redis-exporter:9121']
+  # PostgreSQL Exporter
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Redis Exporter
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # Caddy reverse proxy metrics
+  - job_name: 'caddy'
+    static_configs:
+      - targets: ['caddy:2019']
+    scrape_interval: 30s
