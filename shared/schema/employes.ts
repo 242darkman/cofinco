@@ -36,6 +36,9 @@ export const employes = pgTable("employes", {
   tauxJournalier: integer("taux_journalier").default(0),
   modeCalculPaie: varchar("mode_calcul_paie", { length: 20 }).default("MONTHLY"), // 'MONTHLY', 'HOURLY', 'DAILY'
 
+  // CNSS
+  numeroCnss: varchar("numero_cnss", { length: 50 }),
+
   // Sécurité Caisse
   caissePin: text("caisse_pin"), // PIN hashé pour autorisation caisse
 

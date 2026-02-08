@@ -71,6 +71,7 @@ const createEmployeWithUserSchema = z.object({
   tauxHoraire: numericString.optional(),
   tauxJournalier: numericString.optional(),
   modeCalculPaie: modeCalculPaieSchema.optional(),
+  numeroCnss: z.string().optional().nullable(),
   // Agent Terrain specific fields (optional, used when role === AGENT_TERRAIN)
   zonesAffectation: z.array(z.string()).optional(),
   objectifMensuel: z.string().optional(),
@@ -104,6 +105,7 @@ const updateEmployeWithUserSchema = z.object({
   tauxHoraire: numericString.optional(),
   tauxJournalier: numericString.optional(),
   modeCalculPaie: modeCalculPaieSchema.optional(),
+  numeroCnss: z.string().optional().nullable(),
 });
 
 export function registerEmployesRoutes(app: Express) {
@@ -319,6 +321,7 @@ export function registerEmployesRoutes(app: Express) {
           tauxHoraire: data.tauxHoraire || 0,
           tauxJournalier: data.tauxJournalier || 0,
           modeCalculPaie: data.modeCalculPaie || 'Mensuel',
+          numeroCnss: data.numeroCnss || null,
           statut: StatutUser.ACTIVE,
         }).returning();
 
@@ -463,6 +466,7 @@ export function registerEmployesRoutes(app: Express) {
       if (data.tauxHoraire !== undefined) employeData.tauxHoraire = data.tauxHoraire;
       if (data.tauxJournalier !== undefined) employeData.tauxJournalier = data.tauxJournalier;
       if (data.modeCalculPaie !== undefined) employeData.modeCalculPaie = data.modeCalculPaie;
+      if (data.numeroCnss !== undefined) employeData.numeroCnss = data.numeroCnss || null;
 
       // Mise à jour (Architecture V3: passe le nouveau rôle à updateEmployeWithUser)
       const updated = await storage.updateEmployeWithUser(employeId, userData, employeData, data.role);

@@ -29,21 +29,21 @@ Observabilité :
 
 ## 3 Environnements
 
-| Aspect | DEV | STAGING | PROD |
-|--------|-----|---------|------|
-| **Commande** | `docker compose up -d` | `docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` |
-| **Hot reload** | tsx watch + Vite HMR | Non | Non |
-| **Séparation app/worker** | Non (instance unique) | Oui | Oui |
-| **Caddy (reverse proxy)** | Non (accès direct :5000) | Oui (localhost) | Oui (public) |
-| **TLS** | Non | Self-signed (localhost) | Let's Encrypt (auto) |
-| **NODE_ENV** | development | production | production |
-| **Ports** | `127.0.0.1:*` | `127.0.0.1:*` | 80/443 publics |
-| **Resource limits** | Non | Non | Oui (CPU, RAM) |
-| **Rétention métriques** | 3 jours | 7 jours | 30 jours |
-| **Réseau interne** | bridge | bridge | `internal: true` |
-| **Outils admin** | Profile `admin` | Non | Non |
-| **Image** | Build `dev` target | Build `runtime` local | Registry (GHCR) |
-| **Init DB auto** | Oui (`db-init`) | Oui (`db-init`) | Oui (`db-init`) |
+| Aspect                    | DEV                      | STAGING                                                                    | PROD                                                                    |
+| ------------------------- | ------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Commande**              | `docker compose up -d`   | `docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` |
+| **Hot reload**            | tsx watch + Vite HMR     | Non                                                                        | Non                                                                     |
+| **Séparation app/worker** | Non (instance unique)    | Oui                                                                        | Oui                                                                     |
+| **Caddy (reverse proxy)** | Non (accès direct :5000) | Oui (localhost)                                                            | Oui (public)                                                            |
+| **TLS**                   | Non                      | Self-signed (localhost)                                                    | Let's Encrypt (auto)                                                    |
+| **NODE_ENV**              | development              | production                                                                 | production                                                              |
+| **Ports**                 | `127.0.0.1:*`            | `127.0.0.1:*`                                                              | 80/443 publics                                                          |
+| **Resource limits**       | Non                      | Non                                                                        | Oui (CPU, RAM)                                                          |
+| **Rétention métriques**   | 3 jours                  | 7 jours                                                                    | 30 jours                                                                |
+| **Réseau interne**        | bridge                   | bridge                                                                     | `internal: true`                                                        |
+| **Outils admin**          | Profile `admin`          | Non                                                                        | Non                                                                     |
+| **Image**                 | Build `dev` target       | Build `runtime` local                                                      | Registry (GHCR)                                                         |
+| **Init DB auto**          | Oui (`db-init`)          | Oui (`db-init`)                                                            | Oui (`db-init`)                                                         |
 
 ## Prérequis
 
@@ -91,6 +91,15 @@ docker compose --profile admin up -d
 #   Mailpit     → http://localhost:8025 (capture emails)
 #   pgAdmin     → http://localhost:5050
 #   RedisInsight → http://localhost:5540
+
+# Mettre à jour la base de données
+docker compose exec app npm run db:push
+
+# Lancer les tests
+docker compose --profile test run --rm test-unit
+
+# Lancer l'application
+docker compose up -d --build app
 ```
 
 ### 3. Staging (pré-production)
@@ -222,25 +231,25 @@ docker compose --profile test run --rm test-e2e npx playwright test tests/e2e/cr
 
 ### Frameworks
 
-| Framework | Scope | Config |
-|-----------|-------|--------|
-| **Vitest** | unit, integration, security, robustness | `vitest.config.ts` |
-| **Playwright** | e2e (navigateur Chromium) | `playwright.config.ts` |
+| Framework      | Scope                                   | Config                 |
+| -------------- | --------------------------------------- | ---------------------- |
+| **Vitest**     | unit, integration, security, robustness | `vitest.config.ts`     |
+| **Playwright** | e2e (navigateur Chromium)               | `playwright.config.ts` |
 
 ### Couverture par domaine
 
-| Domaine | Unit | Integration | E2E | Security |
-|---------|------|-------------|-----|----------|
-| Crédits | schedule, disbursements, reevaluation | workflow enquête, reminders | workflow complet, UI enquête | - |
-| Caisse | guards, state machine, reversals, agents | reversal API, coffre API/config | - | - |
-| Comptabilité | - | repayment allocation | - | précision décimale |
-| RBAC | hardening, permissions | matrice API (403/200) | UI permissions | - |
-| HR | logique congés/paie | attendance, leaves, payroll, recruitment | - | - |
-| Notifications | templates, routing, worker, OTP | pipeline, MTN provider | - | - |
-| Tontines | smart dispatcher | - | - | - |
-| Auth | - | - | login page | CSRF, sessions, OTP, passwords |
-| Sécurité | - | - | - | 70+ régressions (XSS, injection, crypto) |
-| Transactions | labels, reversals, duplicates | - | - | robustesse concurrentielle |
+| Domaine       | Unit                                     | Integration                              | E2E                          | Security                                 |
+| ------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------- | ---------------------------------------- |
+| Crédits       | schedule, disbursements, reevaluation    | workflow enquête, reminders              | workflow complet, UI enquête | -                                        |
+| Caisse        | guards, state machine, reversals, agents | reversal API, coffre API/config          | -                            | -                                        |
+| Comptabilité  | -                                        | repayment allocation                     | -                            | précision décimale                       |
+| RBAC          | hardening, permissions                   | matrice API (403/200)                    | UI permissions               | -                                        |
+| HR            | logique congés/paie                      | attendance, leaves, payroll, recruitment | -                            | -                                        |
+| Notifications | templates, routing, worker, OTP          | pipeline, MTN provider                   | -                            | -                                        |
+| Tontines      | smart dispatcher                         | -                                        | -                            | -                                        |
+| Auth          | -                                        | -                                        | login page                   | CSRF, sessions, OTP, passwords           |
+| Sécurité      | -                                        | -                                        | -                            | 70+ régressions (XSS, injection, crypto) |
+| Transactions  | labels, reversals, duplicates            | -                                        | -                            | robustesse concurrentielle               |
 
 ## Observabilité
 
@@ -254,6 +263,7 @@ Accessible dans les 3 environnements (même stack) :
 ## Backups
 
 Backups automatiques via `pg-backup` (conteneur dédié) :
+
 - Quotidiens, rétention 7 jours / 4 semaines / 6 mois
 - Volume Docker `pg_backups`
 
@@ -290,6 +300,7 @@ L'initialisation est **entièrement automatique** via le conteneur `db-init` :
 2. **`seed-prod.ts`** — insère les données de référence (géographie, permissions, produits, comptabilité...)
 
 Le conteneur `db-init` :
+
 - Se connecte directement à PostgreSQL (port 5432, pas pgbouncer) pour les opérations DDL
 - S'exécute une seule fois puis quitte (`restart: "no"`)
 - L'app et le worker ne démarrent qu'après son succès (`service_completed_successfully`)
