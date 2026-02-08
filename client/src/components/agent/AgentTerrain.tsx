@@ -617,7 +617,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
             <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
               <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <Calendar size={11} /> Agenda du jour
+                  <Calendar size={11} /> Mon agenda
                 </div>
                 <div className="flex items-center gap-2">
                   {(todayPlannings.length + pendingEnquetes.length) > 0 && (
@@ -657,7 +657,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     return (
                       <div
                         key={`enq-${enq.id}`}
-                        className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-red-500/5' : ''}`}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-red-950/40' : ''}`}
                       >
                         {/* Priority color bar */}
                         <div className={`w-1 self-stretch rounded-full shrink-0 ${borderColor} ${enq.priority === 'URGENT' ? 'animate-pulse' : ''}`} />
@@ -671,23 +671,30 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
                         {/* Content */}
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1 mb-0.5">
                             <ClipboardCheck size={10} className="text-amber-400 shrink-0" />
-                            <span className="text-xs font-semibold text-white truncate">
-                              {enq.client ? `${enq.client.nom || ''} ${enq.client.prenom || ''}`.trim() : 'Enquête'}
-                            </span>
+                            <span className="text-[10px] text-amber-400/80 font-medium">Enquête crédit</span>
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs font-semibold text-white truncate">
+                            {enq.client
+                              ? `${enq.client.prenom || ''} ${enq.client.nom || ''}`.trim() || 'Client'
+                              : enq.clientNom || 'Client'}
+                          </p>
+                          <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
                             {enq.montantDemande && (
                               <span className="text-[10px] text-emerald-400 font-medium">
                                 {Number(enq.montantDemande).toLocaleString('fr-FR')} F
                               </span>
                             )}
                             {enq.dueDate && (
-                              <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
-                                {isOverdue && <AlertTriangle size={8} />}
-                                <Calendar size={8} />
-                                {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                              <span className={`text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded ${
+                                isOverdue
+                                  ? 'text-red-400 font-bold bg-red-500/10 border border-red-500/20'
+                                  : 'text-amber-400 font-medium bg-amber-500/10 border border-amber-500/20'
+                              }`}>
+                                {isOverdue ? <AlertTriangle size={9} /> : <Calendar size={9} />}
+                                Échéance : {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                {isOverdue && ' (en retard)'}
                               </span>
                             )}
                           </div>
@@ -869,7 +876,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
             </button>
           </header>
           <div className="flex-1 overflow-y-auto p-3">
-            <AgentPlanning agentId={targetAgentId || undefined} />
+            <AgentPlanning agentId={targetAgentId || undefined} enquetes={pendingEnquetes} onStartEnquete={handleStartEnquete} startingEnquete={startingEnquete} />
           </div>
         </div>
       )}

@@ -2315,19 +2315,23 @@ export function registerFinanceRoutes(app: Express) {
       const results = await db.select({
         enquete: enquetesCredit,
         client: clients,
+        userNom: schema.users.nom,
+        userPrenom: schema.users.prenom,
+        userTelephone: schema.users.telephone,
       })
         .from(enquetesCredit)
         .leftJoin(clients, eq(enquetesCredit.clientId, clients.id))
+        .leftJoin(schema.users, eq(clients.userId, schema.users.id))
         .where(eq(enquetesCredit.assignedAgentId, targetUserId))
         .orderBy(desc(enquetesCredit.createdAt));
 
       const data = results.map(r => ({
         ...r.enquete,
-        client: r.client ? {
-          nom: r.client.nom,
-          prenom: r.client.prenom,
-          telephone: r.client.telephone,
-          adresseDomicile: r.client.adresseDomicile,
+        client: r.userNom ? {
+          nom: r.userNom,
+          prenom: r.userPrenom,
+          telephone: r.userTelephone,
+          adresseDomicile: r.client?.adresseDomicile,
         } : null,
       }));
 

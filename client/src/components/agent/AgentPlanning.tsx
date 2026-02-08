@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Loader2, Banknote } from 'lucide-react';
 import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 
@@ -17,7 +17,14 @@ interface Planning {
 
 type ViewMode = 'list' | 'calendar';
 
-export default function AgentPlanning({ agentId }: { agentId?: string }) {
+interface AgentPlanningProps {
+  agentId?: string;
+  enquetes?: any[];
+  onStartEnquete?: (id: string) => void;
+  startingEnquete?: string | null;
+}
+
+export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, startingEnquete }: AgentPlanningProps) {
   const [plannings, setPlannings] = useState<Planning[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -128,6 +135,22 @@ export default function AgentPlanning({ agentId }: { agentId?: string }) {
     Object.values(map).forEach(arr => arr.sort((a, b) => a.heureDebut.localeCompare(b.heureDebut)));
     return map;
   }, [plannings]);
+
+  // Group enquêtes by due date for calendar view
+  const enquetesByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    enquetes.forEach(enq => {
+      if (enq.dueDate) {
+        const dateKey = new Date(enq.dueDate).toISOString().slice(0, 10);
+        if (!map[dateKey]) map[dateKey] = [];
+        map[dateKey].push(enq);
+      }
+    });
+    return map;
+  }, [enquetes]);
+
+  // Active enquêtes always shown in list view (they are ongoing tasks, not tied to a specific planning day)
+  const activeEnquetes = useMemo(() => enquetes, [enquetes]);
 
   const handleSubmit = async (e: React.FormEvent, force = false) => {
     e.preventDefault();
@@ -399,28 +422,59 @@ export default function AgentPlanning({ agentId }: { agentId?: string }) {
                 {new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </h3>
              </div>
-             <span className="text-xs text-slate-500 font-medium">{plannings.length} activités</span>
+             <span className="text-xs text-slate-500 font-medium">
+               {plannings.length + activeEnquetes.length} activités
+             </span>
           </div>
-          <div className="p-3">
+          <div className="p-3 space-y-3">
+            {/* Active enquêtes (always visible) */}
+            {activeEnquetes.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
+                  <ClipboardCheck size={11} />
+                  Enquêtes crédit ({activeEnquetes.length})
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {activeEnquetes.map((enq: any) => (
+                    <EnqueteCard
+                      key={enq.id}
+                      enquete={enq}
+                      onStart={onStartEnquete}
+                      starting={startingEnquete === enq.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Planning entries */}
             {loading ? (
               <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500" /></div>
-            ) : plannings.length === 0 ? (
+            ) : plannings.length === 0 && activeEnquetes.length === 0 ? (
               <div className="text-center py-12 opacity-50">
                 <Calendar size={32} className="mx-auto mb-2 text-slate-500" />
                 <p className="text-sm text-slate-400">Aucune activité planifiée</p>
               </div>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {plannings.map((planning) => (
-                  <PlanningCard
-                    key={planning.id}
-                    planning={planning}
-                    typeColor={typeColor}
-                    onClick={() => setSelectedPlanning(planning)}
-                  />
-                ))}
-              </div>
-            )}
+            ) : plannings.length > 0 ? (
+              <>
+                {activeEnquetes.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                    <Calendar size={11} />
+                    Planning ({plannings.length})
+                  </div>
+                )}
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {plannings.map((planning) => (
+                    <PlanningCard
+                      key={planning.id}
+                      planning={planning}
+                      typeColor={typeColor}
+                      onClick={() => setSelectedPlanning(planning)}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       )}
@@ -450,6 +504,8 @@ export default function AgentPlanning({ agentId }: { agentId?: string }) {
             <div className="grid grid-cols-7 min-h-[300px]">
               {weekDays.map(day => {
                 const dayPlannings = planningsByDate[day.date] || [];
+                const dayEnquetes = enquetesByDate[day.date] || [];
+                const hasItems = dayPlannings.length > 0 || dayEnquetes.length > 0;
                 return (
                   <div
                     key={day.date}
@@ -458,12 +514,35 @@ export default function AgentPlanning({ agentId }: { agentId?: string }) {
                     }`}
                     onClick={() => { setSelectedDate(day.date); setViewMode('list'); }}
                   >
-                    {dayPlannings.length === 0 ? (
+                    {!hasItems ? (
                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <Plus size={16} className="text-slate-600" />
                        </div>
                     ) : (
                       <div className="space-y-1">
+                        {/* Enquêtes on their due date */}
+                        {dayEnquetes.map((enq: any) => {
+                          const isOverdue = new Date(enq.dueDate) < new Date();
+                          return (
+                            <div
+                              key={`enq-${enq.id}`}
+                              className={`w-full text-left px-1.5 py-1 rounded border text-[9px] leading-tight shadow-sm ${
+                                isOverdue
+                                  ? 'bg-red-500/20 text-red-300 border-red-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                              }`}
+                            >
+                              <div className="font-bold truncate flex items-center gap-0.5">
+                                <ClipboardCheck size={8} />
+                                Enquête
+                              </div>
+                              <div className="truncate opacity-80">
+                                {enq.client ? `${enq.client.nom || ''}` : ''}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {/* Regular plannings */}
                         {dayPlannings.map(p => (
                           <button
                             key={p.id}
@@ -624,12 +703,84 @@ function PlanningCard({ planning, typeColor, onClick }: PlanningCardProps) {
   );
 }
 
-interface FormInputProps { 
-    label: string; 
-    type: string; 
-    value: string; 
-    onChange: (v: string) => void; 
-    required?: boolean 
+// Enquête card for list view
+function EnqueteCard({ enquete, onStart, starting }: { enquete: any; onStart?: (id: string) => void; starting: boolean }) {
+  const isOverdue = enquete.dueDate && new Date(enquete.dueDate) < new Date();
+  const isAssigned = enquete.statut === 'ASSIGNED';
+  const priorityConf: Record<string, { label: string; color: string }> = {
+    LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
+    MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+    HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+    URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  };
+  const pConf = priorityConf[enquete.priority || 'MEDIUM'] || priorityConf.MEDIUM;
+
+  return (
+    <div className={`bg-slate-900/50 rounded-xl p-3 border ${isOverdue ? 'border-red-500/40' : 'border-amber-500/30'} space-y-2`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border bg-amber-500/20 text-amber-400 border-amber-500/30`}>
+              Enquête
+            </span>
+            <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold border ${pConf.color}`}>
+              {pConf.label}
+            </span>
+          </div>
+          <p className="text-xs font-semibold text-white truncate">
+            {enquete.client ? `${enquete.client.nom || ''} ${enquete.client.prenom || ''}`.trim() : 'Client'}
+          </p>
+          {enquete.objetCredit && (
+            <p className="text-[10px] text-slate-500 truncate">{enquete.objetCredit}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 text-[11px]">
+        {enquete.montantDemande && (
+          <span className="flex items-center gap-1 text-emerald-400 font-medium">
+            <Banknote size={11} />
+            {Number(enquete.montantDemande).toLocaleString('fr-FR')} F
+          </span>
+        )}
+        {enquete.dueDate && (
+          <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${
+            isOverdue
+              ? 'text-red-400 font-bold bg-red-500/10'
+              : 'text-amber-400 font-medium bg-amber-500/10'
+          }`}>
+            {isOverdue ? <AlertTriangle size={10} /> : <Calendar size={10} />}
+            Échéance : {new Date(enquete.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+            {isOverdue && ' (retard)'}
+          </span>
+        )}
+      </div>
+
+      {/* Action button */}
+      {isAssigned && onStart ? (
+        <button
+          onClick={() => onStart(enquete.id)}
+          disabled={starting}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-xs font-bold rounded-lg transition-colors"
+        >
+          {starting ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+          Démarrer l'enquête
+        </button>
+      ) : (
+        <div className="text-center">
+          <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">En cours</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface FormInputProps {
+    label: string;
+    type: string;
+    value: string;
+    onChange: (v: string) => void;
+    required?: boolean
     placeholder?: string
 }
 
