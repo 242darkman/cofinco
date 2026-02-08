@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, MapPin, Play, Pencil } from 'lucide-react';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, MapPin, Play, UserCheck } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
 import { useCredits } from '../../../hooks/credits/useCredits';
@@ -10,6 +10,7 @@ import { StatutCredit, StatutDemande } from '@shared/enum/status-constants';
 import CreditDetailModal from './CreditDetailModal';
 import CreditRequestForm from './CreditRequestForm';
 import EnqueteCreditForm from './EnqueteCreditForm';
+import EnqueteAssignModal from './EnqueteAssignModal';
 import CreditApprovalModal from './CreditApprovalModal';
 import CreditDisbursementModal from './CreditDisbursementModal';
 import CreditCommissionRejectionModal from './CreditCommissionRejectionModal';
@@ -66,6 +67,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const [demandeToCancel, setDemandeToCancel] = useState<string | null>(null);
   const [enqueteData, setEnqueteData] = useState<any>(null); // Store fetched enquête data
   const [loadingEnquete, setLoadingEnquete] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [demandeToAssign, setDemandeToAssign] = useState<any>(null);
   const ITEMS_PER_PAGE = 15;
 
   // Function to fetch enquête data by demande ID
@@ -417,19 +420,25 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'montantDemande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', align: 'center', format: (val) => {
       const translations: Record<string, string> = {
-        'READY_FOR_INVESTIGATION': 'Prêt à enquêter',
-        'UNDER_INVESTIGATION': 'En cours d\'enquête',
-        'INVESTIGATION_COMPLETE': 'Enquête terminée',
+        'READY_FOR_INVESTIGATION': 'En attente',
+        'UNDER_INVESTIGATION': 'En cours',
+        'INVESTIGATION_COMPLETE': 'Terminée',
       };
       const colors: Record<string, string> = {
         'READY_FOR_INVESTIGATION': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
         'UNDER_INVESTIGATION': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
         'INVESTIGATION_COMPLETE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       };
+      const icons: Record<string, React.ReactNode> = {
+        'READY_FOR_INVESTIGATION': <Clock size={10} className="text-amber-400" />,
+        'UNDER_INVESTIGATION': <Play size={10} className="text-cyan-400" />,
+        'INVESTIGATION_COMPLETE': <CheckCircle size={10} className="text-emerald-400" />,
+      };
       const label = translations[val] || val;
       const colorClass = colors[val] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
       return (
-        <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${colorClass}`}>
+        <span className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${colorClass}`}>
+          {icons[val]}
           {label}
         </span>
       );
@@ -920,16 +929,9 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         </Card>
       )}
 
-      {/* Enquetes Tab (A enquêter) */}
+      {/* Enquetes Tab — Suivi des enquêtes (menées par les agents terrain) */}
       {activeTab === 'enquetes' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
-            <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
-              <Button size="xs" variant="primary" onClick={() => setShowEnqueteForm(true)} icon={TrendingUp}>
-                Nouvelle Enquête
-              </Button>
-            </ProtectedFeature>
-          </div>
           <Card variant="default" padding="none" className="overflow-hidden">
             <ResponsiveTable
               data={demandes.demandes
@@ -943,69 +945,60 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               }
               columns={enqueteColumns}
               loading={isLoading}
-              emptyMessage="Aucune enquête en attente"
-              onRowClick={(item: any) => {
-                  // Seulement ouvrir le formulaire si l'enquête est en cours ou terminée
-                  if (item.statut === StatutDemande.UNDER_INVESTIGATION || item.statut === StatutDemande.INVESTIGATION_COMPLETE) {
+              emptyMessage="Aucune enquête en cours"
+              onRowClick={async (item: any) => {
+                  if (item.statut === StatutDemande.INVESTIGATION_COMPLETE) {
+                    const fetchedEnquete = await fetchEnqueteByDemandeId(item.id);
+                    if (fetchedEnquete) {
+                      setEnqueteData(fetchedEnquete);
+                    }
                     setSelectedDemande(item);
                     setShowEnqueteForm(true);
                   }
               }}
               density="compact"
               actions={(item) => (
-                <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
-                  {/* Bouton Démarrer - pour les demandes prêtes à enquêter */}
+                <div className="flex items-center gap-1.5">
+                  {/* Assigner — pour les demandes en attente d'enquête */}
                   {item.statut === StatutDemande.READY_FOR_INVESTIGATION && (
+                    <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
+                      <Button
+                        size="xs"
+                        variant="primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDemandeToAssign(item);
+                          setShowAssignModal(true);
+                        }}
+                        icon={UserCheck}
+                      >
+                        Assigner
+                      </Button>
+                    </ProtectedFeature>
+                  )}
+                  {/* Voir — uniquement quand l'agent terrain a terminé l'enquête */}
+                  {item.statut === StatutDemande.INVESTIGATION_COMPLETE && (
                     <Button
                       size="xs"
-                      variant="primary"
+                      variant="ghost"
+                      isLoading={loadingEnquete}
                       onClick={async (e) => {
                         e.stopPropagation();
-                        await demandes.startInvestigation(item.id);
-                        // Le statut change, la liste se rafraîchit automatiquement
-                        // L'utilisateur peut ensuite cliquer sur "Continuer" pour remplir le formulaire
-                      }}
-                      icon={Play}
-                    >
-                      Démarrer
-                    </Button>
-                  )}
-                  {/* Bouton Continuer - pour les enquêtes en cours */}
-                  {item.statut === StatutDemande.UNDER_INVESTIGATION && (
-                    <Button
-                      size="xs"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                        const fetchedEnquete = await fetchEnqueteByDemandeId(item.id);
+                        if (fetchedEnquete) {
+                          setEnqueteData(fetchedEnquete);
+                        }
                         setSelectedDemande(item);
                         setShowEnqueteForm(true);
                       }}
-                      icon={Pencil}
+                      icon={Eye}
                     >
-                      Continuer
+                      Voir
                     </Button>
                   )}
-                  {/* Bouton Voir - pour les enquêtes terminées */}
+                  {/* Valider — uniquement quand l'agent terrain a terminé l'enquête */}
                   {item.statut === StatutDemande.INVESTIGATION_COMPLETE && (
-                    <>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        isLoading={loadingEnquete}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          // Fetch the actual enquête data before opening
-                          const fetchedEnquete = await fetchEnqueteByDemandeId(item.id);
-                          if (fetchedEnquete) {
-                            setEnqueteData(fetchedEnquete);
-                          }
-                          setSelectedDemande(item);
-                          setShowEnqueteForm(true);
-                        }}
-                        icon={Eye}
-                      >
-                        Voir
-                      </Button>
+                    <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
                       <Button
                         size="xs"
                         variant="primary"
@@ -1018,9 +1011,9 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                       >
                         Valider
                       </Button>
-                    </>
+                    </ProtectedFeature>
                   )}
-                </ProtectedFeature>
+                </div>
               )}
             />
           </Card>
@@ -1086,7 +1079,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           }}
           clientId={selectedDemande?.clients?.id || selectedDemande?.clientId}
           clientNom={selectedDemande ? formatClientName(selectedDemande.clients?.nom, selectedDemande.clients?.prenom) : undefined}
-          readOnly={selectedDemande?.statut === StatutDemande.INVESTIGATION_COMPLETE}
+          readOnly={true}
           initialData={enqueteData ? {
             // Use fetched enquête data if available
             id: enqueteData.id,
@@ -1168,6 +1161,30 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             setSelectedDemande(null);
             demandes.fetchDemandes();
             credits.fetchCredits();
+          }}
+        />
+      )}
+
+      {showAssignModal && demandeToAssign && (
+        <EnqueteAssignModal
+          isOpen={showAssignModal}
+          onClose={() => {
+            setShowAssignModal(false);
+            setDemandeToAssign(null);
+          }}
+          demande={{
+            id: demandeToAssign.id,
+            clientNom: formatClientName(demandeToAssign.clients?.nom, demandeToAssign.clients?.prenom),
+            montantDemande: demandeToAssign.montantDemande,
+            objetCredit: demandeToAssign.objetCredit || demandeToAssign.objet_credit,
+          }}
+          onAssign={async (data) => {
+            const success = await demandes.startInvestigation(demandeToAssign.id, data);
+            if (success) {
+              setShowAssignModal(false);
+              setDemandeToAssign(null);
+            }
+            return success;
           }}
         />
       )}

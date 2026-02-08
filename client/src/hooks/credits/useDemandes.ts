@@ -163,23 +163,24 @@ export function useDemandes() {
   });
 
   const startInvestigationMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, agentId, priority, dueDate }: { id: string; agentId: string; priority?: string; dueDate?: string }) => {
       const response = await fetch(`/api/demandes-credit/${id}/start-investigation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, priority, dueDate }),
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Erreur lors du démarrage de l'enquête");
+        throw new Error(errorData.message || "Erreur lors de l'assignation de l'enquête");
       }
       return response.json();
     },
     onSuccess: () => {
       invalidateAll();
-      toast.success('Enquête démarrée', { description: 'Vous pouvez maintenant remplir le formulaire d\'enquête' });
+      toast.success('Enquête assignée', { description: 'L\'agent terrain a été notifié' });
     },
     onError: (err: Error) => {
-      toast.error("Échec du démarrage", { description: err.message });
+      toast.error("Échec de l'assignation", { description: err.message });
     },
   });
 
@@ -257,9 +258,9 @@ export function useDemandes() {
     }
   };
 
-  const startInvestigation = async (id: string): Promise<boolean> => {
+  const startInvestigation = async (id: string, data: { agentId: string; priority?: string; dueDate?: string }): Promise<boolean> => {
     try {
-      await startInvestigationMutation.mutateAsync(id);
+      await startInvestigationMutation.mutateAsync({ id, ...data });
       return true;
     } catch {
       return false;

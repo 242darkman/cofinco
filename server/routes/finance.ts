@@ -19,7 +19,8 @@ import {
   demandesCredit,
   credits,
   coffresForts,
-  transactionsCompte
+  transactionsCompte,
+  enquetesCredit
 } from "@shared/schema";
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
@@ -1407,6 +1408,10 @@ export function registerFinanceRoutes(app: Express) {
   app.post("/api/demandes-credit/:id/start-investigation", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
     try {
       const { id } = req.params;
+      const data = normalizeKeysDeep(req.body) as Record<string, any>;
+      const assignedAgentId = data.agentId || data.assignedAgentId;
+      const priority = data.priority || "MEDIUM";
+      const dueDate = data.dueDate;
 
       // Get demande
       const demande = await storage.getDemandeCredit(id);
@@ -1421,14 +1426,36 @@ export function registerFinanceRoutes(app: Express) {
         });
       }
 
-      // Update status to UNDER_INVESTIGATION
+      if (!assignedAgentId) {
+        return res.status(400).json({ message: "Veuillez sélectionner un agent terrain pour l'enquête." });
+      }
+
+      // Create the enquête record with agent assignment
+      const enqueteValues: Record<string, any> = {
+        clientId: demande.clientId,
+        demandeId: id,
+        montantDemande: demande.montantDemande?.toString() || "0",
+        objetCredit: demande.objetCredit || "À définir",
+        assignedAgentId,
+        assignedAt: new Date(),
+        assignedBy: req.session?.user?.id,
+        priority,
+        ...(dueDate && { dueDate: new Date(dueDate) }),
+      };
+
+      const [enquete] = await db
+        .insert(enquetesCredit)
+        .values(enqueteValues)
+        .returning();
+
+      // Update demande status to UNDER_INVESTIGATION
       const updated = await storage.updateDemandeCredit(id, {
         statut: StatutDemande.UNDER_INVESTIGATION,
       });
 
       const wsInstance = getWsInstance();
       if (wsInstance) {
-        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_started', id } });
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_started', id, agentId: assignedAgentId } });
       }
 
       // Domain event: investigation assigned/started
@@ -1438,13 +1465,14 @@ export function registerFinanceRoutes(app: Express) {
           demandeId: id,
           numeroDemande: demande.numeroDemande,
           clientId: demande.clientId,
+          agentId: assignedAgentId,
           agentName: req.session.user?.nom || 'Agent',
           agenceId: req.session.user?.agenceId,
         },
         timestamp: new Date(),
       });
 
-      res.json({ success: true, demande: updated });
+      res.json({ success: true, demande: updated, enquete });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur démarrage enquête');
       res.status(500).json({ message: error.message || "Erreur lors du démarrage de l'enquête" });
