@@ -2191,6 +2191,11 @@ export function registerFinanceRoutes(app: Express) {
           const parsed = insertEnqueteCreditSchema.parse(data);
           logger.info({ parsedDemandeId: parsed.demandeId }, 'Enquete create - after parse');
 
+          // Ensure status is ASSIGNED if an agent is selected but status is default
+          if (parsed.assignedAgentId && (!parsed.statut || parsed.statut === 'PENDING_ASSIGNMENT')) {
+             parsed.statut = 'ASSIGNED';
+          }
+
           const enquete = await storage.createEnqueteCredit(parsed);
           logger.info({ enqueteId: enquete.id, enqueteDemandeId: enquete.demandeId }, 'Enquete created');
 
@@ -2290,10 +2295,22 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Agent-specific: list my assigned investigations with client info
+  // Admin supervision: pass ?agentUserId=<users.id> to view a specific agent's investigations
   app.get("/api/enquetes-credit/mes-enquetes", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.user?.id;
-      if (!userId) return res.status(401).json({ message: "Non authentifié" });
+      const sessionUserId = req.session?.user?.id;
+      if (!sessionUserId) return res.status(401).json({ message: "Non authentifié" });
+
+      // Allow supervisors (admin, chef agence, superviseur, or users with supervision permissions) to query a specific agent's investigations
+      const agentUserId = req.query.agentUserId as string | undefined;
+      let targetUserId = sessionUserId;
+      if (agentUserId) {
+        const role = normalizeRole(req.session?.user?.role);
+        const canSupervise = role === SystemRole.ADMIN || role === SystemRole.CHEF_AGENCE || role === SystemRole.SUPERVISEUR;
+        if (canSupervise) {
+          targetUserId = agentUserId;
+        }
+      }
 
       const results = await db.select({
         enquete: enquetesCredit,
@@ -2301,7 +2318,7 @@ export function registerFinanceRoutes(app: Express) {
       })
         .from(enquetesCredit)
         .leftJoin(clients, eq(enquetesCredit.clientId, clients.id))
-        .where(eq(enquetesCredit.assignedAgentId, userId))
+        .where(eq(enquetesCredit.assignedAgentId, targetUserId))
         .orderBy(desc(enquetesCredit.createdAt));
 
       const data = results.map(r => ({

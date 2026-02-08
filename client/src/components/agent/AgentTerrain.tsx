@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw,
   Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle,
-  Target, Banknote, Calendar, AlertTriangle, MessageSquare, Trophy,
-  ClipboardCheck, ChevronRight, User
+  Target, Banknote, Calendar, AlertTriangle, MessageSquare,
+  ClipboardCheck, ChevronRight, User, Play, Loader2
 } from 'lucide-react';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
@@ -15,10 +15,12 @@ import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/Universal
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { StatutUser, StatutOperationTerrain } from '@shared/enum/status-constants';
+import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { resolveStorageUrl } from '../../lib/format';
 
 interface Agent {
   id: string;
+  userId?: string;
   nom: string;
   prenom: string;
   telephone: string;
@@ -77,13 +79,17 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   // Enquêtes (investigations) state
   const [pendingEnquetes, setPendingEnquetes] = useState<any[]>([]);
   const [showEnquetesPanel, setShowEnquetesPanel] = useState(false);
+  const [startingEnquete, setStartingEnquete] = useState<string | null>(null);
 
   // Auth & Role
   const currentUser = authService.getCurrentUser();
   const isAdmin = authService.isAdmin();
+  // Supervision mode: admin, chef d'agence, superviseur (or users with admin permissions)
+  const userRole = normalizeRole(currentUser?.role);
+  const canSupervise = isAdmin || userRole === SystemRole.CHEF_AGENCE || userRole === SystemRole.SUPERVISEUR;
 
-  // Target agent: admin uses selected agent, normal agent uses themselves
-  const targetAgentId = isAdmin ? selectedAgentId : currentAgent?.id;
+  // Target agent: supervisor uses selected agent, normal agent uses themselves
+  const targetAgentId = canSupervise ? selectedAgentId : currentAgent?.id;
 
   // Modals
   const [showPaiementForm, setShowPaiementForm] = useState(false);
@@ -109,7 +115,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     if (targetAgentId) {
       loadAgentData(targetAgentId);
       loadKPIs(targetAgentId);
-    } else if (isAdmin) {
+    } else if (canSupervise) {
       setLoading(false);
       setAgentSummary(null);
       setRecentTransactions([]);
@@ -122,7 +128,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const loadAgents = async () => {
     try {
       // For non-admin users, first try to get their own agent profile
-      if (!isAdmin) {
+      if (!canSupervise) {
         try {
           const meResponse = await agentTerrainApi.getMe();
           if (meResponse.data) {
@@ -138,11 +144,11 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       // For admins or fallback: load all agents
       const agents = await agentTerrainApi.getAllList();
       setAllAgents(agents);
-      if (!isAdmin && agents.length > 0) {
+      if (!canSupervise && agents.length > 0) {
         // Fallback: if getMe failed, use first active agent (legacy behavior)
         const activeAgent = agents.find((a: Agent) => a.statut === StatutUser.ACTIVE) || agents[0];
         setCurrentAgent(activeAgent);
-      } else if (isAdmin) {
+      } else if (canSupervise) {
         setLoading(false);
       }
     } catch (error) {
@@ -255,9 +261,18 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   }, []);
 
   // Load pending enquêtes assigned to the agent
+  // Admin supervision: pass agentUserId to view a specific agent's investigations
   const loadEnquetes = useCallback(async () => {
     try {
-      const response = await fetch('/api/enquetes-credit/mes-enquetes', { credentials: 'include' });
+      // For admin supervision mode, resolve the agent's users.id from allAgents
+      let url = '/api/enquetes-credit/mes-enquetes';
+      if (canSupervise && selectedAgentId) {
+        const agent = allAgents.find(a => a.id === selectedAgentId);
+        if (agent?.userId) {
+          url += `?agentUserId=${agent.userId}`;
+        }
+      }
+      const response = await fetch(url, { credentials: 'include' });
       if (response.ok) {
         const result = await response.json();
         const all: any[] = Array.isArray(result.data) ? result.data : [];
@@ -267,10 +282,11 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     } catch (error) {
       console.error('[AgentTerrain] Error loading enquêtes:', error);
     }
-  }, []);
+  }, [canSupervise, selectedAgentId, allAgents]);
 
-  // Load enquêtes on mount (uses current user from session)
+  // Load enquêtes when target changes or on mount
   useEffect(() => {
+    if (canSupervise && !selectedAgentId) return; // supervisor without selection: skip
     loadEnquetes();
   }, [loadEnquetes]);
 
@@ -285,18 +301,18 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         payload.type === 'investigation_reviewed' ||
         payload.type === 'demande_updated'
       ) {
-        if (targetAgentId) loadEnquetes(targetAgentId);
+        loadEnquetes();
       }
     };
     window.addEventListener('credit-update', handler);
     return () => window.removeEventListener('credit-update', handler);
-  }, [targetAgentId, loadEnquetes]);
+  }, [loadEnquetes]);
 
   const loadData = () => {
     if (targetAgentId) {
       loadAgentData(targetAgentId);
       loadKPIs(targetAgentId);
-      loadEnquetes(targetAgentId);
+      loadEnquetes();
     }
   };
 
@@ -321,7 +337,24 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const agentDisabled = isAdmin && !selectedAgentId;
+  // Start an investigation (ASSIGNED → IN_PROGRESS)
+  const handleStartEnquete = useCallback(async (enqueteId: string) => {
+    setStartingEnquete(enqueteId);
+    try {
+      const response = await fetch(`/api/enquetes-credit/${enqueteId}/demarrer`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        loadEnquetes();
+      }
+    } finally {
+      setStartingEnquete(null);
+    }
+  }, [loadEnquetes]);
+
+  const agentDisabled = canSupervise && !selectedAgentId;
 
   return (
     <div className="flex flex-col h-full bg-slate-950 overflow-hidden font-sans text-white">
@@ -357,7 +390,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
         {/* --- AGENT CARD --- */}
         <div className="px-3 pt-3 pb-2">
-           {(isAdmin && !selectedAgentId) ? (
+           {(canSupervise && !selectedAgentId) ? (
               <div className="relative">
                  <button
                     onClick={() => setAgentDropdownOpen(!agentDropdownOpen)}
@@ -470,7 +503,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     )}
                     <div className="min-w-0">
                        <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">
-                         {isAdmin ? 'Supervision' : 'Agent Actif'}
+                         {canSupervise ? 'Supervision' : 'Agent Actif'}
                        </div>
                        <div className="text-sm font-bold leading-tight truncate">
                          {currentAgent ? `${currentAgent.nom} ${currentAgent.prenom}` : '...'}
@@ -492,7 +525,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     )}
                  </div>
 
-                 {isAdmin && (
+                 {canSupervise && (
                    <button
                      onClick={() => setSelectedAgentId(null)}
                      className="absolute inset-0 opacity-0 hover:opacity-100 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 text-white text-xs font-bold transition-all"
@@ -522,9 +555,9 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
               />
               <KPIChip
                 icon={Calendar}
-                value={String(kpis.planningToday)}
+                value={String(kpis.planningToday + pendingEnquetes.length)}
                 label="Agenda"
-                color="blue"
+                color={pendingEnquetes.length > 0 ? 'cyan' : 'blue'}
               />
               <KPIChip
                 icon={AlertTriangle}
@@ -562,7 +595,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                  onClick={() => setShowPaiementForm(true)}
               />
               <ActionTile
-                 title={isAdmin ? "ENCAISSER" : "REMISE"}
+                 title={canSupervise ? "ENCAISSER" : "REMISE"}
                  subtitle="Operation"
                  icon={ArrowRightLeft}
                  color="blue"
@@ -578,81 +611,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
            </div>
         </div>
 
-        {/* --- PENDING ENQUETES --- */}
-        {!agentDisabled && pendingEnquetes.length > 0 && (
-          <div className="px-3 pb-2">
-            <div className="bg-slate-900 border border-amber-500/20 rounded-xl overflow-hidden">
-              <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                  <ClipboardCheck size={11} /> Enquêtes à effectuer
-                </div>
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                  {pendingEnquetes.length}
-                </span>
-              </div>
-              <div className="divide-y divide-slate-800/60">
-                {pendingEnquetes.slice(0, 3).map((enq: any) => {
-                  const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
-                  const priorityColor =
-                    enq.priority === 'URGENT' ? 'bg-red-500/15 text-red-400' :
-                    enq.priority === 'HIGH' ? 'bg-amber-500/15 text-amber-400' :
-                    'bg-blue-500/15 text-blue-400';
-                  return (
-                    <div key={enq.id} className="px-3 py-2.5">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className="w-7 h-7 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-[10px] shrink-0">
-                            {enq.client
-                              ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
-                              : '?'}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold text-white truncate">
-                              {enq.client
-                                ? `${enq.client.nom || ''} ${enq.client.prenom || ''}`.trim()
-                                : 'Client'}
-                            </div>
-                            {enq.montantDemande && (
-                              <div className="text-[10px] text-slate-500">
-                                {Number(enq.montantDemande).toLocaleString('fr-FR')} FCFA
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {enq.priority && (
-                            <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ${priorityColor}`}>
-                              {enq.priority === 'URGENT' ? 'Urgent' : enq.priority === 'HIGH' ? 'Haute' : 'Normal'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {enq.dueDate && (
-                        <div className={`text-[10px] flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
-                          <Calendar size={9} />
-                          {isOverdue && <AlertTriangle size={9} />}
-                          Echéance: {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {pendingEnquetes.length > 3 && (
-                <div className="px-3 py-2 border-t border-slate-800 text-center">
-                  <button
-                    onClick={() => setShowEnquetesPanel(true)}
-                    className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto transition-colors"
-                  >
-                    Voir les {pendingEnquetes.length} enquêtes <ChevronRight size={10} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- TODAY'S AGENDA --- */}
+        {/* --- AGENDA DU JOUR (planning + enquêtes intégrées) --- */}
         {!agentDisabled && (
           <div className="px-3 pb-2">
             <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
@@ -661,9 +620,9 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   <Calendar size={11} /> Agenda du jour
                 </div>
                 <div className="flex items-center gap-2">
-                  {todayPlannings.length > 0 && (
+                  {(todayPlannings.length + pendingEnquetes.length) > 0 && (
                     <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
-                      {todayPlannings.length}
+                      {todayPlannings.length + pendingEnquetes.length}
                     </span>
                   )}
                   <button
@@ -674,9 +633,92 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   </button>
                 </div>
               </div>
-              {todayPlannings.length > 0 ? (
+
+              {(todayPlannings.length + pendingEnquetes.length) > 0 ? (
                 <div className="divide-y divide-slate-800/60">
-                  {todayPlannings.map(p => (
+                  {/* Enquêtes assignées - toujours en haut */}
+                  {pendingEnquetes.map((enq: any) => {
+                    const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
+                    const isAssigned = enq.statut === 'ASSIGNED';
+                    const isStarting = startingEnquete === enq.id;
+                    const borderColor =
+                      enq.priority === 'URGENT' ? 'bg-red-500' :
+                      enq.priority === 'HIGH' ? 'bg-amber-500' :
+                      enq.priority === 'MEDIUM' ? 'bg-blue-500' :
+                      'bg-slate-500';
+                    const priorityConf: Record<string, { label: string; color: string }> = {
+                      LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400' },
+                      MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400' },
+                      HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400' },
+                      URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 animate-pulse' },
+                    };
+                    const pConf = priorityConf[enq.priority || 'MEDIUM'] || priorityConf.MEDIUM;
+
+                    return (
+                      <div
+                        key={`enq-${enq.id}`}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-red-500/5' : ''}`}
+                      >
+                        {/* Priority color bar */}
+                        <div className={`w-1 self-stretch rounded-full shrink-0 ${borderColor} ${enq.priority === 'URGENT' ? 'animate-pulse' : ''}`} />
+
+                        {/* Client avatar */}
+                        <div className="w-7 h-7 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-[10px] shrink-0">
+                          {enq.client
+                            ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
+                            : '?'}
+                        </div>
+
+                        {/* Content */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <ClipboardCheck size={10} className="text-amber-400 shrink-0" />
+                            <span className="text-xs font-semibold text-white truncate">
+                              {enq.client ? `${enq.client.nom || ''} ${enq.client.prenom || ''}`.trim() : 'Enquête'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {enq.montantDemande && (
+                              <span className="text-[10px] text-emerald-400 font-medium">
+                                {Number(enq.montantDemande).toLocaleString('fr-FR')} F
+                              </span>
+                            )}
+                            {enq.dueDate && (
+                              <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
+                                {isOverdue && <AlertTriangle size={8} />}
+                                <Calendar size={8} />
+                                {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Priority badge + Action */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ${pConf.color}`}>
+                            {pConf.label}
+                          </span>
+                          {isAssigned ? (
+                            <button
+                              onClick={() => handleStartEnquete(enq.id)}
+                              disabled={isStarting}
+                              className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-[9px] font-bold rounded-lg transition-colors"
+                            >
+                              {isStarting ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
+                              Démarrer
+                            </button>
+                          ) : (
+                            <span className="text-[9px] font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                              En cours
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Planning entries */}
+                  {todayPlannings.map((p: PlanningEntry) => (
                     <div key={p.id} className="flex items-center gap-2.5 px-3 py-2">
                       <div className="text-[10px] font-mono font-bold text-slate-500 w-10 shrink-0">
                         {p.heureDebut}
@@ -719,6 +761,18 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     className="mt-2 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
                   >
                     + Planifier une activite
+                  </button>
+                </div>
+              )}
+
+              {/* Link to full enquêtes panel if many */}
+              {pendingEnquetes.length > 3 && (
+                <div className="px-3 py-1.5 border-t border-slate-800 text-center">
+                  <button
+                    onClick={() => setShowEnquetesPanel(true)}
+                    className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto transition-colors"
+                  >
+                    Voir toutes les enquêtes ({pendingEnquetes.length}) <ChevronRight size={10} />
                   </button>
                 </div>
               )}
@@ -836,7 +890,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
             <button
               onClick={() => {
                 setShowEnquetesPanel(false);
-                if (targetAgentId) loadEnquetes(targetAgentId);
+                loadEnquetes();
               }}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
             >
@@ -924,6 +978,23 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                         <span className="font-medium">Echéance dépassée</span>
                       </div>
                     )}
+                    {/* Action button */}
+                    <div className="mt-2 flex justify-end">
+                      {enq.statut === 'ASSIGNED' ? (
+                        <button
+                          onClick={() => handleStartEnquete(enq.id)}
+                          disabled={startingEnquete === enq.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-[11px] font-bold rounded-lg transition-colors"
+                        >
+                          {startingEnquete === enq.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                          Démarrer l'enquête
+                        </button>
+                      ) : enq.statut === 'IN_PROGRESS' ? (
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-lg">
+                          <Clock size={12} /> En cours
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 );
               })
