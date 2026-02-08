@@ -1485,9 +1485,8 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
     nom: 'Siège',
     codeAgence: 'SIEGE',
     adresse: 'Boulevard Denis Sassou, Brazzaville',
-    ville: 'Brazzaville',
     villeId: villeIdMap['Brazzaville'] || undefined,
-    region: 'Centre',
+    region: 'Brazzaville',
     typeAgence: TypeAgence.MAIN,
     statut: StatutUser.ACTIVE,
     latitude: '-4.2633',
@@ -1508,6 +1507,29 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
         await db.update(agences).set({ villeId: villeIdMap['Brazzaville'] }).where(eq(agences.id, existingSiege.id));
       }
       results.push({ table: 'agences', action: 'skipped', count: 0, details: 'Siège exists' });
+    }
+
+    // ===== Backfill villeId + region + GPS for ALL agences =====
+    // Uses raw SQL since the `ville` text column may already be dropped
+    const backfillResult = await db.execute(sql`
+      WITH matched AS (
+        SELECT a.id, v.id AS ville_id, v.latitude, v.longitude, d.nom AS dept_nom
+        FROM agences a
+        JOIN villes v ON v.nom = a.ville
+        LEFT JOIN departements d ON v.departement_id = d.id
+        WHERE a.ville_id IS NULL AND a.ville IS NOT NULL
+      )
+      UPDATE agences SET
+        ville_id = matched.ville_id,
+        region = COALESCE(agences.region, matched.dept_nom),
+        latitude = COALESCE(agences.latitude, matched.latitude),
+        longitude = COALESCE(agences.longitude, matched.longitude)
+      FROM matched
+      WHERE agences.id = matched.id
+    `);
+    const backfillCount = (backfillResult as any)?.rowCount || 0;
+    if (backfillCount > 0) {
+      results.push({ table: 'agences', action: 'updated', count: backfillCount, details: 'backfill villeId from ville text' });
     }
   }
 

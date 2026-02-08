@@ -1684,9 +1684,13 @@ export const echeanceCreditApi = {
 
 // Agences API
 export const agenceApi = {
-  getAll: (params?: { statut?: string }) => {
+  getAll: (params?: Record<string, string>) => {
     const queryParams = new URLSearchParams();
-    if (params?.statut) queryParams.append('statut', params.statut);
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value);
+      });
+    }
     const query = queryParams.toString();
     return request<any[]>(`/agences${query ? `?${query}` : ''}`);
   },

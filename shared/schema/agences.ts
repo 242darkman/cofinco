@@ -13,8 +13,7 @@ export const agences = pgTable("agences", {
   nom: text("nom").notNull(),
   typeAgence: typeAgenceEnum("type_agence").notNull().default(TypeAgence.SECONDARY),
   adresse: text("adresse"),
-  ville: text("ville"),
-  villeId: uuid("ville_id"), // FK to villes table (nullable for backward compat)
+  villeId: uuid("ville_id"), // FK to villes table
   region: text("region"),
   pays: text("pays").default("Congo-Brazzaville"),
   telephone: text("telephone"),

@@ -6,7 +6,8 @@ const logger = createLogger('Routes:Agences');
 import { agences, userAgences, users, coffresForts, comptesLiaison, userRoles } from "../../shared/schema";
 import { employes } from "../../shared/schema/employes";
 import { clients } from "../../shared/schema/clients";
-import { eq, and, ilike, or, desc, asc, sql, ne } from "drizzle-orm";
+import { eq, and, ilike, or, desc, asc, sql, ne, isNull } from "drizzle-orm";
+import { villes, departements } from "../../shared/schema/operations";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -31,10 +32,9 @@ export function registerAgencesRoutes(app: Express) {
   // GET /api/agences - Liste des agences avec comptes calculés
   app.get("/api/agences", requireAuth, async (req, res) => {
     try {
-      const { statut, type, search, sortBy = "nom", sortOrder = "asc" } = req.query;
+      const { statut, type, search, sortBy = "nom", sortOrder = "asc", includeDeleted } = req.query;
 
       // Requête principale avec sous-requêtes scalaires corrélées
-      // Note: Le statut de l'employé est stocké dans la table users, pas employes
       let query = db
         .select({
           id: agences.id,
@@ -42,7 +42,8 @@ export function registerAgencesRoutes(app: Express) {
           nom: agences.nom,
           typeAgence: agences.typeAgence,
           adresse: agences.adresse,
-          ville: agences.ville,
+          ville: villes.nom,
+          villeId: agences.villeId,
           region: agences.region,
           pays: agences.pays,
           telephone: agences.telephone,
@@ -55,6 +56,7 @@ export function registerAgencesRoutes(app: Express) {
           latitude: agences.latitude,
           longitude: agences.longitude,
           notes: agences.notes,
+          deletedAt: agences.deletedAt,
           createdAt: agences.createdAt,
           updatedAt: agences.updatedAt,
           // Comptes calculés via sous-requêtes corrélées
@@ -69,10 +71,17 @@ export function registerAgencesRoutes(app: Express) {
             WHERE c.agence_id = agences.id AND u.statut = ${StatutClient.ACTIVE}
           )`,
         })
-        .from(agences);
+        .from(agences)
+        .leftJoin(villes, eq(agences.villeId, villes.id));
 
       // Filtres
       const conditions = [];
+
+      // Soft-delete filter: exclude deleted by default
+      if (includeDeleted !== "true") {
+        conditions.push(isNull(agences.deletedAt));
+      }
+
       if (statut && statut !== "all") {
         conditions.push(eq(agences.statut, statut as string));
       }
@@ -85,7 +94,7 @@ export function registerAgencesRoutes(app: Express) {
           or(
             ilike(agences.nom, searchTerm),
             ilike(agences.codeAgence, searchTerm),
-            ilike(agences.ville, searchTerm)
+            ilike(villes.nom, searchTerm)
           )
         );
       }
@@ -153,6 +162,30 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(400).json({ error: "Ce code agence existe déjà" });
       }
 
+      // Auto-fill region/GPS from ville if villeId is provided
+      let regionNom = data.region;
+      let lat = data.latitude;
+      let lng = data.longitude;
+      const villeId = data.villeId || data.ville_id;
+
+      if (villeId) {
+        const [villeData] = await db
+          .select({
+            latitude: villes.latitude,
+            longitude: villes.longitude,
+            departementNom: departements.nom,
+          })
+          .from(villes)
+          .leftJoin(departements, eq(villes.departementId, departements.id))
+          .where(eq(villes.id, villeId));
+
+        if (villeData) {
+          regionNom = regionNom || villeData.departementNom;
+          lat = lat ?? (villeData.latitude ? Number(villeData.latitude) : undefined);
+          lng = lng ?? (villeData.longitude ? Number(villeData.longitude) : undefined);
+        }
+      }
+
       // Transaction atomique: créer agence + coffre-fort
       const result = await db.transaction(async (tx) => {
         // 1. Créer l'agence
@@ -163,8 +196,8 @@ export function registerAgencesRoutes(app: Express) {
             nom: data.nom,
             typeAgence: data.type_agence || data.typeAgence || TypeAgence.SECONDARY,
             adresse: data.adresse,
-            ville: data.ville,
-            region: data.region,
+            villeId: villeId || null,
+            region: regionNom,
             pays: data.pays || "Congo-Brazzaville",
             telephone: data.telephone,
             email: data.email,
@@ -173,8 +206,8 @@ export function registerAgencesRoutes(app: Express) {
             responsablePhone: data.responsable_phone || data.responsablePhone,
             statut: data.statut || StatutAgence.ACTIVE,
             dateOuverture: data.date_ouverture || data.dateOuverture,
-            latitude: data.latitude,
-            longitude: data.longitude,
+            latitude: lat,
+            longitude: lng,
             notes: data.notes
           })
           .returning();
@@ -246,14 +279,38 @@ export function registerAgencesRoutes(app: Express) {
       const data = req.body;
       const userId = (req as any).session?.userId;
 
+      // Auto-fill region/GPS from ville if villeId is provided
+      let regionNom = data.region;
+      let lat = data.latitude;
+      let lng = data.longitude;
+      const villeId = data.villeId || data.ville_id;
+
+      if (villeId) {
+        const [villeData] = await db
+          .select({
+            latitude: villes.latitude,
+            longitude: villes.longitude,
+            departementNom: departements.nom,
+          })
+          .from(villes)
+          .leftJoin(departements, eq(villes.departementId, departements.id))
+          .where(eq(villes.id, villeId));
+
+        if (villeData) {
+          regionNom = regionNom || villeData.departementNom;
+          lat = lat ?? (villeData.latitude ? Number(villeData.latitude) : undefined);
+          lng = lng ?? (villeData.longitude ? Number(villeData.longitude) : undefined);
+        }
+      }
+
       const [updated] = await db
         .update(agences)
         .set({
           nom: data.nom,
           typeAgence: data.type_agence || data.typeAgence,
           adresse: data.adresse,
-          ville: data.ville,
-          region: data.region,
+          villeId: villeId || undefined,
+          region: regionNom,
           pays: data.pays,
           telephone: data.telephone,
           email: data.email,
@@ -262,8 +319,8 @@ export function registerAgencesRoutes(app: Express) {
           responsablePhone: data.responsable_phone || data.responsablePhone,
           statut: data.statut,
           dateOuverture: data.date_ouverture || data.dateOuverture,
-          latitude: data.latitude,
-          longitude: data.longitude,
+          latitude: lat,
+          longitude: lng,
           notes: data.notes,
           updatedAt: new Date()
         })
@@ -360,12 +417,13 @@ export function registerAgencesRoutes(app: Express) {
             codeAgence: agences.codeAgence,
             nom: agences.nom,
             typeAgence: agences.typeAgence,
-            ville: agences.ville,
+            ville: villes.nom,
             statut: agences.statut
           }
         })
         .from(userAgences)
         .innerJoin(agences, eq(userAgences.agenceId, agences.id))
+        .leftJoin(villes, eq(agences.villeId, villes.id))
         .where(and(eq(userAgences.userId, userId), eq(userAgences.actif, true)))
         .orderBy(desc(userAgences.isPrimary), asc(agences.nom));
 
@@ -398,12 +456,13 @@ export function registerAgencesRoutes(app: Express) {
             codeAgence: agences.codeAgence,
             nom: agences.nom,
             typeAgence: agences.typeAgence,
-            ville: agences.ville,
+            ville: villes.nom,
             statut: agences.statut
           }
         })
         .from(userAgences)
         .innerJoin(agences, eq(userAgences.agenceId, agences.id))
+        .leftJoin(villes, eq(agences.villeId, villes.id))
         .where(and(
           eq(userAgences.userId, userId),
           eq(userAgences.actif, true),

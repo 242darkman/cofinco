@@ -1599,6 +1599,7 @@ export const StatutEcheanceCredit = {
   PAID: "PAID",
   LATE: "LATE",
   SETTLED: "SETTLED",
+  PARTIALLY_PAID: "PARTIALLY_PAID",
 } as const;
 
 export type StatutEcheanceCreditType = (typeof StatutEcheanceCredit)[keyof typeof StatutEcheanceCredit];
@@ -1609,6 +1610,7 @@ export const STATUT_ECHEANCE_CREDIT_LABELS: Record<StatutEcheanceCreditType, str
   [StatutEcheanceCredit.PAID]: "Payé",
   [StatutEcheanceCredit.LATE]: "Retard",
   [StatutEcheanceCredit.SETTLED]: "Soldé",
+  [StatutEcheanceCredit.PARTIALLY_PAID]: "Partiellement payé",
 };
 
 

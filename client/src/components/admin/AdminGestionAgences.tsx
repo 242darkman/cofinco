@@ -1,17 +1,25 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { Plus, Edit2, Trash2, Building2, MapPin, Phone, User, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Map, List, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, MapPin, Phone, User, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, Mail, Calendar, Globe, StickyNote, Users, UserCheck, X } from 'lucide-react';
 import { Card, Button, Badge, SearchInput, SelectField, FormField, Modal, EmptyState, LoadingSpinner, IconButton, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { agenceApi, villeApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { AgencyMigrationWizard } from '../agences/AgencyMigrationWizard';
 import MapViewToggle, { ViewMode } from './shared/MapViewToggle';
-import { TypeAgence, TypeAgenceType, StatutAgence, StatutAgenceType } from '@shared/enum/status-constants';
+import { TypeAgence, TypeAgenceType, StatutAgence, StatutAgenceType, STATUT_AGENCE_LABELS } from '@shared/enum/status-constants';
 
 // Lazy load map component
 const AdminAgenciesMap = lazy(() => import('./AdminAgenciesMap'));
+
+// Type labels
+const TYPE_AGENCE_LABELS: Record<TypeAgenceType, string> = {
+  [TypeAgence.MAIN]: 'Principale',
+  [TypeAgence.SECONDARY]: 'Secondaire',
+  [TypeAgence.KIOSK]: 'Kiosque',
+};
 
 interface Agence {
   id: string;
@@ -20,6 +28,7 @@ interface Agence {
   typeAgence: TypeAgenceType;
   adresse?: string;
   ville?: string;
+  villeId?: string;
   region?: string;
   pays?: string;
   telephone?: string;
@@ -33,7 +42,16 @@ interface Agence {
   latitude?: number;
   longitude?: number;
   notes?: string;
+  deletedAt?: string | null;
   createdAt: string;
+}
+
+interface VilleItem {
+  id: string;
+  nom: string;
+  departementNom?: string;
+  latitude?: string | number;
+  longitude?: string | number;
 }
 
 export default function AdminGestionAgences() {
@@ -50,11 +68,13 @@ export default function AdminGestionAgences() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingAgence, setEditingAgence] = useState<Agence | null>(null);
+  const [viewingAgence, setViewingAgence] = useState<Agence | null>(null);
   const [showMigration, setShowMigration] = useState(false);
   const [migrationAgence, setMigrationAgence] = useState<Agence | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatut, setFilterStatut] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [showDeleted, setShowDeleted] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -64,7 +84,6 @@ export default function AdminGestionAgences() {
     nom: '',
     typeAgence: TypeAgence.SECONDARY as TypeAgenceType,
     adresse: '',
-    ville: '',
     villeId: '',
     region: '',
     pays: 'Congo-Brazzaville',
@@ -74,14 +93,12 @@ export default function AdminGestionAgences() {
     responsablePhone: '',
     statut: StatutAgence.ACTIVE as StatutAgenceType,
     dateOuverture: new Date().toISOString().split('T')[0],
-    nombreEmployes: 0,
-    nombreClients: 0,
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
     notes: ''
   });
 
-  const [villesList, setVillesList] = useState<{ id: string; nom: string }[]>([]);
+  const [villesList, setVillesList] = useState<VilleItem[]>([]);
 
   useEffect(() => {
     loadAgences();
@@ -91,14 +108,19 @@ export default function AdminGestionAgences() {
   const loadAgences = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await agenceApi.getAll();
+      const params: Record<string, string> = {};
+      if (showDeleted) params.includeDeleted = 'true';
+      const data = await agenceApi.getAll(params);
       setAgences(data || []);
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du chargement des agences'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showDeleted]);
+
+  // Reload when showDeleted changes
+  useEffect(() => { loadAgences(); }, [loadAgences]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,10 +128,7 @@ export default function AdminGestionAgences() {
 
     try {
       if (editingAgence) {
-        await agenceApi.update(editingAgence.id, {
-          ...formData,
-          updated_at: new Date().toISOString()
-        });
+        await agenceApi.update(editingAgence.id, formData);
         toast.success('Agence mise à jour avec succès');
       } else {
         await agenceApi.create(formData);
@@ -128,7 +147,6 @@ export default function AdminGestionAgences() {
   }, [editingAgence, formData, loadAgences]);
 
   const handleDelete = useCallback((agence: Agence) => {
-    // Check if agency has data that requires migration
     if (agence.nombreClients > 0 || agence.nombreEmployes > 0) {
       setMigrationAgence(agence);
       setShowMigration(true);
@@ -162,8 +180,7 @@ export default function AdminGestionAgences() {
       nom: agence.nom,
       typeAgence: agence.typeAgence,
       adresse: agence.adresse || '',
-      ville: agence.ville || '',
-      villeId: (agence as any).villeId || '',
+      villeId: agence.villeId || '',
       region: agence.region || '',
       pays: agence.pays || 'Congo-Brazzaville',
       telephone: agence.telephone || '',
@@ -172,13 +189,26 @@ export default function AdminGestionAgences() {
       responsablePhone: agence.responsablePhone || '',
       statut: agence.statut,
       dateOuverture: agence.dateOuverture || new Date().toISOString().split('T')[0],
-      nombreEmployes: agence.nombreEmployes || 0,
-      nombreClients: agence.nombreClients || 0,
       latitude: agence.latitude,
       longitude: agence.longitude,
       notes: agence.notes || ''
     });
     setShowForm(true);
+  };
+
+  const handleVilleChange = (villeId: string) => {
+    const selected = villesList.find(v => v.id === villeId);
+    if (selected) {
+      setFormData(prev => ({
+        ...prev,
+        villeId,
+        region: selected.departementNom || prev.region,
+        latitude: selected.latitude ? Number(selected.latitude) : prev.latitude,
+        longitude: selected.longitude ? Number(selected.longitude) : prev.longitude,
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, villeId }));
+    }
   };
 
   const resetForm = () => {
@@ -187,7 +217,6 @@ export default function AdminGestionAgences() {
       nom: '',
       typeAgence: TypeAgence.SECONDARY as TypeAgenceType,
       adresse: '',
-      ville: '',
       villeId: '',
       region: '',
       pays: 'Congo-Brazzaville',
@@ -197,22 +226,24 @@ export default function AdminGestionAgences() {
       responsablePhone: '',
       statut: StatutAgence.ACTIVE,
       dateOuverture: new Date().toISOString().split('T')[0],
-      nombreEmployes: 0,
-      nombreClients: 0,
       latitude: undefined,
       longitude: undefined,
       notes: ''
     });
   };
 
-  const filteredAgences = agences.filter(agence => {
-    const matchesSearch = agence.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         agence.codeAgence.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (agence.ville?.toLowerCase() || '').includes(searchQuery.toLowerCase());
-    const matchesStatut = filterStatut === 'all' || agence.statut === filterStatut;
-    const matchesType = filterType === 'all' || agence.typeAgence === filterType;
-    return matchesSearch && matchesStatut && matchesType;
-  });
+  const filteredAgences = useMemo(() => {
+    return agences.filter(agence => {
+      const matchesSearch = agence.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           agence.codeAgence.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           (agence.ville?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+      const matchesStatut = filterStatut === 'all' || agence.statut === filterStatut;
+      const matchesType = filterType === 'all' || agence.typeAgence === filterType;
+      // If showDeleted is on, show only deleted; otherwise exclude deleted
+      const matchesDeleted = showDeleted ? !!agence.deletedAt : !agence.deletedAt;
+      return matchesSearch && matchesStatut && matchesType && matchesDeleted;
+    });
+  }, [agences, searchQuery, filterStatut, filterType, showDeleted]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredAgences.length / pageSize);
@@ -221,18 +252,39 @@ export default function AdminGestionAgences() {
     return filteredAgences.slice(start, start + pageSize);
   }, [filteredAgences, currentPage, pageSize]);
 
+  // Memoize agencies for map to avoid re-creating array every render
+  const mapAgencies = useMemo(() => {
+    return filteredAgences.map(a => ({
+      id: a.id,
+      codeAgence: a.codeAgence,
+      nom: a.nom,
+      typeAgence: a.typeAgence,
+      adresse: a.adresse,
+      ville: a.ville,
+      region: a.region,
+      telephone: a.telephone,
+      statut: a.statut,
+      latitude: a.latitude,
+      longitude: a.longitude,
+      nombreEmployes: a.nombreEmployes,
+      nombreClients: a.nombreClients,
+    }));
+  }, [filteredAgences]);
+
   // Reset to page 1 when filters change
-  React.useEffect(() => {
+  useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterStatut, filterType]);
+  }, [searchQuery, filterStatut, filterType, showDeleted]);
+
+  const isDeleted = (agence: Agence) => !!agence.deletedAt;
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header - Compact mobile */}
+      {/* Header */}
       <FeatureHeader
         featureKey="admin.agencies"
         title={FEATURE_DESCRIPTIONS['admin.agencies'].title}
-        subtitle={`${FEATURE_DESCRIPTIONS['admin.agencies'].subtitle} (${agences.length} agences)`}
+        subtitle={`${FEATURE_DESCRIPTIONS['admin.agencies'].subtitle} (${agences.filter(a => !a.deletedAt).length} agences)`}
         helpText={FEATURE_DESCRIPTIONS['admin.agencies'].helpText}
         icon={
           <div className="p-2 sm:p-3 bg-cyan-500/20 rounded-xl">
@@ -257,10 +309,9 @@ export default function AdminGestionAgences() {
         }
       />
 
-      {/* Filters - Mobile-first: Stack all on mobile, inline on desktop */}
+      {/* Filters */}
       <Card className="bg-slate-900 border-slate-800 p-3 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-          {/* Search - Full width on mobile, flex-1 on desktop */}
           <div className="w-full sm:flex-1">
             <SearchInput
               value={searchQuery}
@@ -269,7 +320,6 @@ export default function AdminGestionAgences() {
               className="w-full h-full min-h-[42px]"
             />
           </div>
-          {/* Filters row - Side by side on mobile too, but full width */}
           <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-3">
             <SelectField
               label=""
@@ -298,11 +348,21 @@ export default function AdminGestionAgences() {
               className="w-full sm:w-44"
             />
           </div>
-          {/* View Toggle */}
-          <MapViewToggle
-            viewMode={viewMode}
-            onChange={setViewMode}
-          />
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showDeleted}
+                onChange={(e) => setShowDeleted(e.target.checked)}
+                className="rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500/30"
+              />
+              Supprimées
+            </label>
+            <MapViewToggle
+              viewMode={viewMode}
+              onChange={setViewMode}
+            />
+          </div>
         </div>
 
         {/* GPS Warning */}
@@ -325,132 +385,123 @@ export default function AdminGestionAgences() {
         <EmptyState
           icon={Building2}
           title="Aucune agence trouvée"
-          description="Créez votre première agence ou modifiez vos filtres de recherche."
+          description={showDeleted ? "Aucune agence supprimée." : "Créez votre première agence ou modifiez vos filtres de recherche."}
         />
       ) : viewMode === 'map' ? (
-        /* Map View */
         <Suspense fallback={
           <div className="flex justify-center py-12">
             <LoadingSpinner size="lg" />
           </div>
         }>
-          <AdminAgenciesMap
-            agencies={filteredAgences.map(a => ({
-              id: a.id,
-              codeAgence: a.codeAgence,
-              nom: a.nom,
-              typeAgence: a.typeAgence,
-              adresse: a.adresse,
-              ville: a.ville,
-              region: a.region,
-              telephone: a.telephone,
-              statut: a.statut,
-              latitude: a.latitude,
-              longitude: a.longitude,
-              nombreEmployes: a.nombreEmployes,
-              nombreClients: a.nombreClients,
-            }))}
-            onAgencyClick={(agency) => {
-              const agence = agences.find(a => a.id === agency.id);
-              if (agence && canEditAgences) {
-                handleEdit(agence);
-              }
-            }}
-          />
+          <AdminAgenciesMap agencies={mapAgencies} />
         </Suspense>
       ) : (
         <>
         {/* Scrollable Grid Container */}
         <div className="overflow-auto max-h-[500px] custom-scrollbar">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {paginatedAgences.map(agence => (
-            <Card
-              key={agence.id}
-              className="bg-slate-900 border-slate-800 hover:border-cyan-500/50 transition-all p-4 sm:p-5"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <Badge
-                      value={agence.statut}
-                      size="sm"
-                    />
+            {paginatedAgences.map(agence => {
+              const deleted = isDeleted(agence);
+              return (
+              <Card
+                key={agence.id}
+                className={`bg-slate-900 border-slate-800 transition-all p-4 sm:p-5 cursor-pointer ${
+                  deleted
+                    ? 'opacity-50 border-red-500/30'
+                    : 'hover:border-cyan-500/50'
+                }`}
+                onClick={() => setViewingAgence(agence)}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <Badge
+                        value={agence.statut}
+                        size="sm"
+                      />
+                      {deleted && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                          Supprimée
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-white text-sm sm:text-base truncate">{agence.nom}</h3>
+                    <p className="text-xs text-cyan-400 font-mono">{agence.codeAgence}</p>
                   </div>
-                  <h3 className="font-bold text-white text-sm sm:text-base truncate">{agence.nom}</h3>
-                  <p className="text-xs text-cyan-400 font-mono">{agence.codeAgence}</p>
-                </div>
-                <div className="flex gap-1">
-                  {canEditAgences && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(agence)}
-                      className="p-2"
-                    >
-                      <Edit2 size={16} />
-                    </Button>
+                  {!deleted && (
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      {canEditAgences && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(agence)}
+                          className="p-2"
+                        >
+                          <Edit2 size={16} />
+                        </Button>
+                      )}
+                      {canDeleteAgences && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(agence)}
+                          className="p-2 text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      )}
+                    </div>
                   )}
-                  {canDeleteAgences && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(agence)}
-                      className="p-2 text-red-400 hover:text-red-300"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-1.5 text-xs sm:text-sm">
+                  {agence.ville && (
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <MapPin size={14} className="flex-shrink-0" />
+                      <span className="truncate">{agence.ville}{agence.region ? `, ${agence.region}` : ''}</span>
+                    </div>
+                  )}
+                  {agence.telephone && (
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <Phone size={14} className="flex-shrink-0" />
+                      <span>{agence.telephone}</span>
+                    </div>
+                  )}
+                  {agence.responsableNom && (
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <User size={14} className="flex-shrink-0" />
+                      <span className="truncate">{agence.responsableNom}</span>
+                    </div>
                   )}
                 </div>
-              </div>
 
-              {/* Details */}
-              <div className="space-y-1.5 text-xs sm:text-sm">
-                {agence.ville && (
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <MapPin size={14} className="flex-shrink-0" />
-                    <span className="truncate">{agence.ville}{agence.region ? `, ${agence.region}` : ''}</span>
+                {/* Stats Footer */}
+                <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] sm:text-xs text-slate-500">Employés</p>
+                    <p className="text-sm sm:text-base font-bold text-white">{agence.nombreEmployes || 0}</p>
                   </div>
-                )}
-                {agence.telephone && (
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Phone size={14} className="flex-shrink-0" />
-                    <span>{agence.telephone}</span>
+                  <div>
+                    <p className="text-[10px] sm:text-xs text-slate-500">Clients</p>
+                    <p className="text-sm sm:text-base font-bold text-white">{agence.nombreClients || 0}</p>
                   </div>
-                )}
-                {agence.responsableNom && (
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <User size={14} className="flex-shrink-0" />
-                    <span className="truncate">{agence.responsableNom}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Stats Footer */}
-              <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-[10px] sm:text-xs text-slate-500">Employés</p>
-                  <p className="text-sm sm:text-base font-bold text-white">{agence.nombreEmployes || 0}</p>
                 </div>
-                <div>
-                  <p className="text-[10px] sm:text-xs text-slate-500">Clients</p>
-                  <p className="text-sm sm:text-base font-bold text-white">{agence.nombreClients || 0}</p>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );})}
           </div>
         </div>
 
-        {/* Pagination Controls - Mobile First */}
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
         <div className="p-3 sm:p-4 mt-4 bg-surface-muted/30 border border-edge rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Page info & size selector */}
           <div className="flex items-center gap-3 text-xs sm:text-sm text-content-muted">
             <span className="hidden sm:inline">
               {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredAgences.length)} sur {filteredAgences.length}
             </span>
             <span className="sm:hidden">
-              Page {currentPage}/{totalPages || 1}
+              Page {currentPage}/{totalPages}
             </span>
             <select
               value={pageSize}
@@ -466,7 +517,6 @@ export default function AdminGestionAgences() {
             </select>
           </div>
 
-          {/* Navigation buttons */}
           <div className="flex items-center gap-1">
             <IconButton
               icon={ChevronsLeft}
@@ -486,8 +536,7 @@ export default function AdminGestionAgences() {
               className="w-8 h-8 text-content-muted disabled:opacity-30"
               aria-label="Page précédente"
             />
-            
-            {/* Page numbers */}
+
             <div className="flex items-center gap-1 mx-1">
               {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
                 let pageNum: number;
@@ -522,7 +571,7 @@ export default function AdminGestionAgences() {
               variant="ghost"
               size="sm"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
+              disabled={currentPage === totalPages}
               className="w-8 h-8 text-content-muted disabled:opacity-30"
               aria-label="Page suivante"
             />
@@ -531,14 +580,156 @@ export default function AdminGestionAgences() {
               variant="ghost"
               size="sm"
               onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages || totalPages === 0}
+              disabled={currentPage === totalPages}
               className="w-8 h-8 text-content-muted disabled:opacity-30"
               aria-label="Dernière page"
             />
           </div>
         </div>
+        )}
       </>
       )}
+
+      {/* Read-only Detail Sheet */}
+      <Sheet open={!!viewingAgence} onOpenChange={(open) => !open && setViewingAgence(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-slate-950 border-l-slate-800 p-0">
+          <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
+            <SheetTitle className="text-white">Détail de l'agence</SheetTitle>
+            <SheetDescription className="text-slate-400">
+              Informations complètes
+            </SheetDescription>
+          </SheetHeader>
+
+          {viewingAgence && (
+            <div className="p-6 space-y-6">
+              {/* Identity */}
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-white leading-tight">{viewingAgence.nom}</h3>
+                    <p className="text-xs text-cyan-400 font-mono mt-0.5">{viewingAgence.codeAgence}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-bold border tracking-wide ${
+                      viewingAgence.statut === StatutAgence.ACTIVE
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : viewingAgence.statut === StatutAgence.CLOSED
+                        ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                    }`}>
+                      {STATUT_AGENCE_LABELS[viewingAgence.statut] || viewingAgence.statut}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      {TYPE_AGENCE_LABELS[viewingAgence.typeAgence] || viewingAgence.typeAgence}
+                    </span>
+                  </div>
+                </div>
+                {isDeleted(viewingAgence) && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <Trash2 size={14} className="text-red-400" />
+                    <span className="text-xs text-red-300 font-medium">
+                      Supprimée le {new Date(viewingAgence.deletedAt!).toLocaleDateString('fr-FR')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Localisation */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <MapPin size={12} /> Localisation
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailCard label="Ville" value={viewingAgence.ville} />
+                  <DetailCard label="Région" value={viewingAgence.region} />
+                  <DetailCard label="Pays" value={viewingAgence.pays} />
+                  {viewingAgence.adresse && (
+                    <div className="col-span-2">
+                      <DetailCard label="Adresse" value={viewingAgence.adresse} />
+                    </div>
+                  )}
+                </div>
+                {(viewingAgence.latitude || viewingAgence.longitude) && (
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Globe size={12} />
+                    <span className="font-mono">{viewingAgence.latitude}, {viewingAgence.longitude}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Contact */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Phone size={12} /> Contact
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailCard label="Téléphone" value={viewingAgence.telephone} />
+                  <DetailCard label="Email" value={viewingAgence.email} />
+                  <DetailCard label="Responsable" value={viewingAgence.responsableNom} />
+                  <DetailCard label="Tél. responsable" value={viewingAgence.responsablePhone} />
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Users size={12} /> Statistiques
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-center">
+                    <div className="text-2xl font-bold text-white">{viewingAgence.nombreEmployes || 0}</div>
+                    <div className="text-[10px] font-medium text-slate-500 uppercase mt-0.5">Employés actifs</div>
+                  </div>
+                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-center">
+                    <div className="text-2xl font-bold text-white">{viewingAgence.nombreClients || 0}</div>
+                    <div className="text-[10px] font-medium text-slate-500 uppercase mt-0.5">Clients actifs</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dates & Notes */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Calendar size={12} /> Informations
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailCard
+                    label="Date d'ouverture"
+                    value={viewingAgence.dateOuverture ? new Date(viewingAgence.dateOuverture).toLocaleDateString('fr-FR') : undefined}
+                  />
+                  <DetailCard
+                    label="Créée le"
+                    value={viewingAgence.createdAt ? new Date(viewingAgence.createdAt).toLocaleDateString('fr-FR') : undefined}
+                  />
+                </div>
+                {viewingAgence.notes && (
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] font-medium text-slate-500 uppercase mb-0.5">Notes</div>
+                    <div className="text-sm text-slate-200 leading-relaxed">{viewingAgence.notes}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              {!isDeleted(viewingAgence) && canEditAgences && (
+                <div className="pt-4 border-t border-slate-800/50">
+                  <Button
+                    variant="primary"
+                    icon={Edit2}
+                    fullWidth
+                    onClick={() => {
+                      handleEdit(viewingAgence);
+                      setViewingAgence(null);
+                    }}
+                  >
+                    Modifier cette agence
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Modal Form */}
       <Modal
@@ -595,21 +786,19 @@ export default function AdminGestionAgences() {
               label="Ville"
               name="villeId"
               value={formData.villeId}
-              onChange={(e) => {
-                const selected = villesList.find(v => v.id === e.target.value);
-                setFormData({ ...formData, villeId: e.target.value, ville: selected?.nom || '' });
-              }}
+              onChange={(e) => handleVilleChange(e.target.value)}
               options={[
                 { value: '', label: 'Sélectionner une ville...' },
                 ...villesList.map(v => ({ value: v.id, label: v.nom })),
               ]}
             />
             <FormField
-              label="Région"
+              label="Région / Département"
               name="region"
               value={formData.region}
               onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-              placeholder="Région"
+              placeholder="Auto-rempli par la ville"
+              disabled={!!formData.villeId}
             />
             <FormField
               label="Téléphone"
@@ -646,6 +835,14 @@ export default function AdminGestionAgences() {
               ]}
             />
           </div>
+
+          {/* GPS info when ville is selected */}
+          {formData.villeId && (formData.latitude || formData.longitude) && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-xs text-cyan-300">
+              <Globe size={14} />
+              <span>Coordonnées GPS: {formData.latitude}, {formData.longitude} (depuis la ville)</span>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4">
             <Button
@@ -696,6 +893,15 @@ export default function AdminGestionAgences() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function DetailCard({ label, value }: { label: string; value: string | undefined }) {
+  return (
+    <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+      <div className="text-[10px] font-medium text-slate-500 uppercase mb-0.5">{label}</div>
+      <div className="text-sm text-slate-200 font-medium break-words">{value || '-'}</div>
     </div>
   );
 }

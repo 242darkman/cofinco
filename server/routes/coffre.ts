@@ -442,10 +442,11 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
         solde: schema.coffresForts.solde,
         agenceId: schema.coffresForts.ownerId,
         agenceNom: schema.agences.nom,
-        ville: schema.agences.ville
+        ville: schema.villes.nom,
     })
     .from(schema.coffresForts)
-    .leftJoin(schema.agences, eq(schema.coffresForts.ownerId, schema.agences.id));
+    .leftJoin(schema.agences, eq(schema.coffresForts.ownerId, schema.agences.id))
+    .leftJoin(schema.villes, eq(schema.agences.villeId, schema.villes.id));
 
     // 2. Calculate Global Stats
     const totalSolde = allCoffres.reduce((acc, c) => acc + Number(c.solde), 0);

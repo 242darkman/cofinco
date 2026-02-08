@@ -3,7 +3,7 @@
  * Interactive map view for agency locations
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -18,7 +18,6 @@ import {
   ZoomIn,
   ZoomOut,
   UserCheck,
-  Eye,
 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -70,7 +69,6 @@ export interface Agency {
 export interface AdminAgenciesMapProps {
   agencies: Agency[];
   loading?: boolean;
-  onAgencyClick?: (agency: Agency) => void;
   selectedAgencyId?: string;
   height?: string;
   showMissingGpsWarning?: boolean;
@@ -151,11 +149,14 @@ function MapControls() {
   );
 }
 
-// Fit bounds to markers
+// Fit bounds to markers - only on initial load
 function FitBounds({ agencies }: { agencies: Agency[] }) {
   const map = useMap();
+  const hasFitted = useRef(false);
 
   useEffect(() => {
+    if (hasFitted.current) return;
+
     const validAgencies = agencies.filter((a) => {
       const lat = Number(a.latitude);
       const lng = Number(a.longitude);
@@ -167,6 +168,7 @@ function FitBounds({ agencies }: { agencies: Agency[] }) {
         validAgencies.map((a) => [Number(a.latitude), Number(a.longitude)] as [number, number])
       );
       map.fitBounds(bounds, { padding: [50, 50] });
+      hasFitted.current = true;
     }
   }, [agencies, map]);
 
@@ -176,7 +178,6 @@ function FitBounds({ agencies }: { agencies: Agency[] }) {
 export default function AdminAgenciesMap({
   agencies,
   loading = false,
-  onAgencyClick,
   selectedAgencyId,
   height = '500px',
   showMissingGpsWarning = true,
@@ -297,9 +298,6 @@ export default function AdminAgenciesMap({
               key={agency.id}
               position={[Number(agency.latitude), Number(agency.longitude)]}
               icon={getAgencyIcon(agency.typeAgence, agency.id === selectedAgencyId)}
-              eventHandlers={{
-                click: () => onAgencyClick?.(agency),
-              }}
             >
               <Popup
                 closeButton={true}
@@ -382,18 +380,6 @@ export default function AdminAgenciesMap({
                       <span>{agency.nombreClients || 0} client(s)</span>
                     </div>
                   </div>
-
-                  {/* Action button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAgencyClick?.(agency);
-                    }}
-                    className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5"
-                  >
-                    <Eye size={14} />
-                    Voir les détails
-                  </button>
                 </div>
               </Popup>
             </Marker>
