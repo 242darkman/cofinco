@@ -225,7 +225,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                     <span>•</span>
                     <span className="flex items-center gap-1">
                       <Building2 size={12} />
-                      {viewingClient.agenceNom || viewingClient.agence}
+                      {viewingClient.agenceNom || viewingClient.agence_nom}
                     </span>
                   </>
                 )}
@@ -506,7 +506,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       format: (_, item) => (
                         <div className="w-24 mx-auto">
                           <Badge 
-                            value={item.agenceNom || item.agence || 'N/A'} 
+                            value={item.agenceNom || item.agence_nom || 'N/A'}
                             variant="neutral"
                             size="sm"
                             className="w-full justify-center text-[10px] font-medium py-0 h-5"

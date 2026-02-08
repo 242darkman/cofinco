@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
-import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections, agentsTerrain, employes, arrondissements, marches, clients, users, prospectionPrimes, prospectionPrimeConfig } from "@shared/schema";
+import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections, agentsTerrain, employes, arrondissements, marches, clients, users, prospectionPrimes, prospectionPrimeConfig, userAgences } from "@shared/schema";
 import { PROSPECTION_STATUS_TRANSITIONS, StatutProspection, ClientOrigin } from "@shared/enum/status-constants";
 import { logAudit } from "../lib/logger";
 import { and, desc, inArray, isNull, or, sql } from "drizzle-orm";
@@ -427,9 +427,18 @@ export function registerOperationsRoutes(app: Express) {
       // Convert within a transaction
       const result = await db.transaction(async (tx) => {
         // 1. Create user record for the client
-        const nameParts = existing.nomProspect.trim().split(/\s+/);
-        const nom = nameParts.length > 1 ? nameParts[nameParts.length - 1] : existing.nomProspect;
-        const prenom = nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : undefined;
+        // Use prenomProspect if available, otherwise try splitting nomProspect
+        let nom = existing.nomProspect.trim();
+        let prenom = (existing as any).prenomProspect?.trim() || undefined;
+
+        if (!prenom) {
+          // Fallback: try splitting nomProspect if it contains spaces
+          const nameParts = nom.split(/\s+/);
+          if (nameParts.length > 1) {
+            nom = nameParts[nameParts.length - 1];
+            prenom = nameParts.slice(0, -1).join(" ");
+          }
+        }
 
         const [newUser] = await tx.insert(users).values({
           username: existing.telephoneProspect || `prospect_${id.substring(0, 8)}`,
@@ -442,17 +451,36 @@ export function registerOperationsRoutes(app: Express) {
           canLogin: false,
         }).returning();
 
-        // 2. Create client with origin tracking
-        const agenceId = req.session?.user?.agenceId;
+        // 2. Resolve agent's agency (from agent → employee → userAgences)
+        let agenceId = req.session?.user?.agenceId;
+
+        if (!agenceId && existing.agentId) {
+          const [agentAgence] = await tx
+            .select({ agenceId: userAgences.agenceId })
+            .from(agentsTerrain)
+            .innerJoin(employes, eq(employes.id, agentsTerrain.employeId))
+            .innerJoin(userAgences, and(
+              eq(userAgences.userId, employes.userId),
+              eq(userAgences.isPrimary, true),
+              eq(userAgences.actif, true),
+            ))
+            .where(eq(agentsTerrain.id, existing.agentId))
+            .limit(1);
+
+          if (agentAgence) {
+            agenceId = agentAgence.agenceId;
+          }
+        }
+
+        // 3. Create client with origin tracking
         const [newClient] = await tx.insert(clients).values({
           userId: newUser.id,
-          agence: agenceId || "Brazzaville",
           agenceId: agenceId || null,
           clientOrigin: ClientOrigin.FIELD_PROSPECTION,
           prospectId: id,
         } as any).returning();
 
-        // 3. Update prospect status
+        // 4. Update prospect status
         await tx
           .update(prospections)
           .set({
@@ -462,7 +490,7 @@ export function registerOperationsRoutes(app: Express) {
           })
           .where(eq(prospections.id, id));
 
-        // 4. Auto-create prime if config is active
+        // 5. Auto-create prime if config is active
         const [primeConfig] = await tx
           .select()
           .from(prospectionPrimeConfig)

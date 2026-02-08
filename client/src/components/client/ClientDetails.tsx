@@ -56,7 +56,19 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
         );
     }
 
-    const { summary, distribution, monthlyTrend } = analytics;
+    const raw = analytics as any;
+    const summary = {
+      totalSavings: raw.summary?.totalSavings ?? raw.summary?.total_savings ?? 0,
+      totalCreditDue: raw.summary?.totalCreditDue ?? raw.summary?.total_credit_due ?? 0,
+      activeLoansCount: raw.summary?.activeLoansCount ?? raw.summary?.active_loans_count ?? 0,
+      fidelityPoints: raw.summary?.fidelityPoints ?? raw.summary?.fidelity_points ?? 0,
+      repaymentRate: raw.summary?.repaymentRate ?? raw.summary?.repayment_rate ?? 0,
+    };
+    const distribution = raw.distribution ?? [];
+    const monthlyTrend = {
+      savingsGrowth: raw.monthlyTrend?.savingsGrowth ?? raw.monthly_trend?.savings_growth ?? '0%',
+      creditEvolution: raw.monthlyTrend?.creditEvolution ?? raw.monthly_trend?.credit_evolution ?? '0%',
+    };
 
   return (
     <>
@@ -85,26 +97,24 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
              <Award size={16} className="text-slate-400" /> Segment & Fidélité
          </h3>
 
-         <div className="grid grid-cols-2 gap-3 relative z-10">
-             {/* Segment Box */}
-             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-                 <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Segment</p>
-                 <p className="text-2xl font-bold text-white tracking-tight">{client.segment}</p>
-                 <div className="mt-2">
-                    <ClientTags clientId={client.id} compact={true} />
+         <div className="space-y-3 relative z-10">
+             {/* Segment + Points row */}
+             <div className="flex items-center gap-3">
+                 <div className="flex-1 bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
+                     <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1.5">Segment</p>
+                     <span className="inline-block px-2.5 py-1 rounded-md text-xs font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/25">
+                         {client.segment || 'Standard'}
+                     </span>
+                 </div>
+                 <div className="flex-1 bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
+                     <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1.5">Fidélité</p>
+                     <p className="text-lg font-bold text-white">{summary.fidelityPoints.toLocaleString()} <span className="text-xs font-normal text-slate-500">pts</span></p>
+                     <p className="text-[10px] text-slate-400 mt-0.5">{summary.repaymentRate}% remboursement</p>
                  </div>
              </div>
 
-             {/* Points Fidélité Box */}
-             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex flex-col justify-between">
-                 <div>
-                     <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Points Fidélité</p>
-                     <p className="text-2xl font-bold text-cyan-400">{summary.fidelityPoints.toLocaleString()}</p>
-                 </div>
-                 <div className="mt-1 text-xs font-medium text-slate-400">
-                     {summary.repaymentRate}% remboursement
-                 </div>
-             </div>
+             {/* Tags */}
+             <ClientTags clientId={client.id} compact={true} />
          </div>
       </Card>
 
