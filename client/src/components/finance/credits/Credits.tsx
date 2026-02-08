@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, MapPin, Play, UserCheck } from 'lucide-react';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, Play, UserCheck } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
 import { useCredits } from '../../../hooks/credits/useCredits';
@@ -25,10 +25,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 import { PipelineFunnel } from './PipelineFunnel';
-import EnqueteZoneAnalytics from './EnqueteZoneAnalytics';
 import { differenceInDays } from 'date-fns';
 
-type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'carte' | 'reevaluations' | 'remboursements' | 'echeancier' | 'archives';
+type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements' | 'echeancier' | 'archives';
 
 // Helper to get static configuration
 const getTabConfig = () => [
@@ -36,8 +35,7 @@ const getTabConfig = () => [
   { key: 'credits', label: 'Crédits', icon: CreditCard },
   { key: 'demandes', label: 'À traiter', icon: FileText, badgeColors: 'bg-blue-100 text-blue-800' }, // New demands, rejected, cancelled
   { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck, badgeColors: 'bg-yellow-100 text-yellow-800' }, // Only "A enquêter" (ready for investigation)
-  { key: 'carte', label: 'Carte', icon: MapPin }, // Geographic analysis map
-  { key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeColors: 'bg-red-100 text-red-800' }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
+{ key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeColors: 'bg-red-100 text-red-800' }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
   { key: 'commission', label: "Comité", icon: Users, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
   { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw, badgeColors: 'bg-gray-100 text-gray-800' }, // Credit reevaluation workflow
   { key: 'remboursements', label: 'Remboursements', icon: TrendingUp },
@@ -1047,14 +1045,6 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         </div>
       )}
 
-      {/* Carte Tab - Analyse Géographique */}
-      {activeTab === 'carte' && (
-        <EnqueteZoneAnalytics
-          enquetes={enquetes.enquetes}
-          loading={enquetes.loading}
-          onRefresh={() => enquetes.fetchEnquetes?.()}
-        />
-      )}
 
       {/* Remboursements Tab */}
       {activeTab === 'remboursements' && (
