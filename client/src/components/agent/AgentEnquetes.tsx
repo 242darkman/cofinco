@@ -83,13 +83,12 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [starting, setStarting] = useState<string | null>(null);
+
   const fetchInvestigations = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '50' });
-      if (agentId) params.set('agentId', agentId);
-
-      const response = await fetch(`/api/credit-investigations/investigations?${params}`, {
+      const response = await fetch('/api/enquetes-credit/mes-enquetes', {
         credentials: 'include',
       });
       if (response.ok) {
@@ -101,7 +100,28 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
     } finally {
       setLoading(false);
     }
-  }, [agentId]);
+  }, []);
+
+  const handleStart = useCallback(async (enqueteId: string) => {
+    setStarting(enqueteId);
+    try {
+      const response = await fetch(`/api/enquetes-credit/${enqueteId}/demarrer`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        fetchInvestigations();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        console.error('[AgentEnquetes] Start error:', err.message);
+      }
+    } catch (error) {
+      console.error('[AgentEnquetes] Start error:', error);
+    } finally {
+      setStarting(null);
+    }
+  }, [fetchInvestigations]);
 
   useEffect(() => { fetchInvestigations(); }, [fetchInvestigations]);
 
@@ -336,6 +356,24 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                   <div className="mt-2 flex items-center gap-1.5 text-[11px] text-red-400 bg-red-500/10 rounded-lg px-2.5 py-1.5">
                     <AlertTriangle size={12} />
                     <span className="font-medium">Echéance dépassée</span>
+                  </div>
+                )}
+
+                {/* Démarrer button for ASSIGNED investigations */}
+                {investigation.statut === 'ASSIGNED' && (
+                  <div className="mt-2 pt-2 border-t border-slate-700/50">
+                    <button
+                      onClick={() => handleStart(investigation.id)}
+                      disabled={starting === investigation.id}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg transition-all"
+                    >
+                      {starting === investigation.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <ChevronRight size={14} />
+                      )}
+                      Démarrer l'enquête
+                    </button>
                   </div>
                 )}
 

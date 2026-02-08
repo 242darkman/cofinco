@@ -780,6 +780,7 @@ export const notificationScheduleStatusEnum = pgEnum("notification_schedule_stat
 export const scheduleSourceTypeEnum = pgEnum("schedule_source_type_enum", [
   "CREDIT",
   "TONTINE",
+  "INVESTIGATION",
 ]);
 
 export const otpPurposeEnum = pgEnum("otp_purpose_enum", [

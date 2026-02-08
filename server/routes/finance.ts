@@ -1404,7 +1404,7 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
-  // Start investigation - changes status from READY_FOR_INVESTIGATION to UNDER_INVESTIGATION
+  // Assign investigation — creates enquête with ASSIGNED status, demande stays at READY_FOR_INVESTIGATION
   app.post("/api/demandes-credit/:id/start-investigation", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
     try {
       const { id } = req.params;
@@ -1430,7 +1430,8 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(400).json({ message: "Veuillez sélectionner un agent terrain pour l'enquête." });
       }
 
-      // Create the enquête record with agent assignment
+      // Create the enquête record with agent assignment (statut = ASSIGNED)
+      // The demande stays at READY_FOR_INVESTIGATION until the agent starts the investigation
       const enqueteValues: Record<string, any> = {
         clientId: demande.clientId,
         demandeId: id,
@@ -1440,6 +1441,7 @@ export function registerFinanceRoutes(app: Express) {
         assignedAt: new Date(),
         assignedBy: req.session?.user?.id,
         priority,
+        statut: "ASSIGNED",
         ...(dueDate && { dueDate: new Date(dueDate) }),
       };
 
@@ -1448,14 +1450,9 @@ export function registerFinanceRoutes(app: Express) {
         .values(enqueteValues)
         .returning();
 
-      // Update demande status to UNDER_INVESTIGATION
-      const updated = await storage.updateDemandeCredit(id, {
-        statut: StatutDemande.UNDER_INVESTIGATION,
-      });
-
       const wsInstance = getWsInstance();
       if (wsInstance) {
-        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_started', id, agentId: assignedAgentId } });
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_assigned', id, agentId: assignedAgentId } });
       }
 
       // Domain event: investigation assigned/started
@@ -1472,10 +1469,124 @@ export function registerFinanceRoutes(app: Express) {
         timestamp: new Date(),
       });
 
-      res.json({ success: true, demande: updated, enquete });
+      // Schedule deadline reminders for the agent (J-3, J-1, J, J+1)
+      if (dueDate && enquete.id) {
+        try {
+          const { generateInvestigationReminderSchedule } = await import("../services/notifications/investigation-reminder-service");
+          const count = await generateInvestigationReminderSchedule(enquete.id);
+          if (count > 0) {
+            logger.info({ enqueteId: enquete.id, reminderCount: count }, "Investigation reminders scheduled");
+          }
+        } catch (reminderErr) {
+          // Non-blocking: reminder scheduling failure should not break assignment
+          logger.warn({ err: reminderErr, enqueteId: enquete.id }, "Failed to schedule investigation reminders");
+        }
+      }
+
+      res.json({ success: true, demande, enquete });
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur démarrage enquête');
       res.status(500).json({ message: error.message || "Erreur lors du démarrage de l'enquête" });
+    }
+  });
+
+  // Reassign investigation — change the agent on an existing enquête (only if not yet started)
+  app.post("/api/demandes-credit/:id/reassign-investigation", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = normalizeKeysDeep(req.body) as Record<string, any>;
+      const newAgentId = data.agentId || data.assignedAgentId;
+      const priority = data.priority;
+      const dueDate = data.dueDate;
+
+      if (!newAgentId) {
+        return res.status(400).json({ message: "Veuillez sélectionner un agent terrain." });
+      }
+
+      // Get demande
+      const demande = await storage.getDemandeCredit(id);
+      if (!demande) {
+        return res.status(404).json({ message: "Demande non trouvée" });
+      }
+
+      // Allow reassignment for READY_FOR_INVESTIGATION (assigned but agent hasn't started)
+      // or UNDER_INVESTIGATION (agent started but hasn't progressed)
+      const allowedReassignStatuses = [StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION];
+      if (!allowedReassignStatuses.includes(demande.statut as any)) {
+        return res.status(400).json({ message: "Cette demande ne peut pas être réassignée dans son statut actuel." });
+      }
+
+      // Find the existing enquête for this demande
+      const [existingEnquete] = await db
+        .select()
+        .from(enquetesCredit)
+        .where(eq(enquetesCredit.demandeId, id))
+        .orderBy(desc(enquetesCredit.createdAt))
+        .limit(1);
+
+      if (!existingEnquete) {
+        return res.status(404).json({ message: "Aucune enquête trouvée pour cette demande." });
+      }
+
+      // Only allow reassignment if the agent hasn't started (no startedAt, status is not IN_PROGRESS/SUBMITTED)
+      const blockedStatuses = ["IN_PROGRESS", "SUBMITTED", "REVIEWED", "CLOSED"];
+      if (existingEnquete.statut && blockedStatuses.includes(existingEnquete.statut)) {
+        return res.status(400).json({ message: "L'agent a déjà commencé l'enquête. La réassignation n'est plus possible." });
+      }
+
+      // Cancel old reminders
+      try {
+        const { cancelInvestigationReminders } = await import("../services/notifications/investigation-reminder-service");
+        await cancelInvestigationReminders(existingEnquete.id, "Réassignation de l'enquête");
+      } catch {
+        // Non-blocking
+      }
+
+      // Update the enquête with new agent, reset to ASSIGNED
+      const updateValues: Record<string, any> = {
+        assignedAgentId: newAgentId,
+        assignedAt: new Date(),
+        assignedBy: req.session?.user?.id,
+        statut: "ASSIGNED",
+        startedAt: null,
+        updatedAt: new Date(),
+      };
+      if (priority) updateValues.priority = priority;
+      if (dueDate) updateValues.dueDate = new Date(dueDate);
+
+      const [updated] = await db
+        .update(enquetesCredit)
+        .set(updateValues)
+        .where(eq(enquetesCredit.id, existingEnquete.id))
+        .returning();
+
+      // If demande was UNDER_INVESTIGATION (agent had started), reset to READY_FOR_INVESTIGATION
+      if (demande.statut === StatutDemande.UNDER_INVESTIGATION) {
+        await storage.updateDemandeCredit(id, {
+          statut: StatutDemande.READY_FOR_INVESTIGATION,
+        });
+      }
+
+      // Schedule new reminders
+      if ((dueDate || existingEnquete.dueDate) && updated.id) {
+        try {
+          const { generateInvestigationReminderSchedule } = await import("../services/notifications/investigation-reminder-service");
+          await generateInvestigationReminderSchedule(updated.id);
+        } catch {
+          // Non-blocking
+        }
+      }
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_reassigned', id, agentId: newAgentId } });
+      }
+
+      res.json({ success: true, enquete: updated });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur réassignation enquête');
+      res.status(500).json({ message: error.message || "Erreur lors de la réassignation" });
     }
   });
 
@@ -2094,6 +2205,14 @@ export function registerFinanceRoutes(app: Express) {
               logger.warn({ enqueteId: enquete.id }, 'No demandeId on enquete - status not updated');
           }
 
+          // Cancel deadline reminders — enquête terminée
+          try {
+            const { cancelInvestigationReminders } = await import("../services/notifications/investigation-reminder-service");
+            await cancelInvestigationReminders(enquete.id, "Enquête terminée");
+          } catch {
+            // Non-blocking
+          }
+
           // Notify Credit Update
           const wsInstance = getWsInstance();
           if (wsInstance) {
@@ -2111,6 +2230,95 @@ export function registerFinanceRoutes(app: Express) {
               code: 'ENQUETE_CREATE_ERROR'
           });
       }
+  });
+
+  // Agent starts an investigation — transitions enquête ASSIGNED → IN_PROGRESS, demande READY_FOR_INVESTIGATION → UNDER_INVESTIGATION
+  app.post("/api/enquetes-credit/:id/demarrer", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session?.user?.id;
+
+      // Load enquête
+      const [enquete] = await db
+        .select()
+        .from(enquetesCredit)
+        .where(eq(enquetesCredit.id, id))
+        .limit(1);
+
+      if (!enquete) {
+        return res.status(404).json({ message: "Enquête non trouvée" });
+      }
+
+      // Only the assigned agent can start
+      if (enquete.assignedAgentId !== userId) {
+        return res.status(403).json({ message: "Vous n'êtes pas l'agent assigné à cette enquête." });
+      }
+
+      // Only ASSIGNED enquêtes can be started
+      if (enquete.statut !== "ASSIGNED") {
+        return res.status(400).json({ message: `Cette enquête ne peut pas être démarrée (statut actuel: ${enquete.statut}).` });
+      }
+
+      // Update enquête to IN_PROGRESS
+      const [updated] = await db
+        .update(enquetesCredit)
+        .set({
+          statut: "IN_PROGRESS",
+          startedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(enquetesCredit.id, id))
+        .returning();
+
+      // Update demande status to UNDER_INVESTIGATION
+      if (enquete.demandeId) {
+        await storage.updateDemandeCredit(enquete.demandeId, {
+          statut: StatutDemande.UNDER_INVESTIGATION,
+        });
+      }
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_started', id, demandeId: enquete.demandeId, agentId: userId } });
+      }
+
+      res.json({ success: true, enquete: updated });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur démarrage enquête par agent');
+      res.status(500).json({ message: error.message || "Erreur lors du démarrage de l'enquête" });
+    }
+  });
+
+  // Agent-specific: list my assigned investigations with client info
+  app.get("/api/enquetes-credit/mes-enquetes", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) return res.status(401).json({ message: "Non authentifié" });
+
+      const results = await db.select({
+        enquete: enquetesCredit,
+        client: clients,
+      })
+        .from(enquetesCredit)
+        .leftJoin(clients, eq(enquetesCredit.clientId, clients.id))
+        .where(eq(enquetesCredit.assignedAgentId, userId))
+        .orderBy(desc(enquetesCredit.createdAt));
+
+      const data = results.map(r => ({
+        ...r.enquete,
+        client: r.client ? {
+          nom: r.client.nom,
+          prenom: r.client.prenom,
+          telephone: r.client.telephone,
+          adresseDomicile: r.client.adresseDomicile,
+        } : null,
+      }));
+
+      res.json({ success: true, data });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération enquêtes agent');
+      res.status(500).json({ message: error.message || "Erreur" });
+    }
   });
 
   app.post("/api/enquetes-credit/:id/valider", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.DEMANDE_CREDIT), async (req, res) => {

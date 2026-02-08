@@ -418,27 +418,33 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => renderClientName(item) },
     { key: 'typeActivite', label: 'Activité' },
     { key: 'montantDemande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', align: 'center', format: (val) => {
+    { key: 'statut', label: 'Statut', align: 'center', format: (val: string, item: any) => {
+      // READY_FOR_INVESTIGATION can mean "unassigned" or "assigned but not started"
+      const isAssigned = val === 'READY_FOR_INVESTIGATION' && enquetes.enquetes.some((e: any) => e.demandeId === item?.id);
+      const effectiveStatus = isAssigned ? 'ASSIGNED' : val;
       const translations: Record<string, string> = {
         'READY_FOR_INVESTIGATION': 'En attente',
+        'ASSIGNED': 'Assignée',
         'UNDER_INVESTIGATION': 'En cours',
         'INVESTIGATION_COMPLETE': 'Terminée',
       };
       const colors: Record<string, string> = {
         'READY_FOR_INVESTIGATION': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+        'ASSIGNED': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
         'UNDER_INVESTIGATION': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
         'INVESTIGATION_COMPLETE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       };
       const icons: Record<string, React.ReactNode> = {
         'READY_FOR_INVESTIGATION': <Clock size={10} className="text-amber-400" />,
+        'ASSIGNED': <UserCheck size={10} className="text-blue-400" />,
         'UNDER_INVESTIGATION': <Play size={10} className="text-cyan-400" />,
         'INVESTIGATION_COMPLETE': <CheckCircle size={10} className="text-emerald-400" />,
       };
-      const label = translations[val] || val;
-      const colorClass = colors[val] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+      const label = translations[effectiveStatus] || val;
+      const colorClass = colors[effectiveStatus] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
       return (
         <span className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${colorClass}`}>
-          {icons[val]}
+          {icons[effectiveStatus]}
           {label}
         </span>
       );
@@ -957,10 +963,13 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                   }
               }}
               density="compact"
-              actions={(item) => (
+              actions={(item) => {
+                // Check if an enquête is already assigned for this demande
+                const hasEnquete = enquetes.enquetes.some((e: any) => e.demandeId === item.id);
+                return (
                 <div className="flex items-center gap-1.5">
-                  {/* Assigner — pour les demandes en attente d'enquête */}
-                  {item.statut === StatutDemande.READY_FOR_INVESTIGATION && (
+                  {/* Assigner — pour les demandes sans enquête assignée */}
+                  {item.statut === StatutDemande.READY_FOR_INVESTIGATION && !hasEnquete && (
                     <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
                       <Button
                         size="xs"
@@ -973,6 +982,23 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                         icon={UserCheck}
                       >
                         Assigner
+                      </Button>
+                    </ProtectedFeature>
+                  )}
+                  {/* Réassigner — enquête assignée mais agent n'a pas encore démarré, ou en cours */}
+                  {((item.statut === StatutDemande.READY_FOR_INVESTIGATION && hasEnquete) || item.statut === StatutDemande.UNDER_INVESTIGATION) && (
+                    <ProtectedFeature requiredPermission={{ module: 'credits', action: 'edit' }}>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDemandeToAssign(item);
+                          setShowAssignModal(true);
+                        }}
+                        icon={RefreshCw}
+                      >
+                        Réassigner
                       </Button>
                     </ProtectedFeature>
                   )}
@@ -1014,7 +1040,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                     </ProtectedFeature>
                   )}
                 </div>
-              )}
+              );
+              }}
             />
           </Card>
         </div>
@@ -1179,10 +1206,14 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             objetCredit: demandeToAssign.objetCredit || demandeToAssign.objet_credit,
           }}
           onAssign={async (data) => {
-            const success = await demandes.startInvestigation(demandeToAssign.id, data);
+            const hasExistingEnquete = enquetes.enquetes.some((e: any) => e.demandeId === demandeToAssign.id);
+            const success = hasExistingEnquete
+              ? await demandes.reassignInvestigation(demandeToAssign.id, data)
+              : await demandes.startInvestigation(demandeToAssign.id, data);
             if (success) {
               setShowAssignModal(false);
               setDemandeToAssign(null);
+              enquetes.fetchEnquetes?.();
             }
             return success;
           }}

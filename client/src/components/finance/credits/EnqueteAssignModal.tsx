@@ -5,6 +5,7 @@ import { resolveStorageUrl } from '../../../lib/format';
 
 interface Agent {
   id: string;
+  userId?: string;
   nom: string;
   prenom: string;
   telephone?: string;
@@ -66,9 +67,12 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
 
   const handleSubmit = async () => {
     if (!selectedAgentId) return;
+    // Resolve the userId for the selected agent (FK targets users.id, not agents_terrain.id)
+    const selectedAgent = agents.find(a => a.id === selectedAgentId);
+    const agentUserId = selectedAgent?.userId || selectedAgentId;
     setSubmitting(true);
     try {
-      const success = await onAssign({ agentId: selectedAgentId, priority, dueDate: dueDate || undefined });
+      const success = await onAssign({ agentId: agentUserId, priority, dueDate: dueDate || undefined });
       if (success) onClose();
     } finally {
       setSubmitting(false);

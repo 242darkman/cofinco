@@ -175,6 +175,7 @@ export async function getAgentsTerrainPaginated(
 
     return {
       ...agent,
+      userId: user?.id || null,
       nom: user?.nom || "Inconnu",
       prenom: user?.prenom || "",
       telephone: user?.telephone || null,

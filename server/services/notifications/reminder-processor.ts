@@ -1,7 +1,7 @@
 import { db } from "../../db";
 import { notificationSchedules } from "@shared/schema";
 import { eq, and, lte } from "drizzle-orm";
-import { enqueueNotification } from "./notification-service";
+import { enqueueNotification, sendInAppNotification } from "./notification-service";
 import { v4 as uuidv4 } from "uuid";
 import { createLogger } from "../../lib/logger";
 
@@ -14,6 +14,30 @@ const logger = createLogger('ReminderProcessor');
 // ============================================================================
 
 const POLL_BATCH_SIZE = 50;
+
+// Template → human-readable notification content
+const INVESTIGATION_TEMPLATES: Record<string, { titre: string; message: (p: any) => string; priorite: "LOW" | "NORMAL" | "HIGH" | "URGENT" }> = {
+  INVESTIGATION_REMINDER_J3: {
+    titre: "Enquête — Échéance dans 3 jours",
+    message: (p) => `L'enquête crédit${p.objetCredit ? ` (${p.objetCredit})` : ""} arrive à échéance dans 3 jours.`,
+    priorite: "NORMAL",
+  },
+  INVESTIGATION_REMINDER_J1: {
+    titre: "Enquête — Échéance demain",
+    message: (p) => `L'enquête crédit${p.objetCredit ? ` (${p.objetCredit})` : ""} arrive à échéance demain.`,
+    priorite: "HIGH",
+  },
+  INVESTIGATION_DUE_TODAY: {
+    titre: "Enquête — Échéance aujourd'hui",
+    message: (p) => `L'enquête crédit${p.objetCredit ? ` (${p.objetCredit})` : ""} arrive à échéance aujourd'hui.`,
+    priorite: "URGENT",
+  },
+  INVESTIGATION_OVERDUE_J1: {
+    titre: "Enquête en retard",
+    message: (p) => `L'enquête crédit${p.objetCredit ? ` (${p.objetCredit})` : ""} a dépassé son échéance.`,
+    priorite: "URGENT",
+  },
+};
 
 /**
  * Process all due reminders. Called by a cron/interval scheduler.
@@ -45,25 +69,41 @@ export async function processDueReminders(): Promise<{
     results.processed++;
 
     try {
-      // Enqueue the notification job
-      const correlationId = `sched-${schedule.id}-${uuidv4().slice(0, 8)}`;
+      if (schedule.channel === "IN_APP") {
+        // IN_APP: send directly via sendInAppNotification (real-time WebSocket)
+        const template = INVESTIGATION_TEMPLATES[schedule.templateCode];
+        const payload = (schedule.payload as Record<string, unknown>) ?? {};
 
-      const jobCorrelationId = await enqueueNotification({
-        channel: schedule.channel,
-        templateCode: schedule.templateCode,
-        recipient: schedule.recipient,
-        payload: (schedule.payload as Record<string, unknown>) ?? {},
-        userId: schedule.userId ?? undefined,
-        agenceId: schedule.agenceId ?? undefined,
-        correlationId,
-      });
+        await sendInAppNotification({
+          userId: schedule.recipient, // recipient = agentId for IN_APP
+          type: schedule.templateCode,
+          titre: template?.titre || "Rappel enquête",
+          message: template?.message(payload) || "Vous avez un rappel pour une enquête crédit.",
+          lien: payload.enqueteId ? `/agent/enquetes` : undefined,
+          priorite: template?.priorite || "NORMAL",
+          referenceId: (payload.enqueteId as string) || schedule.sourceId,
+          referenceType: "INVESTIGATION",
+        });
+      } else {
+        // SMS/EMAIL: enqueue as notification job
+        const correlationId = `sched-${schedule.id}-${uuidv4().slice(0, 8)}`;
 
-      // Mark as SENT and link to the notification job
+        await enqueueNotification({
+          channel: schedule.channel,
+          templateCode: schedule.templateCode,
+          recipient: schedule.recipient,
+          payload: (schedule.payload as Record<string, unknown>) ?? {},
+          userId: schedule.userId ?? undefined,
+          agenceId: schedule.agenceId ?? undefined,
+          correlationId,
+        });
+      }
+
+      // Mark as SENT
       await db
         .update(notificationSchedules)
         .set({
           status: "SENT",
-          notificationJobId: undefined, // correlationId links them
           updatedAt: new Date(),
         })
         .where(eq(notificationSchedules.id, schedule.id));

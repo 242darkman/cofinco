@@ -184,6 +184,28 @@ export function useDemandes() {
     },
   });
 
+  const reassignInvestigationMutation = useMutation({
+    mutationFn: async ({ id, agentId, priority, dueDate }: { id: string; agentId: string; priority?: string; dueDate?: string }) => {
+      const response = await fetch(`/api/demandes-credit/${id}/reassign-investigation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, priority, dueDate }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Erreur lors de la réassignation");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast.success('Enquête réassignée', { description: 'Le nouvel agent terrain a été notifié' });
+    },
+    onError: (err: Error) => {
+      toast.error("Échec de la réassignation", { description: err.message });
+    },
+  });
+
   const payerFraisMutation = useMutation({
     mutationFn: async ({
       id,
@@ -261,6 +283,15 @@ export function useDemandes() {
   const startInvestigation = async (id: string, data: { agentId: string; priority?: string; dueDate?: string }): Promise<boolean> => {
     try {
       await startInvestigationMutation.mutateAsync({ id, ...data });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const reassignInvestigation = async (id: string, data: { agentId: string; priority?: string; dueDate?: string }): Promise<boolean> => {
+    try {
+      await reassignInvestigationMutation.mutateAsync({ id, ...data });
       return true;
     } catch {
       return false;
@@ -356,6 +387,7 @@ export function useDemandes() {
     deleteDemande,
     cancelDemande,
     startInvestigation,
+    reassignInvestigation,
     validateInvestigation,
     validatingInvestigation: validateInvestigationMutation.isPending,
     getDemandesEnAttente,

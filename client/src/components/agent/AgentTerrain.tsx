@@ -255,32 +255,24 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   }, []);
 
   // Load pending enquêtes assigned to the agent
-  const loadEnquetes = useCallback(async (agentId?: string) => {
+  const loadEnquetes = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ limit: '10' });
-      if (agentId) params.set('agentId', agentId);
-      // Fetch ASSIGNED and IN_PROGRESS investigations
-      const [assignedRes, inProgressRes] = await Promise.allSettled([
-        fetch(`/api/credit-investigations/investigations?status=ASSIGNED&${params}`, { credentials: 'include' }),
-        fetch(`/api/credit-investigations/investigations?status=IN_PROGRESS&${params}`, { credentials: 'include' }),
-      ]);
-      const all: any[] = [];
-      for (const r of [assignedRes, inProgressRes]) {
-        if (r.status === 'fulfilled' && r.value.ok) {
-          const data = await r.value.json();
-          if (data && Array.isArray(data.data)) all.push(...data.data);
-        }
+      const response = await fetch('/api/enquetes-credit/mes-enquetes', { credentials: 'include' });
+      if (response.ok) {
+        const result = await response.json();
+        const all: any[] = Array.isArray(result.data) ? result.data : [];
+        // Only show ASSIGNED and IN_PROGRESS
+        setPendingEnquetes(all.filter((e: any) => ['ASSIGNED', 'IN_PROGRESS'].includes(e.statut)));
       }
-      setPendingEnquetes(all);
     } catch (error) {
       console.error('[AgentTerrain] Error loading enquêtes:', error);
     }
   }, []);
 
-  // Load enquêtes when target agent changes
+  // Load enquêtes on mount (uses current user from session)
   useEffect(() => {
-    if (targetAgentId) loadEnquetes(targetAgentId);
-  }, [targetAgentId, loadEnquetes]);
+    loadEnquetes();
+  }, [loadEnquetes]);
 
   // Real-time updates for enquêtes
   useEffect(() => {

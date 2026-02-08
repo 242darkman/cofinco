@@ -2,8 +2,8 @@
  * useEnqueteBadge - Real-time badge counters for credit investigations (enquêtes)
  *
  * Returns:
- * - pendingCount: investigations assigned to current agent but not yet completed
- * - totalCount: all investigations assigned to agent (for history)
+ * - pendingCount: investigations assigned/in_progress for current agent
+ * - totalCount: all investigations assigned to agent
  *
  * Listens to 'credit-update' custom DOM events (dispatched by WebSocket)
  * to refresh counts when enquêtes are assigned/updated.
@@ -18,6 +18,8 @@ export interface EnqueteBadgeData {
   isLoading: boolean;
 }
 
+const PENDING_STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ASSIGNMENT'];
+
 export function useEnqueteBadge() {
   const [data, setData] = useState<EnqueteBadgeData>({
     pendingCount: 0,
@@ -27,7 +29,7 @@ export function useEnqueteBadge() {
 
   const loadCounts = useCallback(async () => {
     try {
-      const response = await fetch('/api/credit-investigations/investigations?status=ASSIGNED&limit=1', {
+      const response = await fetch('/api/enquetes-credit/mes-enquetes', {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -35,31 +37,13 @@ export function useEnqueteBadge() {
         return;
       }
       const result = await response.json();
-      const assigned = (result && Array.isArray(result.data)) ? result.data : [];
+      const investigations: any[] = Array.isArray(result.data) ? result.data : [];
 
-      // Also fetch in-progress
-      const inProgressRes = await fetch('/api/credit-investigations/investigations?status=IN_PROGRESS&limit=1', {
-        credentials: 'include',
-      });
-      let inProgress: any[] = [];
-      if (inProgressRes.ok) {
-        const ipResult = await inProgressRes.json();
-        inProgress = (ipResult && Array.isArray(ipResult.data)) ? ipResult.data : [];
-      }
-
-      // Fetch all for total
-      const allRes = await fetch('/api/credit-investigations/investigations?limit=1', {
-        credentials: 'include',
-      });
-      let total = 0;
-      if (allRes.ok) {
-        const allResult = await allRes.json();
-        total = (allResult && Array.isArray(allResult.data)) ? allResult.data.length : 0;
-      }
+      const pendingCount = investigations.filter(i => PENDING_STATUSES.includes(i.statut)).length;
 
       setData({
-        pendingCount: assigned.length + inProgress.length,
-        totalCount: total,
+        pendingCount,
+        totalCount: investigations.length,
         isLoading: false,
       });
     } catch (error) {
@@ -84,8 +68,9 @@ export function useEnqueteBadge() {
         payload.type === 'enquete_assigned' ||
         payload.type === 'enquete_updated' ||
         payload.type === 'investigation_assigned' ||
+        payload.type === 'investigation_started' ||
         payload.type === 'investigation_submitted' ||
-        payload.type === 'investigation_reviewed' ||
+        payload.type === 'investigation_reassigned' ||
         payload.type === 'demande_updated'
       ) {
         loadCounts();

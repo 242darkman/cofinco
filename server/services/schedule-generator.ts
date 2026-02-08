@@ -59,6 +59,17 @@ export const TONTINE_REMINDER_OFFSETS: ReminderOffset[] = [
 ];
 
 // ============================================================================
+// INVESTIGATION REMINDER OFFSETS (J-3, J-1, J, J+1)
+// ============================================================================
+
+export const INVESTIGATION_REMINDER_OFFSETS: ReminderOffset[] = [
+  { dayOffset: -3, templateCode: "INVESTIGATION_REMINDER_J3", label: "Rappel J-3" },
+  { dayOffset: -1, templateCode: "INVESTIGATION_REMINDER_J1", label: "Rappel J-1" },
+  { dayOffset: 0, templateCode: "INVESTIGATION_DUE_TODAY", label: "Échéance enquête" },
+  { dayOffset: 1, templateCode: "INVESTIGATION_OVERDUE_J1", label: "Enquête en retard J+1" },
+];
+
+// ============================================================================
 // CALENDAR-AWARE DATE ADVANCEMENT
 // ============================================================================
 
