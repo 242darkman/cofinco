@@ -87,6 +87,9 @@ export function registerClientRoutes(app: Express) {
           co.id as compte_courant_id,
           co.numero_compte as compte_courant_numero,
           co.solde_courant as compte_courant_solde,
+          c.revenu_mensuel,
+          c.revenu_journalier,
+          c.type_revenu,
           COUNT(*) OVER() as total_count
         FROM clients c
         INNER JOIN users u ON c.user_id = u.id
@@ -136,6 +139,9 @@ export function registerClientRoutes(app: Express) {
         compteCourantId: row.compte_courant_id,
         compteCourantNumero: row.compte_courant_numero,
         compteCourantSolde: row.compte_courant_solde,
+        revenuMensuel: row.revenu_mensuel,
+        revenuJournalier: row.revenu_journalier,
+        typeRevenu: row.type_revenu,
       }));
 
       logger.debug({ total, page, perPage }, 'Eligible clients fetched (SQL pagination)');
@@ -206,6 +212,9 @@ export function registerClientRoutes(app: Express) {
               c.profession,
               c.segment,
               c.created_at,
+              c.revenu_mensuel,
+              c.revenu_journalier,
+              c.type_revenu,
               u.nom,
               u.prenom,
               u.email,
@@ -299,6 +308,9 @@ export function registerClientRoutes(app: Express) {
           agence_nom: row.agence_nom,
           isEligible: row.is_eligible,
           ineligibilityReason: row.ineligibility_reason,
+          revenuMensuel: row.revenu_mensuel,
+          revenuJournalier: row.revenu_journalier,
+          typeRevenu: row.type_revenu,
         }));
 
         logger.debug({ total, page, perPage, query: normalizedQuery }, 'Search results (SQL pagination)');
