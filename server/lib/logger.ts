@@ -32,6 +32,7 @@
  */
 
 import pino, { Logger as PinoLogger, LoggerOptions } from 'pino';
+import { randomBytes } from 'crypto';
 
 // Types
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
@@ -212,7 +213,6 @@ export function createRequestLogger(req: any): PinoLogger {
  * Generate a simple request ID
  */
 function generateRequestId(): string {
-  const { randomBytes } = require('crypto');
   return `req_${Date.now().toString(36)}_${randomBytes(4).toString('hex').slice(0, 6)}`;
 }
 

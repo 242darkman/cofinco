@@ -1803,27 +1803,27 @@ export async function ensureCustomFunctions(): Promise<void> {
           s.caissier_id,
           s.agence_id,
           s.statut,
-          s.date_ouverture,
-          s.date_fermeture,
-          s.solde_initial,
-          s.solde_theorique,
-          s.solde_reel,
+          s.opened_at,
+          s.closed_at,
+          s.montant_ouverture,
+          s.montant_fermeture_theorique,
+          s.montant_fermeture_declare,
           s.ecart,
           s.last_activity,
           s.timeout_at,
           s.closed_reason,
-          EXTRACT(EPOCH FROM (NOW() - s.date_ouverture)) / 3600 AS hours_open,
+          EXTRACT(EPOCH FROM (NOW() - s.opened_at)) / 3600 AS hours_open,
           EXTRACT(EPOCH FROM (NOW() - s.last_activity)) / 60 AS minutes_since_activity,
           (SELECT COUNT(*) FROM operations_caisse o WHERE o.session_id = s.id) AS nb_operations,
           (SELECT COALESCE(SUM(CAST(o.montant AS NUMERIC)), 0)
            FROM operations_caisse o
            WHERE o.session_id = s.id
-           AND o.type_operation IN ('Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre')
+           AND o.type_operation::text IN ('Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre')
           ) AS total_entrees,
           (SELECT COALESCE(SUM(CAST(o.montant AS NUMERIC)), 0)
            FROM operations_caisse o
            WHERE o.session_id = s.id
-           AND o.type_operation IN ('Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre')
+           AND o.type_operation::text IN ('Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre')
           ) AS total_sorties,
           c.nom AS caisse_nom,
           u.nom AS caissier_nom,
@@ -1985,9 +1985,9 @@ export async function ensureCustomFunctions(): Promise<void> {
         FROM mouvements_financiers mf
         LEFT JOIN accounting_rules ar ON (
             ar.source_type = 'MOUVEMENT'
-            AND ar.event_type = mf.type_paiement
+            AND ar.event_type = mf.type_paiement::text
             AND ar.active = true
-            AND (ar.payment_method IS NULL OR ar.payment_method = mf.methode_paiement)
+            AND (ar.payment_method IS NULL OR ar.payment_method = mf.methode_paiement::text)
         )
         WHERE mf.requires_gl_posting = true
         ORDER BY mf.created_at DESC;
@@ -2034,7 +2034,7 @@ export async function ensureCustomFunctions(): Promise<void> {
             p.name AS permission_name,
             rp.granted,
             'ROLE' AS source,
-            ur.role AS source_role,
+            ur.role::text AS source_role,
             NULL::UUID AS source_agence_id,
             rp.conditions
           FROM user_roles ur
@@ -2065,12 +2065,9 @@ export async function ensureCustomFunctions(): Promise<void> {
             p.code AS permission_code,
             p.name AS permission_name,
             up.granted,
-            CASE up.scope
-              WHEN 'GLOBAL' THEN 'OVERRIDE_GLOBAL'
-              ELSE 'OVERRIDE_AGENCE'
-            END AS source,
+            'OVERRIDE' AS source,
             NULL AS source_role,
-            up.agence_id AS source_agence_id,
+            NULL::UUID AS source_agence_id,
             up.conditions
           FROM user_permissions up
           JOIN permissions p ON p.id = up.permission_id

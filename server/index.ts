@@ -172,10 +172,22 @@ app.get("/api/health", async (_req, res) => {
 });
 
 (async () => {
-  // Ensure custom SQL functions exist (for db:push compatibility)
-  const { ensureCustomFunctions } = await import("./db");
-  await ensureCustomFunctions();
-  logger.info('Custom SQL functions ensured (get_next_piece_number, etc.)');
+  // Ensure custom SQL functions exist
+  // In Docker, db-init handles this via direct PostgreSQL connection (db:5432).
+  // Only run here for local dev (npm run dev) where DATABASE_URL points to PostgreSQL directly.
+  // Through pgbouncer (port 6432, transaction mode), DDL operations fail and poison the pool.
+  const dbUrl = process.env.DATABASE_URL || '';
+  if (!dbUrl.includes(':6432')) {
+    try {
+      const { ensureCustomFunctions } = await import("./db");
+      await ensureCustomFunctions();
+      logger.info('Custom SQL functions ensured');
+    } catch (error) {
+      logger.warn({ err: error }, 'Custom SQL functions check failed');
+    }
+  } else {
+    logger.info('Skipping ensureCustomFunctions (pgbouncer detected — handled by db-init)');
+  }
 
   // Setup auth first (creates session table and middleware)
   await setupAuth(app);

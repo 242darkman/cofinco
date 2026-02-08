@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique, jsonb, index, inet, numeric } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, varchar, integer, bigint, boolean, timestamp, uuid, date, unique, jsonb, index, inet, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { SystemRole } from "../types/roles";
@@ -234,6 +234,20 @@ export const rolePermissions = pgTable("role_permissions", {
 export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
 export type RolePermission = typeof rolePermissions.$inferSelect;
+
+// ============================================
+// RBAC Versions — cache invalidation tracker
+// ============================================
+export const rbacVersions = pgTable("rbac_versions", {
+  id: text("id").primaryKey(),
+  version: bigint("version", { mode: "number" }).notNull().default(1),
+  lastChangeType: text("last_change_type"),
+  lastChangeEntity: text("last_change_entity"),
+  lastChangeDetail: jsonb("last_change_detail"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type RbacVersion = typeof rbacVersions.$inferSelect;
 
 // ============================================
 // Permission Condition Templates

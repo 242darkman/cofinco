@@ -13,8 +13,7 @@ x-app-env: &app-env
   REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
   SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
   OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?OTP_HMAC_SECRET is required}
-  MINIO_ENDPOINT: minio
-  MINIO_PORT: "9000"
+  MINIO_ENDPOINT: http://minio:9000
   MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
   MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
   SMTP_HOST: ${SMTP_HOST:-}
@@ -43,6 +42,30 @@ x-healthcheck-app: &healthcheck-app
   retries: 3
 
 services:
+  # ==========================================
+  # DB INIT — schema push + seed (one-shot)
+  # Built locally from source (init target, not in registry)
+  # ==========================================
+  db-init:
+    container_name: cofinco-db-init
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: init
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cofinco_internal
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
   # ==========================================
   # REVERSE PROXY — Caddy (TLS Let's Encrypt)
   # ==========================================
@@ -86,8 +109,8 @@ services:
       - "5000"
     healthcheck: *healthcheck-app
     depends_on:
-      db:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       pgbouncer:
@@ -130,8 +153,8 @@ services:
       - "5000"
     healthcheck: *healthcheck-app
     depends_on:
-      db:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       pgbouncer:

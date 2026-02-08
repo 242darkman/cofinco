@@ -17,6 +17,8 @@
 import { db, pool } from './db';
 import { eq, count, and, isNull, sql } from 'drizzle-orm';
 import { seedRBAC } from './seed-rbac-logic';
+import { generateMatricule } from './storage/employes';
+import { ensureCustomFunctions } from './db';
 import { createLogger } from './lib/logger';
 
 const logger = createLogger('SeedProd');
@@ -64,6 +66,7 @@ import {
   permissionConditionTemplates,
   systemFeatureFlags,
   criticalPermissionPatterns,
+  rbacVersions,
 } from '@shared/schema';
 import { departments, jobPositions, employes, payrollConfig } from '@shared/schema';
 import { accountingRules } from '@shared/schema/accounting';
@@ -1726,6 +1729,15 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
   results.push({ table: 'criticalPermissionPatterns', action: 'created', count: patternsCreated, details: `${patternsCreated} new patterns (${criticalPatternsData.length} total)` });
   logger.info(`Critical permission patterns: ${patternsCreated} created`);
 
+  // RBAC Versions — initial row for cache invalidation
+  const [existingRbacVersion] = await db.select().from(rbacVersions).where(eq(rbacVersions.id, 'global'));
+  if (!existingRbacVersion && !dryRun) {
+    await db.insert(rbacVersions).values({ id: 'global', version: 1 });
+    results.push({ table: 'rbacVersions', action: 'created', count: 1 });
+  } else {
+    results.push({ table: 'rbacVersions', action: 'skipped', count: 0, details: 'exists' });
+  }
+
   return results;
 }
 
@@ -3323,9 +3335,10 @@ async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<See
     }
 
     // Create employe record
+    const adminMatricule = await generateMatricule(siegeId);
     await db.insert(employes).values({
       userId: adminUser.id,
-      matricule: 'EMP-SIEGE-2026-ADMIN',
+      matricule: adminMatricule,
       agenceId: siegeId,
       dateEmbauche: '2018-01-01',
       typeContrat: 'CDI',
@@ -3527,7 +3540,14 @@ async function seedProd() {
       logger.info('Use --force to reset configuration (dangerous!)');
     }
 
-    // 2. Execute seed modules
+    // 2. Ensure custom SQL functions (triggers, views, etc.)
+    if (!DRY_RUN) {
+      logger.info('Ensuring custom SQL functions...');
+      await ensureCustomFunctions();
+      logger.info('Custom SQL functions ensured');
+    }
+
+    // 3. Execute seed modules
     logger.info('───────────────────────────────────────────────────────────────');
 
     // Geography

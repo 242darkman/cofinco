@@ -19,6 +19,17 @@ ENTRYPOINT ["tini", "--"]
 CMD ["npx", "tsx", "watch", "--clear-screen=false", "server/index.ts"]
 
 # ============================================
+# Stage: INIT — one-shot DB schema push + seed
+# ============================================
+# Usage: docker compose service "db-init" (runs once then exits)
+# Needs full source (schema, drizzle config, seed) + all deps (drizzle-kit, tsx)
+FROM deps AS init
+WORKDIR /app
+COPY . .
+ENTRYPOINT ["sh", "-c"]
+CMD ["npx drizzle-kit push && node --import tsx server/seed-prod.ts"]
+
+# ============================================
 # Stage 2: Build application
 # ============================================
 FROM node:20-alpine AS build

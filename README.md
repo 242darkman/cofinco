@@ -5,6 +5,8 @@ Application de microfinance (Node.js / React / PostgreSQL / Drizzle / MinIO) con
 ## Architecture
 
 ```
+db-init (one-shot)                ← schema push + seed (s'exécute puis quitte)
+  ↓ service_completed_successfully
 Caddy (TLS auto, L7 LB)          ← staging + prod uniquement
   ├── app  ×N  (API + WebSocket + SPA)   DISABLE_CRON_JOBS=true
   └── worker ×1 (cron jobs financiers)    DISABLE_CRON_JOBS=false
@@ -23,6 +25,8 @@ Observabilité :
 
 **Image unique** : `app` et `worker` utilisent la même image Docker. Seule la variable `DISABLE_CRON_JOBS` détermine le rôle.
 
+**Initialisation automatique** : Le conteneur `db-init` exécute `drizzle-kit push` (sync schéma) puis les seeds de production avant que l'app ne démarre. Connexion directe à PostgreSQL (pas pgbouncer) pour les DDL. Les deux opérations sont idempotentes.
+
 ## 3 Environnements
 
 | Aspect | DEV | STAGING | PROD |
@@ -39,6 +43,7 @@ Observabilité :
 | **Réseau interne** | bridge | bridge | `internal: true` |
 | **Outils admin** | Profile `admin` | Non | Non |
 | **Image** | Build `dev` target | Build `runtime` local | Registry (GHCR) |
+| **Init DB auto** | Oui (`db-init`) | Oui (`db-init`) | Oui (`db-init`) |
 
 ## Prérequis
 
@@ -60,8 +65,13 @@ cp .env.production.example .env
 ### 2. Développement (hot reload)
 
 ```bash
-# Démarrer tout (infra + app avec hot reload)
+# Démarrer tout (infra + db-init + app avec hot reload)
 docker compose up -d
+
+# db-init s'exécute automatiquement :
+#   1. drizzle-kit push (sync schéma → DB)
+#   2. seed-prod.ts (données de référence)
+# Puis l'app démarre une fois db-init terminé.
 
 # L'app rebuild automatiquement sur chaque modification de fichier.
 # Backend : tsx watch (restart auto)
@@ -122,7 +132,7 @@ docker-compose.yml              ← base infrastructure (DB, Redis, MinIO, monit
 docker-compose.override.yml     ← DEV (auto-chargé, hot reload, ports debug)
 docker-compose.staging.yml      ← STAGING (Caddy + app/worker, localhost)
 docker-compose.prod.yml         ← PROD (Caddy + app/worker, public, resource limits)
-Dockerfile                      ← multi-stage (deps → dev → build → runtime)
+Dockerfile                      ← multi-stage (deps → dev → init → build → runtime)
 .dockerignore                   ← exclut .env, node_modules, .git
 
 .env.dev                        ← defaults DEV pré-remplis
@@ -203,6 +213,27 @@ Secrets requis : `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
 - Non-root dans Docker, tini PID 1
 - Réseau interne isolé (DB/Redis/MinIO non exposés en prod)
 - Backups chiffrables (GPG)
+
+## Initialisation de la base de données
+
+L'initialisation est **entièrement automatique** via le conteneur `db-init` :
+
+1. **`drizzle-kit push`** — synchronise le schéma TypeScript vers PostgreSQL (DDL)
+2. **`seed-prod.ts`** — insère les données de référence (géographie, permissions, produits, comptabilité...)
+
+Le conteneur `db-init` :
+- Se connecte directement à PostgreSQL (port 5432, pas pgbouncer) pour les opérations DDL
+- S'exécute une seule fois puis quitte (`restart: "no"`)
+- L'app et le worker ne démarrent qu'après son succès (`service_completed_successfully`)
+- Les deux opérations sont **idempotentes** — safe à relancer
+
+```bash
+# Vérifier les logs d'initialisation
+docker logs cofinco-db-init
+
+# Relancer l'init manuellement (si nécessaire)
+docker compose restart db-init
+```
 
 ## Remarques importantes
 

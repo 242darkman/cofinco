@@ -90,17 +90,17 @@ export const MODULES_DATA: ModuleSeed[] = [
   { name: 'Incidents', description: 'Gestion des incidents terrain', icon: 'AlertTriangle', category: 'operations', orderIndex: 21 },
   { name: 'Visites', description: 'Visites clients terrain', icon: 'Map', category: 'operations', orderIndex: 22 },
   { name: 'Prospection', description: 'Prospection et acquisition clients', icon: 'UserPlus', category: 'operations', orderIndex: 23 },
-  { name: 'Zones Commerciales', description: 'Gestion des arrondissements et marchés', icon: 'MapPin', category: 'operations', orderIndex: 23.5 },
-  { name: 'Paiements Agent', description: 'Paiements initiés par agents', icon: 'Banknote', category: 'finance', orderIndex: 24 },
-  { name: 'Virements Programmes', description: 'Planification des virements internes', icon: 'CalendarClock', category: 'admin', orderIndex: 25 },
+  { name: 'Zones Commerciales', description: 'Gestion des arrondissements et marchés', icon: 'MapPin', category: 'operations', orderIndex: 24 },
+  { name: 'Paiements Agent', description: 'Paiements initiés par agents', icon: 'Banknote', category: 'finance', orderIndex: 25 },
+  { name: 'Virements Programmes', description: 'Planification des virements internes', icon: 'CalendarClock', category: 'admin', orderIndex: 26 },
   // New modules for CASL alignment
-  { name: 'RBAC', description: 'Gestion des rôles et permissions', icon: 'Key', category: 'admin', orderIndex: 26 },
-  { name: 'Maintenance', description: 'Outils de maintenance système', icon: 'Wrench', category: 'admin', orderIndex: 27 },
-  { name: 'Fidélité', description: 'Programme de fidélité', icon: 'Award', category: 'operations', orderIndex: 28 },
-  { name: 'Régularisation', description: 'Régularisations comptables', icon: 'Scale', category: 'finance', orderIndex: 29 },
-  { name: 'Départements', description: 'Gestion des départements', icon: 'Building2', category: 'admin', orderIndex: 30 },
-  { name: 'Employés', description: 'Gestion des employés', icon: 'Users', category: 'admin', orderIndex: 31 },
-  { name: 'Agences', description: 'Gestion des agences', icon: 'Building', category: 'admin', orderIndex: 32 },
+  { name: 'RBAC', description: 'Gestion des rôles et permissions', icon: 'Key', category: 'admin', orderIndex: 27 },
+  { name: 'Maintenance', description: 'Outils de maintenance système', icon: 'Wrench', category: 'admin', orderIndex: 28 },
+  { name: 'Fidélité', description: 'Programme de fidélité', icon: 'Award', category: 'operations', orderIndex: 29 },
+  { name: 'Régularisation', description: 'Régularisations comptables', icon: 'Scale', category: 'finance', orderIndex: 30 },
+  { name: 'Départements', description: 'Gestion des départements', icon: 'Building2', category: 'admin', orderIndex: 31 },
+  { name: 'Employés', description: 'Gestion des employés', icon: 'Users', category: 'admin', orderIndex: 32 },
+  { name: 'Agences', description: 'Gestion des agences', icon: 'Building', category: 'admin', orderIndex: 33 },
 ];
 
 /**
