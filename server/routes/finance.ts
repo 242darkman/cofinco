@@ -2254,9 +2254,13 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(404).json({ message: "Enquête non trouvée" });
       }
 
-      // Only the assigned agent can start
+      // The assigned agent can start, OR a supervisor acting on their behalf
       if (enquete.assignedAgentId !== userId) {
-        return res.status(403).json({ message: "Vous n'êtes pas l'agent assigné à cette enquête." });
+        const role = normalizeRole(req.session?.user?.role);
+        const canSupervise = role === SystemRole.ADMIN || role === SystemRole.CHEF_AGENCE || role === SystemRole.SUPERVISEUR;
+        if (!canSupervise) {
+          return res.status(403).json({ message: "Vous n'êtes pas l'agent assigné à cette enquête." });
+        }
       }
 
       // Only ASSIGNED enquêtes can be started
@@ -2284,7 +2288,7 @@ export function registerFinanceRoutes(app: Express) {
 
       const wsInstance = getWsInstance();
       if (wsInstance) {
-        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_started', id, demandeId: enquete.demandeId, agentId: userId } });
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_started', id, demandeId: enquete.demandeId, agentId: enquete.assignedAgentId } });
       }
 
       res.json({ success: true, enquete: updated });
@@ -2332,6 +2336,13 @@ export function registerFinanceRoutes(app: Express) {
           prenom: r.userPrenom,
           telephone: r.userTelephone,
           adresseDomicile: r.client?.adresseDomicile,
+          // Activity & revenue fields from client profile (for pre-filling investigation form)
+          typeActivite: r.client?.typeActivite,
+          revenuMensuel: r.client?.revenuMensuel,
+          revenuJournalier: r.client?.revenuJournalier,
+          typeRevenu: r.client?.typeRevenu,
+          profession: r.client?.profession,
+          lieuActivite: r.client?.lieuActivite,
         } : null,
       }));
 
@@ -2339,6 +2350,96 @@ export function registerFinanceRoutes(app: Express) {
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur récupération enquêtes agent');
       res.status(500).json({ message: error.message || "Erreur" });
+    }
+  });
+
+  // Agent submits investigation data on an existing IN_PROGRESS enquête
+  app.patch("/api/enquetes-credit/:id/soumettre", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session?.user?.id;
+      if (!userId) return res.status(401).json({ message: "Non authentifié" });
+
+      const [enquete] = await db.select().from(enquetesCredit).where(eq(enquetesCredit.id, id)).limit(1);
+      if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
+
+      // Only the assigned agent or a supervisor can submit
+      if (enquete.assignedAgentId !== userId) {
+        const role = normalizeRole(req.session?.user?.role);
+        const canSupervise = role === SystemRole.ADMIN || role === SystemRole.CHEF_AGENCE || role === SystemRole.SUPERVISEUR;
+        if (!canSupervise) {
+          return res.status(403).json({ message: "Vous n'êtes pas autorisé à soumettre cette enquête." });
+        }
+      }
+
+      // Only IN_PROGRESS enquêtes can be submitted
+      if (enquete.statut !== "IN_PROGRESS") {
+        return res.status(400).json({ message: `Cette enquête ne peut pas être soumise (statut actuel: ${enquete.statut}).` });
+      }
+
+      const data = normalizeKeysDeep(req.body) as any;
+
+      const updatePayload: Record<string, any> = {
+        statut: "SUBMITTED",
+        submittedAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Investigation data fields
+      if (data.categorieActivite) updatePayload.categorieActivite = data.categorieActivite;
+      if (data.typeActivite) updatePayload.typeActivite = data.typeActivite;
+      if (data.ancienneteActivite != null) updatePayload.ancienneteActivite = parseInt(data.ancienneteActivite) || 0;
+      if (data.objetCredit) updatePayload.objetCredit = data.objetCredit;
+      if (data.revenuMensuel) updatePayload.revenuMensuel = data.revenuMensuel.toString();
+      if (data.typeRevenu) updatePayload.typeRevenu = data.typeRevenu;
+      if (data.revenuJournalier) updatePayload.revenuJournalier = data.revenuJournalier.toString();
+      if (data.joursTravailMois != null) updatePayload.joursTravailMois = parseInt(data.joursTravailMois) || 26;
+      if (data.chargesMensuelles) updatePayload.chargesMensuelles = data.chargesMensuelles.toString();
+      if (data.autresCredits) updatePayload.autresCredits = data.autresCredits;
+      if (data.garantiesProposees) updatePayload.garantiesProposees = data.garantiesProposees;
+      if (data.photosActivite) updatePayload.photosActivite = data.photosActivite;
+      if (data.documentsJustificatifs) updatePayload.documentsJustificatifs = data.documentsJustificatifs;
+      if (data.observations) updatePayload.observations = data.observations;
+
+      // Agent recommendation
+      if (data.agentRecommendation) updatePayload.agentRecommendation = data.agentRecommendation;
+      if (data.recommendedAmount) updatePayload.recommendedAmount = data.recommendedAmount.toString();
+      if (data.riskLevel) updatePayload.riskLevel = data.riskLevel;
+      if (data.riskFactors) updatePayload.riskFactors = data.riskFactors;
+
+      // Geo data
+      if (data.geoLatitude != null) updatePayload.geoLatitude = data.geoLatitude.toString();
+      if (data.geoLongitude != null) updatePayload.geoLongitude = data.geoLongitude.toString();
+      if (data.geoAccuracy != null) updatePayload.geoAccuracy = data.geoAccuracy.toString();
+      if (data.geoTimestamp) updatePayload.geoTimestamp = new Date(data.geoTimestamp);
+
+      const [updated] = await db.update(enquetesCredit).set(updatePayload).where(eq(enquetesCredit.id, id)).returning();
+
+      // Update the associated demande status to INVESTIGATION_COMPLETE
+      if (enquete.demandeId) {
+        await storage.updateDemandeCredit(enquete.demandeId, {
+          statut: StatutDemande.INVESTIGATION_COMPLETE,
+        });
+      }
+
+      // Cancel deadline reminders — enquête soumise
+      try {
+        const { cancelInvestigationReminders } = await import("../services/notifications/investigation-reminder-service");
+        await cancelInvestigationReminders(id, "Enquête soumise par l'agent");
+      } catch {
+        // Non-blocking
+      }
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_submitted', id, demandeId: enquete.demandeId, agentId: enquete.assignedAgentId } });
+      }
+
+      res.json({ success: true, enquete: updated });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur soumission enquête agent');
+      res.status(500).json({ message: error.message || "Erreur lors de la soumission de l'enquête" });
     }
   });
 

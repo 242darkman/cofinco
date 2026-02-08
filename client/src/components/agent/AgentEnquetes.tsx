@@ -22,6 +22,7 @@ import {
   FileSearch,
 } from 'lucide-react';
 import clsx from 'clsx';
+import EnqueteCreditForm from '../finance/credits/EnqueteCreditForm';
 
 interface Investigation {
   id: string;
@@ -84,6 +85,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [starting, setStarting] = useState<string | null>(null);
+  const [enqueteFormData, setEnqueteFormData] = useState<Investigation | null>(null);
 
   const fetchInvestigations = useCallback(async () => {
     setLoading(true);
@@ -122,6 +124,22 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
       setStarting(null);
     }
   }, [fetchInvestigations]);
+
+  const handleSubmitEnquete = useCallback(async (payload: any) => {
+    if (!enqueteFormData?.id) return;
+    const response = await fetch(`/api/enquetes-credit/${enqueteFormData.id}/soumettre`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Erreur lors de la soumission");
+    }
+    setEnqueteFormData(null);
+    fetchInvestigations();
+  }, [enqueteFormData, fetchInvestigations]);
 
   useEffect(() => { fetchInvestigations(); }, [fetchInvestigations]);
 
@@ -359,7 +377,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                   </div>
                 )}
 
-                {/* Démarrer button for ASSIGNED investigations */}
+                {/* Action buttons for pending investigations */}
                 {investigation.statut === 'ASSIGNED' && (
                   <div className="mt-2 pt-2 border-t border-slate-700/50">
                     <button
@@ -373,6 +391,17 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                         <ChevronRight size={14} />
                       )}
                       Démarrer l'enquête
+                    </button>
+                  </div>
+                )}
+                {investigation.statut === 'IN_PROGRESS' && (
+                  <div className="mt-2 pt-2 border-t border-slate-700/50">
+                    <button
+                      onClick={() => setEnqueteFormData(investigation)}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all"
+                    >
+                      <ClipboardCheck size={14} />
+                      Remplir l'enquête
                     </button>
                   </div>
                 )}
@@ -419,6 +448,33 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
           Actualiser
         </button>
       </div>
+
+      {/* Enquête Credit Form — agent fills investigation data */}
+      {enqueteFormData && (
+        <EnqueteCreditForm
+          clientId={enqueteFormData.clientId}
+          clientNom={enqueteFormData.client ? `${enqueteFormData.client.prenom || ''} ${enqueteFormData.client.nom || ''}`.trim() : undefined}
+          initialData={{
+            demandeId: enqueteFormData.demandeId,
+            id: enqueteFormData.id,
+            client_id: enqueteFormData.clientId,
+            montant_demande: enqueteFormData.montantDemande,
+            objet_credit: enqueteFormData.objetCredit,
+            // Enquête fields with client profile fallback
+            categorie_activite: enqueteFormData.categorieActivite,
+            type_activite: enqueteFormData.typeActivite || enqueteFormData.client?.typeActivite,
+            anciennete_activite: enqueteFormData.ancienneteActivite,
+            revenu_mensuel: enqueteFormData.revenuMensuel || enqueteFormData.client?.revenuMensuel,
+            revenus_mensuels: enqueteFormData.revenuMensuel || enqueteFormData.client?.revenuMensuel,
+            revenu_journalier: enqueteFormData.revenuJournalier || enqueteFormData.client?.revenuJournalier,
+            type_revenu: enqueteFormData.typeRevenu || enqueteFormData.client?.typeRevenu,
+            charges_mensuelles: enqueteFormData.chargesMensuelles,
+            description_activite: enqueteFormData.descriptionActivite || enqueteFormData.client?.profession,
+          }}
+          onClose={() => setEnqueteFormData(null)}
+          onSave={handleSubmitEnquete}
+        />
+      )}
     </div>
   );
 }

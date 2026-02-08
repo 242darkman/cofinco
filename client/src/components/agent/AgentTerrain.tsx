@@ -11,6 +11,7 @@ import AgentTerrainPaiement from './AgentTerrainPaiement';
 import SettlementModal from './SettlementModal';
 import ProspectionFormModal from './ProspectionFormModal';
 import AgentPlanning from './AgentPlanning';
+import EnqueteCreditForm from '../finance/credits/EnqueteCreditForm';
 import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
@@ -98,6 +99,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>();
   const [showFullPlanning, setShowFullPlanning] = useState(false);
+  const [enqueteFormData, setEnqueteFormData] = useState<any>(null);
 
   // Agent dropdown search
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
@@ -384,6 +386,23 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       setStartingEnquete(null);
     }
   }, [loadEnquetes]);
+
+  // Submit investigation form data for an IN_PROGRESS enquête
+  const handleSubmitEnquete = useCallback(async (payload: any) => {
+    if (!enqueteFormData?.id) return;
+    const response = await fetch(`/api/enquetes-credit/${enqueteFormData.id}/soumettre`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Erreur lors de la soumission");
+    }
+    setEnqueteFormData(null);
+    loadEnquetes();
+  }, [enqueteFormData, loadEnquetes]);
 
   const agentDisabled = canSupervise && !selectedAgentId;
 
@@ -739,11 +758,14 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                                 {isStarting ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
                                 Démarrer
                               </button>
-                            ) : (
-                              <span className="text-[9px] font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
-                                En cours
-                              </span>
-                            )}
+                            ) : enq.statut === 'IN_PROGRESS' ? (
+                              <button
+                                onClick={() => setEnqueteFormData(enq)}
+                                className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold rounded-lg transition-colors"
+                              >
+                                <ClipboardCheck size={10} /> Remplir
+                              </button>
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -1034,9 +1056,12 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                           Démarrer l'enquête
                         </button>
                       ) : enq.statut === 'IN_PROGRESS' ? (
-                        <span className="flex items-center gap-1.5 text-[11px] font-bold text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-lg">
-                          <Clock size={12} /> En cours
-                        </span>
+                        <button
+                          onClick={() => setEnqueteFormData(enq)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition-colors"
+                        >
+                          <ClipboardCheck size={12} /> Remplir l'enquête
+                        </button>
                       ) : null}
                     </div>
                   </div>
@@ -1045,6 +1070,33 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Enquête Credit Form — agent fills investigation data */}
+      {enqueteFormData && (
+        <EnqueteCreditForm
+          clientId={enqueteFormData.clientId}
+          clientNom={enqueteFormData.client ? `${enqueteFormData.client.prenom || ''} ${enqueteFormData.client.nom || ''}`.trim() : undefined}
+          initialData={{
+            demandeId: enqueteFormData.demandeId,
+            id: enqueteFormData.id,
+            client_id: enqueteFormData.clientId,
+            montant_demande: enqueteFormData.montantDemande,
+            objet_credit: enqueteFormData.objetCredit,
+            // Enquête fields with client profile fallback
+            categorie_activite: enqueteFormData.categorieActivite,
+            type_activite: enqueteFormData.typeActivite || enqueteFormData.client?.typeActivite,
+            anciennete_activite: enqueteFormData.ancienneteActivite,
+            revenu_mensuel: enqueteFormData.revenuMensuel || enqueteFormData.client?.revenuMensuel,
+            revenus_mensuels: enqueteFormData.revenuMensuel || enqueteFormData.client?.revenuMensuel,
+            revenu_journalier: enqueteFormData.revenuJournalier || enqueteFormData.client?.revenuJournalier,
+            type_revenu: enqueteFormData.typeRevenu || enqueteFormData.client?.typeRevenu,
+            charges_mensuelles: enqueteFormData.chargesMensuelles,
+            description_activite: enqueteFormData.descriptionActivite || enqueteFormData.client?.profession,
+          }}
+          onClose={() => setEnqueteFormData(null)}
+          onSave={handleSubmitEnquete}
+        />
       )}
 
     </div>
