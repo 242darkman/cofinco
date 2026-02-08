@@ -183,13 +183,14 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       try {
         const res = await api.get<Caisse[]>(`/agences/${selectedAgenceId}/caisses`);
         if (res.data) {
-          let availableCaisses = res.data;
+          // Exclure les coffres-forts — uniquement les caisses physiques
+          let availableCaisses = res.data.filter((c: any) => c.type !== 'Coffre-Fort');
 
           const normalizedRole = normalizeRole(currentUser?.role);
           const isManager = normalizedRole === SystemRole.CHEF_AGENCE || normalizedRole === SystemRole.ADMIN;
 
           if (!isManager && currentUser?.id) {
-            availableCaisses = res.data.filter(c =>
+            availableCaisses = availableCaisses.filter(c =>
               c.assignments && c.assignments.includes(currentUser.id)
             );
           }
