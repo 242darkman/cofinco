@@ -47,6 +47,17 @@ vi.mock('server/services/notifications/domain-events/event-registry', () => ({
   dispatchDomainEvent: vi.fn(),
 }));
 
+vi.mock('server/lib/logger', () => ({
+  createLogger: () => ({
+    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn()
+  })
+}));
+
+vi.mock('server/services/accounting-posting-service', () => ({
+  postGlForMouvement: vi.fn().mockResolvedValue(null),
+  AccountingRuleNotFoundError: class extends Error {},
+}));
+
 import { db } from 'server/db';
 import { reverseOperation, ReversalError, canReverseOperation } from 'server/services/caisse/transaction-reversal-service';
 

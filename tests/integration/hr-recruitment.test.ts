@@ -2,14 +2,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { hrRouter } from 'server/routes/hr';
-import { db } from 'server/db';
-import { candidatures } from '@shared/schema';
 
 // MOCK MIDDLEWARE
 vi.mock('server/middleware', () => ({
   getAuthUser: (req: any, res: any, next: any) => {
-    req.user = { id: 'test-user', role: 'rh' }; 
+    req.user = { id: 'test-user', role: 'rh' };
     next();
   },
   requireRole: (roles: any) => (req: any, res: any, next: any) => next()
@@ -25,12 +22,51 @@ vi.mock('server/db', () => ({
   }
 }));
 
+// MOCK AUTHORIZATION
+vi.mock('server/authorization', () => ({
+  attachAbility: (req: any, res: any, next: any) => next(),
+  requireAbility: () => (req: any, res: any, next: any) => next()
+}));
+
 // MOCK WS SERVER
 vi.mock('server/ws-server', () => ({
-  getWsInstance: () => ({
-    broadcast: vi.fn()
-  })
+  getWsInstance: () => ({ broadcast: vi.fn() })
 }));
+
+// MOCK STORAGE
+vi.mock('server/storage', () => ({
+  storage: {}
+}));
+
+// MOCK deep dependencies
+vi.mock('server/services/notifications/domain-events/event-registry', () => ({
+  dispatchDomainEvent: vi.fn(),
+}));
+vi.mock('server/services/hr-service', () => ({
+  hrService: {
+    generateMonthlyPayroll: vi.fn(),
+    logAction: vi.fn().mockResolvedValue(undefined),
+    validateLeaveRequest: vi.fn().mockResolvedValue({ valid: true }),
+    onLeaveApproved: vi.fn().mockResolvedValue(undefined),
+    createLeavePresenceEntries: vi.fn().mockResolvedValue(undefined),
+    calculateBusinessDays: vi.fn().mockReturnValue(0),
+  },
+  HrService: class {},
+}));
+vi.mock('server/services/hiring-approval-service', () => ({ hiringApprovalService: {} }));
+vi.mock('server/services/sanction-escalation-service', () => ({ sanctionEscalationService: {} }));
+vi.mock('server/services/onboarding-service', () => ({ onboardingService: {} }));
+vi.mock('server/services/hr-accounting-service', () => ({
+  postPayrollEngagement: vi.fn(), postPayrollPayment: vi.fn(),
+  postAdvancePayment: vi.fn(), postAdvanceDeduction: vi.fn(),
+}));
+vi.mock('server/services/hr-import-service', () => ({ importEmployees: vi.fn(), parseCsv: vi.fn() }));
+vi.mock('server/services/storage-service', () => ({
+  StorageService: { getPresignedDownloadUrl: vi.fn(), uploadFile: vi.fn() }
+}));
+
+import { hrRouter } from 'server/routes/hr';
+import { db } from 'server/db';
 
 const app = express();
 app.use(express.json());
@@ -52,6 +88,7 @@ const mockQueryBuilder = (result: any) => {
 describe('HR Recruitment Integration', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        (db.select as any).mockImplementation(() => mockQueryBuilder([]));
     });
 
     it('GET /api/hr/candidatures should return candidatures', async () => {
@@ -81,11 +118,12 @@ describe('HR Recruitment Integration', () => {
     });
 
     it('PATCH /api/hr/candidatures/:id should update status', async () => {
-        (db.update as any).mockReturnValue(mockQueryBuilder([{ id: 1, statut: 'Entretien' }]));
+        // Use English enum value (StatutCandidature.INTERVIEW = "INTERVIEW")
+        (db.update as any).mockReturnValue(mockQueryBuilder([{ id: 1, statut: 'INTERVIEW' }]));
 
-        const res = await request(app).patch('/api/hr/candidatures/1').send({ statut: 'Entretien' });
+        const res = await request(app).patch('/api/hr/candidatures/1').send({ statut: 'INTERVIEW' });
 
         expect(res.status).toBe(200);
-        expect(res.body.statut).toBe('Entretien');
+        expect(res.body.statut).toBe('INTERVIEW');
     });
 });

@@ -150,8 +150,8 @@ services:
       - .:/app
       - /app/node_modules
     depends_on:
-      db:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     networks:

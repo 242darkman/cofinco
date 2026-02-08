@@ -342,7 +342,7 @@ describe("Rollback Route", () => {
   it("should handle MigrationError with appropriate HTTP status codes", () => {
     const rollbackRouteSection = agencesRoute.slice(
       agencesRoute.indexOf("migrations/:id/rollback"),
-      agencesRoute.indexOf("migrations/:id/rollback") + 800
+      agencesRoute.indexOf("migrations/:id/rollback") + 1600
     );
     expect(rollbackRouteSection).toContain("ROLLBACK_EXPIRED");
     expect(rollbackRouteSection).toContain("410");

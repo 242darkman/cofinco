@@ -4,19 +4,23 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from 'server/db';
-import { 
-  credits, 
-  echeancesCredits, 
+import {
+  credits,
+  echeancesCredits,
   remboursements,
   clients,
   agences,
   users,
+  caisses,
+  factures,
+  lignesFactures,
+  mouvementsFinanciers,
   type InsertCredit,
   type InsertEcheanceCredit,
   type InsertClient,
   type InsertUser
 } from '@shared/schema';
-import { remboursementEcheances, clientCreditBalances } from '@shared/schema/remboursement-allocations';
+import { remboursementEcheances, clientCreditBalances, remboursementAllocationAudit } from '@shared/schema/remboursement-allocations';
 import { 
   allocateRepaymentToSchedule,
   reverseRepaymentAllocations,
@@ -181,7 +185,7 @@ describe('Repayment FIFO Allocation', () => {
           montant: '1000',
           dateRemboursement: new Date(),
           methodePaiement: 'CASH',
-          idempotencyKey: 'test-idempotent-123'
+          idempotencyKey: `test-idempotent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         }).returning();
         return remboursement.id;
       });
@@ -223,7 +227,8 @@ describe('Repayment FIFO Allocation', () => {
 
         const echeances = await tx.select()
           .from(echeancesCredits)
-          .where(eq(echeancesCredits.creditId, testCreditId));
+          .where(eq(echeancesCredits.creditId, testCreditId))
+          .orderBy(echeancesCredits.numeroEcheance);
 
         return {
           remboursementId: remboursement.id,
@@ -246,7 +251,8 @@ describe('Repayment FIFO Allocation', () => {
       // Vérifier que les échéances sont revenues à 0
       const echeancesAfterReverse = await db.select()
         .from(echeancesCredits)
-        .where(eq(echeancesCredits.creditId, testCreditId));
+        .where(eq(echeancesCredits.creditId, testCreditId))
+        .orderBy(echeancesCredits.numeroEcheance);
 
       expect(Number(echeancesAfterReverse[0].montantPaye)).toBe(0);
       expect(Number(echeancesAfterReverse[1].montantPaye)).toBe(0);
@@ -359,9 +365,9 @@ describe('Repayment FIFO Allocation', () => {
         {
           creditId: testCreditId,
           montant: '1500',
-          methodePaiement: 'CASH',
+          methodePaiement: 'TRANSFER',
           observations: 'Test payment',
-          idempotencyKey: 'test-complete-123'
+          idempotencyKey: `test-complete-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         },
         testUserId
       );
@@ -397,7 +403,7 @@ async function setupTestData() {
   // Créer une agence
   const [agence] = await db.insert(agences).values({
     nom: 'Test Agency',
-    code: 'TEST001',
+    codeAgence: 'TEST001',
     adresse: 'Test Address'
   }).returning();
 
@@ -428,6 +434,7 @@ async function setupTestData() {
     montant: '3000',
     taux: '10',
     duree: 3,
+    typeCredit: 'PERSONAL',
     soldeRestant: '3000',
     dateDebut: new Date(),
     statut: StatutCredit.ACTIVE as any,
@@ -466,12 +473,43 @@ async function setupTestData() {
 
 async function cleanupTestData() {
   // Nettoyer dans l'ordre inverse des dépendances
-  await db.delete(remboursementEcheances);
-  await db.delete(clientCreditBalances);
-  await db.delete(remboursements);
-  await db.delete(echeancesCredits);
-  await db.delete(credits);
-  await db.delete(clients);
+  // Scope to test data only to avoid FK violations with seeded data
+  const testUserRows = await db.select({ id: users.id }).from(users).where(eq(users.username, 'testuser'));
+
+  for (const u of testUserRows) {
+    const testClientRows = await db.select({ id: clients.id }).from(clients).where(eq(clients.userId, u.id));
+
+    for (const c of testClientRows) {
+      const testCreditRows = await db.select({ id: credits.id }).from(credits).where(eq(credits.clientId, c.id));
+
+      for (const cr of testCreditRows) {
+        const rembRows = await db.select({ id: remboursements.id }).from(remboursements).where(eq(remboursements.creditId, cr.id));
+        for (const r of rembRows) {
+          await db.delete(remboursementAllocationAudit).where(eq(remboursementAllocationAudit.remboursementId, r.id));
+          await db.delete(remboursementEcheances).where(eq(remboursementEcheances.remboursementId, r.id));
+        }
+        await db.delete(remboursements).where(eq(remboursements.creditId, cr.id));
+        await db.delete(echeancesCredits).where(eq(echeancesCredits.creditId, cr.id));
+      }
+
+      await db.delete(clientCreditBalances).where(eq(clientCreditBalances.clientId, c.id));
+      await db.delete(credits).where(eq(credits.clientId, c.id));
+      // Delete lignes_factures -> factures -> mouvements that reference this client
+      const factureRows = await db.select({ id: factures.id }).from(factures).where(eq(factures.clientId, c.id));
+      for (const f of factureRows) {
+        await db.delete(lignesFactures).where(eq(lignesFactures.factureId, f.id));
+      }
+      await db.delete(factures).where(eq(factures.clientId, c.id));
+      await db.delete(mouvementsFinanciers).where(eq(mouvementsFinanciers.clientId, c.id));
+      await db.delete(clients).where(eq(clients.id, c.id));
+    }
+  }
+
   await db.delete(users).where(eq(users.username, 'testuser'));
-  await db.delete(agences).where(eq(agences.code, 'TEST001'));
+  // Delete caisses for test agence (seed creates coffre-fort for all agences)
+  const testAgenceRows = await db.select({ id: agences.id }).from(agences).where(eq(agences.codeAgence, 'TEST001'));
+  for (const a of testAgenceRows) {
+    await db.delete(caisses).where(eq(caisses.agenceId, a.id));
+  }
+  await db.delete(agences).where(eq(agences.codeAgence, 'TEST001'));
 }

@@ -244,8 +244,10 @@ describe("generateRemindersForDueDate", () => {
 
 describe("generateCreditReminders", () => {
   it("should generate reminders for each installment in a credit schedule", () => {
+    const futureStart = new Date();
+    futureStart.setFullYear(futureStart.getFullYear() + 1);
     const reminders = generateCreditReminders({
-      startDate: new Date("2026-01-01"),
+      startDate: futureStart,
       frequency: FinancialFrequency.MONTHLY,
       totalPeriods: 3,
     });
@@ -254,8 +256,10 @@ describe("generateCreditReminders", () => {
   });
 
   it("should sort all reminders chronologically", () => {
+    const futureStart = new Date();
+    futureStart.setFullYear(futureStart.getFullYear() + 1);
     const reminders = generateCreditReminders({
-      startDate: new Date("2026-01-01"),
+      startDate: futureStart,
       frequency: FinancialFrequency.MONTHLY,
       totalPeriods: 6,
     });
@@ -267,8 +271,10 @@ describe("generateCreditReminders", () => {
   });
 
   it("should include installmentIndex in each reminder", () => {
+    const futureStart = new Date();
+    futureStart.setFullYear(futureStart.getFullYear() + 1);
     const reminders = generateCreditReminders({
-      startDate: new Date("2026-01-01"),
+      startDate: futureStart,
       frequency: FinancialFrequency.MONTHLY,
       totalPeriods: 2,
     });
@@ -284,8 +290,11 @@ describe("generateCreditReminders", () => {
 
 describe("generateTontineReminders", () => {
   it("should generate reminders for tontine contributions", () => {
+    // Use a future start date so reminders aren't filtered out as past
+    const futureStart = new Date();
+    futureStart.setFullYear(futureStart.getFullYear() + 1);
     const reminders = generateTontineReminders({
-      startDate: new Date("2026-01-01"),
+      startDate: futureStart,
       frequency: FinancialFrequency.WEEKLY,
       totalPeriods: 4,
     });
@@ -293,8 +302,10 @@ describe("generateTontineReminders", () => {
   });
 
   it("should use TONTINE offsets (J-2, J, J+1)", () => {
+    const futureStart = new Date();
+    futureStart.setFullYear(futureStart.getFullYear() + 1);
     const reminders = generateTontineReminders({
-      startDate: new Date("2026-06-01"),
+      startDate: futureStart,
       frequency: FinancialFrequency.MONTHLY,
       totalPeriods: 2,
     });
@@ -306,8 +317,10 @@ describe("generateTontineReminders", () => {
   });
 
   it("should sort reminders chronologically", () => {
+    const futureStart = new Date();
+    futureStart.setFullYear(futureStart.getFullYear() + 1);
     const reminders = generateTontineReminders({
-      startDate: new Date("2026-01-01"),
+      startDate: futureStart,
       frequency: FinancialFrequency.BIWEEKLY,
       totalPeriods: 5,
     });

@@ -110,7 +110,7 @@ describe('Scheduled Disbursements Service', () => {
         numeroCredit: 'CR-004',
         decaissementAutomatique: true,
         dateDecaissementProgramme: new Date(Date.now() - 3600000),
-        statut: 'Approuvée',
+        statut: 'PENDING',
         dateDecaissementEffectif: disbursedDate,
         montant: '100000',
       };

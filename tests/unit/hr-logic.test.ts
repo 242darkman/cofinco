@@ -18,6 +18,7 @@ const mockQueryBuilder = (result: any) => {
   const query = {
     from: vi.fn().mockReturnThis(),
     innerJoin: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
@@ -48,7 +49,7 @@ describe('HR Logic Unit Tests', () => {
         salaireBase: 500000,
         tauxHoraire: 0,
         tauxJournalier: 0,
-        modeCalculPaie: 'Mensuel'
+        modeCalculPaie: 'MONTHLY'
       }];
 
       const mockPresences: any[] = []; // Presences don't matter for fixed monthly
@@ -105,7 +106,7 @@ describe('HR Logic Unit Tests', () => {
           salaireBase: 0,
           tauxHoraire: 2000,
           tauxJournalier: 0,
-          modeCalculPaie: 'Horaire'
+          modeCalculPaie: 'HOURLY'
         }];
   
         // 100 hours worked + 10 overtime

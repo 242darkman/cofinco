@@ -30,6 +30,39 @@ vi.mock('server/services/coffre/transfert-service', () => {
   };
 });
 
+// MOCK AUTH (coffreRouter.use(requireAuth))
+vi.mock('server/auth', () => ({
+  requireAuth: (req: any, res: any, next: any) => next()
+}));
+
+// MOCK AUTHORIZATION (routes use attachAbility/requireAbility)
+vi.mock('server/authorization', () => ({
+  attachAbility: (req: any, res: any, next: any) => next(),
+  requireAbility: () => (req: any, res: any, next: any) => next()
+}));
+
+// MOCK domain events
+vi.mock('server/services/notifications/domain-events/event-registry', () => ({
+  dispatchDomainEvent: vi.fn(),
+}));
+
+// MOCK idempotency middleware
+vi.mock('server/middleware/idempotency', () => ({
+  idempotencyMiddleware: () => (req: any, res: any, next: any) => next()
+}));
+
+// MOCK storage
+vi.mock('server/storage', () => ({
+  storage: {}
+}));
+
+// MOCK logger
+vi.mock('server/lib/logger', () => ({
+  createLogger: () => ({
+    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn()
+  })
+}));
+
 describe('Coffre Configuration API', () => {
   let app: express.Express;
 
@@ -38,7 +71,7 @@ describe('Coffre Configuration API', () => {
     app.use(express.json());
     // Mock user middleware
     app.use((req, res, next) => {
-      (req as any).user = { id: 'admin-id', role: 'Administrateur', agenceId: 'agence-1' };
+      (req as any).user = { id: 'admin-id', role: 'Administrateur', agenceId: '00000000-0000-0000-0000-000000000001' };
       next();
     });
     app.use('/api/coffre', coffreRouter);
@@ -53,7 +86,7 @@ describe('Coffre Configuration API', () => {
         }),
       });
 
-      const res = await request(app).get('/api/coffre/config?agenceId=agence-1');
+      const res = await request(app).get('/api/coffre/config?agenceId=00000000-0000-0000-0000-000000000001');
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
@@ -66,7 +99,7 @@ describe('Coffre Configuration API', () => {
     it('should return existing config', async () => {
       const mockConfig = {
         id: 1,
-        agenceId: 'agence-1',
+        agenceId: '00000000-0000-0000-0000-000000000001',
         seuilDoubleValidation: "500000",
         separationInitiateurValideur: false,
         actif: true
@@ -78,7 +111,7 @@ describe('Coffre Configuration API', () => {
         }),
       });
 
-      const res = await request(app).get('/api/coffre/config?agenceId=agence-1');
+      const res = await request(app).get('/api/coffre/config?agenceId=00000000-0000-0000-0000-000000000001');
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual(mockConfig);
@@ -102,7 +135,7 @@ describe('Coffre Configuration API', () => {
       });
 
       const res = await request(app).put('/api/coffre/config').send({
-        agenceId: 'agence-1',
+        agenceId: '00000000-0000-0000-0000-000000000001',
         seuilDoubleValidation: "2000000"
       });
 
@@ -124,7 +157,7 @@ describe('Coffre Configuration API', () => {
       });
 
       const res = await request(app).put('/api/coffre/config').send({
-        agenceId: 'agence-1',
+        agenceId: '00000000-0000-0000-0000-000000000001',
         seuilDoubleValidation: "2000000"
       });
 
@@ -136,13 +169,13 @@ describe('Coffre Configuration API', () => {
       const appUser = express();
       appUser.use(express.json());
       appUser.use((req, res, next) => {
-        (req as any).user = { id: 'user-id', role: 'Caissier', agenceId: 'agence-1' };
+        (req as any).user = { id: 'user-id', role: 'Caissier', agenceId: '00000000-0000-0000-0000-000000000001' };
         next();
       });
       appUser.use('/api/coffre', coffreRouter);
 
       const res = await request(appUser).put('/api/coffre/config').send({
-        agenceId: 'agence-1',
+        agenceId: '00000000-0000-0000-0000-000000000001',
         seuilDoubleValidation: "2000000"
       });
 

@@ -654,9 +654,9 @@ describe("Decimal precision — money.ts utility functions", () => {
   });
 
   it("Decimal division then multiplication should not lose precision (unlike float)", () => {
-    // Classic float failure: 1000 / 3 * 3 !== 1000 with Number
-    const floatResult = (1000 / 3) * 3;
-    expect(floatResult).not.toBe(1000); // float fails
+    // Classic float failure: 0.1 + 0.2 !== 0.3 with Number
+    const floatResult = 0.1 + 0.2;
+    expect(floatResult).not.toBe(0.3); // float fails (gives 0.30000000000000004)
 
     // Decimal should preserve precision through splitEvenly
     const parts = splitEvenly(D("1000"), 3);

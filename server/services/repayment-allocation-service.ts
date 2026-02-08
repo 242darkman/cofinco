@@ -87,7 +87,7 @@ export async function allocateRepaymentToSchedule(
     const echeanceIds = existingAllocations.map(a => a.echeanceId);
     const updatedEcheances = await tx.select()
       .from(echeancesCredits)
-      .where(sql`${echeancesCredits.id} = ANY(${echeanceIds})`);
+      .where(sql`${echeancesCredits.id} IN (${sql.join(echeanceIds.map(id => sql`${id}`), sql`, `)})`);
 
     const totalAllocated = existingAllocations.reduce((sum, a) => sum + Number(a.allocatedAmount), 0);
     
@@ -146,8 +146,9 @@ export async function allocateRepaymentToSchedule(
   // 3. Verrouiller les échéances pour éviter les conditions de course
   if (echeances.length > 0) {
     const echeanceIds = echeances.map(e => e.id);
+    const idList = sql.join(echeanceIds.map(id => sql`${id}`), sql`, `);
     await tx.execute(
-      sql`SELECT * FROM echeances_credits WHERE id = ANY(${echeanceIds}) FOR UPDATE`
+      sql`SELECT * FROM echeances_credits WHERE id IN (${idList}) FOR UPDATE`
     );
   }
 

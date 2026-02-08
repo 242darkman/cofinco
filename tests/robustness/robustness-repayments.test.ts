@@ -76,7 +76,7 @@ describe('Automatic Repayment Robustness', () => {
         vi.mocked(db.query.credits.findMany).mockResolvedValue([mockCredit] as any);
         vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([mockAccount]));
 
-        const { updateCreditSolde, updateCompteSolde } = await import('../services/ledger');
+        const { updateCreditSolde, updateCompteSolde } = await import('server/services/ledger');
 
         // Execute
         await processAutomaticCreditRepayments();
@@ -108,7 +108,7 @@ describe('Automatic Repayment Robustness', () => {
         // Important: Reset previous select mock to match structure if needed, or rely on implementation detail
         vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([mockAccount]));
 
-        const { updateCreditSolde, updateCompteSolde } = await import('../services/ledger');
+        const { updateCreditSolde, updateCompteSolde } = await import('server/services/ledger');
 
         // Execute
         await processAutomaticCreditRepayments();
@@ -132,7 +132,7 @@ describe('Automatic Repayment Robustness', () => {
 
         vi.mocked(db.query.credits.findMany).mockResolvedValue([mockCredit] as any);
 
-        const { updateCreditSolde } = await import('../services/ledger');
+        const { updateCreditSolde } = await import('server/services/ledger');
 
         // Execute
         await processAutomaticCreditRepayments();

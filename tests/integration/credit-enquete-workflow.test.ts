@@ -11,7 +11,7 @@ import {
 import { clients } from '@shared/schema/clients';
 import { users } from '@shared/schema/auth';
 import { agences } from '@shared/schema/agences';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, or, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 describe('Credit Enquete Workflow Integration', () => {
@@ -101,21 +101,23 @@ describe('Credit Enquete Workflow Integration', () => {
   it('should create credit application and generate enquete', async () => {
     // Create credit application
     const [demande] = await db.insert(demandesCredit).values({
+      numeroDemande: `DEM-${uuidv4().slice(0, 8)}`,
       clientId: testClient.id,
+      agenceId: testAgence.id,
       montantDemande: "500000",
       tauxInteret: "2.5",
       frequenceRemboursement: "DAILY",
       dureeValeur: 30,
-      dureeUnite: "JOUR",
-      typeRevenu: "Salarie",
-      statut: "EN_ATTENTE",
+      dureeUnite: "DAY",
+      typeRevenu: "MONTHLY",
+      statut: "PENDING_FEES",
       typeCredit: "COMMERCIAL",
       objetCredit: "Achat de marchandises",
       createdBy: testClient.id
     }).returning();
 
     expect(demande).toBeDefined();
-    expect(demande.statut).toBe("EN_ATTENTE");
+    expect(demande.statut).toBe("PENDING_FEES");
 
     // Create enquete for the application
     const [enquete] = await db.insert(enquetesCredit).values({
@@ -134,14 +136,16 @@ describe('Credit Enquete Workflow Integration', () => {
   it('should assign enquete to agent and create activity', async () => {
     // Setup: Create demande and enquete
     const [demande] = await db.insert(demandesCredit).values({
+      numeroDemande: `DEM-${uuidv4().slice(0, 8)}`,
       clientId: testClient.id,
+      agenceId: testAgence.id,
       montantDemande: "500000",
       tauxInteret: "2.5",
       frequenceRemboursement: "DAILY",
       dureeValeur: 30,
-      dureeUnite: "JOUR",
-      typeRevenu: "Salarie",
-      statut: "EN_ATTENTE",
+      dureeUnite: "DAY",
+      typeRevenu: "MONTHLY",
+      statut: "PENDING_FEES",
       typeCredit: "COMMERCIAL",
       objetCredit: "Achat de marchandises",
       createdBy: testClient.id
@@ -196,14 +200,16 @@ describe('Credit Enquete Workflow Integration', () => {
   it('should submit enquete with agent recommendation', async () => {
     // Setup: Create and assign enquete
     const [demande] = await db.insert(demandesCredit).values({
+      numeroDemande: `DEM-${uuidv4().slice(0, 8)}`,
       clientId: testClient.id,
+      agenceId: testAgence.id,
       montantDemande: "500000",
       tauxInteret: "2.5",
       frequenceRemboursement: "DAILY",
       dureeValeur: 30,
-      dureeUnite: "JOUR",
-      typeRevenu: "Salarie",
-      statut: "EN_ATTENTE",
+      dureeUnite: "DAY",
+      typeRevenu: "MONTHLY",
+      statut: "PENDING_FEES",
       typeCredit: "COMMERCIAL",
       objetCredit: "Achat de marchandises",
       createdBy: testClient.id
@@ -234,7 +240,7 @@ describe('Credit Enquete Workflow Integration', () => {
         // Income assessment
         revenuMensuel: "800000",
         revenuJournalier: "30000",
-        typeRevenu: "Commercial",
+        typeRevenu: "MONTHLY",
         chargesMensuelles: "200000",
         
         // Household situation
@@ -283,14 +289,16 @@ describe('Credit Enquete Workflow Integration', () => {
   it('should review and approve enquete by supervisor', async () => {
     // Setup: Create submitted enquete
     const [demande] = await db.insert(demandesCredit).values({
+      numeroDemande: `DEM-${uuidv4().slice(0, 8)}`,
       clientId: testClient.id,
+      agenceId: testAgence.id,
       montantDemande: "500000",
       tauxInteret: "2.5",
       frequenceRemboursement: "DAILY",
       dureeValeur: 30,
-      dureeUnite: "JOUR",
-      typeRevenu: "Salarie",
-      statut: "EN_ATTENTE",
+      dureeUnite: "DAY",
+      typeRevenu: "MONTHLY",
+      statut: "PENDING_FEES",
       typeCredit: "COMMERCIAL",
       objetCredit: "Achat de marchandises",
       createdBy: testClient.id
@@ -326,7 +334,7 @@ describe('Credit Enquete Workflow Integration', () => {
     // Update demande status
     await db.update(demandesCredit)
       .set({
-        statut: "APPROUVEE",
+        statut: "APPROVED",
         montantApprouve: demande.montantDemande,
         updatedAt: new Date()
       })
@@ -336,14 +344,16 @@ describe('Credit Enquete Workflow Integration', () => {
   it('should handle enquete rejection', async () => {
     // Setup: Create enquete with negative assessment
     const [demande] = await db.insert(demandesCredit).values({
+      numeroDemande: `DEM-${uuidv4().slice(0, 8)}`,
       clientId: testClient.id,
+      agenceId: testAgence.id,
       montantDemande: "1000000",
       tauxInteret: "2.5",
       frequenceRemboursement: "DAILY",
       dureeValeur: 60,
-      dureeUnite: "JOUR",
-      typeRevenu: "Informel",
-      statut: "EN_ATTENTE",
+      dureeUnite: "DAY",
+      typeRevenu: "DAILY",
+      statut: "PENDING_FEES",
       typeCredit: "COMMERCIAL",
       objetCredit: "Expansion commerciale",
       createdBy: testClient.id
@@ -379,14 +389,14 @@ describe('Credit Enquete Workflow Integration', () => {
     // Update demande status
     const [rejectedDemande] = await db.update(demandesCredit)
       .set({
-        statut: "REJETEE",
+        statut: "REJECTED",
         motifRejet: "Enquête terrain défavorable - risque trop élevé",
         updatedAt: new Date()
       })
       .where(eq(demandesCredit.id, demande.id))
       .returning();
 
-    expect(rejectedDemande.statut).toBe("REJETEE");
+    expect(rejectedDemande.statut).toBe("REJECTED");
   });
 
   it('should track multiple activities per agent', async () => {
@@ -432,15 +442,17 @@ describe('Credit Enquete Workflow Integration', () => {
   it('should handle enquete reassignment', async () => {
     // Setup: Create assigned enquete
     const [demande] = await db.insert(demandesCredit).values({
+      numeroDemande: `DEM-${uuidv4().slice(0, 8)}`,
       clientId: testClient.id,
+      agenceId: testAgence.id,
       montantDemande: "300000",
       tauxInteret: "2.5",
       frequenceRemboursement: "DAILY",
       dureeValeur: 20,
-      dureeUnite: "JOUR",
-      typeRevenu: "Salarie",
-      statut: "EN_ATTENTE",
-      typeCredit: "PERSONNEL",
+      dureeUnite: "DAY",
+      typeRevenu: "MONTHLY",
+      statut: "PENDING_FEES",
+      typeCredit: "PERSONAL",
       objetCredit: "Besoins personnels",
       createdBy: testClient.id
     }).returning();
@@ -494,7 +506,13 @@ describe('Credit Enquete Workflow Integration', () => {
         )
       );
 
-    // Cleanup
+    // Cleanup - must clear FK references before deleting user
+    await db.update(enquetesCredit)
+      .set({ assignedAgentId: null })
+      .where(eq(enquetesCredit.assignedAgentId, newAgent.id));
+    await db.update(agentActivities)
+      .set({ assignedAgentId: testAgent.id })
+      .where(eq(agentActivities.assignedAgentId, newAgent.id));
     await db.delete(users).where(eq(users.id, newAgent.id));
   });
 });

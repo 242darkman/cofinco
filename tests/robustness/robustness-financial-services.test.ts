@@ -21,16 +21,17 @@ let mockValuesSpy: any;
 let mockSetSpy: any;
 
 const createMockBuilder = (result: any = []) => {
+  const resolved = Array.isArray(result) ? result : [result];
   const builder: any = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     leftJoin: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
-    set: mockSetSpy,
-    values: mockValuesSpy,
-    returning: vi.fn().mockResolvedValue(Array.isArray(result) ? result : [result]),
-    then: (resolve: any) => resolve(Array.isArray(result) ? result : [result]),
+    get set() { return mockSetSpy; },
+    get values() { return mockValuesSpy; },
+    returning: vi.fn().mockResolvedValue(resolved),
+    then: (resolve: any) => resolve(resolved),
   };
   return builder;
 };
@@ -77,6 +78,17 @@ vi.mock('server/services/tontine-logic', () => ({
     isTourFullyPaid: vi.fn().mockResolvedValue({ isPaid: false, montantRestant: 1000 }),
 }));
 
+vi.mock('server/lib/logger', () => ({
+  createLogger: () => ({
+    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn()
+  })
+}));
+
+vi.mock('server/services/accounting-posting-service', () => ({
+  postGlForMouvement: vi.fn().mockResolvedValue(null),
+  AccountingRuleNotFoundError: class extends Error {},
+}));
+
 describe('Production Readiness - Staged Features Robustness', () => {
 
   beforeEach(() => {
@@ -111,9 +123,9 @@ describe('Production Readiness - Staged Features Robustness', () => {
         id: 'tontine-1',
         nom: 'Tontine A',
         montantCotisation: '1000',
-        frequence: 'Hebdomadaire',
+        frequence: 'WEEKLY',
         dateDebut: new Date(),
-        statut: 'ACTIF'
+        statut: 'ACTIVE'
       };
       
       const mockMembre = {
@@ -121,7 +133,7 @@ describe('Production Readiness - Staged Features Robustness', () => {
         tontineId: 'tontine-1',
         clientId: 'client-1',
         cotisationCompteId: 'compte-1',
-        statut: 'Actif',
+        statut: 'ACTIVE',
         cotisationAutomatique: true,
         dateInscription: new Date()
       };
@@ -157,7 +169,7 @@ describe('Production Readiness - Staged Features Robustness', () => {
       const hasExpectedData = valuesCalls.some((call: any) => {
           const data = call[0];
           return data.compteId === 'compte-1' && 
-                 data.typePaiement === "Versement Tontine";
+                 data.typePaiement === "TONTINE_CONTRIBUTION";
       });
       expect(hasExpectedData).toBe(true);
     });
@@ -170,18 +182,18 @@ describe('Production Readiness - Staged Features Robustness', () => {
               id: 'compte-src',
               numeroCompte: 'SRC-001',
               soldeCourant: '50000',
-              statut: 'Actif',
+              statut: 'ACTIVE',
               clientId: 'client-1'
           };
           const mockDest = {
               id: 'compte-dest',
               numeroCompte: 'DST-001',
               soldeCourant: '1000',
-              statut: 'Actif',
+              statut: 'ACTIVE',
               versementAutoActif: true,
               compteSourceId: 'compte-src',
               versementAutoMontant: '1000',
-              versementAutoFrequence: 'Hebdomadaire',
+              versementAutoFrequence: 'WEEKLY',
               prochainVersementAuto: new Date(),
               clientId: 'client-1'
           };
@@ -211,7 +223,7 @@ describe('Production Readiness - Staged Features Robustness', () => {
           const hasSourceRecord = valuesCalls.some((call: any) => {
               const data = call[0];
               return data.compteId === 'compte-src' && 
-                     data.typePaiement === 'Transfert Sortant' &&
+                     data.typePaiement === 'TRANSFER_OUT' &&
                      data.montant === '1000';
           });
           expect(hasSourceRecord).toBe(true);
@@ -220,7 +232,7 @@ describe('Production Readiness - Staged Features Robustness', () => {
           const hasDestRecord = valuesCalls.some((call: any) => {
               const data = call[0];
               return data.compteId === 'compte-dest' && 
-                     data.typePaiement === 'Transfert Entrant' &&
+                     data.typePaiement === 'TRANSFER_IN' &&
                      data.montant === '1000';
           });
           expect(hasDestRecord).toBe(true);
@@ -262,7 +274,7 @@ describe('Production Readiness - Staged Features Robustness', () => {
           const hasRecord = valuesCalls.some((call: any) => {
               const data = call[0];
               return data.compteId === 'compte-1' && 
-                     data.typePaiement === 'Remboursement Crédit';
+                     data.typePaiement === 'CREDIT_REPAYMENT';
           });
           expect(hasRecord).toBe(true);
       });

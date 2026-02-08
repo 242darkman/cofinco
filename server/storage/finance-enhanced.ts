@@ -11,13 +11,13 @@ import {
   type MouvementFinancier
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { executeWithLedger, updateCreditSolde, updateSessionSolde, validateUserId } from "./finance";
+import { executeWithLedger, updateCreditSolde, updateSessionSolde, validateUserId } from "../services/ledger";
 import { 
   allocateRepaymentToSchedule, 
   type AllocationResult,
   type RepaymentAllocationOptions 
 } from "../services/repayment-allocation-service";
-import { createFactureForRemboursement } from "./operations";
+import { createFactureForRemboursement } from "./finance";
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
 import { StatutCredit } from "@shared/enum/status-constants";
