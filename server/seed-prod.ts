@@ -15,7 +15,7 @@
  */
 
 import { db, pool } from './db';
-import { eq, count, and, isNull, sql } from 'drizzle-orm';
+import { eq, count, and, isNull } from 'drizzle-orm';
 import { seedRBAC } from './seed-rbac-logic';
 import { generateMatricule } from './storage/employes';
 import { ensureCustomFunctions } from './db';
@@ -1489,8 +1489,6 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
     region: 'Brazzaville',
     typeAgence: TypeAgence.MAIN,
     statut: StatutUser.ACTIVE,
-    latitude: '-4.2633',
-    longitude: '15.2847',
     telephone: '+242060000100',
     email: 'siege@cofin.com',
     dateOuverture: '2018-01-01',
@@ -1509,28 +1507,7 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
       results.push({ table: 'agences', action: 'skipped', count: 0, details: 'Siège exists' });
     }
 
-    // ===== Backfill villeId + region + GPS for ALL agences =====
-    // Uses raw SQL since the `ville` text column may already be dropped
-    const backfillResult = await db.execute(sql`
-      WITH matched AS (
-        SELECT a.id, v.id AS ville_id, v.latitude, v.longitude, d.nom AS dept_nom
-        FROM agences a
-        JOIN villes v ON v.nom = a.ville
-        LEFT JOIN departements d ON v.departement_id = d.id
-        WHERE a.ville_id IS NULL AND a.ville IS NOT NULL
-      )
-      UPDATE agences SET
-        ville_id = matched.ville_id,
-        region = COALESCE(agences.region, matched.dept_nom),
-        latitude = COALESCE(agences.latitude, matched.latitude),
-        longitude = COALESCE(agences.longitude, matched.longitude)
-      FROM matched
-      WHERE agences.id = matched.id
-    `);
-    const backfillCount = (backfillResult as any)?.rowCount || 0;
-    if (backfillCount > 0) {
-      results.push({ table: 'agences', action: 'updated', count: backfillCount, details: 'backfill villeId from ville text' });
-    }
+    // NOTE: ville text column removed — villeId migration is complete
   }
 
   return results;
@@ -2409,8 +2386,8 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'CREDIT_APPLICATION_RECEIVED',
       nom: 'Demande de credit recue',
       subject: 'Votre demande de credit a ete recue - COFIN&CO-M',
-      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bonjour {{clientName}},</h2><p style="color:#495057;line-height:1.6">Nous avons bien recu votre demande de credit. Elle est en cours de traitement.</p><table role="presentation" style="background:#eff6ff;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N\u00b0 de demande</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Montant demande</span></td><td align="right"><strong style="color:#1b2d4b">{{amount}} FCFA</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6"><strong>Prochaines etapes :</strong></p><ol style="color:#495057;line-height:1.8;padding-left:20px"><li>Paiement des frais d\'engagement</li><li>Enquete terrain par un agent</li><li>Decision du comite de credit</li></ol><p style="color:#868e96;font-size:13px;margin-top:24px">Vous serez notifie a chaque etape de l\'avancement de votre dossier.</p>'),
-      contenuText: 'Bonjour {{clientName}}, votre demande de credit N\u00b0{{creditNumber}} de {{amount}} FCFA a ete recue. Vous serez notifie de l\'avancement. COFIN&CO-M',
+      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bonjour {{clientName}},</h2><p style="color:#495057;line-height:1.6">Nous avons bien recu votre demande de credit. Elle est en cours de traitement.</p><table role="presentation" style="background:#eff6ff;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N° de demande</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Montant demande</span></td><td align="right"><strong style="color:#1b2d4b">{{amount}} FCFA</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6"><strong>Prochaines etapes :</strong></p><ol style="color:#495057;line-height:1.8;padding-left:20px"><li>Paiement des frais d\'engagement</li><li>Enquete terrain par un agent</li><li>Decision du comite de credit</li></ol><p style="color:#868e96;font-size:13px;margin-top:24px">Vous serez notifie a chaque etape de l\'avancement de votre dossier.</p>'),
+      contenuText: 'Bonjour {{clientName}}, votre demande de credit N°{{creditNumber}} de {{amount}} FCFA a ete recue. Vous serez notifie de l\'avancement. COFIN&CO-M',
       placeholders: 'clientName,amount,creditNumber',
       description: 'Confirmation de reception de demande de credit',
     },
@@ -2427,7 +2404,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'CREDIT_OVERDUE',
       nom: 'Echeance credit depassee',
       subject: 'Echeance de remboursement depassee - COFIN&CO-M',
-      contenuHtml: emailWrap('<h2 style="color:#ef4444;margin:0 0 16px">Attention {{clientName}},</h2><p style="color:#495057;line-height:1.6">Votre echeance de remboursement de credit est depassee.</p><table role="presentation" style="background:#fef2f2;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Credit N\u00b0</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Montant restant</span></td><td align="right"><strong style="color:#ef4444">{{amount}} FCFA</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Echeance du</span></td><td align="right"><strong style="color:#1b2d4b">{{dueDate}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Retard</span></td><td align="right"><strong style="color:#ef4444">{{daysOverdue}} jour(s)</strong></td></tr></table></td></tr></table><div style="background:#fef3f2;border-left:4px solid #ef4444;padding:16px 20px;border-radius:0 8px 8px 0;margin:20px 0"><p style="color:#495057;margin:0;line-height:1.6">Des penalites de retard peuvent s\'appliquer. Veuillez regulariser votre situation au plus vite en vous rendant a votre agence ou en contactant votre conseiller.</p></div>'),
+      contenuHtml: emailWrap('<h2 style="color:#ef4444;margin:0 0 16px">Attention {{clientName}},</h2><p style="color:#495057;line-height:1.6">Votre echeance de remboursement de credit est depassee.</p><table role="presentation" style="background:#fef2f2;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Credit N°</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Montant restant</span></td><td align="right"><strong style="color:#ef4444">{{amount}} FCFA</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Echeance du</span></td><td align="right"><strong style="color:#1b2d4b">{{dueDate}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Retard</span></td><td align="right"><strong style="color:#ef4444">{{daysOverdue}} jour(s)</strong></td></tr></table></td></tr></table><div style="background:#fef3f2;border-left:4px solid #ef4444;padding:16px 20px;border-radius:0 8px 8px 0;margin:20px 0"><p style="color:#495057;margin:0;line-height:1.6">Des penalites de retard peuvent s\'appliquer. Veuillez regulariser votre situation au plus vite en vous rendant a votre agence ou en contactant votre conseiller.</p></div>'),
       contenuText: 'Attention {{clientName}}, votre echeance de remboursement du credit {{creditNumber}} est depassee de {{daysOverdue}} jour(s). Montant restant : {{amount}} FCFA. Regularisez votre situation. COFIN&CO-M',
       placeholders: 'clientName,amount,dueDate,daysOverdue,creditNumber',
       description: 'Notification d\'echeance de credit depassee',
@@ -2436,7 +2413,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'CREDIT_PAYMENT_REMINDER',
       nom: 'Rappel echeance credit',
       subject: 'Rappel : echeance de remboursement proche - COFIN&CO-M',
-      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bonjour {{clientName}},</h2><p style="color:#495057;line-height:1.6">Nous vous rappelons qu\'une echeance de remboursement approche.</p><table role="presentation" style="background:#fffbeb;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Credit N\u00b0</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Montant</span></td><td align="right"><strong style="color:#1b2d4b">{{amount}} FCFA</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Date d\'echeance</span></td><td align="right"><strong style="color:#f5a623">{{dueDate}}</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Pensez a effectuer votre remboursement avant la date d\'echeance pour eviter les penalites de retard.</p>'),
+      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bonjour {{clientName}},</h2><p style="color:#495057;line-height:1.6">Nous vous rappelons qu\'une echeance de remboursement approche.</p><table role="presentation" style="background:#fffbeb;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Credit N°</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Montant</span></td><td align="right"><strong style="color:#1b2d4b">{{amount}} FCFA</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Date d\'echeance</span></td><td align="right"><strong style="color:#f5a623">{{dueDate}}</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Pensez a effectuer votre remboursement avant la date d\'echeance pour eviter les penalites de retard.</p>'),
       contenuText: 'Bonjour {{clientName}}, rappel : echeance de remboursement du credit {{creditNumber}} de {{amount}} FCFA le {{dueDate}}. COFIN&CO-M',
       placeholders: 'clientName,amount,dueDate,creditNumber',
       description: 'Rappel d\'echeance de remboursement de credit',
@@ -2445,7 +2422,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'CREDIT_PAID_OFF',
       nom: 'Credit entierement rembourse',
       subject: 'Felicitations ! Votre credit est solde - COFIN&CO-M',
-      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Felicitations {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Votre credit a ete <strong style="color:#0f766e">entierement rembourse</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Credit N\u00b0</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Total rembourse</span></td><td align="right"><strong style="color:#0f766e">{{totalPaid}} FCFA</strong></td></tr></table></td></tr></table><div style="background:#f0fdf4;border-radius:8px;padding:20px;margin:20px 0;text-align:center"><p style="color:#0f766e;font-size:16px;font-weight:bold;margin:0">Votre historique de credit est excellent !</p><p style="color:#495057;margin:8px 0 0;font-size:13px">Ce bon historique ameliore votre eligibilite pour de futurs credits avec des conditions avantageuses.</p></div>'),
+      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Felicitations {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Votre credit a ete <strong style="color:#0f766e">entierement rembourse</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Credit N°</span></td><td align="right"><strong style="color:#1b2d4b">{{creditNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Total rembourse</span></td><td align="right"><strong style="color:#0f766e">{{totalPaid}} FCFA</strong></td></tr></table></td></tr></table><div style="background:#f0fdf4;border-radius:8px;padding:20px;margin:20px 0;text-align:center"><p style="color:#0f766e;font-size:16px;font-weight:bold;margin:0">Votre historique de credit est excellent !</p><p style="color:#495057;margin:8px 0 0;font-size:13px">Ce bon historique ameliore votre eligibilite pour de futurs credits avec des conditions avantageuses.</p></div>'),
       contenuText: 'Felicitations {{clientName}} ! Votre credit {{creditNumber}} a ete entierement rembourse ({{totalPaid}} FCFA). COFIN&CO-M',
       placeholders: 'clientName,creditNumber,totalPaid',
       description: 'Notification de credit entierement rembourse',
@@ -2537,8 +2514,8 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'ACCOUNT_CREATED',
       nom: 'Compte ouvert',
       subject: 'Votre compte a ete ouvert - COFIN&CO-M',
-      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Bienvenue {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Votre nouveau compte a ete cree avec succes chez <strong>COFIN&amp;CO-M</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N\u00b0 de compte</span></td><td align="right"><strong style="color:#1b2d4b">{{accountNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Type</span></td><td align="right"><strong style="color:#0f766e">{{accountType}}</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Conservez votre numero de compte et rendez-vous a votre agence pour effectuer votre premier depot.</p>'),
-      contenuText: 'Bonjour {{clientName}}, votre compte {{accountType}} N\u00b0{{accountNumber}} a ete ouvert. Rendez-vous a votre agence. COFIN&CO-M',
+      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Bienvenue {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Votre nouveau compte a ete cree avec succes chez <strong>COFIN&amp;CO-M</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N° de compte</span></td><td align="right"><strong style="color:#1b2d4b">{{accountNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Type</span></td><td align="right"><strong style="color:#0f766e">{{accountType}}</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Conservez votre numero de compte et rendez-vous a votre agence pour effectuer votre premier depot.</p>'),
+      contenuText: 'Bonjour {{clientName}}, votre compte {{accountType}} N°{{accountNumber}} a ete ouvert. Rendez-vous a votre agence. COFIN&CO-M',
       placeholders: 'clientName,accountNumber,accountType',
       description: 'Notification d\'ouverture de compte',
     },
@@ -2546,8 +2523,8 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'ACCOUNT_ACTIVATED',
       nom: 'Compte active',
       subject: 'Votre compte est maintenant actif - COFIN&CO-M',
-      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Compte active {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Votre depot initial a ete encaisse et votre compte est maintenant <strong style="color:#0f766e">actif</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N\u00b0 de compte</span></td><td align="right"><strong style="color:#1b2d4b">{{accountNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Type</span></td><td align="right"><strong style="color:#1b2d4b">{{accountType}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Depot initial</span></td><td align="right"><strong style="color:#0f766e;font-size:18px">{{amount}} FCFA</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Vous pouvez des a present effectuer des depots et retraits sur votre compte.</p>'),
-      contenuText: 'Bonjour {{clientName}}, votre compte {{accountType}} N\u00b0{{accountNumber}} est actif ! Depot initial: {{amount}} FCFA. COFIN&CO-M',
+      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Compte active {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Votre depot initial a ete encaisse et votre compte est maintenant <strong style="color:#0f766e">actif</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N° de compte</span></td><td align="right"><strong style="color:#1b2d4b">{{accountNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Type</span></td><td align="right"><strong style="color:#1b2d4b">{{accountType}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Depot initial</span></td><td align="right"><strong style="color:#0f766e;font-size:18px">{{amount}} FCFA</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Vous pouvez des a present effectuer des depots et retraits sur votre compte.</p>'),
+      contenuText: 'Bonjour {{clientName}}, votre compte {{accountType}} N°{{accountNumber}} est actif ! Depot initial: {{amount}} FCFA. COFIN&CO-M',
       placeholders: 'clientName,accountNumber,accountType,amount',
       description: 'Notification d\'activation de compte',
     },
@@ -2591,8 +2568,8 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'ACCOUNT_CLOSED',
       nom: 'Compte cloture',
       subject: 'Cloture de votre compte - COFIN&CO-M',
-      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bonjour {{clientName}},</h2><p style="color:#495057;line-height:1.6">Votre compte a ete cloture definitivement.</p><table role="presentation" style="background:#f8f9fa;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N\u00b0 de compte</span></td><td align="right"><strong style="color:#1b2d4b">{{accountNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Type</span></td><td align="right"><strong style="color:#1b2d4b">{{accountType}}</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Merci de votre confiance. N\'hesitez pas a nous contacter pour ouvrir un nouveau compte.</p>'),
-      contenuText: 'Bonjour {{clientName}}, votre compte {{accountType}} N\u00b0{{accountNumber}} a ete cloture. Merci de votre confiance. COFIN&CO-M',
+      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bonjour {{clientName}},</h2><p style="color:#495057;line-height:1.6">Votre compte a ete cloture definitivement.</p><table role="presentation" style="background:#f8f9fa;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">N° de compte</span></td><td align="right"><strong style="color:#1b2d4b">{{accountNumber}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Type</span></td><td align="right"><strong style="color:#1b2d4b">{{accountType}}</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Merci de votre confiance. N\'hesitez pas a nous contacter pour ouvrir un nouveau compte.</p>'),
+      contenuText: 'Bonjour {{clientName}}, votre compte {{accountType}} N°{{accountNumber}} a ete cloture. Merci de votre confiance. COFIN&CO-M',
       placeholders: 'clientName,accountNumber,accountType',
       description: 'Notification de cloture de compte',
     },
@@ -2937,7 +2914,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
     {
       code: 'ACCOUNT_CREATED',
       nom: 'Compte ouvert SMS',
-      contenu: 'Bonjour {{clientName}}, votre compte {{accountType}} N\u00b0{{accountNumber}} a ete ouvert. Rendez-vous a votre agence. COFIN&CO-M',
+      contenu: 'Bonjour {{clientName}}, votre compte {{accountType}} N°{{accountNumber}} a ete ouvert. Rendez-vous a votre agence. COFIN&CO-M',
       placeholders: 'clientName,accountNumber,accountType',
       description: 'SMS d\'ouverture de compte',
     },
@@ -2979,7 +2956,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
     {
       code: 'ACCOUNT_CLOSED',
       nom: 'Compte cloture SMS',
-      contenu: 'Bonjour {{clientName}}, compte {{accountType}} N\u00b0{{accountNumber}} cloture. Merci de votre confiance. COFIN&CO-M',
+      contenu: 'Bonjour {{clientName}}, compte {{accountType}} N°{{accountNumber}} cloture. Merci de votre confiance. COFIN&CO-M',
       placeholders: 'clientName,accountNumber,accountType',
       description: 'SMS de cloture de compte',
     },

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw,
   Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle,
-  Target, Banknote, Calendar, AlertTriangle, MessageSquare, Trophy
+  Target, Banknote, Calendar, AlertTriangle, MessageSquare, Trophy,
+  ClipboardCheck, ChevronRight, User
 } from 'lucide-react';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
@@ -72,6 +73,10 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     collectesToday: 0, collectesMontant: 0,
   });
   const [todayPlannings, setTodayPlannings] = useState<PlanningEntry[]>([]);
+
+  // Enquêtes (investigations) state
+  const [pendingEnquetes, setPendingEnquetes] = useState<any[]>([]);
+  const [showEnquetesPanel, setShowEnquetesPanel] = useState(false);
 
   // Auth & Role
   const currentUser = authService.getCurrentUser();
@@ -249,10 +254,57 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     setKpis(kpiState);
   }, []);
 
+  // Load pending enquêtes assigned to the agent
+  const loadEnquetes = useCallback(async (agentId?: string) => {
+    try {
+      const params = new URLSearchParams({ limit: '10' });
+      if (agentId) params.set('agentId', agentId);
+      // Fetch ASSIGNED and IN_PROGRESS investigations
+      const [assignedRes, inProgressRes] = await Promise.allSettled([
+        fetch(`/api/credit-investigations/investigations?status=ASSIGNED&${params}`, { credentials: 'include' }),
+        fetch(`/api/credit-investigations/investigations?status=IN_PROGRESS&${params}`, { credentials: 'include' }),
+      ]);
+      const all: any[] = [];
+      for (const r of [assignedRes, inProgressRes]) {
+        if (r.status === 'fulfilled' && r.value.ok) {
+          const data = await r.value.json();
+          if (data && Array.isArray(data.data)) all.push(...data.data);
+        }
+      }
+      setPendingEnquetes(all);
+    } catch (error) {
+      console.error('[AgentTerrain] Error loading enquêtes:', error);
+    }
+  }, []);
+
+  // Load enquêtes when target agent changes
+  useEffect(() => {
+    if (targetAgentId) loadEnquetes(targetAgentId);
+  }, [targetAgentId, loadEnquetes]);
+
+  // Real-time updates for enquêtes
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const payload = (event as CustomEvent).detail || {};
+      if (
+        payload.type === 'enquete_new' ||
+        payload.type === 'investigation_assigned' ||
+        payload.type === 'investigation_submitted' ||
+        payload.type === 'investigation_reviewed' ||
+        payload.type === 'demande_updated'
+      ) {
+        if (targetAgentId) loadEnquetes(targetAgentId);
+      }
+    };
+    window.addEventListener('credit-update', handler);
+    return () => window.removeEventListener('credit-update', handler);
+  }, [targetAgentId, loadEnquetes]);
+
   const loadData = () => {
     if (targetAgentId) {
       loadAgentData(targetAgentId);
       loadKPIs(targetAgentId);
+      loadEnquetes(targetAgentId);
     }
   };
 
@@ -294,7 +346,10 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 <Wifi size={10} /> Hors ligne {pendingCount > 0 && `(${pendingCount})`}
              </div>
            )}
-           <span className="text-[10px] text-slate-600 hidden sm:inline">POS v2.2</span>
+           {/* POS version only shown in standalone/PWA mode (actual POS device) */}
+           {window.matchMedia?.('(display-mode: standalone)')?.matches && (
+             <span className="text-[10px] text-slate-600 hidden sm:inline">POS v2.2</span>
+           )}
         </div>
         <button
           onClick={loadData}
@@ -492,6 +547,13 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 label="Messages"
                 color={kpis.messagesUnread > 0 ? 'purple' : 'slate'}
               />
+              <KPIChip
+                icon={ClipboardCheck}
+                value={String(pendingEnquetes.length)}
+                label="Enquêtes"
+                color={pendingEnquetes.length > 0 ? 'amber' : 'slate'}
+                pulse={pendingEnquetes.length > 0}
+              />
             </div>
           </div>
         )}
@@ -523,6 +585,80 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
               />
            </div>
         </div>
+
+        {/* --- PENDING ENQUETES --- */}
+        {!agentDisabled && pendingEnquetes.length > 0 && (
+          <div className="px-3 pb-2">
+            <div className="bg-slate-900 border border-amber-500/20 rounded-xl overflow-hidden">
+              <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                  <ClipboardCheck size={11} /> Enquêtes à effectuer
+                </div>
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                  {pendingEnquetes.length}
+                </span>
+              </div>
+              <div className="divide-y divide-slate-800/60">
+                {pendingEnquetes.slice(0, 3).map((enq: any) => {
+                  const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
+                  const priorityColor =
+                    enq.priority === 'URGENT' ? 'bg-red-500/15 text-red-400' :
+                    enq.priority === 'HIGH' ? 'bg-amber-500/15 text-amber-400' :
+                    'bg-blue-500/15 text-blue-400';
+                  return (
+                    <div key={enq.id} className="px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="w-7 h-7 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-[10px] shrink-0">
+                            {enq.client
+                              ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
+                              : '?'}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-white truncate">
+                              {enq.client
+                                ? `${enq.client.nom || ''} ${enq.client.prenom || ''}`.trim()
+                                : 'Client'}
+                            </div>
+                            {enq.montantDemande && (
+                              <div className="text-[10px] text-slate-500">
+                                {Number(enq.montantDemande).toLocaleString('fr-FR')} FCFA
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {enq.priority && (
+                            <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ${priorityColor}`}>
+                              {enq.priority === 'URGENT' ? 'Urgent' : enq.priority === 'HIGH' ? 'Haute' : 'Normal'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {enq.dueDate && (
+                        <div className={`text-[10px] flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
+                          <Calendar size={9} />
+                          {isOverdue && <AlertTriangle size={9} />}
+                          Echéance: {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {pendingEnquetes.length > 3 && (
+                <div className="px-3 py-2 border-t border-slate-800 text-center">
+                  <button
+                    onClick={() => setShowEnquetesPanel(true)}
+                    className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto transition-colors"
+                  >
+                    Voir les {pendingEnquetes.length} enquêtes <ChevronRight size={10} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* --- TODAY'S AGENDA --- */}
         {!agentDisabled && (
@@ -679,7 +815,6 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
             <button
               onClick={() => {
                 setShowFullPlanning(false);
-                // Refresh KPIs when closing planning (in case new plannings were added)
                 if (targetAgentId) loadKPIs(targetAgentId);
               }}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
@@ -689,6 +824,118 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
           </header>
           <div className="flex-1 overflow-y-auto p-3">
             <AgentPlanning agentId={targetAgentId || undefined} />
+          </div>
+        </div>
+      )}
+
+      {/* ═══ FULL ENQUETES OVERLAY ═══ */}
+      {showEnquetesPanel && (
+        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
+          <header className="h-12 flex-none bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3">
+            <div className="flex items-center gap-2 text-white font-bold text-sm">
+              <ClipboardCheck size={16} className="text-amber-400" />
+              Enquêtes à effectuer
+              {pendingEnquetes.length > 0 && (
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                  {pendingEnquetes.length}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setShowEnquetesPanel(false);
+                if (targetAgentId) loadEnquetes(targetAgentId);
+              }}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
+            >
+              Fermer
+            </button>
+          </header>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {pendingEnquetes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <ClipboardCheck size={40} className="text-slate-700 mb-3" />
+                <p className="text-sm text-slate-400 font-medium">Aucune enquête en attente</p>
+                <p className="text-xs text-slate-600 mt-1">Les nouvelles enquêtes assignées apparaîtront ici</p>
+              </div>
+            ) : (
+              pendingEnquetes.map((enq: any) => {
+                const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
+                const priorityConf: Record<string, { label: string; color: string }> = {
+                  LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400' },
+                  MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400' },
+                  HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400' },
+                  URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 animate-pulse' },
+                };
+                const pConf = priorityConf[enq.priority || 'MEDIUM'] || priorityConf.MEDIUM;
+                return (
+                  <div
+                    key={enq.id}
+                    className={`bg-slate-900 border rounded-xl p-3 ${isOverdue ? 'border-red-500/40' : 'border-slate-800'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-xs shrink-0">
+                          {enq.client
+                            ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
+                            : '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">
+                            {enq.client ? `${enq.client.nom || ''} ${enq.client.prenom || ''}`.trim() : 'Client'}
+                          </div>
+                          {enq.objetCredit && (
+                            <div className="text-[11px] text-slate-500 truncate">{enq.objetCredit}</div>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${pConf.color}`}>
+                        {pConf.label}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                      {enq.montantDemande && (
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Banknote size={11} className="text-emerald-500 shrink-0" />
+                          {Number(enq.montantDemande).toLocaleString('fr-FR')} FCFA
+                        </div>
+                      )}
+                      {enq.client?.telephone && (
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <User size={11} className="text-blue-400 shrink-0" />
+                          <span className="truncate">{enq.client.telephone}</span>
+                        </div>
+                      )}
+                      {enq.client?.adresseDomicile && (
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <MapPin size={11} className="text-purple-400 shrink-0" />
+                          <span className="truncate">{enq.client.adresseDomicile}</span>
+                        </div>
+                      )}
+                      {enq.dueDate && (
+                        <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
+                          <Calendar size={11} className={isOverdue ? 'text-red-400' : 'text-slate-500'} />
+                          {isOverdue && <AlertTriangle size={9} />}
+                          {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        </div>
+                      )}
+                      {enq.assignedAt && (
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Clock size={11} />
+                          Assignée: {new Date(enq.assignedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        </div>
+                      )}
+                    </div>
+                    {isOverdue && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-red-400 bg-red-500/10 rounded-lg px-2 py-1">
+                        <AlertTriangle size={10} />
+                        <span className="font-medium">Echéance dépassée</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

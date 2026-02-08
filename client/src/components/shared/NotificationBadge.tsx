@@ -24,7 +24,7 @@ export default function NotificationBadge() {
     }
   }, []);
 
-  // Click outside handler
+  // Click outside handler (desktop only)
   const badgeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,20 +40,55 @@ export default function NotificationBadge() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showCenter]);
 
+  // Escape key handler
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showCenter) setShowCenter(false);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showCenter]);
 
+  // Polling + visibility
   useEffect(() => {
     fetchUnreadCount();
     intervalRef.current = setInterval(fetchUnreadCount, 60000);
-    
+
     const handleVisibility = () => {
       if (!document.hidden) fetchUnreadCount();
     };
     document.addEventListener('visibilitychange', handleVisibility);
-    
+
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
+  }, [fetchUnreadCount]);
+
+  // Listen for WebSocket notification events for faster updates
+  useEffect(() => {
+    const handler = () => fetchUnreadCount();
+    window.addEventListener('credit-update', handler);
+    window.addEventListener('operations-update', handler);
+    return () => {
+      window.removeEventListener('credit-update', handler);
+      window.removeEventListener('operations-update', handler);
+    };
+  }, [fetchUnreadCount]);
+
+  // Prevent body scroll on mobile when panel is open
+  useEffect(() => {
+    if (showCenter) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [showCenter]);
+
+  const handleClose = useCallback(() => {
+    setShowCenter(false);
+    fetchUnreadCount();
   }, [fetchUnreadCount]);
 
   return (
@@ -69,7 +104,7 @@ export default function NotificationBadge() {
         <Bell size={20} className={showCenter ? 'text-white' : 'text-slate-300'} />
         {unreadCount > 0 && (
           <div className="absolute -top-1 -right-1">
-            <Badge 
+            <Badge
               variant="primary"
               className="w-5 h-5 flex items-center justify-center p-0 text-xs animate-pulse bg-blue-600 hover:bg-blue-700 border-none text-white shadow-lg shadow-blue-500/20"
               data-testid="badge-notification-count"
@@ -81,23 +116,24 @@ export default function NotificationBadge() {
 
       {showCenter && (
         <>
-            {/* Mobile Backdrop & Modal */}
-           <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/60 backdrop-blur-sm sm:hidden animate-in fade-in duration-200">
-               <div className="w-full max-w-[350px]" onClick={e => e.stopPropagation()}>
-                    <NotificationCenter onClose={() => {
-                        setShowCenter(false);
-                        fetchUnreadCount();
-                    }} />
-               </div>
-           </div>
+          {/* Mobile: Full-screen slide-up panel */}
+          <div
+            className="fixed inset-0 z-50 sm:hidden animate-in fade-in duration-200"
+            onClick={handleClose}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div
+              className="absolute inset-x-0 bottom-0 top-12 animate-in slide-in-from-bottom-4 duration-300"
+              onClick={e => e.stopPropagation()}
+            >
+              <NotificationCenter onClose={handleClose} fullHeight />
+            </div>
+          </div>
 
-           {/* Desktop Dropdown */}
-           <div className="hidden sm:block absolute right-0 top-full mt-2 z-50 origin-top-right">
-              <NotificationCenter onClose={() => {
-                setShowCenter(false);
-                fetchUnreadCount();
-              }} />
-           </div>
+          {/* Desktop: Dropdown panel */}
+          <div className="hidden sm:block absolute right-0 top-full mt-2 z-50 origin-top-right animate-in zoom-in-95 fade-in duration-200">
+            <NotificationCenter onClose={handleClose} />
+          </div>
         </>
       )}
     </div>

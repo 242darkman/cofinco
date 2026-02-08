@@ -107,7 +107,7 @@ export default function ProspectionSupervisionPanel() {
         </div>
       ) : data.length === 0 ? (
         <div className="text-center py-8 text-slate-400">
-          <p className="text-sm">Aucune donn\u00e9e pour cette p\u00e9riode</p>
+          <p className="text-sm">Aucune donnée pour cette période</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -136,10 +136,10 @@ export default function ProspectionSupervisionPanel() {
               {/* Stats row */}
               <div className="flex items-center gap-3 text-[10px]">
                 <span className="text-blue-400">{agent.totalProspects} prospects</span>
-                <span className="text-emerald-400">{agent.interested} int\u00e9ress\u00e9s</span>
+                <span className="text-emerald-400">{agent.interested} intéressés</span>
                 <span className="text-purple-400">{agent.converted} convertis</span>
-                <span className="text-amber-400">{agent.toFollowUp} \u00e0 suivre</span>
-                <span className="text-red-400">{agent.refused} refus\u00e9s</span>
+                <span className="text-amber-400">{agent.toFollowUp} à suivre</span>
+                <span className="text-red-400">{agent.refused} refusés</span>
               </div>
             </div>
           ))}

@@ -82,7 +82,7 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
 
   return (
     <Sheet open={true} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-slate-950 border-l-slate-800 p-0">
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto scrollbar-thin bg-slate-950 border-l-slate-800 p-0">
         <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
           <SheetTitle className="text-white">Détail du Prospect</SheetTitle>
           <SheetDescription className="text-slate-400">

@@ -3,7 +3,7 @@ import { createLogger } from "../lib/logger";
 import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections, agentsTerrain, employes, arrondissements, marches, clients, users, prospectionPrimes, prospectionPrimeConfig } from "@shared/schema";
 import { PROSPECTION_STATUS_TRANSITIONS, StatutProspection, ClientOrigin } from "@shared/enum/status-constants";
 import { logAudit } from "../lib/logger";
-import { and, desc, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, inArray, isNull, or, sql } from "drizzle-orm";
 import { notDeleted } from "../storage/query-helpers";
 
 const logger = createLogger('Routes:Operations');
@@ -101,6 +101,7 @@ export function registerOperationsRoutes(app: Express) {
         agent_id, agentId: agentIdQ,
         date_from, dateFrom: dateFromQ,
         date_to, dateTo: dateToQ,
+        search: searchQ, q: qQ,
       } = req.query as Record<string, string>;
 
       const filterArrondissementId = arrondissement_id || arrIdQ;
@@ -108,9 +109,20 @@ export function registerOperationsRoutes(app: Express) {
       const filterAgentId = agent_id || agentIdQ;
       const filterDateFrom = date_from || dateFromQ;
       const filterDateTo = date_to || dateToQ;
+      const searchTerm = (searchQ || qQ || '').trim();
 
       const conditions = [notDeleted(prospections)];
 
+      if (searchTerm) {
+        const pattern = `%${searchTerm}%`;
+        conditions.push(
+          or(
+            sql`${prospections.nomProspect} ILIKE ${pattern}`,
+            sql`${prospections.prenomProspect} ILIKE ${pattern}`,
+            sql`${prospections.telephoneProspect} ILIKE ${pattern}`,
+          )!
+        );
+      }
       if (filterArrondissementId) {
         conditions.push(eq(prospections.arrondissementId, filterArrondissementId));
       }
@@ -143,6 +155,7 @@ export function registerOperationsRoutes(app: Express) {
           id: prospections.id,
           agentId: prospections.agentId,
           nomProspect: prospections.nomProspect,
+          prenomProspect: prospections.prenomProspect,
           telephoneProspect: prospections.telephoneProspect,
           sexe: prospections.sexe,
           activitePrincipale: prospections.activitePrincipale,
@@ -466,12 +479,15 @@ export function registerOperationsRoutes(app: Express) {
           const now = new Date();
           const periode = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
+          // For VARIABLE type, montant will be calculated at payment time based on gross annual salary
+          const montant = primeConfig.typePrime === "VARIABLE" ? "0" : (primeConfig.montantFixe || "5000");
+
           const [newPrime] = await tx.insert(prospectionPrimes).values({
             agentId: existing.agentId,
             agenceId: agenceId || primeConfig.agenceId,
             prospectionId: id,
             clientId: newClient.id,
-            montant: primeConfig.montantFixe || "5000",
+            montant,
             typePrime: primeConfig.typePrime || "FIXED",
             periode,
             statut: "PENDING",

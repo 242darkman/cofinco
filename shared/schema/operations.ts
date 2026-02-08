@@ -773,6 +773,7 @@ export type Zone = typeof zones.$inferSelect;
 
 export const prospectionPrimeConfig = pgTable("prospection_prime_config", {
   id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull().default("Prime de Prospection"), // Display name for this config
   agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
   typePrime: text("type_prime").notNull().default("FIXED"), // FIXED or VARIABLE
   montantFixe: numeric("montant_fixe").default("5000"), // Fixed amount per qualified prospect (FCFA)

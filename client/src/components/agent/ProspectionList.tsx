@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, UserPlus, Eye, ArrowRightLeft, Download, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Search, Filter, UserPlus, Eye, ChevronLeft, ChevronRight, Loader2, RefreshCw, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { prospectionApi, arrondissementApi } from '../../lib/api-client';
 import { STATUT_PROSPECTION_LABELS, STATUT_PROSPECTION_OPTIONS } from '@shared/enum/status-constants';
 import type { StatutProspectionType } from '@shared/enum/status-constants';
@@ -19,19 +19,25 @@ const STATUS_COLORS: Record<string, string> = {
   CONVERTED_TO_CLIENT: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+
 export default function ProspectionList({ agentId, onCreateNew }: ProspectionListProps) {
   const { hasPermission } = usePermissions();
   const canConvert = hasPermission('prospection', 'convert');
-  const canExport = hasPermission('prospection', 'export');
 
   const [prospects, setProspects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  // Filters
+  // Search (debounced, server-side)
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Filters
   const [filterStatut, setFilterStatut] = useState('');
   const [filterArrondissement, setFilterArrondissement] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -41,8 +47,15 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
 
   // Detail modal
   const [selectedProspectId, setSelectedProspectId] = useState<string | null>(null);
-  
-  const ITEMS_PER_PAGE = 5;
+
+  // Debounce search input
+  useEffect(() => {
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [search]);
 
   useEffect(() => {
     arrondissementApi.getAll({ actif: true }).then(setArrondissements).catch(() => {});
@@ -51,10 +64,11 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
   const loadProspects = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, any> = { page, perPage: ITEMS_PER_PAGE };
+      const params: Record<string, any> = { page, perPage };
       if (agentId) params.agentId = agentId;
       if (filterStatut) params.statut = filterStatut;
       if (filterArrondissement) params.arrondissementId = filterArrondissement;
+      if (debouncedSearch) params.search = debouncedSearch;
 
       const result = await prospectionApi.getAll(params);
       setProspects(result.data || []);
@@ -65,7 +79,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
     } finally {
       setLoading(false);
     }
-  }, [page, agentId, filterStatut, filterArrondissement]);
+  }, [page, perPage, agentId, filterStatut, filterArrondissement, debouncedSearch]);
 
   useEffect(() => {
     loadProspects();
@@ -81,18 +95,25 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
     );
   };
 
-  // Filter prospects by search term locally
-  const filteredProspects = prospects.filter(p => {
-    if (!search) return true;
-    const term = search.toLowerCase();
-    const nom = (p.nom_prospect || p.nomProspect || '').toLowerCase();
-    const tel = (p.telephone_prospect || p.telephoneProspect || '').toLowerCase();
-    return nom.includes(term) || tel.includes(term);
-  });
+  // Compute visible page numbers
+  const getPageNumbers = (): (number | 'ellipsis')[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages: (number | 'ellipsis')[] = [1];
+    const start = Math.max(2, page - 1);
+    const end = Math.min(totalPages - 1, page + 1);
+    if (start > 2) pages.push('ellipsis');
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < totalPages - 1) pages.push('ellipsis');
+    pages.push(totalPages);
+    return pages;
+  };
+
+  const rangeStart = Math.min((page - 1) * perPage + 1, total);
+  const rangeEnd = Math.min(page * perPage, total);
 
   return (
     <div className="space-y-3">
-      {/* Header Compact */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -106,7 +127,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
             title="Rafraîchir"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
           {onCreateNew && (
             <button
@@ -114,13 +135,13 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
               className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs font-bold uppercase tracking-wide transition shadow-sm hover:shadow"
             >
               <UserPlus size={12} />
-              Nouveau
+              <span className="hidden sm:inline">Nouveau</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Search & Filters Compact */}
+      {/* Search & Filters */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -128,7 +149,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher..."
+            placeholder="Rechercher par nom, prénom ou téléphone..."
             className="w-full pl-8 pr-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-xs text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:bg-slate-800 focus:outline-none transition-all"
           />
         </div>
@@ -140,7 +161,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
         </button>
       </div>
 
-      {/* Filter Panel Compact */}
+      {/* Filter Panel */}
       {showFilters && (
         <div className="grid grid-cols-2 gap-2 p-2 bg-slate-800/50 rounded-lg border border-slate-700/50 animate-in slide-in-from-top-2 duration-200">
           <div>
@@ -172,18 +193,20 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
         </div>
       )}
 
-      {/* List Compact */}
+      {/* List */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 size={20} className="animate-spin text-cyan-500" />
         </div>
-      ) : filteredProspects.length === 0 ? (
+      ) : prospects.length === 0 ? (
         <div className="text-center py-8 bg-slate-800/30 rounded-lg border border-slate-800 border-dashed">
-            <p className="text-xs text-slate-500">Aucun prospect trouvé</p>
+            <p className="text-xs text-slate-500">
+              {debouncedSearch ? `Aucun résultat pour "${debouncedSearch}"` : 'Aucun prospect trouvé'}
+            </p>
         </div>
       ) : (
         <div className="space-y-1.5">
-          {filteredProspects.map((prospect: any) => (
+          {prospects.map((prospect: any) => (
             <div
               key={prospect.id}
               onClick={() => setSelectedProspectId(prospect.id)}
@@ -216,26 +239,92 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
         </div>
       )}
 
-      {/* Pagination Compact */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between py-1 border-t border-slate-800/50">
-          <span className="text-[10px] text-slate-500">Page {page} / {totalPages}</span>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
-            >
-              <ChevronLeft size={12} />
-            </button>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
-            >
-              <ChevronRight size={12} />
-            </button>
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-800/50">
+          {/* Left: Info + Per Page */}
+          <div className="flex items-center gap-3 text-[11px] text-slate-500 w-full sm:w-auto justify-between sm:justify-start">
+            <span>
+              {rangeStart}-{rangeEnd} sur {total}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="hidden sm:inline">Par page</span>
+              <select
+                value={perPage}
+                onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+                className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[11px] text-white focus:border-cyan-500 focus:outline-none"
+              >
+                {PAGE_SIZE_OPTIONS.map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {/* Right: Page Navigation */}
+          {totalPages > 1 && (
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                title="Première page"
+              >
+                <ChevronsLeft size={14} />
+              </button>
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                title="Page précédente"
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              {/* Page numbers (desktop) */}
+              <div className="hidden sm:flex items-center gap-0.5 mx-1">
+                {getPageNumbers().map((p, i) =>
+                  p === 'ellipsis' ? (
+                    <span key={`e-${i}`} className="w-7 text-center text-[11px] text-slate-600">...</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-7 h-7 rounded text-[11px] font-bold transition ${
+                        p === page
+                          ? 'bg-cyan-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Mobile: simple page indicator */}
+              <span className="sm:hidden text-[11px] text-slate-400 mx-2 font-medium">
+                {page}/{totalPages}
+              </span>
+
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                title="Page suivante"
+              >
+                <ChevronRight size={14} />
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                title="Dernière page"
+              >
+                <ChevronsRight size={14} />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

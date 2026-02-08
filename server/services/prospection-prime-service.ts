@@ -6,7 +6,7 @@
  * - HR integration: assigns benefit to agent's employee record
  */
 
-import { mouvementsFinanciers, prospectionPrimes, avantages, avantagesEmployes, agentsTerrain, employes } from "@shared/schema";
+import { mouvementsFinanciers, prospectionPrimes, prospectionPrimeConfig, avantages, avantagesEmployes, agentsTerrain, employes } from "@shared/schema";
 import type { ProspectionPrime } from "@shared/schema";
 import { StatutTransaction } from "@shared/enum/status-constants";
 import { eq, and } from "drizzle-orm";
@@ -74,11 +74,52 @@ export async function payProspectionPrime(
     }
   }
 
+  // 0. For VARIABLE primes, calculate montant from agent's gross annual salary
+  let effectiveMontant = prime.montant;
+
+  if (prime.typePrime === "VARIABLE" && employeId) {
+    // Get agent's salary
+    const [emp] = await tx
+      .select({ salaireBase: employes.salaireBase })
+      .from(employes)
+      .where(eq(employes.id, employeId))
+      .limit(1);
+
+    // Get active config for this agency
+    const [config] = await tx
+      .select({ tauxVariable: prospectionPrimeConfig.tauxVariable })
+      .from(prospectionPrimeConfig)
+      .where(
+        and(
+          eq(prospectionPrimeConfig.actif, true),
+          prime.agenceId ? eq(prospectionPrimeConfig.agenceId, prime.agenceId) : undefined
+        )
+      )
+      .limit(1);
+
+    const salaireBase = Number(emp?.salaireBase) || 0;
+    const tauxVariable = Number(config?.tauxVariable) || 0;
+
+    if (salaireBase > 0 && tauxVariable > 0) {
+      const salaireBrutAnnuel = salaireBase * 12;
+      effectiveMontant = String(Math.round(salaireBrutAnnuel * tauxVariable / 100));
+      logger.info({ primeId: prime.id, salaireBase, salaireBrutAnnuel, tauxVariable, effectiveMontant }, "Calculated variable prime amount");
+
+      // Update prime montant
+      await tx
+        .update(prospectionPrimes)
+        .set({ montant: effectiveMontant, updatedAt: new Date() })
+        .where(eq(prospectionPrimes.id, prime.id));
+    } else {
+      logger.warn({ primeId: prime.id, salaireBase, tauxVariable }, "Cannot calculate variable prime: missing salary or rate");
+    }
+  }
+
   // 1. Create financial movement
   const [mouvement] = await tx
     .insert(mouvementsFinanciers)
     .values({
-      montant: prime.montant,
+      montant: effectiveMontant,
       sens: "DEBIT",
       sourceModule: "RH_PAYROLL",
       typePaiement: "PROSPECTION_PRIME",
@@ -98,7 +139,7 @@ export async function payProspectionPrime(
         agentId: prime.agentId,
         employeNom,
         periode: prime.periode,
-        montant: prime.montant,
+        montant: effectiveMontant,
       },
     } as any)
     .returning();
@@ -163,7 +204,7 @@ export async function payProspectionPrime(
           .values({
             nom: "Prime de Prospection",
             type: "Prime",
-            montantParDefaut: Number(prime.montant) || 5000,
+            montantParDefaut: Number(effectiveMontant) || 5000,
             description: "Prime versée pour la conversion d'un prospect en client",
             actif: true,
           })
@@ -176,7 +217,7 @@ export async function payProspectionPrime(
         .values({
           employeId,
           avantageId: primeAvantage.id,
-          montant: Number(prime.montant) || 5000,
+          montant: Number(effectiveMontant) || 5000,
           statut: "ACTIVE",
         })
         .returning();

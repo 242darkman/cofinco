@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, CheckCircle, Calendar, CreditCard, Users, AlertTriangle, Settings, Info, Trash2, Check, Clock, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Bell, X, CheckCircle, Calendar, CreditCard, Users, AlertTriangle, Settings, Info, Trash2, Check, Clock, ChevronRight, ClipboardCheck, Banknote } from 'lucide-react';
 import { Badge, Button } from '../ui';
 import clsx from 'clsx';
 
@@ -20,9 +20,10 @@ export interface Notification {
 
 interface NotificationCenterProps {
   onClose?: () => void;
+  fullHeight?: boolean;
 }
 
-export default function NotificationCenter({ onClose }: NotificationCenterProps) {
+export default function NotificationCenter({ onClose, fullHeight }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -105,6 +106,10 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
       case 'tontine': return <Users className={clsx(iconClass, "text-purple-500")} />;
       case 'alerte': return <AlertTriangle className={clsx(iconClass, "text-red-500")} />;
       case 'system': return <Settings className={clsx(iconClass, "text-cyan-500")} />;
+      case 'INVESTIGATION_ASSIGNED':
+      case 'enquete': return <ClipboardCheck className={clsx(iconClass, "text-indigo-500")} />;
+      case 'paiement':
+      case 'remboursement': return <Banknote className={clsx(iconClass, "text-emerald-500")} />;
       default: return <Info className={clsx(iconClass, "text-blue-500")} />;
     }
   };
@@ -115,17 +120,51 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
 
   const unreadCount = notifications.filter(n => !n.lue).length;
 
+  // Group notifications by date
+  const groupedNotifications = useMemo(() => {
+    const groups: { label: string; items: Notification[] }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const map = new Map<string, Notification[]>();
+
+    for (const n of filteredNotifications) {
+      const date = new Date(n.createdAt);
+      date.setHours(0, 0, 0, 0);
+
+      let label: string;
+      if (date.getTime() === today.getTime()) {
+        label = "Aujourd'hui";
+      } else if (date.getTime() === yesterday.getTime()) {
+        label = 'Hier';
+      } else {
+        label = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+      }
+
+      if (!map.has(label)) map.set(label, []);
+      map.get(label)!.push(n);
+    }
+
+    for (const [label, items] of map) {
+      groups.push({ label, items });
+    }
+
+    return groups;
+  }, [filteredNotifications]);
+
   const NotificationItem = ({ notification }: { notification: Notification }) => (
-    <div 
+    <div
       className={clsx(
-        "group relative p-4 transition-all duration-200 hover:bg-slate-800/40 border-b border-slate-800/50 last:border-0",
+        "group relative p-3 sm:p-4 transition-all duration-200 hover:bg-slate-800/40",
         !notification.lue ? "bg-slate-800/20" : ""
       )}
     >
-      <div className="flex gap-4">
+      <div className="flex gap-3">
         {/* Icon Container */}
         <div className={clsx(
-          "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-lg",
+          "flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-lg",
           "bg-slate-900 border border-slate-800"
         )}>
           {getIcon(notification.type)}
@@ -133,20 +172,20 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="flex items-start justify-between gap-2 mb-0.5">
             <h4 className={clsx(
               "text-sm font-semibold leading-tight",
               notification.lue ? "text-slate-400" : "text-slate-200"
             )}>
               {notification.titre}
             </h4>
-            <span className="text-[10px] text-slate-500 whitespace-nowrap flex items-center gap-1">
+            <span className="text-[10px] text-slate-500 whitespace-nowrap flex items-center gap-1 shrink-0">
               <Clock size={10} />
               {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
-          
-          <p className="text-xs text-slate-400 leading-relaxed mb-3 line-clamp-2">
+
+          <p className="text-xs text-slate-400 leading-relaxed mb-2 line-clamp-2">
             {notification.message}
           </p>
 
@@ -159,12 +198,12 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
               {notification.type === 'echeance' && !notification.lue && (
                 <span className="text-[10px] font-medium text-amber-500 flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded">
                   <AlertTriangle size={10} />
-                  À traiter
+                  A traiter
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-y-1 group-hover:translate-y-0 duration-200">
+            <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity sm:translate-y-1 sm:group-hover:translate-y-0 duration-200">
                {!notification.lue && (
                 <button
                   onClick={(e) => markAsRead(notification.id, e)}
@@ -185,19 +224,24 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
           </div>
         </div>
       </div>
-      
+
       {/* Unread Indicator */}
       {!notification.lue && (
-        <div className="absolute top-4 right-2 w-2 h-2 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50 animate-pulse" />
+        <div className="absolute top-3 right-2 sm:top-4 w-2 h-2 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50 animate-pulse" />
       )}
     </div>
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-950/95 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl overflow-hidden w-full max-w-[400px]">
+    <div className={clsx(
+      "flex flex-col bg-slate-950/95 backdrop-blur-xl border border-slate-800 shadow-2xl overflow-hidden",
+      fullHeight
+        ? "h-full rounded-t-2xl"
+        : "h-auto max-h-[min(80vh,600px)] rounded-2xl w-full sm:w-[380px] md:w-[420px]"
+    )}>
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-slate-800 bg-slate-900/50">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex-shrink-0 p-3 sm:p-4 border-b border-slate-800 bg-slate-900/50">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
              <div className="relative">
                 <Bell size={20} className="text-blue-400" />
@@ -215,7 +259,7 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
 
           <div className="flex gap-1">
              <Button
-                variant="ghost" 
+                variant="ghost"
                 size="sm"
                 onClick={markAllAsRead}
                 disabled={unreadCount === 0}
@@ -224,13 +268,13 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
              >
                 <CheckCircle size={16} />
              </Button>
-             
+
              {onClose && (
                 <Button
                    variant="ghost"
                    size="sm"
                    onClick={onClose}
-                   className="h-8 w-8 p-0 rounded-full hover:bg-slate-800 text-slate-400 sm:hidden"
+                   className="h-8 w-8 p-0 rounded-full hover:bg-slate-800 text-slate-400"
                 >
                    <X size={16} />
                 </Button>
@@ -244,8 +288,8 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
              onClick={() => setFilter('all')}
              className={clsx(
                "flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
-               filter === 'all' 
-                 ? "bg-slate-800 text-white shadow-sm" 
+               filter === 'all'
+                 ? "bg-slate-800 text-white shadow-sm"
                  : "text-slate-500 hover:text-slate-300"
              )}
            >
@@ -255,8 +299,8 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
              onClick={() => setFilter('unread')}
              className={clsx(
                "flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 relative",
-               filter === 'unread' 
-                 ? "bg-slate-800 text-white shadow-sm" 
+               filter === 'unread'
+                 ? "bg-slate-800 text-white shadow-sm"
                  : "text-slate-500 hover:text-slate-300"
              )}
            >
@@ -271,9 +315,9 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
       </div>
 
       {/* Content */}
-      <div 
+      <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparentoverscroll-contain bg-slate-950/30"
+        className="flex-1 overflow-y-auto overscroll-contain bg-slate-950/30"
       >
         {loading && notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3">
@@ -286,15 +330,15 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
                <Bell className="text-slate-600 opacity-50" size={32} />
              </div>
              <p className="text-slate-300 font-medium text-sm mb-1">
-               {filter === 'unread' ? 'Tout est à jour !' : 'Aucune notification'}
+               {filter === 'unread' ? 'Tout est a jour !' : 'Aucune notification'}
              </p>
              <p className="text-slate-500 text-xs max-w-[200px]">
-               {filter === 'unread' 
-                 ? "Vous avez lu toutes vos notifications importantes." 
-                 : "Les nouvelles activités apparaîtront ici."}
+               {filter === 'unread'
+                 ? "Vous avez lu toutes vos notifications importantes."
+                 : "Les nouvelles activites apparaitront ici."}
              </p>
              {filter === 'unread' && (
-               <button 
+               <button
                  onClick={() => setFilter('all')}
                  className="mt-4 text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1"
                >
@@ -303,9 +347,20 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
              )}
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/50">
-            {filteredNotifications.map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
+          <div>
+            {groupedNotifications.map((group) => (
+              <div key={group.label}>
+                <div className="sticky top-0 z-10 px-4 py-1.5 bg-slate-900/90 backdrop-blur-sm border-b border-slate-800/50">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    {group.label}
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-800/50">
+                  {group.items.map((notification) => (
+                    <NotificationItem key={notification.id} notification={notification} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -313,10 +368,10 @@ export default function NotificationCenter({ onClose }: NotificationCenterProps)
 
       {/* Footer */}
       {notifications.length > 0 && (
-         <div className="p-3 border-t border-slate-800 bg-slate-900/50 text-center">
+         <div className="flex-shrink-0 p-3 border-t border-slate-800 bg-slate-900/50 text-center">
             {filter === 'all' && (
                 <p className="text-[10px] text-slate-500">
-                    Les notifications sont conservées pendant 30 jours
+                    Les notifications sont conservees pendant 30 jours
                 </p>
             )}
          </div>

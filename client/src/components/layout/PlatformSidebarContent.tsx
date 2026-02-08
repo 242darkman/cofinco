@@ -11,6 +11,7 @@ import { isAdminRole } from '@shared/types/roles';
 import { useOperationsBadge } from '../../hooks/useOperationsBadge';
 import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 import { useProspectionBadge } from '../../hooks/useProspectionBadge';
+import { useEnqueteBadge } from '../../hooks/useEnqueteBadge';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -47,6 +48,12 @@ export default function PlatformSidebarContent({
 
   // Active prospection count for Gestion Agent badge
   const { activeCount: activeProspectionCount } = useProspectionBadge();
+
+  // Pending enquête count for Gestion Agent badge
+  const { pendingCount: pendingEnqueteCount } = useEnqueteBadge();
+
+  // Combined badge for Agent Modules (prospections + enquêtes)
+  const agentModulesBadge = activeProspectionCount + pendingEnqueteCount;
 
   // Fetch Pending Refunds Count (Restitutions Frais)
   const fetchPendingRefundsCount = async () => {
@@ -318,10 +325,10 @@ export default function PlatformSidebarContent({
             {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
           </div>
         )}
-        {/* Real-time Badge for Collapsed Sidebar - Gestion Agent */}
-        {!sidebarOpen && route.key === 'agentModules' && activeProspectionCount > 0 && (
+        {/* Real-time Badge for Collapsed Sidebar - Gestion Agent (prospections + enquêtes) */}
+        {!sidebarOpen && route.key === 'agentModules' && agentModulesBadge > 0 && (
           <div className="absolute top-1 right-2 bg-violet-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
-            {activeProspectionCount > 99 ? '99+' : activeProspectionCount}
+            {agentModulesBadge > 99 ? '99+' : agentModulesBadge}
           </div>
         )}
 
@@ -345,9 +352,9 @@ export default function PlatformSidebarContent({
                 {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
               </span>
             )}
-            {route.key === 'agentModules' && activeProspectionCount > 0 && (
+            {route.key === 'agentModules' && agentModulesBadge > 0 && (
               <span className="bg-violet-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
-                {activeProspectionCount > 99 ? '99+' : activeProspectionCount}
+                {agentModulesBadge > 99 ? '99+' : agentModulesBadge}
               </span>
             )}
             {isDisabled && (

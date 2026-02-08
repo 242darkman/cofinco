@@ -323,7 +323,7 @@ export function registerProspectionPrimesRoutes(app: Express) {
         const { agence_id, agenceId: agenceIdQ } = req.query as Record<string, string>;
         const filterAgenceId = agence_id || agenceIdQ;
 
-        const conditions = [eq(prospectionPrimeConfig.actif, true)];
+        const conditions = [];
         if (filterAgenceId) {
           conditions.push(eq(prospectionPrimeConfig.agenceId, filterAgenceId));
         }
@@ -331,7 +331,7 @@ export function registerProspectionPrimesRoutes(app: Express) {
         const configs = await db
           .select()
           .from(prospectionPrimeConfig)
-          .where(and(...conditions))
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
           .orderBy(desc(prospectionPrimeConfig.createdAt));
 
         res.json(configs);
@@ -363,11 +363,12 @@ export function registerProspectionPrimesRoutes(app: Express) {
         }
 
         const updates: Record<string, any> = {};
+        if (typeof data.nom === "string") updates.nom = data.nom;
         if (typeof data.typePrime === "string") updates.typePrime = data.typePrime;
-        if (data.montantFixe !== undefined) updates.montantFixe = String(data.montantFixe);
-        if (data.tauxVariable !== undefined) updates.tauxVariable = String(data.tauxVariable);
+        if (data.montantFixe !== undefined) updates.montantFixe = data.montantFixe === "" ? null : String(data.montantFixe);
+        if (data.tauxVariable !== undefined) updates.tauxVariable = data.tauxVariable === "" ? null : String(data.tauxVariable);
         if (typeof data.requireFirstCredit === "boolean") updates.requireFirstCredit = data.requireFirstCredit;
-        if (data.requireMinRevenu !== undefined) updates.requireMinRevenu = String(data.requireMinRevenu);
+        if (data.requireMinRevenu !== undefined) updates.requireMinRevenu = data.requireMinRevenu === "" ? null : String(data.requireMinRevenu);
         if (typeof data.actif === "boolean") updates.actif = data.actif;
         if (typeof data.effectiveFrom === "string") updates.effectiveFrom = new Date(data.effectiveFrom);
         if (typeof data.effectiveTo === "string") updates.effectiveTo = new Date(data.effectiveTo);
@@ -403,6 +404,10 @@ export function registerProspectionPrimesRoutes(app: Express) {
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as Record<string, any>;
+        // Sanitize empty strings for numeric fields → null
+        if (data.tauxVariable === "" || data.tauxVariable === undefined) data.tauxVariable = null;
+        if (data.requireMinRevenu === "" || data.requireMinRevenu === undefined) data.requireMinRevenu = null;
+        if (data.montantFixe === "") data.montantFixe = null;
         const parsed = insertProspectionPrimeConfigSchema.parse({
           ...data,
           createdBy: req.session?.user?.id,

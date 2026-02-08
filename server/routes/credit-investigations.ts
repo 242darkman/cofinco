@@ -16,6 +16,7 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { upload } from "@/middleware/upload";
 import multer from "multer";
+import { getWsInstance } from "@/ws-server";
 
 const router = Router();
 
@@ -133,6 +134,15 @@ router.post(
         req.user!.id
       );
 
+      // Broadcast to all clients for real-time badge updates
+      const ws = getWsInstance();
+      if (ws) {
+        ws.broadcast({
+          type: "CREDIT_UPDATE",
+          payload: { type: 'investigation_assigned', investigationId: req.body.investigationId, agentId: req.body.agentId },
+        });
+      }
+
       res.json({
         success: true,
         data: investigation,
@@ -211,6 +221,14 @@ router.post(
         req.user!.id
       );
 
+      const ws = getWsInstance();
+      if (ws) {
+        ws.broadcast({
+          type: "CREDIT_UPDATE",
+          payload: { type: 'investigation_submitted', investigationId: req.params.id },
+        });
+      }
+
       res.json({
         success: true,
         data: investigation,
@@ -250,6 +268,14 @@ router.post(
         } as ReviewInvestigationRequest,
         req.user!.id
       );
+
+      const ws = getWsInstance();
+      if (ws) {
+        ws.broadcast({
+          type: "CREDIT_UPDATE",
+          payload: { type: 'investigation_reviewed', investigationId: req.params.id },
+        });
+      }
 
       res.json({
         success: true,
