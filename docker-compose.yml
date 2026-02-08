@@ -56,6 +56,7 @@ services:
   # DATABASE — PostgreSQL
   # ==========================================
   db:
+    container_name: cofinco-db
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -71,37 +72,39 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # CONNECTION POOLER — PgBouncer
   # ==========================================
   pgbouncer:
-    image: bitnami/pgbouncer:1.23.1
+    container_name: cofinco-pgbouncer
+    image: edoburu/pgbouncer:v1.25.1-p0
     restart: unless-stopped
     environment:
-      POSTGRESQL_HOST: db
-      POSTGRESQL_PORT: "5432"
-      POSTGRESQL_USERNAME: ${POSTGRES_USER:?}
-      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:?}
-      POSTGRESQL_DATABASE: ${POSTGRES_DB:?}
-      PGBOUNCER_PORT: "6432"
-      PGBOUNCER_POOL_MODE: transaction
-      PGBOUNCER_MAX_CLIENT_CONN: "200"
-      PGBOUNCER_DEFAULT_POOL_SIZE: "20"
-      PGBOUNCER_MIN_POOL_SIZE: "5"
-      PGBOUNCER_RESERVE_POOL_SIZE: "5"
-      PGBOUNCER_SERVER_IDLE_TIMEOUT: "600"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:?}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?}
+      DB_NAME: ${POSTGRES_DB:?}
+      LISTEN_PORT: "6432"
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "200"
+      DEFAULT_POOL_SIZE: "20"
+      MIN_POOL_SIZE: "5"
+      RESERVE_POOL_SIZE: "5"
+      SERVER_IDLE_TIMEOUT: "600"
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # CACHE / SESSION STORE — Redis
   # ==========================================
   redis:
+    container_name: cofinco-redis
     image: redis:7.2-alpine
     restart: unless-stopped
     volumes:
@@ -118,13 +121,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # OBJECT STORAGE — MinIO (S3-compatible)
   # ==========================================
   minio:
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: cofinco-minio
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
@@ -138,12 +142,13 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # DATABASE BACKUPS
   # ==========================================
   pg-backup:
+    container_name: cofinco-backup
     image: prodrigestivill/postgres-backup-local:16-alpine
     restart: unless-stopped
     environment:
@@ -162,12 +167,13 @@ services:
       db:
         condition: service_healthy
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # OBSERVABILITY — Logs
   # ==========================================
   loki:
+    container_name: cofinco-loki
     image: grafana/loki:3.3.2
     restart: unless-stopped
     volumes:
@@ -180,9 +186,10 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   promtail:
+    container_name: cofinco-promtail
     image: grafana/promtail:3.3.2
     restart: unless-stopped
     volumes:
@@ -193,12 +200,13 @@ services:
       loki:
         condition: service_healthy
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # OBSERVABILITY — Metrics
   # ==========================================
   prometheus:
+    container_name: cofinco-prometheus
     image: prom/prometheus:v2.49.1
     restart: unless-stopped
     volumes:
@@ -210,12 +218,13 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # OBSERVABILITY — Alerting
   # ==========================================
   alertmanager:
+    container_name: cofinco-alertmanager
     image: prom/alertmanager:v0.27.0
     restart: unless-stopped
     volumes:
@@ -225,12 +234,13 @@ services:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # OBSERVABILITY — Dashboards
   # ==========================================
   grafana:
+    container_name: cofinco-grafana
     image: grafana/grafana:10.3.1
     restart: unless-stopped
     environment:
@@ -244,12 +254,13 @@ services:
       - prometheus
       - loki
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # EXPORTERS — Infrastructure metrics
   # ==========================================
   postgres-exporter:
+    container_name: cofinco-pg-exporter
     image: prometheuscommunity/postgres-exporter:v0.16.0
     restart: unless-stopped
     environment:
@@ -258,9 +269,10 @@ services:
       db:
         condition: service_healthy
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   redis-exporter:
+    container_name: cofinco-redis-exporter
     image: oliver006/redis_exporter:v1.66.0
     restart: unless-stopped
     environment:
@@ -270,7 +282,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - cofin_internal
+      - cofinco_internal
 
 volumes:
   postgres_data:
@@ -285,7 +297,7 @@ volumes:
   caddy_config:
 
 networks:
-  cofin_public:
+  cofinco_public:
     driver: bridge
-  cofin_internal:
+  cofinco_internal:
     driver: bridge

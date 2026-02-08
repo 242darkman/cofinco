@@ -17,6 +17,7 @@ services:
   # APPLICATION — hot reload dev
   # ==========================================
   app:
+    container_name: cofinco-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -38,11 +39,11 @@ services:
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-dev@cofinco.local}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-COFIN-DEV}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-COFINCO-DEV}
       SMTP_SECURE: "false"
       MTN_SMS_CLIENT_ID: ${MTN_SMS_CLIENT_ID:-}
       MTN_SMS_CLIENT_SECRET: ${MTN_SMS_CLIENT_SECRET:-}
-      MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFIN}
+      MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFINCO}
       MTN_SMS_WEBHOOK_SECRET: ${MTN_SMS_WEBHOOK_SECRET:-}
       MTN_SMS_TOKEN_URL: ${MTN_SMS_TOKEN_URL:-}
       MTN_SMS_BASE_URL: ${MTN_SMS_BASE_URL:-}
@@ -67,7 +68,7 @@ services:
       pgbouncer:
         condition: service_started
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   # ==========================================
   # INFRASTRUCTURE — ports exposés pour debug
@@ -115,6 +116,7 @@ services:
   # DEV-ONLY — Admin tools (profile: admin)
   # ==========================================
   mailpit:
+    container_name: cofinco-mailpit
     image: axllent/mailpit:v1.21
     restart: unless-stopped
     profiles: ["admin"]
@@ -126,9 +128,10 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   pgadmin:
+    container_name: cofinco-pgadmin
     image: dpage/pgadmin4:8.9
     profiles: ["admin"]
     environment:
@@ -143,9 +146,10 @@ services:
       db:
         condition: service_healthy
     networks:
-      - cofin_internal
+      - cofinco_internal
 
   redisinsight:
+    container_name: cofinco-redisinsight
     image: redis/redisinsight:2.50.0
     profiles: ["admin"]
     ports:
@@ -156,7 +160,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - cofin_internal
+      - cofinco_internal
 
 volumes:
   cofin_pgadmin_data:

@@ -3,8 +3,8 @@
 # ============================================
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
 # ============================================
 # Stage: DEV — hot reload (tsx watch + Vite HMR)
@@ -49,8 +49,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Install production dependencies only
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY package.json ./
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy build artifacts
 COPY --from=build /app/dist ./dist

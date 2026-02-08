@@ -26,7 +26,7 @@ x-app-env: &app-env
   SMTP_SECURE: ${SMTP_SECURE:-false}
   MTN_SMS_CLIENT_ID: ${MTN_SMS_CLIENT_ID:-}
   MTN_SMS_CLIENT_SECRET: ${MTN_SMS_CLIENT_SECRET:-}
-  MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFIN}
+  MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFINCO}
   MTN_SMS_WEBHOOK_SECRET: ${MTN_SMS_WEBHOOK_SECRET:-}
   MTN_SMS_TOKEN_URL: ${MTN_SMS_TOKEN_URL:-}
   MTN_SMS_BASE_URL: ${MTN_SMS_BASE_URL:-}
@@ -47,7 +47,8 @@ services:
   # REVERSE PROXY — Caddy (TLS Let's Encrypt)
   # ==========================================
   caddy:
-    image: caddy:2.9-alpine
+    container_name: cofinco-caddy
+    image: caddy:2.9.1-alpine
     restart: unless-stopped
     ports:
       - "80:80"
@@ -64,8 +65,8 @@ services:
       app:
         condition: service_healthy
     networks:
-      - cofin_public
-      - cofin_internal
+      - cofinco_public
+      - cofinco_internal
     deploy:
       resources:
         limits:
@@ -92,7 +93,7 @@ services:
       pgbouncer:
         condition: service_started
     networks:
-      - cofin_internal
+      - cofinco_internal
     deploy:
       replicas: ${APP_REPLICAS:-2}
       resources:
@@ -136,7 +137,7 @@ services:
       pgbouncer:
         condition: service_started
     networks:
-      - cofin_internal
+      - cofinco_internal
     deploy:
       replicas: 1
       resources:
@@ -217,5 +218,5 @@ services:
 
 # Enforce internal network in prod
 networks:
-  cofin_internal:
+  cofinco_internal:
     internal: true
