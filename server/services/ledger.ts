@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { db } from "../db";
 import {
   mouvementsFinanciers,
@@ -78,7 +79,6 @@ export function generateReference(sourceModule: SourceModule | "TIC"): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   const time = Date.now().toString().slice(-6);
-  const { randomInt } = require('crypto');
   const random = randomInt(0, 1000).toString().padStart(3, "0");
   
   const prefixes: Record<SourceModule | "TIC", string> = {
