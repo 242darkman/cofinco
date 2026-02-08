@@ -842,13 +842,13 @@ export async function ensureCustomFunctions(): Promise<void> {
             FROM operations_caisse o
             WHERE o.session_id = expired_session.id;
 
-            calculated_solde := CAST(expired_session.solde_initial AS NUMERIC) + calculated_solde;
+            calculated_solde := CAST(expired_session.montant_ouverture AS NUMERIC) + calculated_solde;
 
             UPDATE sessions_caisse
             SET
               statut = 'Fermée',
-              date_fermeture = NOW(),
-              solde_theorique = calculated_solde::TEXT,
+              closed_at = NOW(),
+              montant_fermeture_theorique = calculated_solde::TEXT,
               closed_reason = 'timeout',
               observations = COALESCE(observations, '') ||
                 E'\n[AUTO-FERMETURE] Session expirée après ' || timeout_hours || 'h d''inactivité. ' ||
@@ -886,7 +886,7 @@ export async function ensureCustomFunctions(): Promise<void> {
               'OPENED',
               NEW.statut,
               jsonb_build_object(
-                'solde_initial', NEW.solde_initial,
+                'montant_ouverture', NEW.montant_ouverture,
                 'caisse_id', NEW.caisse_id,
                 'caissier_id', NEW.caissier_id,
                 'billetage_ouverture', NEW.billetage_ouverture
@@ -907,8 +907,8 @@ export async function ensureCustomFunctions(): Promise<void> {
                 OLD.statut,
                 NEW.statut,
                 jsonb_build_object(
-                  'solde_theorique', NEW.solde_theorique,
-                  'solde_reel', NEW.solde_reel,
+                  'montant_fermeture_theorique', NEW.montant_fermeture_theorique,
+                  'montant_fermeture_declare', NEW.montant_fermeture_declare,
                   'ecart', NEW.ecart,
                   'billetage_fermeture', NEW.billetage_fermeture,
                   'observations', NEW.observations,
@@ -963,7 +963,7 @@ export async function ensureCustomFunctions(): Promise<void> {
               WHEN EXTRACT(EPOCH FROM (NOW() - s.last_activity)) / 3600 >= warning_hours THEN 'WARNING'
               ELSE 'OK'
             END,
-            CAST(s.solde_initial AS NUMERIC) + COALESCE(
+            CAST(s.montant_ouverture AS NUMERIC) + COALESCE(
               (SELECT SUM(
                 CASE
                   WHEN o.type_operation IN ('Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre')
