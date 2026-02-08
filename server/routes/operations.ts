@@ -3,7 +3,7 @@ import { createLogger } from "../lib/logger";
 import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections, agentsTerrain, employes, arrondissements, marches, clients, users, prospectionPrimes, prospectionPrimeConfig } from "@shared/schema";
 import { PROSPECTION_STATUS_TRANSITIONS, StatutProspection, ClientOrigin } from "@shared/enum/status-constants";
 import { logAudit } from "../lib/logger";
-import { and, desc, isNull, sql } from "drizzle-orm";
+import { and, desc, inArray, isNull, sql } from "drizzle-orm";
 import { notDeleted } from "../storage/query-helpers";
 
 const logger = createLogger('Routes:Operations');
@@ -238,6 +238,36 @@ export function registerOperationsRoutes(app: Express) {
       }
   });
 
+  // GET prospection count - lightweight badge endpoint
+  app.get("/api/prospections/count", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.PROSPECTION), async (req, res) => {
+    try {
+      const { statut, agent_id, agentId: agentIdQ } = req.query as Record<string, string>;
+      const filterAgentId = agent_id || agentIdQ;
+
+      const conditions: ReturnType<typeof notDeleted>[] = [notDeleted(prospections)];
+
+      if (statut) {
+        const statuses = statut.split(',').map(s => s.trim()).filter(Boolean);
+        if (statuses.length > 0) {
+          conditions.push(inArray(prospections.statut, statuses));
+        }
+      }
+      if (filterAgentId) {
+        conditions.push(eq(prospections.agentId, filterAgentId));
+      }
+
+      const [result] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(prospections)
+        .where(and(...conditions));
+
+      res.json({ count: Number(result?.count || 0) });
+    } catch (error) {
+      logger.error({ err: error }, "Error counting prospections");
+      res.status(500).json({ message: "Erreur lors du comptage des prospections" });
+    }
+  });
+
   // GET single prospection
   app.get("/api/prospections/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.PROSPECTION), async (req, res) => {
     try {
@@ -248,16 +278,26 @@ export function registerOperationsRoutes(app: Express) {
           id: prospections.id,
           agentId: prospections.agentId,
           nomProspect: prospections.nomProspect,
+          prenomProspect: prospections.prenomProspect,
           telephoneProspect: prospections.telephoneProspect,
+          adresseProspect: prospections.adresseProspect,
           sexe: prospections.sexe,
+          typeActivite: prospections.typeActivite,
           activitePrincipale: prospections.activitePrincipale,
+          descriptionActivite: prospections.descriptionActivite,
           ancienneteActivite: prospections.ancienneteActivite,
+          revenuEstime: prospections.revenuEstime,
+          chiffreAffairesMensuel: prospections.chiffreAffairesMensuel,
+          typeRevenu: prospections.typeRevenu,
+          revenuJournalier: prospections.revenuJournalier,
+          priorite: prospections.priorite,
           arrondissementId: prospections.arrondissementId,
           marcheId: prospections.marcheId,
           arrondissementNom: arrondissements.nom,
           marcheNom: marches.nom,
           statut: prospections.statut,
           observations: prospections.observations,
+          commentairesAgent: prospections.commentairesAgent,
           photoUrl: prospections.photoUrl,
 
           lastActionAt: prospections.lastActionAt,

@@ -17,6 +17,7 @@ import ProspectionSupervisionPanel from './ProspectionSupervisionPanel';
 import LoadingScreen from '../ui/LoadingScreen';
 import { authService } from '../../lib/auth';
 import { agentTerrainApi } from '../../lib/api-client';
+import { useProspectionBadge } from '../../hooks/useProspectionBadge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
 
 interface AgentOption {
@@ -41,6 +42,9 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
   };
   const [moduleLoading, setModuleLoading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Prospection badge counts
+  const { totalCount: prospectionCount } = useProspectionBadge();
 
   // Admin / Supervisor shared state
   const isAdminOrSupervisor = authService.isAdmin() || authService.hasRole?.('superviseur') || authService.hasRole?.('chef_agence');
@@ -86,7 +90,7 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
     { id: 'dashboard', name: 'Tableau de Bord', icon: LayoutDashboard, component: AgentDashboard },
     { id: 'reports', name: 'Rapports', icon: Download, component: AgentReportsGenerator },
     { id: 'leaderboard', name: 'Classement', icon: Trophy, component: AgentTeamLeaderboard },
-    { id: 'prospections', name: 'Prospections', icon: UserPlus, component: ProspectionList },
+    { id: 'prospections', name: 'Prospections', icon: UserPlus, component: ProspectionList, badge: prospectionCount },
     { id: 'commissions', name: 'Commissions', icon: BarChart3, component: AgentCommissions },
     { id: 'planning', name: 'Planning', icon: FileText, component: AgentPlanning },
     { id: 'gps', name: 'Géolocalisation', icon: Map, component: AgentGeolocalisation },
@@ -135,6 +139,11 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
                    >
                      <Icon size={18} />
                      <span className="text-sm font-medium">{module.name}</span>
+                     {module.badge != null && module.badge > 0 && (
+                       <span className="ml-auto bg-violet-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                         {module.badge > 99 ? '99+' : module.badge}
+                       </span>
+                     )}
                    </button>
                  );
                })}
@@ -179,6 +188,13 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
                 >
                   <Icon size={16} />
                   <span className="text-xs font-semibold">{module.name}</span>
+                  {module.badge != null && module.badge > 0 && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-violet-500 text-white'
+                    }`}>
+                      {module.badge > 99 ? '99+' : module.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}

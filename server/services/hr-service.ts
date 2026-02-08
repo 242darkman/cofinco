@@ -447,7 +447,7 @@ export class HrService {
     for (const bracket of sortedBrackets) {
       if (remaining <= 0) break;
 
-      const bracketSize = bracket.max !== null ? bracket.max - bracket.min : Infinity;
+      const bracketSize = bracket.max !== null ? bracket.max - bracket.min + 1 : Infinity;
       const taxable = Math.min(remaining, bracketSize);
 
       impot += Math.round(taxable * bracket.rate);

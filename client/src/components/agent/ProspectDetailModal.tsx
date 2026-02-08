@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, UserCheck, ArrowRight, Phone, MapPin, Briefcase, Calendar, AlertTriangle, Clock, Activity, FileText } from 'lucide-react';
+import { Loader2, UserCheck, ArrowRight, Phone, MapPin, Briefcase, AlertTriangle, Activity, FileText, DollarSign, User } from 'lucide-react';
 import { prospectionApi } from '../../lib/api-client';
 import { toast } from 'sonner';
 import {
@@ -105,14 +105,9 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
             {/* Identity Card */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                   <h3 className="text-lg font-bold text-white leading-tight">
-                    {prospect.nom_prospect || prospect.nomProspect}
-                  </h3>
-                  {(prospect.prenom_prospect || prospect.prenomProspect) && (
-                    <p className="text-sm text-slate-400 font-medium">{prospect.prenom_prospect || prospect.prenomProspect}</p>
-                  )}
-                </div>
+                <h3 className="text-lg font-bold text-white leading-tight">
+                  {[prospect.nom_prospect || prospect.nomProspect, prospect.prenom_prospect || prospect.prenomProspect].filter(Boolean).join(' ')}
+                </h3>
                 <div className={`shrink-0 px-2.5 py-1 rounded-md text-[10px] uppercase font-bold border tracking-wide ${STATUS_COLORS[prospect.statut] || 'bg-slate-500/20 text-slate-400 border-slate-500/30'}`}>
                    {STATUT_PROSPECTION_LABELS[prospect.statut as StatutProspectionType] || prospect.statut}
                 </div>
@@ -120,17 +115,34 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
 
                <div className="grid grid-cols-2 gap-3 pt-2">
                   <div className="flex items-center gap-2 text-slate-300 bg-slate-950/50 p-2 rounded-lg border border-slate-800/50">
-                    <Phone size={14} className="text-cyan-500" />
+                    <Phone size={14} className="text-cyan-500 shrink-0" />
                     <span className="text-xs font-mono">{prospect.telephoneProspect || '-'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-300 bg-slate-950/50 p-2 rounded-lg border border-slate-800/50">
-                    <Briefcase size={14} className="text-purple-500" />
-                    <span className="text-xs truncate">{prospect.typeActivite || prospect.activitePrincipale || '-'}</span>
+                    <Briefcase size={14} className="text-purple-500 shrink-0" />
+                    <span className="text-xs break-words">{prospect.typeActivite || prospect.activitePrincipale || '-'}</span>
                   </div>
                </div>
+               {prospect.adresseProspect && (
+                 <div className="flex items-center gap-2 text-slate-400 text-xs pt-1">
+                   <MapPin size={12} className="shrink-0" />
+                   <span>{prospect.adresseProspect}</span>
+                 </div>
+               )}
             </div>
 
-            {/* Main Info */}
+            {/* Informations Personnelles */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                <User size={12} /> Informations Personnelles
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                 {prospect.sexe && <InfoCard label="Sexe" value={prospect.sexe === 'M' ? 'Homme' : 'Femme'} />}
+                 <InfoCard label="Créé le" value={prospect.createdAt ? new Date(prospect.createdAt).toLocaleDateString('fr-FR') : '-'} />
+              </div>
+            </div>
+
+            {/* Localisation */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                 <MapPin size={12} /> Localisation
@@ -141,27 +153,54 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
               </div>
             </div>
 
+            {/* Activité */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                <Activity size={12} /> Détails Activité
+                <Activity size={12} /> Activité
               </h4>
               <div className="grid grid-cols-2 gap-3">
-                 <InfoCard label="Revenu Est." value={prospect.revenuEstime ? `${Number(prospect.revenuEstime).toLocaleString()} FCFA` : '-'} />
+                 <InfoCard label="Type d'activité" value={prospect.typeActivite || prospect.activitePrincipale} />
                  <InfoCard label="Ancienneté" value={prospect.ancienneteActivite} />
-                 {prospect.sexe && <InfoCard label="Sexe" value={prospect.sexe === 'M' ? 'Homme' : 'Femme'} />}
-                 <InfoCard label="Créé le" value={prospect.createdAt ? new Date(prospect.createdAt).toLocaleDateString('fr-FR') : '-'} />
+              </div>
+              {prospect.descriptionActivite && (
+                <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                  <div className="text-[10px] font-medium text-slate-500 uppercase mb-0.5">Description</div>
+                  <div className="text-sm text-slate-200 leading-relaxed">{prospect.descriptionActivite}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Données Financières */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                <DollarSign size={12} /> Données Financières
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                 <InfoCard label="Revenu estimé" value={prospect.revenuEstime ? `${Number(prospect.revenuEstime).toLocaleString('fr-FR')} FCFA` : undefined} />
+                 <InfoCard label="CA Mensuel" value={prospect.chiffreAffairesMensuel ? `${Number(prospect.chiffreAffairesMensuel).toLocaleString('fr-FR')} FCFA` : undefined} />
+                 <InfoCard label="Type de revenu" value={prospect.typeRevenu} />
+                 {prospect.revenuJournalier && <InfoCard label="Revenu journalier" value={`${Number(prospect.revenuJournalier).toLocaleString('fr-FR')} FCFA`} />}
               </div>
             </div>
 
-            {/* Observations */}
-            {(prospect.observations) && (
+            {/* Observations & Commentaires */}
+            {(prospect.observations || prospect.commentairesAgent) && (
               <div className="space-y-2">
                  <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                    <FileText size={12} /> Observations
+                    <FileText size={12} /> Notes
                  </h4>
-                 <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 leading-relaxed italic">
-                   "{prospect.observations}"
-                 </div>
+                 {prospect.observations && (
+                   <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-3 space-y-1">
+                     <div className="text-[10px] font-medium text-slate-500 uppercase">Observations</div>
+                     <div className="text-sm text-slate-300 leading-relaxed italic">"{prospect.observations}"</div>
+                   </div>
+                 )}
+                 {prospect.commentairesAgent && (
+                   <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-3 space-y-1">
+                     <div className="text-[10px] font-medium text-slate-500 uppercase">Commentaires Agent</div>
+                     <div className="text-sm text-slate-300 leading-relaxed">{prospect.commentairesAgent}</div>
+                   </div>
+                 )}
               </div>
             )}
 
@@ -214,7 +253,7 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
                       <div>
                         <p className="text-sm font-bold text-purple-100">Confirmer la conversion ?</p>
                         <p className="text-xs text-purple-200/70 mt-1 leading-relaxed">
-                          Vous allez créer un client pour <strong>{prospect.nom_prospect}</strong>.
+                          Vous allez créer un client pour <strong>{[prospect.nom_prospect || prospect.nomProspect, prospect.prenom_prospect || prospect.prenomProspect].filter(Boolean).join(' ')}</strong>.
                           Une prime sera générée si éligible.
                         </p>
                       </div>
@@ -249,7 +288,7 @@ function InfoCard({ label, value }: { label: string; value: string | undefined }
   return (
     <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
       <div className="text-[10px] font-medium text-slate-500 uppercase mb-0.5">{label}</div>
-      <div className="text-sm text-slate-200 font-medium truncate">{value || '-'}</div>
+      <div className="text-sm text-slate-200 font-medium break-words">{value || '-'}</div>
     </div>
   );
 }

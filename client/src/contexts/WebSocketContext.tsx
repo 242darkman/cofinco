@@ -608,6 +608,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          queryClient.invalidateQueries({ queryKey: ["/api/zones"] });
          queryClient.invalidateQueries({ queryKey: ["/api/objectifs-mensuels"] });
          queryClient.invalidateQueries({ queryKey: ["/api/paiements-terrain"] });
+         window.dispatchEvent(new CustomEvent('operations-update', { detail: message.payload }));
          break;
 
       case "AGENT_MODULES_UPDATE": {

@@ -193,7 +193,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
-                      {prospect.nom_prospect || prospect.nomProspect}
+                      {[prospect.nom_prospect || prospect.nomProspect, prospect.prenom_prospect || prospect.prenomProspect].filter(Boolean).join(' ')}
                     </span>
                     {getStatusBadge(prospect.statut)}
                   </div>

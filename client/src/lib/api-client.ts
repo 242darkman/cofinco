@@ -1426,6 +1426,10 @@ export const prospectionApi = {
     request<any>(`/agents/${agentId}/prospection-stats${params?.period ? `?period=${params.period}` : ''}`),
   getFollowups: (agentId: string) =>
     request<any[]>(`/agents/${agentId}/prospection-followups`),
+  countAll: (params?: { agentId?: string }) =>
+    request<{ count: number }>(`/prospections/count${params?.agentId ? `?agentId=${params.agentId}` : ''}`),
+  countActive: (params?: { agentId?: string }) =>
+    request<{ count: number }>(`/prospections/count?statut=REGISTERED,INTERESTED,TO_FOLLOW_UP${params?.agentId ? `&agentId=${params.agentId}` : ''}`),
 };
 
 // Arrondissements & Marchés API
