@@ -37,7 +37,7 @@ export const employes = pgTable("employes", {
   modeCalculPaie: varchar("mode_calcul_paie", { length: 20 }).default("MONTHLY"), // 'MONTHLY', 'HOURLY', 'DAILY'
 
   // CNSS
-  numeroCnss: varchar("numero_cnss", { length: 50 }),
+  numeroCnss: varchar("numero_cnss", { length: 50 }).unique(),
 
   // Sécurité Caisse
   caissePin: text("caisse_pin"), // PIN hashé pour autorisation caisse

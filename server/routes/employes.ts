@@ -111,6 +111,39 @@ const updateEmployeWithUserSchema = z.object({
 export function registerEmployesRoutes(app: Express) {
 
   // ============================================
+  // GET - Vérifier l'unicité du numéro CNSS
+  // ============================================
+  app.get("/api/employes/check-cnss", requireAuth, async (req, res) => {
+    try {
+      const { numeroCnss, excludeEmployeId } = req.query;
+
+      if (!numeroCnss || typeof numeroCnss !== 'string') {
+        return res.status(400).json({ message: "Paramètre 'numeroCnss' requis" });
+      }
+
+      const trimmed = numeroCnss.trim().toUpperCase();
+      if (!trimmed) {
+        return res.json({ available: true });
+      }
+
+      const [existing] = await db
+        .select({ id: employes.id })
+        .from(employes)
+        .where(eq(employes.numeroCnss, trimmed))
+        .limit(1);
+
+      if (existing && existing.id !== excludeEmployeId) {
+        return res.json({ available: false, message: "Ce numéro CNSS est déjà utilisé par un autre employé" });
+      }
+
+      return res.json({ available: true });
+    } catch (error) {
+      logger.error({ err: error }, 'Error checking CNSS uniqueness');
+      res.status(500).json({ message: "Erreur lors de la vérification du numéro CNSS" });
+    }
+  });
+
+  // ============================================
   // GET - Vérifier et générer un username unique
   // ============================================
   app.get("/api/employes/check-username", requireAuth, async (req, res) => {

@@ -116,6 +116,12 @@ export default function EmployeeForm({
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
   const [selectedJobPositionId, setSelectedJobPositionId] = useState<string | null>(null);
 
+  // CNSS uniqueness check
+  const [checkingCnss, setCheckingCnss] = useState(false);
+  const [cnssAvailable, setCnssAvailable] = useState<boolean | null>(null);
+  const [cnssError, setCnssError] = useState<string | null>(null);
+  const cnssDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Tabs state
   const [activeTab, setActiveTab] = useState<'identity' | 'contract'>('identity');
 
@@ -221,7 +227,9 @@ export default function EmployeeForm({
 
       // Validation CNSS
       if (formData.numeroCnss && !VALIDATION_PATTERNS.cnss.test(formData.numeroCnss)) {
-        errors.numeroCnss = 'Format CNSS invalide';
+        errors.numeroCnss = 'Format CNSS invalide (6-20 caractères alphanumériques)';
+      } else if (cnssAvailable === false) {
+        errors.numeroCnss = cnssError || 'Ce numéro CNSS est déjà utilisé';
       }
       
       // Validation Date Embauche
@@ -305,9 +313,11 @@ export default function EmployeeForm({
     const salary = parseFloat(formData.salaireBase);
     if (isNaN(salary) || salary < 0) return false;
     if (formData.numeroCnss && !VALIDATION_PATTERNS.cnss.test(formData.numeroCnss)) return false;
+    if (formData.numeroCnss && cnssAvailable === false) return false;
+    if (formData.numeroCnss && checkingCnss) return false;
 
     return true;
-  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId]);
+  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId, cnssAvailable, checkingCnss]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -372,6 +382,9 @@ export default function EmployeeForm({
     setPhotoPreview(initialData.photoProfile || editingEmploye?.photoProfile || null);
     initialDataRef.current = initialDataJson;
     setValidationErrors({});
+    setCnssAvailable(null);
+    setCnssError(null);
+    setCheckingCnss(false);
 
     // Reset user selection for new employee
     if (!editingEmploye) {
@@ -576,6 +589,42 @@ export default function EmployeeForm({
       setAgenceId('');
     }
   }, [selectedUserId, unlinkedUsers, editingEmploye]);
+
+  // Vérification CNSS en temps réel (debounced)
+  useEffect(() => {
+    const cnss = formData.numeroCnss?.trim();
+    if (!cnss || !VALIDATION_PATTERNS.cnss.test(cnss)) {
+      setCnssAvailable(null);
+      setCnssError(null);
+      setCheckingCnss(false);
+      return;
+    }
+
+    if (cnssDebounceRef.current) clearTimeout(cnssDebounceRef.current);
+    setCheckingCnss(true);
+    setCnssAvailable(null);
+    setCnssError(null);
+
+    cnssDebounceRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ numeroCnss: cnss });
+        if (editingEmploye?.id) params.set('excludeEmployeId', editingEmploye.id);
+        const res = await fetch(`/api/employes/check-cnss?${params}`, { credentials: 'include' });
+        const data = await res.json();
+        setCnssAvailable(data.available);
+        setCnssError(data.available ? null : data.message);
+      } catch {
+        setCnssError(null);
+        setCnssAvailable(null);
+      } finally {
+        setCheckingCnss(false);
+      }
+    }, 500);
+
+    return () => {
+      if (cnssDebounceRef.current) clearTimeout(cnssDebounceRef.current);
+    };
+  }, [formData.numeroCnss, editingEmploye?.id]);
 
   // Libellé dynamique pour le taux de paiement
   const tauxPaiementLabel = useMemo(() => {
@@ -897,16 +946,25 @@ export default function EmployeeForm({
                   className="py-1"
                 />
   
-                <FormField
-                  label="Numéro CNSS"
-                  name="numeroCnss"
-                  type="text"
-                  value={formData.numeroCnss || ''}
-                  onChange={(e) => updateField('numeroCnss', e.target.value.toUpperCase())}
-                  error={validationErrors.numeroCnss}
-                  placeholder="Ex: CNSS123456"
-                  className="py-1 md:col-span-2"
-                />
+                <div className="md:col-span-2">
+                  <FormField
+                    label="Numéro CNSS"
+                    name="numeroCnss"
+                    type="text"
+                    value={formData.numeroCnss || ''}
+                    onChange={(e) => updateField('numeroCnss', e.target.value.toUpperCase())}
+                    error={validationErrors.numeroCnss || (cnssAvailable === false ? (cnssError || 'Déjà utilisé') : undefined)}
+                    placeholder="Ex: CNSS-CG-12345"
+                    className="py-1"
+                  />
+                  {formData.numeroCnss && VALIDATION_PATTERNS.cnss.test(formData.numeroCnss) && (
+                    <div className="mt-1 text-xs">
+                      {checkingCnss && <span className="text-slate-400">Vérification...</span>}
+                      {!checkingCnss && cnssAvailable === true && <span className="text-emerald-400">Numéro CNSS disponible</span>}
+                      {!checkingCnss && cnssAvailable === false && <span className="text-red-400">{cnssError || 'Déjà utilisé par un autre employé'}</span>}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
   
