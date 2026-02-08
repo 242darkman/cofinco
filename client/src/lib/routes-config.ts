@@ -24,7 +24,7 @@ const MessagesModule = lazy(() => import('@/components/shared/MessagesModule'));
 const UserProfile = lazy(() => import('@/components/shared/UserProfile'));
 const CreditRefundsPage = lazy(() => import('@/pages/finance/CreditRefundsPage'));
 const AdminVirementsProgrammes = lazy(() => import('@/components/admin/AdminVirementsProgrammes'));
-const ReconciliationPage = lazy(() => import('@/pages/finance/ReconciliationPage'));
+// const ReconciliationPage = lazy(() => import('@/pages/finance/ReconciliationPage')); // Masqué temporairement
 const TresoreriePage = lazy(() => import('@/pages/finance/TresoreriePage'));
 
 
@@ -172,15 +172,15 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuTresorerie',
     group: 'Opérations',
   },
-  {
-    key: 'reconciliation',
-    path: '/finance/reconciliation',
-    component: ReconciliationPage,
-    requiredModule: 'Administration',
-    label: 'Réconciliation MM',
-    labelKey: 'menuReconciliation',
-    group: 'Opérations',
-  },
+  // {
+  //   key: 'reconciliation',
+  //   path: '/finance/reconciliation',
+  //   component: ReconciliationPage,
+  //   requiredModule: 'Administration',
+  //   label: 'Réconciliation MM',
+  //   labelKey: 'menuReconciliation',
+  //   group: 'Opérations',
+  // }, // Masqué temporairement
   {
     key: 'virements_programmes',
     path: '/virements',

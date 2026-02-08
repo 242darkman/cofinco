@@ -237,7 +237,7 @@ export default function PlatformSidebarContent({
         <button
           onClick={onLogout}
           className={`
-            w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+            w-full flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer
             text-red-400 hover:text-red-300 hover:bg-red-500/10
             transition-all duration-200
             ${!sidebarOpen ? 'justify-center' : ''}

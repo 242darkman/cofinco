@@ -35,7 +35,7 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     ref
   ) => {
     // Base classes (mobile-first)
-    const baseClasses = 'inline-flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-base disabled:opacity-50 disabled:cursor-not-allowed';
+    const baseClasses = 'inline-flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-base disabled:opacity-50 disabled:cursor-not-allowed';
 
     // Size classes
     const sizeClasses = {

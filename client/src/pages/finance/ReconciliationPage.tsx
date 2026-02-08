@@ -201,85 +201,75 @@ export default function ReconciliationPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-2 p-2 max-w-7xl mx-auto overflow-y-auto overflow-x-hidden">
-      {/* Header - Compact */}
-      <div className="shrink-0 flex items-center justify-between">
+    <div className="flex-1 flex flex-col gap-2 min-h-0">
+      {/* Header */}
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold text-white">Réconciliation Mobile Money</h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h1 className="text-base sm:text-xl font-bold text-white">Réconciliation Mobile Money</h1>
+          <p className="text-[10px] sm:text-xs text-slate-400">
             Rapports quotidiens et détection des anomalies
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => handleGenerateReport('MTN')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors text-xs font-medium"
+            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors text-[10px] sm:text-xs font-medium"
           >
             <ProviderLogo provider="MTN" size="sm" />
-            Générer MTN
+            <span className="hidden xs:inline">Générer</span> MTN
           </button>
           <button
             onClick={() => handleGenerateReport('AIRTEL')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors text-xs font-medium"
+            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors text-[10px] sm:text-xs font-medium"
           >
             <ProviderLogo provider="AIRTEL" size="sm" />
-            Générer Airtel
+            <span className="hidden xs:inline">Générer</span> Airtel
           </button>
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors disabled:opacity-50 border border-slate-700"
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors disabled:opacity-50 border border-slate-700"
           >
             <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
 
-      {/* Summary Cards - Compact */}
-      <div className="shrink-0 grid grid-cols-2 md:grid-cols-4 gap-2">
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-cyan-500/10 shrink-0">
-              <FileText size={18} className="text-cyan-400" />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Rapports</p>
-              <p className="text-lg font-bold text-white leading-none">{reports.length}</p>
-            </div>
+      {/* Summary Cards */}
+      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5">
+          <div className="p-1.5 sm:p-2 rounded-lg bg-cyan-500/10 shrink-0"><FileText size={16} className="text-cyan-400" /></div>
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">Rapports</p>
+            <p className="text-sm sm:text-lg font-bold text-white leading-none">{reports.length}</p>
+          </div>
         </div>
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 shrink-0">
-              <AlertTriangle size={18} className="text-amber-400" />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Anomalies</p>
-              <p className="text-lg font-bold text-amber-400 leading-none">{totalAnomalies}</p>
-            </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5">
+          <div className="p-1.5 sm:p-2 rounded-lg bg-amber-500/10 shrink-0"><AlertTriangle size={16} className="text-amber-400" /></div>
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">Anomalies</p>
+            <p className="text-sm sm:text-lg font-bold text-amber-400 leading-none">{totalAnomalies}</p>
+          </div>
         </div>
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-500/10 shrink-0">
-              <TrendingUp size={18} className="text-red-400" />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Écart Total</p>
-              <p className="text-lg font-bold text-red-400 leading-none">
-                {totalEcart.toLocaleString()} <span className="text-[10px]">F</span>
-              </p>
-            </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5">
+          <div className="p-1.5 sm:p-2 rounded-lg bg-red-500/10 shrink-0"><TrendingUp size={16} className="text-red-400" /></div>
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">Écart Total</p>
+            <p className="text-sm sm:text-lg font-bold text-red-400 leading-none">{totalEcart.toLocaleString()} <span className="text-[10px]">F</span></p>
+          </div>
         </div>
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 shrink-0">
-              <Clock size={18} className="text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Non résolus</p>
-              <p className="text-lg font-bold text-emerald-400 leading-none">{unresolvedCount}</p>
-            </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5">
+          <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-500/10 shrink-0"><Clock size={16} className="text-emerald-400" /></div>
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">Non résolus</p>
+            <p className="text-sm sm:text-lg font-bold text-emerald-400 leading-none">{unresolvedCount}</p>
+          </div>
         </div>
       </div>
 
-      {/* Filters & Table - Fixed Height Container */}
+      {/* Filters & Table */}
       <div className="flex-1 min-h-0 bg-slate-900/50 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-        
+
         {/* Toolbar */}
         <div className="shrink-0 p-2 border-b border-slate-800 flex items-center gap-2">
           <div className="relative">
@@ -308,23 +298,30 @@ export default function ReconciliationPage() {
             </select>
             <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>
+
+          <span className="ml-auto text-[10px] text-slate-600 hidden sm:inline">
+            {reports.length} rapport{reports.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
-        {/* Scrollable Report List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 size={32} className="text-cyan-500 animate-spin" />
-              </div>
-            ) : reports.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                <FileText size={48} className="mb-4 opacity-20" />
-                <p className="text-sm">Aucun rapport de réconciliation</p>
-              </div>
-            ) : (
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full min-h-[200px]">
+              <Loader2 size={24} className="text-cyan-500 animate-spin" />
+            </div>
+          ) : reports.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-slate-500 gap-2">
+              <FileText size={32} className="opacity-20" />
+              <p className="text-sm">Aucun rapport de réconciliation</p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block">
                 <table className="w-full relative border-collapse">
-                  <thead className="bg-slate-900/95 sticky top-0 z-10 backdrop-blur-sm shadow-sm ring-1 ring-slate-800">
-                    <tr>
+                  <thead className="bg-slate-900/95 sticky top-0 z-10 backdrop-blur-sm">
+                    <tr className="border-b border-slate-800">
                       <th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 py-2">Date</th>
                       <th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 py-2">Provider</th>
                       <th className="text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 py-2">Transactions</th>
@@ -337,7 +334,7 @@ export default function ReconciliationPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
                     {reports.map((report) => (
-                      <tr key={report.id} className="hover:bg-slate-800/40 transition-colors group">
+                      <tr key={report.id} className="hover:bg-slate-800/40 transition-colors">
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1.5">
                             <Calendar size={12} className="text-slate-500" />
@@ -383,22 +380,61 @@ export default function ReconciliationPage() {
                           <ReportStatusBadge statut={report.statut} />
                         </td>
                         <td className="px-3 py-2.5 text-center">
-                            <button
-                              onClick={() => {
-                                setSelectedReport(report);
-                                setShowDetailModal(true);
-                              }}
-                              className="p-1.5 rounded-md bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors border border-transparent hover:border-slate-600"
-                              title="Voir détails"
-                            >
-                              <Eye size={14} />
-                            </button>
+                          <button
+                            onClick={() => { setSelectedReport(report); setShowDetailModal(true); }}
+                            className="p-1.5 rounded-md bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors border border-transparent hover:border-slate-600"
+                            title="Voir détails"
+                          >
+                            <Eye size={14} />
+                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-            )}
+              </div>
+
+              {/* Mobile card list */}
+              <div className="md:hidden divide-y divide-slate-800/50">
+                {reports.map((report) => (
+                  <button
+                    key={report.id}
+                    onClick={() => { setSelectedReport(report); setShowDetailModal(true); }}
+                    className="w-full text-left p-3 hover:bg-slate-800/40 transition-colors space-y-2"
+                  >
+                    {/* Row 1: Provider + Date + Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <ProviderLogo provider={report.provider} size="sm" />
+                        <span className="text-xs font-semibold text-white">{report.provider}</span>
+                        <span className="text-[10px] text-slate-500">{safeDateFormat(report.dateRapport, 'dd/MM/yy')}</span>
+                      </div>
+                      <ReportStatusBadge statut={report.statut} />
+                    </div>
+
+                    {/* Row 2: Stats */}
+                    <div className="flex items-center gap-3 text-xs">
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
+                        <span className="text-emerald-400 font-bold">{report.successCount}</span>
+                        <span className="text-slate-600">/</span>
+                        <span className="text-slate-400">{report.totalIntents}</span>
+                      </div>
+                      <span className="font-mono font-bold text-white">{Number(report.montantConfirme).toLocaleString()} F</span>
+                      <span className={`font-mono font-bold ${Number(report.ecart) > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {Number(report.ecart) > 0 ? '+' : ''}{Number(report.ecart).toLocaleString()}
+                      </span>
+                      {report.anomaliesCount > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-500">
+                          <AlertTriangle size={10} />
+                          {report.anomaliesCount}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -406,9 +442,9 @@ export default function ReconciliationPage() {
       {showDetailModal && selectedReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowDetailModal(false)} />
-          <div className="relative bg-slate-900 rounded-2xl border border-slate-700/50 max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="relative bg-slate-900 rounded-2xl border border-slate-700/50 max-w-2xl w-full mx-3 sm:mx-4 max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
                 <ProviderLogo provider={selectedReport.provider} size="md" />
                 <div>
