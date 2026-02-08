@@ -786,7 +786,7 @@ export async function ensureCustomFunctions(): Promise<void> {
         BEGIN
           UPDATE sessions_caisse
           SET last_activity = NOW()
-          WHERE id = NEW.session_id AND statut = 'Ouverte';
+          WHERE id = NEW.session_id AND statut = 'OPEN';
 
           RETURN NEW;
         END;
@@ -826,7 +826,7 @@ export async function ensureCustomFunctions(): Promise<void> {
           FOR expired_session IN
             SELECT s.*
             FROM sessions_caisse s
-            WHERE s.statut = 'Ouverte'
+            WHERE s.statut = 'OPEN'
             AND s.last_activity < NOW() - (timeout_hours || ' hours')::INTERVAL
           LOOP
             SELECT
@@ -846,7 +846,7 @@ export async function ensureCustomFunctions(): Promise<void> {
 
             UPDATE sessions_caisse
             SET
-              statut = 'Fermée',
+              statut = 'CLOSED',
               closed_at = NOW(),
               montant_fermeture_theorique = calculated_solde::TEXT,
               closed_reason = 'timeout',
@@ -899,9 +899,9 @@ export async function ensureCustomFunctions(): Promise<void> {
               VALUES (
                 NEW.id,
                 CASE
-                  WHEN NEW.statut = 'Fermée' AND NEW.closed_reason = 'timeout' THEN 'TIMEOUT'
-                  WHEN NEW.statut = 'Fermée' AND NEW.closed_reason = 'admin' THEN 'ADMIN_CLOSED'
-                  WHEN NEW.statut = 'Fermée' THEN 'CLOSED'
+                  WHEN NEW.statut = 'CLOSED' AND NEW.closed_reason = 'timeout' THEN 'TIMEOUT'
+                  WHEN NEW.statut = 'CLOSED' AND NEW.closed_reason = 'admin' THEN 'ADMIN_CLOSED'
+                  WHEN NEW.statut = 'CLOSED' THEN 'CLOSED'
                   ELSE 'STATUS_CHANGE'
                 END,
                 OLD.statut,
@@ -977,7 +977,7 @@ export async function ensureCustomFunctions(): Promise<void> {
           FROM sessions_caisse s
           LEFT JOIN caisses c ON s.caisse_id = c.id
           LEFT JOIN users u ON s.caissier_id = u.id
-          WHERE s.statut = 'Ouverte'
+          WHERE s.statut = 'OPEN'
           AND EXTRACT(EPOCH FROM (NOW() - s.last_activity)) / 3600 >= warning_hours
           ORDER BY EXTRACT(EPOCH FROM (NOW() - s.last_activity)) DESC;
         END;

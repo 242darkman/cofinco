@@ -1031,20 +1031,23 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   export async function getSessionCaisse(id: string): Promise<any | undefined> {
     const results = await db.select({
       session: sessionsCaisse,
+      caisse_nom: caisses.nom,
       caissier_nom: users.nom,
       caissier_prenom: users.prenom
     })
     .from(sessionsCaisse)
+    .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
     .where(eq(sessionsCaisse.id, id));
 
     if (results.length === 0) return undefined;
-    
+
     const r = results[0];
     return {
       ...r.session,
       computedStatus: computeSessionStatus(r.session),
-      caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu'
+      caisseNom: r.caisse_nom || 'Caisse Inconnue',
+      caissierNom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu',
     };
   }
 
@@ -1071,8 +1074,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return {
       ...r.session,
       computedStatus: computeSessionStatus(r.session),
-      caisse_nom: r.caisse_nom || 'Caisse Inconnue',
-      caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Moi'
+      caisseNom: r.caisse_nom || 'Caisse Inconnue',
+      caissierNom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Moi',
     };
   }
 
@@ -1126,10 +1129,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return results.map(r => ({
       ...r.session,
       computedStatus: computeSessionStatus(r.session),
-      caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu',
-      caisse_nom: r.caisse_nom,
-      agence_nom: r.agence_nom || 'Agence Inconnue',
-      agence_code: r.agence_code
+      caissierNom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu',
+      caisseNom: r.caisse_nom,
+      agenceNom: r.agence_nom || 'Agence Inconnue',
+      agenceCode: r.agence_code,
     }));
   }
 
@@ -1469,10 +1472,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     const results = await query;
     return results.map(r => ({
       ...r.caisse,
-      active_session: r.session ? {
+      activeSession: r.session ? {
         ...r.session,
         computedStatus: computeSessionStatus(r.session),
-        caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim()
+        caissierNom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim()
       } : null
     }));
   }
