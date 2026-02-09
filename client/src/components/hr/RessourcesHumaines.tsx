@@ -87,9 +87,6 @@ export default function RessourcesHumaines() {
 
   const {
     avantagesList,
-    selectedEmployes,
-    toggleEmployeSelection,
-    applyAvantageToSelected,
     createAvantage,
     updateAvantage,
     deleteAvantage
@@ -249,9 +246,6 @@ export default function RessourcesHumaines() {
           <AvantagesManager
             avantages={avantagesList}
             employes={employes}
-            selectedEmployes={selectedEmployes}
-            onToggleEmploye={toggleEmployeSelection}
-            onApplyToSelected={applyAvantageToSelected}
             onCreate={createAvantage}
             onUpdate={updateAvantage}
             onDelete={deleteAvantage}
