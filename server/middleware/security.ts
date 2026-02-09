@@ -172,7 +172,7 @@ const developmentCSP = {
     connectSrc: ["'self'", "https:", "wss:", "ws:"], // ws: pour HMR
     frameSrc: ["'none'"],
     objectSrc: ["'none'"],
-    upgradeInsecureRequests: [], // Désactivé en dev pour localhost HTTP
+    upgradeInsecureRequests: false, // Désactivé en dev pour localhost HTTP
   },
 };
 
