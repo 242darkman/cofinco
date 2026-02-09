@@ -732,7 +732,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       setReceiptData(rData);
       setLastPaymentInfo(paiementData);
       setShowSuccessModal(true);
-      autoPrint(rData).catch(err => console.warn('[AutoPrint]', err.message));
     } catch (error: any) {
       console.error('Erreur:', error);
       setErrors({ submit: error.message || "Erreur lors de l'enregistrement" });
@@ -893,9 +892,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     setLoading(false);
     setMmPaymentStatus('idle');
     setMmPaymentIntent(null);
-
-    // Auto-print receipt
-    autoPrint(rData).catch(err => console.warn('[AutoPrint]', err.message));
   };
 
   // Cancel MM payment polling

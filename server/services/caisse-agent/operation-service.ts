@@ -20,6 +20,7 @@ import {
   type OperationTerrainWithRelations,
 } from "@shared/schema";
 import { eq, and, isNull, desc, gte, lte, sql, count } from "drizzle-orm";
+import { randomInt } from "crypto";
 import { caisseAgentService } from "./caisse-agent-service";
 import { StatutCaisseAgent } from "@shared/enum/status-constants";
 import { normalizeRole, SystemRole } from "@shared/types/roles";
@@ -33,7 +34,6 @@ function generateOperationReference(type: "COLLECT" | "SETTLE"): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   const time = Date.now().toString().slice(-6);
-  const { randomInt } = require('crypto');
   const random = randomInt(0, 1000).toString().padStart(3, "0");
 
   const prefix = type === "COLLECT" ? "OPT-COL" : "OPT-SET";
