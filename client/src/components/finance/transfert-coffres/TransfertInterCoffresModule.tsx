@@ -96,6 +96,11 @@ const api = {
     return res.json();
   },
 
+  async getTransfertStats(): Promise<any> {
+    const res = await fetch('/api/transferts-inter-coffres/stats/transferts', { credentials: 'include' });
+    return res.json();
+  },
+
   async createTransfert(data: any): Promise<any> {
     const res = await fetch('/api/transferts-inter-coffres/transferts', {
       method: 'POST',
@@ -166,6 +171,7 @@ export default function TransfertInterCoffresModule({
   const [transferts, setTransferts] = useState<TransfertInterCoffre[]>([]);
   const [coffres, setCoffres] = useState<CoffreFort[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const [transfertStats, setTransfertStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -200,12 +206,14 @@ export default function TransfertInterCoffresModule({
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [coffresData, statsData] = await Promise.all([
+      const [coffresData, statsData, tStatsData] = await Promise.all([
         api.getCoffres(),
         api.getCoffresStats(),
+        api.getTransfertStats(),
       ]);
       setCoffres(coffresData);
       if (statsData.success) setStats(statsData.data);
+      if (tStatsData.success) setTransfertStats(tStatsData.data);
 
       await loadTransferts();
     } catch (error) {
@@ -228,12 +236,16 @@ export default function TransfertInterCoffresModule({
       if (dateDebutFilter) params.dateDebut = dateDebutFilter;
       if (dateFinFilter) params.dateFin = dateFinFilter;
 
-      const result = await api.getTransferts(params);
+      const [result, tStatsData] = await Promise.all([
+        api.getTransferts(params),
+        api.getTransfertStats(),
+      ]);
       if (result.success) {
         setTransferts(result.transferts);
         setTotalPages(result.pagination.totalPages);
         setTotalItems(result.pagination.total);
       }
+      if (tStatsData.success) setTransfertStats(tStatsData.data);
     } catch (error) {
       console.error('Error loading transferts:', error);
     }
@@ -353,19 +365,21 @@ export default function TransfertInterCoffresModule({
 
   // Computed stats
   const computedStats = useMemo(() => {
-    const byStatut = transferts.reduce((acc, t) => {
-      acc[t.statut] = (acc[t.statut] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const bs = transfertStats?.byStatus || {};
+    const sumMontant = (...keys: string[]) => keys.reduce((s, k) => s + parseFloat(bs[k]?.montant || '0'), 0);
+    const sumCount = (...keys: string[]) => keys.reduce((s, k) => s + (bs[k]?.count || 0), 0);
 
     return {
-      total: totalItems,
-      enAttente: (byStatut['SUBMITTED'] || 0) + (byStatut['APPROVED_L1'] || 0),
-      enTransit: byStatut['IN_TRANSIT'] || 0,
-      recus: (byStatut['RECEIVED'] || 0) + (byStatut['RECEIVED_WITH_DISCREPANCY'] || 0),
+      total: transfertStats?.total || totalItems,
+      enAttente: sumCount('SUBMITTED', 'APPROVED_L1'),
+      enAttenteMontant: sumMontant('SUBMITTED', 'APPROVED_L1'),
+      enTransit: sumCount('IN_TRANSIT'),
+      enTransitMontant: sumMontant('IN_TRANSIT'),
+      recus: sumCount('RECEIVED', 'RECEIVED_WITH_DISCREPANCY'),
+      recusMontant: sumMontant('RECEIVED', 'RECEIVED_WITH_DISCREPANCY'),
       soldeTotalCoffres: stats?.soldeTotal || 0,
     };
-  }, [transferts, totalItems, stats]);
+  }, [transfertStats, totalItems, stats]);
 
   // Get status badge variant
   const getStatutBadge = (statut: string) => {
@@ -534,8 +548,9 @@ export default function TransfertInterCoffresModule({
               <div className="flex flex-col">
                 <span className="text-[10px] text-amber-400/80 uppercase tracking-wide leading-tight">En Attente</span>
                 <span className="text-sm font-bold text-amber-400 leading-tight">
-                   {loading ? "..." : computedStats.enAttente}
+                   {loading ? "..." : formatMoney(computedStats.enAttenteMontant)}
                 </span>
+                <span className="text-[9px] text-amber-400/50 leading-tight">{computedStats.enAttente} transfert{computedStats.enAttente !== 1 ? 's' : ''}</span>
               </div>
             </div>
           </div>
@@ -548,8 +563,9 @@ export default function TransfertInterCoffresModule({
               <div className="flex flex-col">
                 <span className="text-[10px] text-blue-400/80 uppercase tracking-wide leading-tight">En Transit</span>
                 <span className="text-sm font-bold text-blue-400 leading-tight">
-                   {loading ? "..." : computedStats.enTransit}
+                   {loading ? "..." : formatMoney(computedStats.enTransitMontant)}
                 </span>
+                <span className="text-[9px] text-blue-400/50 leading-tight">{computedStats.enTransit} transfert{computedStats.enTransit !== 1 ? 's' : ''}</span>
               </div>
             </div>
           </div>
@@ -562,8 +578,9 @@ export default function TransfertInterCoffresModule({
               <div className="flex flex-col">
                 <span className="text-[10px] text-emerald-400/80 uppercase tracking-wide leading-tight">Reçus</span>
                 <span className="text-sm font-bold text-emerald-400 leading-tight">
-                   {loading ? "..." : computedStats.recus}
+                   {loading ? "..." : formatMoney(computedStats.recusMontant)}
                 </span>
+                <span className="text-[9px] text-emerald-400/50 leading-tight">{computedStats.recus} transfert{computedStats.recus !== 1 ? 's' : ''}</span>
               </div>
             </div>
           </div>

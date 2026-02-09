@@ -407,6 +407,77 @@ export const TypeMouvementCoffre = {
 
 export type TypeMouvementCoffreType = (typeof TypeMouvementCoffre)[keyof typeof TypeMouvementCoffre];
 
+// ============================================
+// EVACUATION DE COFFRE (Vide de Coffre)
+// ============================================
+
+export const StatutEvacuationCoffre = {
+  DRAFT: "DRAFT",
+  SUBMITTED: "SUBMITTED",
+  APPROVED: "APPROVED",
+  PREPARED: "PREPARED",
+  IN_TRANSIT: "IN_TRANSIT",
+  DEPOSITED: "DEPOSITED",
+  RECONCILED: "RECONCILED",
+  DISCREPANCY: "DISCREPANCY",
+  REJECTED: "REJECTED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type StatutEvacuationCoffreType = (typeof StatutEvacuationCoffre)[keyof typeof StatutEvacuationCoffre];
+
+/** Labels FR pour l'UI des statuts d'évacuation */
+export const STATUT_EVACUATION_COFFRE_LABELS: Record<StatutEvacuationCoffreType, string> = {
+  [StatutEvacuationCoffre.DRAFT]: "Brouillon",
+  [StatutEvacuationCoffre.SUBMITTED]: "Soumise",
+  [StatutEvacuationCoffre.APPROVED]: "Approuvée",
+  [StatutEvacuationCoffre.PREPARED]: "Préparée",
+  [StatutEvacuationCoffre.IN_TRANSIT]: "En transit",
+  [StatutEvacuationCoffre.DEPOSITED]: "Déposée",
+  [StatutEvacuationCoffre.RECONCILED]: "Rapprochée",
+  [StatutEvacuationCoffre.DISCREPANCY]: "Écart détecté",
+  [StatutEvacuationCoffre.REJECTED]: "Rejetée",
+  [StatutEvacuationCoffre.CANCELLED]: "Annulée",
+};
+
+export const TypeDestinationEvacuation = {
+  BANQUE: "BANQUE",
+  COFFRE_CENTRAL: "COFFRE_CENTRAL",
+  TRANSPORTEUR: "TRANSPORTEUR",
+} as const;
+
+export type TypeDestinationEvacuationType = (typeof TypeDestinationEvacuation)[keyof typeof TypeDestinationEvacuation];
+
+/** Labels FR pour les destinations d'évacuation */
+export const TYPE_DESTINATION_EVACUATION_LABELS: Record<TypeDestinationEvacuationType, string> = {
+  [TypeDestinationEvacuation.BANQUE]: "Banque",
+  [TypeDestinationEvacuation.COFFRE_CENTRAL]: "Coffre Central / Siège",
+  [TypeDestinationEvacuation.TRANSPORTEUR]: "Transporteur de fonds",
+};
+
+export const MotifEvacuation = {
+  EXCEDENT_ENCAISSE: "EXCEDENT_ENCAISSE",
+  FIN_EXERCICE: "FIN_EXERCICE",
+  SECURITE: "SECURITE",
+  FERMETURE_AGENCE: "FERMETURE_AGENCE",
+  APPROVISIONNEMENT_SIEGE: "APPROVISIONNEMENT_SIEGE",
+  TRANSFERT_BANCAIRE: "TRANSFERT_BANCAIRE",
+  AUTRE: "AUTRE",
+} as const;
+
+export type MotifEvacuationType = (typeof MotifEvacuation)[keyof typeof MotifEvacuation];
+
+/** Labels FR pour les motifs d'évacuation */
+export const MOTIF_EVACUATION_LABELS: Record<MotifEvacuationType, string> = {
+  [MotifEvacuation.EXCEDENT_ENCAISSE]: "Excédent d'encaisse",
+  [MotifEvacuation.FIN_EXERCICE]: "Fin d'exercice",
+  [MotifEvacuation.SECURITE]: "Mesure de sécurité",
+  [MotifEvacuation.FERMETURE_AGENCE]: "Fermeture d'agence",
+  [MotifEvacuation.APPROVISIONNEMENT_SIEGE]: "Approvisionnement siège",
+  [MotifEvacuation.TRANSFERT_BANCAIRE]: "Transfert bancaire",
+  [MotifEvacuation.AUTRE]: "Autre motif",
+};
+
 /** Labels FR pour l'UI des types de mouvement coffre */
 export const TYPE_MOUVEMENT_COFFRE_LABELS: Record<string, string> = {
   [TypeMouvementCoffre.SORTIE_COFFRE]: "Sortie Coffre",

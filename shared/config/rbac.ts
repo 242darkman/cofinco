@@ -294,6 +294,15 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Voir configuration', code: 'coffre.config.view', description: 'Voir la configuration du coffre' },
     { name: 'Modifier configuration', code: 'coffre.config.edit', description: 'Modifier la configuration du coffre' },
     { name: 'Supervision Trésorerie', code: 'coffre.supervision.view', description: 'Vue globale trésorerie' },
+    // Evacuation de cash (vide de coffre)
+    { name: 'Voir évacuations', code: 'coffre.evacuation.view', description: 'Consulter les évacuations de coffre' },
+    { name: 'Créer évacuation', code: 'coffre.evacuation.create', description: 'Créer une demande d\'évacuation de coffre' },
+    { name: 'Approuver évacuation', code: 'coffre.evacuation.approve', description: 'Approuver ou rejeter une évacuation' },
+    { name: 'Préparer évacuation', code: 'coffre.evacuation.prepare', description: 'Préparer physiquement l\'évacuation (billetage, scellé)' },
+    { name: 'Dispatcher évacuation', code: 'coffre.evacuation.dispatch', description: 'Dispatcher les fonds (comptabilise la sortie)' },
+    { name: 'Enregistrer dépôt', code: 'coffre.evacuation.deposit', description: 'Confirmer le dépôt à destination' },
+    { name: 'Réconcilier évacuation', code: 'coffre.evacuation.reconcile', description: 'Réconcilier les montants évacués' },
+    { name: 'Config évacuation', code: 'coffre.evacuation.config', description: 'Gérer la configuration des évacuations' },
   ],
   // New modules for CASL alignment
   'RBAC': [

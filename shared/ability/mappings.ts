@@ -201,6 +201,15 @@ export const PERMISSION_MAPPINGS: Record<string, PermissionMapping> = {
   'coffre.config.view': { action: Actions.VIEW, subject: Subjects.SETTINGS },
   'coffre.config.edit': { action: Actions.EDIT, subject: Subjects.SETTINGS },
   'coffre.supervision.view': { action: Actions.VIEW, subject: Subjects.COFFRE },
+  // Evacuation de cash (vide de coffre)
+  'coffre.evacuation.view': { action: Actions.VIEW, subject: Subjects.EVACUATION_COFFRE },
+  'coffre.evacuation.create': { action: Actions.CREATE, subject: Subjects.EVACUATION_COFFRE },
+  'coffre.evacuation.approve': { action: Actions.APPROVE, subject: Subjects.EVACUATION_COFFRE },
+  'coffre.evacuation.prepare': { action: Actions.PREPARE, subject: Subjects.EVACUATION_COFFRE },
+  'coffre.evacuation.dispatch': { action: Actions.DISPATCH, subject: Subjects.EVACUATION_COFFRE },
+  'coffre.evacuation.deposit': { action: Actions.DEPOSIT, subject: Subjects.EVACUATION_COFFRE },
+  'coffre.evacuation.reconcile': { action: Actions.RECONCILE, subject: Subjects.EVACUATION_COFFRE },
+  'coffre.evacuation.config': { action: Actions.EDIT, subject: Subjects.SETTINGS },
 
   // =====================
   // COMPTABILITÉ
@@ -681,6 +690,15 @@ export const MODULE_PERMISSION_BUNDLES: Record<string, string[]> = {
     'coffre.config.view',
     'coffre.config.edit',
     'coffre.supervision.view',
+    // Evacuation
+    'coffre.evacuation.view',
+    'coffre.evacuation.create',
+    'coffre.evacuation.approve',
+    'coffre.evacuation.prepare',
+    'coffre.evacuation.dispatch',
+    'coffre.evacuation.deposit',
+    'coffre.evacuation.reconcile',
+    'coffre.evacuation.config',
   ],
 
   // === OPÉRATIONS - COMPTABILITÉ ===

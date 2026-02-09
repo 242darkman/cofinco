@@ -1262,6 +1262,80 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Prélèvement coffre-fort',
     priority: 100,
   },
+
+  // --- Evacuation coffre (vide de coffre) ---
+  {
+    code: 'EVACUATION_COFFRE_OUT',
+    name: 'Évacuation coffre — sortie transit',
+    description: 'Sortie de fonds du coffre vers compte de transit (dispatch)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'EVACUATION_COFFRE_OUT',
+    journalCode: 'OD',
+    debitAccount: '581',   // Virements internes (transit)
+    creditAccount: '531',  // Coffre-fort source
+    descriptionTemplate: 'Évacuation coffre — fonds en transit',
+    priority: 100,
+  },
+  {
+    code: 'EVACUATION_COFFRE_BANQUE',
+    name: 'Évacuation coffre — dépôt banque',
+    description: 'Dépôt des fonds évacués sur compte bancaire',
+    sourceType: 'MOUVEMENT',
+    eventType: 'EVACUATION_COFFRE_BANQUE',
+    journalCode: 'BQ',
+    debitAccount: '512',   // Banque (compte bancaire)
+    creditAccount: '581',  // Virements internes (transit)
+    descriptionTemplate: 'Évacuation coffre — dépôt bancaire',
+    priority: 100,
+  },
+  {
+    code: 'EVACUATION_COFFRE_CENTRAL',
+    name: 'Évacuation coffre — coffre central',
+    description: 'Transfert des fonds évacués vers coffre central/siège',
+    sourceType: 'MOUVEMENT',
+    eventType: 'EVACUATION_COFFRE_CENTRAL',
+    journalCode: 'OD',
+    debitAccount: '531',   // Coffre-fort destination (central)
+    creditAccount: '581',  // Virements internes (transit)
+    descriptionTemplate: 'Évacuation coffre — entrée coffre central',
+    priority: 100,
+  },
+  {
+    code: 'EVACUATION_COFFRE_TRANSPORTEUR',
+    name: 'Évacuation coffre — transporteur',
+    description: 'Remise des fonds évacués à un transporteur de fonds',
+    sourceType: 'MOUVEMENT',
+    eventType: 'EVACUATION_COFFRE_TRANSPORTEUR',
+    journalCode: 'OD',
+    debitAccount: '512',   // Banque (destination finale via transporteur)
+    creditAccount: '581',  // Virements internes (transit)
+    descriptionTemplate: 'Évacuation coffre — remise transporteur',
+    priority: 100,
+  },
+  {
+    code: 'EVACUATION_COFFRE_ECART_DEFICIT',
+    name: 'Écart évacuation — déficit',
+    description: 'Manquant constaté lors de la réconciliation d\'évacuation',
+    sourceType: 'MOUVEMENT',
+    eventType: 'EVACUATION_COFFRE_ECART_DEFICIT',
+    journalCode: 'OD',
+    debitAccount: '672',   // Pertes sur créances (charges transit)
+    creditAccount: '581',  // Virements internes (transit)
+    descriptionTemplate: 'Écart évacuation coffre — déficit constaté',
+    priority: 100,
+  },
+  {
+    code: 'EVACUATION_COFFRE_ECART_SURPLUS',
+    name: 'Écart évacuation — excédent',
+    description: 'Excédent constaté lors de la réconciliation d\'évacuation',
+    sourceType: 'MOUVEMENT',
+    eventType: 'EVACUATION_COFFRE_ECART_SURPLUS',
+    journalCode: 'OD',
+    debitAccount: '581',   // Virements internes (transit)
+    creditAccount: '772',  // Produits sur transit (produits exceptionnels)
+    descriptionTemplate: 'Écart évacuation coffre — excédent constaté',
+    priority: 100,
+  },
 ];
 
 // ============================================================================

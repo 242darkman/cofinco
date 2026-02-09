@@ -156,6 +156,17 @@ transfertsInterCoffresRouter.get("/stats/coffres", async (req, res) => {
   }
 });
 
+// GET /stats/transferts - Statistiques des transferts (comptage + montants)
+transfertsInterCoffresRouter.get("/stats/transferts", async (req, res) => {
+  try {
+    const result = await transfertService.getTransfertStats();
+    res.json(result);
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur GET /stats/transferts');
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════
 // TRANSFERTS INTER-COFFRES
 // ═══════════════════════════════════════════════════════════════════

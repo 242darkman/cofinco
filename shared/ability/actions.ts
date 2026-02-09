@@ -57,6 +57,10 @@ export const Actions = {
   VALIDATE_TRANSFER: 'validate_transfer',
   EXECUTE_TRANSFER: 'execute_transfer',
 
+  // Evacuation coffre
+  PREPARE: 'prepare',
+  DISPATCH: 'dispatch',
+
   // Agent terrain/caisse
   APPROVE_AGENT_OP: 'approve_agent_op',
   REJECT_AGENT_OP: 'reject_agent_op',
@@ -153,6 +157,8 @@ export const ACTION_LABELS: Record<Action, string> = {
   [Actions.INIT_TRANSFER]: 'Initier transfert',
   [Actions.VALIDATE_TRANSFER]: 'Valider transfert',
   [Actions.EXECUTE_TRANSFER]: 'Exécuter transfert',
+  [Actions.PREPARE]: 'Préparer',
+  [Actions.DISPATCH]: 'Expédier',
   [Actions.APPROVE_AGENT_OP]: 'Approuver opération agent',
   [Actions.REJECT_AGENT_OP]: 'Rejeter opération agent',
   [Actions.SUSPEND_AGENT]: 'Suspendre agent',

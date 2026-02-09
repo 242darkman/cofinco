@@ -245,6 +245,7 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "RH_PAYROLL",
   "COFFRE_TRANSFER",
   "INTER_COFFRE",
+  "EVACUATION_COFFRE",
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -821,4 +822,50 @@ export const caisseOpeningStrictnessEnum = pgEnum("caisse_opening_strictness_enu
   "STRICT_BLOCK",              // Bloquer si billetage > GL attendu
   "WARNING_WITH_JUSTIFICATION", // Permettre avec justification + validation manager
   "LOG_ONLY",                  // Logging uniquement (dev/legacy)
+]);
+
+// ============================================
+// EVACUATION DE COFFRE (Vide de Coffre)
+// ============================================
+
+export const statutEvacuationCoffreEnum = pgEnum("statut_evacuation_coffre_enum", [
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED",
+  "PREPARED",
+  "IN_TRANSIT",
+  "DEPOSITED",
+  "RECONCILED",
+  "DISCREPANCY",
+  "REJECTED",
+  "CANCELLED",
+]);
+
+export const typeDestinationEvacuationEnum = pgEnum("type_destination_evacuation_enum", [
+  "BANQUE",
+  "COFFRE_CENTRAL",
+  "TRANSPORTEUR",
+]);
+
+export const motifEvacuationEnum = pgEnum("motif_evacuation_enum", [
+  "EXCEDENT_ENCAISSE",
+  "FIN_EXERCICE",
+  "SECURITE",
+  "FERMETURE_AGENCE",
+  "APPROVISIONNEMENT_SIEGE",
+  "TRANSFERT_BANCAIRE",
+  "AUTRE",
+]);
+
+export const actionAuditEvacuationEnum = pgEnum("action_audit_evacuation_enum", [
+  "CREATED",
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+  "PREPARED",
+  "DISPATCHED",
+  "DEPOSITED",
+  "RECONCILED",
+  "DISCREPANCY_FLAGGED",
+  "CANCELLED",
 ]);

@@ -35,6 +35,7 @@ import { caisseAdminRouter } from "./routes/caisse-admin";
 import { maintenanceRouter } from "./routes/maintenance";
 import { checkMaintenanceMode } from "./middleware/maintenance";
 import { transfertsInterCoffresRouter } from "./routes/transferts-inter-coffres";
+import { evacuationCoffreRouter } from "./routes/evacuation-coffre";
 import storageRouter from "./routes/storage";
 import { regularisationRouter } from "./routes/regularisation";
 import { paymentsRouter, webhooksRouter } from "./routes/payments";
@@ -59,6 +60,7 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/caisses", caisseAdminRouter); // Advanced caisse admin operations
   app.use("/api/maintenance-mode", maintenanceRouter);
   app.use("/api/transferts-inter-coffres", transfertsInterCoffresRouter);
+  app.use("/api/evacuations-coffre", evacuationCoffreRouter);
   app.use("/api/transactions", transactionsRouter);
 
   // Admin - Regularisation Module (gestion des tâches de régularisation)

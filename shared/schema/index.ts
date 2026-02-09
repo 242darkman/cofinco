@@ -19,6 +19,7 @@ export * from "./remboursement-allocations";
 export * from "./agences";
 export * from "./caisse-agent";
 export * from "./coffres-forts";
+export * from "./evacuation-coffre";
 export * from "./agency_migration";
 export * from "./mobile-money";
 export * from "./dossier-credit";

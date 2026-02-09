@@ -950,4 +950,34 @@ export class TransfertInterCoffresService {
 
     return { success: true, auditLogs: logs };
   }
+
+  /**
+   * Statistiques des transferts par statut (comptage + montants)
+   */
+  async getTransfertStats() {
+    const sumMontant = sql<string>`coalesce(sum(${transfertsInterCoffres.montant}), 0)`;
+
+    const rows = await db
+      .select({
+        statut: transfertsInterCoffres.statut,
+        count: count(),
+        montant: sumMontant,
+      })
+      .from(transfertsInterCoffres)
+      .groupBy(transfertsInterCoffres.statut);
+
+    const byStatus: Record<string, { count: number; montant: string }> = {};
+    let total = 0;
+    let totalMontant = 0;
+    for (const row of rows) {
+      byStatus[row.statut] = { count: Number(row.count), montant: row.montant };
+      total += Number(row.count);
+      totalMontant += parseFloat(row.montant || "0");
+    }
+
+    return {
+      success: true,
+      data: { total, totalMontant: totalMontant.toString(), byStatus },
+    };
+  }
 }

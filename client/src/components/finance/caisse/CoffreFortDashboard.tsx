@@ -37,6 +37,7 @@ import { CoffreAdminPanel } from './CoffreAdminPanel';
 import { ProvisionCoffreModal } from './ProvisionCoffreModal';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import TransfertInterCoffresModule from '../transfert-coffres/TransfertInterCoffresModule';
+import EvacuationCoffreModule from '../evacuation-coffre/EvacuationCoffreModule';
 import { TreasurySupervision } from '../../admin/TreasurySupervision';
 import { coffreKeys, caisseKeys } from '../../../lib/query-keys';
 
@@ -54,6 +55,7 @@ interface ConfirmAction {
 const TAB_HELP: Record<string, string> = {
   operations: 'Demandez, validez et exécutez les transferts entre le coffre et les caisses. Chaque transfert suit un workflow : Demande → Validation → Exécution.',
   intercoffres: 'Envoyez et recevez des fonds entre coffres de différentes agences. Idéal pour les rééquilibrages de trésorerie entre sites.',
+  evacuation: 'Évacuez les fonds du coffre vers une banque, le coffre central ou un transporteur. Workflow complet avec billetage, transit et réconciliation.',
   historique: 'Consultez l\'historique complet de tous les mouvements du coffre : entrées, sorties, provisions et compensations.',
   supervision: 'Vue consolidée des soldes et mouvements de toutes les agences. Comparez les performances et exportez les rapports.',
   admin: 'Configurez les seuils d\'alerte, les plafonds de transfert et les règles de validation du coffre-fort.',
@@ -92,7 +94,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const canExecute = hasPermission('coffre', 'transfert.execute');
   const canConfigure = hasPermission('coffre', 'config.view') || hasPermission('coffre', 'config.edit');
   const canSupervise = hasPermission('coffre', 'supervision.view') || hasPermission('admin', 'access');
-
+  const canEvacuate = hasPermission('coffre', 'evacuation.view');
 
   const [activeTab, setActiveTab] = useState('operations');
   const [showHelp, setShowHelp] = useState(false);
@@ -655,6 +657,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             {[
               { id: 'operations', label: 'Transferts', icon: ArrowRightLeft },
               { id: 'intercoffres', label: 'Inter-Coffres', icon: Vault },
+              ...(canEvacuate ? [{ id: 'evacuation', label: 'Évacuation', icon: ArrowUpRight }] : []),
               { id: 'historique', label: 'Historique', icon: Clock },
               ...(canSupervise ? [{ id: 'supervision', label: 'Supervision', icon: Shield }] : []),
               ...(canConfigure ? [{ id: 'admin', label: 'Admin', icon: Settings }] : [])
@@ -728,6 +731,11 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             <TreasurySupervision />
           ) : activeTab === 'intercoffres' ? (
             <TransfertInterCoffresModule
+              onBack={() => setActiveTab('operations')}
+              userAgenceId={agenceId}
+            />
+          ) : activeTab === 'evacuation' ? (
+            <EvacuationCoffreModule
               onBack={() => setActiveTab('operations')}
               userAgenceId={agenceId}
             />
