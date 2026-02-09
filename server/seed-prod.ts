@@ -2596,6 +2596,13 @@ async function seedHRBootstrap(context: SeedContext, dryRun: boolean): Promise<S
       agenceId: null, // Global
       cnssEmployeeRate: '0.0500',
       cnssEmployerRate: '0.0900',
+      // CNSS breakdown (Congo)
+      cnssAllocFamilialesRate: '0.0000',       // Employé: 0%
+      cnssAllocFamilialesEmployerRate: '0.0650', // Patronal: 6.5%
+      cnssPvidRate: '0.0350',                   // Employé: 3.5%
+      cnssPvidEmployerRate: '0.0050',           // Patronal: 0.5%
+      cnssAtmpRate: '0.0150',                   // Employé: 1.5%
+      cnssAtmpEmployerRate: '0.0150',           // Patronal: 1.5%
       iprBrackets: [
         { min: 0, max: 524000, rate: 0 },
         { min: 524001, max: 1428000, rate: 0.15 },

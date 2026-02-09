@@ -9,7 +9,6 @@ import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/Universal
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi, clientApi, agentTerrainApi } from '../../lib/api-client';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { usePOSPrint } from '@/hooks/usePOSPrint';
 import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
 
 // MM Payment status types
@@ -338,7 +337,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const isMobileMoneyPayment = formData.methode_paiement === 'Airtel Money' || formData.methode_paiement === 'MTN Mobile Money';
 
   const { user } = useUserProfile();
-  const { autoPrint, isPrinting } = usePOSPrint();
 
   const isAgentAutoSelected = useMemo(() => !!agentId, [agentId]);
 
@@ -661,7 +659,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         body: JSON.stringify({
           client_id: paiementData.client_id,
           activity_type: 'paiement',
-          activity_description: `Collecte ${paiementData.type_paiement} - ${paiementData.montant.toLocaleString()} FCFA`,
+          activity_description: `Collecte ${TYPE_OPERATION_TERRAIN_LABELS[paiementData.type_paiement as keyof typeof TYPE_OPERATION_TERRAIN_LABELS] || paiementData.type_paiement} - ${paiementData.montant.toLocaleString()} FCFA`,
           amount: paiementData.montant
         })
       });
@@ -700,7 +698,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         title: 'REÇU PROVISOIRE',
         reference: paiementData.reference,
         date: new Date(),
-        type: paiementData.type_paiement,
+        type: TYPE_OPERATION_TERRAIN_LABELS[paiementData.type_paiement as keyof typeof TYPE_OPERATION_TERRAIN_LABELS] || paiementData.type_paiement,
         transaction: {
           id: paiementData.reference,
           date: new Date(),
@@ -718,7 +716,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         agent: { nom: agentName, prenom: '' },
         details,
         items: [{
-          description: `Collecte ${paiementData.type_paiement}`,
+          description: TYPE_OPERATION_TERRAIN_LABELS[paiementData.type_paiement as keyof typeof TYPE_OPERATION_TERRAIN_LABELS] || paiementData.type_paiement,
           details: paiementData.notes || 'Collecte terrain',
           montant,
           quantite: 1
@@ -781,7 +779,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       compteId: paiementData.compteId || undefined,
       creditId: paiementData.creditId || undefined,
       tontineId: paiementData.tontineId || undefined,
-      description: paiementData.notes || `Collecte ${paiementData.type_paiement}`,
+      description: paiementData.notes || (TYPE_OPERATION_TERRAIN_LABELS[paiementData.type_paiement as keyof typeof TYPE_OPERATION_TERRAIN_LABELS] || paiementData.type_paiement),
       observations: paiementData.notes,
       idempotencyKey: `agent-mm-${Date.now()}-${Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(36)).join('').slice(0, 9)}`,
     };
@@ -853,7 +851,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       title: 'REÇU PAIEMENT MOBILE',
       reference: intent.externalRef || `MM-${Date.now()}`,
       date: new Date(),
-      type: formData.type_paiement,
+      type: TYPE_OPERATION_TERRAIN_LABELS[formData.type_paiement as keyof typeof TYPE_OPERATION_TERRAIN_LABELS] || formData.type_paiement,
       transaction: {
         id: intent.id,
         date: new Date(),
@@ -871,7 +869,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       agent: { nom: agentName, prenom: '' },
       details,
       items: [{
-        description: `Collecte ${formData.type_paiement}`,
+        description: TYPE_OPERATION_TERRAIN_LABELS[formData.type_paiement as keyof typeof TYPE_OPERATION_TERRAIN_LABELS] || formData.type_paiement,
         details: formData.notes || `Paiement ${intent.provider}`,
         montant,
         quantite: 1,

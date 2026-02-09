@@ -30,6 +30,7 @@ import {
 import { users } from "@shared/schema/auth";
 import { eq, and, or, sql, gte, lte, desc, isNull } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
+import { payslipLines, avancesSalaire, StatutAvance } from "@shared/schema";
 
 const logger = createLogger('Service:HR');
 
@@ -56,6 +57,18 @@ interface BenefitsResolution {
   exemptCnss: number;
 }
 
+export interface PayslipLineItem {
+  code: string;
+  libelle: string;
+  category: 'GAIN' | 'RETENUE' | 'PATRONAL' | 'SUBTOTAL' | 'NET';
+  base: number;
+  taux: number | null;
+  montantGain: number;
+  montantRetenue: number;
+  montantPatronal: number;
+  sortOrder: number;
+}
+
 interface PayrollResult {
   salaireBase: number;
   primeAnciennete: number;
@@ -70,6 +83,8 @@ interface PayrollResult {
   autresRetenues: number;
   totalRetenues: number;
   salaireNet: number;
+  lines: PayslipLineItem[];
+  avanceDeduction: number;
 }
 
 interface LeaveValidationResult {
@@ -674,7 +689,7 @@ export class HrService {
 
     // 4. Calculate overtime
     const heuresSupp = monthPresences.reduce(
-      (sum, p) => sum + ((p.heuresSupplementaires || 0) / 60),
+      (sum: number, p: any) => sum + ((p.heuresSupplementaires || 0) / 60),
       0
     );
     const tauxHoraire = input.tauxHoraire || Math.round(salaireBase / 173);
@@ -692,21 +707,185 @@ export class HrService {
     // 6. Gross salary
     const salaireBrut = salaireBase + primeTransport + primeAnciennete + autresPrimes + primeRendement;
 
-    // 7. CNSS contributions (only on components subject to CNSS)
+    // 7. CNSS contributions - breakdown
     const baseCnss = salaireBase + primeTransport + primeAnciennete + primeRendement + benefits.soumisCnss;
-    const cnssEmploye = Math.round(baseCnss * Number(config.cnssEmployeeRate));
-    const cnssPatronale = Math.round(baseCnss * Number(config.cnssEmployerRate));
+    // Employee CNSS breakdown
+    const cnssAllocFamEmployee = Math.round(baseCnss * Number((config as any).cnssAllocFamilialesRate || 0));
+    const cnssPvidEmployee = Math.round(baseCnss * Number((config as any).cnssPvidRate || 0.035));
+    const cnssAtmpEmployee = Math.round(baseCnss * Number((config as any).cnssAtmpRate || 0.015));
+    const cnssEmploye = cnssAllocFamEmployee + cnssPvidEmployee + cnssAtmpEmployee;
+    // Employer CNSS breakdown
+    const cnssAllocFamEmployer = Math.round(baseCnss * Number((config as any).cnssAllocFamilialesEmployerRate || 0.065));
+    const cnssPvidEmployer = Math.round(baseCnss * Number((config as any).cnssPvidEmployerRate || 0.005));
+    const cnssAtmpEmployer = Math.round(baseCnss * Number((config as any).cnssAtmpEmployerRate || 0.015));
+    const cnssPatronale = cnssAllocFamEmployer + cnssPvidEmployer + cnssAtmpEmployer;
 
     // 8. IPR calculation (exclude non-taxable benefits from taxable base)
     const baseImposable = salaireBrut - cnssEmploye - benefits.nonImposable;
     const ipr = this.calculateIPR(Math.max(0, baseImposable), config.iprBrackets as IprBracket[]);
 
-    // 9. Total deductions
-    const autresRetenues = 0;
-    const totalRetenues = cnssEmploye + ipr + autresRetenues;
+    // 9. Salary advance deduction
+    const advancesForMonth = await db
+      .select()
+      .from(avancesSalaire)
+      .where(
+        and(
+          eq(avancesSalaire.employeId, input.employeId),
+          eq(avancesSalaire.moisDeduction, month),
+          or(
+            eq(avancesSalaire.statut, StatutAvance.APPROVED),
+            eq(avancesSalaire.statut, StatutAvance.PAID)
+          )
+        )
+      );
+    const avanceDeduction = advancesForMonth.reduce((sum: number, a: any) => sum + (a.montant || 0), 0);
 
-    // 10. Net salary
+    // 10. Total deductions
+    const autresRetenues = 0;
+    const totalRetenues = cnssEmploye + ipr + autresRetenues + avanceDeduction;
+
+    // 11. Net salary
     const salaireNet = salaireBrut - totalRetenues;
+
+    // ============================================
+    // BUILD PAYSLIP LINES
+    // ============================================
+    const lines: PayslipLineItem[] = [];
+    let sortOrder = 0;
+
+    // --- GAINS ---
+    // 100: Salaire de base
+    lines.push({
+      code: '100', libelle: 'Salaire de base', category: 'GAIN',
+      base: salaireBase, taux: null, montantGain: salaireBase, montantRetenue: 0, montantPatronal: 0,
+      sortOrder: sortOrder++,
+    });
+
+    // 110: Prime d'ancienneté
+    if (primeAnciennete > 0) {
+      const yearsOfService = input.dateEmbauche
+        ? Math.floor((Date.now() - new Date(input.dateEmbauche).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+        : 0;
+      const seniorityRate = Math.min(yearsOfService * 2, 30); // percentage
+      lines.push({
+        code: '110', libelle: "Prime d'ancienneté", category: 'GAIN',
+        base: salaireBase, taux: seniorityRate, montantGain: primeAnciennete, montantRetenue: 0, montantPatronal: 0,
+        sortOrder: sortOrder++,
+      });
+    }
+
+    // 294: Majoration heures supplémentaires
+    if (primeRendement > 0) {
+      lines.push({
+        code: '294', libelle: 'Majoration heures suppl.', category: 'GAIN',
+        base: Math.round(heuresSupp * 100) / 100, taux: Number(config.overtimeRate || 1.5) * 100,
+        montantGain: primeRendement, montantRetenue: 0, montantPatronal: 0,
+        sortOrder: sortOrder++,
+      });
+    }
+
+    // Benefits -> payslip lines (dynamic mapping)
+    const BENEFIT_CODE_MAP: Record<string, { code: string; libelle: string }> = {
+      'PERFORMANCE': { code: '201', libelle: "Prime d'assiduité" },
+      'SCOLAIRE': { code: '801', libelle: 'Prime de diplôme' },
+      'REPAS': { code: '860', libelle: 'Prime de panier' },
+      'RISQUE': { code: '810', libelle: 'Prime de risque' },
+      'LOGEMENT': { code: '820', libelle: 'Indemnité de logement' },
+      'TELECOMMUNICATION': { code: '830', libelle: 'Indemnité téléphone' },
+      'MEDICAL': { code: '840', libelle: 'Indemnité médicale' },
+      'REPRESENTATION': { code: '850', libelle: 'Indemnité de représentation' },
+    };
+
+    for (const benefit of benefits.items) {
+      // Skip TRANSPORT category (handled separately as line 6400)
+      if (benefit.categorie === 'TRANSPORT') continue;
+      // Skip ANCIENNETE category (already handled as line 110)
+      if (benefit.categorie === 'ANCIENNETE') continue;
+
+      const mapping = BENEFIT_CODE_MAP[benefit.categorie] || {
+        code: `8${String(benefit.avantageId).padStart(2, '0')}`,
+        libelle: benefit.nom,
+      };
+      lines.push({
+        code: mapping.code, libelle: mapping.libelle, category: 'GAIN',
+        base: benefit.modeCalcul === 'POURCENTAGE' ? salaireBase : 0,
+        taux: benefit.modeCalcul === 'POURCENTAGE' ? benefit.montantCalcule / salaireBase * 100 : null,
+        montantGain: benefit.montantCalcule, montantRetenue: 0, montantPatronal: 0,
+        sortOrder: sortOrder++,
+      });
+    }
+
+    // 2000: Rémunération Brute (subtotal)
+    lines.push({
+      code: '2000', libelle: 'Rémunération Brute', category: 'SUBTOTAL',
+      base: 0, taux: null, montantGain: salaireBrut, montantRetenue: 0, montantPatronal: 0,
+      sortOrder: sortOrder++,
+    });
+
+    // --- RETENUES & PATRONAL ---
+    // 2100: CNSS Allocations Familiales (employer only)
+    lines.push({
+      code: '2100', libelle: 'CNSS Allocations familiales', category: 'PATRONAL',
+      base: baseCnss, taux: Number((config as any).cnssAllocFamilialesEmployerRate || 0.065) * 100,
+      montantGain: 0, montantRetenue: cnssAllocFamEmployee, montantPatronal: cnssAllocFamEmployer,
+      sortOrder: sortOrder++,
+    });
+
+    // 2160: CNSS Cotisations PVID (employee + employer)
+    lines.push({
+      code: '2160', libelle: 'CNSS Cotisations PVID', category: 'RETENUE',
+      base: baseCnss, taux: Number((config as any).cnssPvidRate || 0.035) * 100,
+      montantGain: 0, montantRetenue: cnssPvidEmployee, montantPatronal: cnssPvidEmployer,
+      sortOrder: sortOrder++,
+    });
+
+    // 2200: CNSS Cotisations AT/MP (employee + employer)
+    lines.push({
+      code: '2200', libelle: 'CNSS Cotisations AT/MP', category: 'RETENUE',
+      base: baseCnss, taux: Number((config as any).cnssAtmpRate || 0.015) * 100,
+      montantGain: 0, montantRetenue: cnssAtmpEmployee, montantPatronal: cnssAtmpEmployer,
+      sortOrder: sortOrder++,
+    });
+
+    // 4950: IRPP
+    lines.push({
+      code: '4950', libelle: 'IRPP', category: 'RETENUE',
+      base: Math.max(0, baseImposable), taux: null, // progressive, no single rate
+      montantGain: 0, montantRetenue: ipr, montantPatronal: 0,
+      sortOrder: sortOrder++,
+    });
+
+    // 6900: Acompte versé en cours de mois
+    if (avanceDeduction > 0) {
+      lines.push({
+        code: '6900', libelle: 'Acompte versé en cours de mois', category: 'RETENUE',
+        base: 0, taux: null, montantGain: 0, montantRetenue: avanceDeduction, montantPatronal: 0,
+        sortOrder: sortOrder++,
+      });
+    }
+
+    // 5000: Total des retenues (subtotal)
+    lines.push({
+      code: '5000', libelle: 'Total des retenues', category: 'SUBTOTAL',
+      base: 0, taux: null, montantGain: 0, montantRetenue: totalRetenues, montantPatronal: cnssPatronale,
+      sortOrder: sortOrder++,
+    });
+
+    // 6400: Prime de transport (non-taxable, listed after retenues)
+    if (primeTransport > 0) {
+      lines.push({
+        code: '6400', libelle: 'Prime de transport', category: 'GAIN',
+        base: 0, taux: null, montantGain: primeTransport, montantRetenue: 0, montantPatronal: 0,
+        sortOrder: sortOrder++,
+      });
+    }
+
+    // 9999: Net à payer
+    lines.push({
+      code: '9999', libelle: 'Net à payer', category: 'NET',
+      base: 0, taux: null, montantGain: salaireNet, montantRetenue: 0, montantPatronal: 0,
+      sortOrder: sortOrder++,
+    });
 
     return {
       salaireBase,
@@ -722,6 +901,8 @@ export class HrService {
       autresRetenues,
       totalRetenues,
       salaireNet,
+      lines,
+      avanceDeduction,
     };
   }
 
@@ -829,6 +1010,24 @@ export class HrService {
           statut: BulletinStatus.DRAFT,
         })
         .returning();
+
+      // Persist payslip lines
+      if (payroll.lines && payroll.lines.length > 0) {
+        await db.insert(payslipLines).values(
+          payroll.lines.map(line => ({
+            bulletinId: bulletin.id,
+            code: line.code,
+            libelle: line.libelle,
+            category: line.category,
+            base: line.base,
+            taux: line.taux !== null ? String(line.taux) : null,
+            montantGain: line.montantGain,
+            montantRetenue: line.montantRetenue,
+            montantPatronal: line.montantPatronal,
+            sortOrder: line.sortOrder,
+          }))
+        );
+      }
 
       results.push(bulletin);
     }

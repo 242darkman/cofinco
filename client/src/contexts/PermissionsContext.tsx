@@ -320,3 +320,8 @@ export function usePermissionsContext() {
   }
   return context;
 }
+
+/** Optional variant that returns null instead of throwing when outside provider */
+export function usePermissionsContextOptional() {
+  return useContext(PermissionsContext) ?? null;
+}

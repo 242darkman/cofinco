@@ -319,6 +319,25 @@ export const bulletinsPaie = pgTable("bulletins_paie", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Lignes détaillées de bulletin de paie
+export const payslipLines = pgTable("payslip_lines", {
+  id: serial("id").primaryKey(),
+  bulletinId: integer("bulletin_id").notNull().references(() => bulletinsPaie.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 10 }).notNull(),          // '100', '2000', '4950', etc.
+  libelle: varchar("libelle", { length: 100 }).notNull(),
+  category: varchar("category", { length: 20 }).notNull(),  // 'GAIN', 'RETENUE', 'PATRONAL', 'SUBTOTAL', 'NET'
+  base: integer("base").default(0),
+  taux: numeric("taux", { precision: 10, scale: 4 }),       // Taux ou pourcentage
+  montantGain: integer("montant_gain").default(0),
+  montantRetenue: integer("montant_retenue").default(0),
+  montantPatronal: integer("montant_patronal").default(0),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const insertPayslipLineSchema = createInsertSchema(payslipLines).omit({ id: true });
+export type InsertPayslipLine = z.infer<typeof insertPayslipLineSchema>;
+export type PayslipLine = typeof payslipLines.$inferSelect;
+
 // Avantages (Catalog)
 export const avantages = pgTable("avantages", {
   id: serial("id").primaryKey(),
@@ -481,9 +500,17 @@ export const payrollConfig = pgTable("payroll_config", {
   id: uuid("id").primaryKey().defaultRandom(),
   // Scope (NULL = global)
   agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
-  // Taux cotisations employé
+  // Taux cotisations globaux (totaux)
   cnssEmployeeRate: numeric("cnss_employee_rate", { precision: 5, scale: 4 }).notNull().default("0.0500"),
   cnssEmployerRate: numeric("cnss_employer_rate", { precision: 5, scale: 4 }).notNull().default("0.0900"),
+  // Breakdown CNSS employé
+  cnssAllocFamilialesRate: numeric("cnss_alloc_familiales_rate", { precision: 5, scale: 4 }).default("0.0000"),  // 0% salarié
+  cnssPvidRate: numeric("cnss_pvid_rate", { precision: 5, scale: 4 }).default("0.0350"),                        // 3.5% salarié
+  cnssAtmpRate: numeric("cnss_atmp_rate", { precision: 5, scale: 4 }).default("0.0150"),                        // 1.5% salarié
+  // Breakdown CNSS employeur
+  cnssAllocFamilialesEmployerRate: numeric("cnss_alloc_familiales_employer_rate", { precision: 5, scale: 4 }).default("0.0650"), // 6.5% patron
+  cnssPvidEmployerRate: numeric("cnss_pvid_employer_rate", { precision: 5, scale: 4 }).default("0.0050"),       // 0.5% patron
+  cnssAtmpEmployerRate: numeric("cnss_atmp_employer_rate", { precision: 5, scale: 4 }).default("0.0150"),       // 1.5% patron
   // Barème IPR (impôt progressif sur le revenu)
   iprBrackets: json("ipr_brackets").$type<IprBracket[]>().notNull().default([
     { min: 0, max: 524000, rate: 0 },

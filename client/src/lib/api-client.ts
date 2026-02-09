@@ -2782,10 +2782,13 @@ import type {
  * Types pour les réponses API caisse agent
  */
 export interface OperationTerrainListResponse {
-  data: OperationTerrainWithRelations[];
+  operations: OperationTerrainWithRelations[];
   total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
 }
 
 export interface OperationTerrainFilters {

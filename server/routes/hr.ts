@@ -37,7 +37,10 @@ import {
   departments,
   jobPositions,
   avantages,
+  payslipLines,
 } from "@shared/schema";
+import { systemSettings } from "@shared/schema/settings";
+import { agences } from "@shared/schema/agences";
 import { normalizeRole } from "@shared/types/roles";
 import { StatutCandidature, StatutConge, StatutUser, StatutVisiteTerrain, StatutArchive } from "@shared/enum/status-constants";
 import { eq, desc, and, gte, lte, sql, count, isNull } from "drizzle-orm";
@@ -2176,6 +2179,111 @@ hrRouter.get("/bulletins", getAuthUser, async (req, res) => {
   }
 });
 
+// GET /api/hr/bulletins/:id - Détail d'un bulletin avec lignes
+hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
+  try {
+    const bulletinId = parseInt(req.params.id);
+    if (isNaN(bulletinId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
+
+    const [bulletin] = await db
+      .select()
+      .from(bulletinsPaie)
+      .where(eq(bulletinsPaie.id, bulletinId));
+
+    if (!bulletin) {
+      return res.status(404).json({ error: 'Bulletin non trouvé' });
+    }
+
+    // Fetch payslip lines
+    const lines = await db
+      .select()
+      .from(payslipLines)
+      .where(eq(payslipLines.bulletinId, bulletinId))
+      .orderBy(payslipLines.sortOrder);
+
+    // Fetch employee + user details
+    const [employeData] = await db
+      .select({ employe: employes, user: users })
+      .from(employes)
+      .innerJoin(users, eq(employes.userId, users.id))
+      .where(eq(employes.id, bulletin.employeId));
+
+    // Fetch company settings
+    const [settings] = await db.select().from(systemSettings);
+
+    // Fetch agence info
+    let agence = null;
+    if (employeData?.employe.agenceId) {
+      const [ag] = await db.select().from(agences).where(eq(agences.id, employeData.employe.agenceId));
+      agence = ag || null;
+    }
+
+    // Fetch leave balance for current year
+    let leaves = null;
+    if (employeData) {
+      const year = parseInt(bulletin.mois.split('-')[0]);
+      const [lb] = await db
+        .select()
+        .from(leaveBalances)
+        .where(
+          and(
+            eq(leaveBalances.employeId, employeData.employe.id),
+            eq(leaveBalances.year, year)
+          )
+        );
+      if (lb) {
+        leaves = { acquired: lb.acquired, used: lb.used, balance: (lb.acquired || 0) - (lb.used || 0) };
+      }
+    }
+
+    // Fetch job position title
+    let jobTitle = null;
+    if (employeData?.employe.jobPositionId) {
+      const [jp] = await db.select().from(jobPositions).where(eq(jobPositions.id, employeData.employe.jobPositionId));
+      jobTitle = jp?.titre || null;
+    }
+
+    res.json({
+      bulletin,
+      lines,
+      employe: employeData ? {
+        id: employeData.employe.id,
+        matricule: employeData.employe.matricule,
+        numeroCnss: employeData.employe.numeroCnss,
+        dateEmbauche: employeData.employe.dateEmbauche,
+        typeContrat: employeData.employe.typeContrat,
+        categorie: (employeData.employe as any).categorie || null,
+        coefficient: (employeData.employe as any).coefficient || null,
+        paymentMethod: (employeData.employe as any).paymentMethod || 'CASH',
+        paymentDetails: (employeData.employe as any).paymentDetails || null,
+        nom: employeData.user.nom,
+        prenom: employeData.user.prenom,
+        jobTitle,
+      } : null,
+      company: settings ? {
+        agenceName: settings.agenceName,
+        adresse: settings.adresse,
+        telephone: settings.telephone,
+        niu: (settings as any).niu || null,
+        cnssMembership: (settings as any).cnssMembership || null,
+        rccm: (settings as any).rccm || null,
+        logoUrl: (settings as any).logoUrl || null,
+      } : null,
+      agence: agence ? {
+        nom: agence.nom,
+        adresse: agence.adresse,
+        telephone: agence.telephone,
+      } : null,
+      leaves,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur récupération bulletin détaillé');
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // POST /api/hr/paie/generate - Générer les fiches de paie pour un mois
 hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actions.GENERATE, Subjects.PAIE), async (req, res) => {
     try {
@@ -2518,13 +2626,18 @@ hrRouter.get("/paie/my", getAuthUser, async (req, res) => {
             employeAgenceId: employe.agenceId,
         }, 'Mes bulletins: recherche des bulletins');
 
-        const bulletins = await storage.getBulletins(employe.id);
+        const allBulletins = await storage.getBulletins(employe.id);
+        // N'afficher que les bulletins validés ou payés (pas les brouillons)
+        const bulletins = allBulletins.filter(
+            (b: any) => b.statut !== BulletinStatus.DRAFT
+        );
 
         logger.info({
             userId,
             employeId: employe.id,
             bulletinsCount: bulletins.length,
-        }, `Mes bulletins: ${bulletins.length} bulletin(s) trouvé(s)`);
+            totalCount: allBulletins.length,
+        }, `Mes bulletins: ${bulletins.length} visible(s) sur ${allBulletins.length}`);
 
         res.json(bulletins);
     } catch (error) {

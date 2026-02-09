@@ -24,6 +24,11 @@ export const systemSettings = pgTable("system_settings", {
   adresse: text("adresse"),
   telephone: text("telephone"),
   email: text("email"),
+  // Identifiants légaux
+  niu: text("niu"),                          // Numéro d'Identification Unique (fiscal)
+  cnssMembership: text("cnss_membership"),   // N° CNSS employeur
+  rccm: text("rccm"),                       // Registre Commerce et Crédit Mobilier
+  logoUrl: text("logo_url"),                 // URL du logo dans MinIO
   sessionTimeout: integer("session_timeout").default(30),
   maxLoginAttempts: integer("max_login_attempts").default(5),
   passwordMinLength: integer("password_min_length").default(12),

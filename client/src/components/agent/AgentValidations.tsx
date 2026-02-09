@@ -356,7 +356,7 @@ export default function AgentValidations() {
 
       const [opsResponse, agencesResponse] = await Promise.all([opsPromise, agencesPromise]);
 
-      const opsData = opsResponse.data || [];
+      const opsData = opsResponse.operations || [];
       setOperations(opsData);
 
       if (Array.isArray(agencesResponse)) {

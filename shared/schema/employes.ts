@@ -27,7 +27,6 @@ export const employes = pgTable("employes", {
   // Organisation
   agenceId: uuid("agence_id").references(() => agences.id),
   managerId: uuid("manager_id"), // Self-reference vers employes.id (géré au niveau app)
-  // NOTE: roleSystem a été supprimé - utiliser user_roles à la place
   statut: text("statut").notNull().default("ACTIVE"),
 
   // Rémunération
@@ -38,6 +37,14 @@ export const employes = pgTable("employes", {
 
   // CNSS
   numeroCnss: varchar("numero_cnss", { length: 50 }).unique(),
+
+  // Paiement
+  paymentMethod: varchar("payment_method", { length: 20 }).default("CASH"), // 'CASH', 'TRANSFER', 'MOBILE_MONEY', 'CHECK'
+  paymentDetails: text("payment_details"), // Coordonnées bancaires, N° Mobile Money, etc.
+
+  // Classification
+  coefficient: integer("coefficient"),                         // Coefficient salarial (ex: 100, 150, 220)
+  categorie: varchar("categorie", { length: 20 }),            // Catégorie (ex: 'CADRE', 'AGENT_MAITRISE', 'OUVRIER')
 
   // Sécurité Caisse
   caissePin: text("caisse_pin"), // PIN hashé pour autorisation caisse

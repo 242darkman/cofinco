@@ -301,8 +301,11 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
           <p className={`text-[10px] uppercase tracking-wider mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
             Prévisualisation Facture
           </p>
-          <div className="bg-white rounded-lg p-2 max-h-[300px] overflow-y-auto">
-            <InvoiceTemplate data={data} />
+          <div className="relative overflow-hidden rounded-lg bg-white" style={{ height: '400px' }}>
+            <div className="absolute top-3 left-1/2 origin-top" style={{ transform: 'translateX(-50%) scale(0.42)' }}>
+              <InvoiceTemplate data={data} />
+            </div>
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-white via-transparent to-transparent" />
           </div>
         </div>
       )}

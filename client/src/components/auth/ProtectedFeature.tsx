@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { authService } from '@/lib/auth';
-import { usePermissionsContext } from '@/contexts/PermissionsContext';
+import { usePermissionsContext, usePermissionsContextOptional } from '@/contexts/PermissionsContext';
 import { useAbility, useIsFeatureLocked } from '@/contexts/AbilityContext';
 import { SystemRole } from '@shared/types/roles';
 import { Action, Subject } from '@/lib/casl';
@@ -80,8 +80,8 @@ export function ProtectedFeature({
   fallback = null,
 }: ProtectedFeatureProps) {
 
-  // Subscribe to permission updates
-  usePermissionsContext();
+  // Subscribe to permission updates (non-throwing)
+  usePermissionsContextOptional();
 
   // Get CASL ability
   const ability = useAbility();
@@ -162,8 +162,8 @@ export function ProtectedFeature({
  * Hook pour vérifier les permissions
  */
 export function usePermissions() {
-  // Subscribe to updates to force re-render
-  usePermissionsContext();
+  // Subscribe to permission updates (non-throwing: graceful during HMR or provider absence)
+  usePermissionsContextOptional();
 
   const user = authService.getCurrentUser();
   const ability = useAbility();

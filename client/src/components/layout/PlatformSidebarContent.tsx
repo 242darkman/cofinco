@@ -6,7 +6,7 @@ import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
-import { usePermissionsContext } from '../../contexts/PermissionsContext';
+import { usePermissionsContextOptional } from '../../contexts/PermissionsContext';
 import { isAdminRole } from '@shared/types/roles';
 import { useOperationsBadge } from '../../hooks/useOperationsBadge';
 import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
@@ -34,7 +34,7 @@ export default function PlatformSidebarContent({
 }: PlatformSidebarContentProps) {
   const { t } = useLanguage();
   const { settings: systemSettings } = useSystemSettings();
-  usePermissionsContext(); // Subscribe to permission changes to force re-render
+  usePermissionsContextOptional(); // Subscribe to permission changes to force re-render
   const agenceName = systemSettings?.find(s => s.cle === 'agence_name')?.valeur || 'COFIN&CO-M';
 
   // Maintenance Status State
