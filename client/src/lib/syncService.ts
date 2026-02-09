@@ -21,7 +21,7 @@ import {
   OperationType,
   clearCompletedOperations
 } from './offline-db';
-import { connectivityService } from './connectivityService';
+import { networkManager, isNetworkUsable } from './networkManager';
 
 // ========== TYPES ==========
 
@@ -129,8 +129,9 @@ class SyncService {
   }
 
   private setupConnectivityListener(): void {
-    connectivityService.subscribe((isOnline) => {
-      if (isOnline) {
+    networkManager.subscribe((state) => {
+      const usable = state.status === 'online' || state.status === 'unstable';
+      if (usable) {
         console.log('[Sync Service] Connexion rétablie, démarrage de la synchronisation');
         this.currentRetryDelay = RETRY_DELAY_MS; // Reset retry delay
         this.scheduleSync(1000);
@@ -247,7 +248,7 @@ class SyncService {
       return this.syncStats;
     }
 
-    if (!connectivityService.getStatus()) {
+    if (!isNetworkUsable()) {
       console.log('[Sync Service] Hors ligne, synchronisation reportée');
 
       // Try background sync if supported
@@ -295,7 +296,7 @@ class SyncService {
 
       // Process in batches
       for (let i = 0; i < filteredOps.length; i += BATCH_SIZE) {
-        if (!connectivityService.getStatus()) {
+        if (!isNetworkUsable()) {
           console.log('[Sync Service] Connexion perdue pendant la synchronisation');
           break;
         }
@@ -428,7 +429,7 @@ class SyncService {
     });
 
     // Schedule retry with exponential backoff
-    if (this.syncStats.failed > 0 && connectivityService.getStatus()) {
+    if (this.syncStats.failed > 0 && isNetworkUsable()) {
       console.log('[Sync Service] Programmation nouvelle tentative dans', this.currentRetryDelay, 'ms');
       this.scheduleSync(this.currentRetryDelay);
       this.currentRetryDelay = Math.min(this.currentRetryDelay * 2, MAX_RETRY_DELAY_MS);
@@ -605,6 +606,127 @@ class SyncService {
       registration.active?.postMessage({ type: 'CACHE_URLS', payload: { urls } });
     } catch (error) {
       console.error('[Sync Service] Erreur cache URLs:', error);
+    }
+  }
+  // ========== PULL SYNC (Server → Client) ==========
+
+  private pullCursors: Record<string, string> = {};
+  private isPulling = false;
+
+  /**
+   * Pull changes from server for specified entity types.
+   * Uses cursor-based delta sync to only fetch what changed.
+   */
+  public async pullChanges(
+    entities: string[] = ['clients', 'credits', 'remboursements', 'comptes', 'transferts', 'tontines', 'prospections'],
+    options?: { limit?: number }
+  ): Promise<{ totalChanges: number; byEntity: Record<string, number> }> {
+    if (this.isPulling) {
+      console.log('[Sync Service] Pull already in progress');
+      return { totalChanges: 0, byEntity: {} };
+    }
+
+    if (!isNetworkUsable()) {
+      console.log('[Sync Service] Offline, pull skipped');
+      return { totalChanges: 0, byEntity: {} };
+    }
+
+    this.isPulling = true;
+    const byEntity: Record<string, number> = {};
+    let totalChanges = 0;
+
+    try {
+      // Load cursors from IndexedDB
+      await this.loadPullCursors();
+
+      const cursors: Record<string, string> = {};
+      for (const entity of entities) {
+        cursors[entity] = this.pullCursors[entity] || '1970-01-01T00:00:00.000Z';
+      }
+
+      const response = await fetch('/api/sync/pull', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entities,
+          cursors,
+          limit: options?.limit || 200,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Pull failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Store pulled changes in IndexedDB
+      for (const entity of entities) {
+        const changes = data.changes?.[entity] || [];
+        byEntity[entity] = changes.length;
+        totalChanges += changes.length;
+
+        if (changes.length > 0) {
+          await this.storePulledChanges(entity, changes);
+          // Update cursor
+          this.pullCursors[entity] = data.cursors[entity];
+        }
+      }
+
+      // Persist cursors
+      await this.savePullCursors();
+
+      console.log(`[Sync Service] Pull complete: ${totalChanges} changes across ${entities.length} entities`);
+
+      // If any entity has more data, schedule another pull
+      const hasMore = Object.values(data.hasMore || {}).some(Boolean);
+      if (hasMore) {
+        setTimeout(() => this.pullChanges(entities, options), 1000);
+      }
+
+      return { totalChanges, byEntity };
+    } catch (err: any) {
+      console.error('[Sync Service] Pull error:', err.message);
+      return { totalChanges: 0, byEntity: {} };
+    } finally {
+      this.isPulling = false;
+    }
+  }
+
+  private async storePulledChanges(entity: string, changes: any[]): Promise<void> {
+    // Store in the offline DB's cached queries table for now
+    // This provides a generic storage mechanism that other components can read from
+    try {
+      const { setCachedQuery } = await import('./offline-db');
+      await setCachedQuery(
+        `sync:${entity}:latest`,
+        changes,
+        24 * 60 * 60 * 1000 // 24h TTL
+      );
+    } catch (err) {
+      console.error(`[Sync Service] Error storing ${entity} changes:`, err);
+    }
+  }
+
+  private async loadPullCursors(): Promise<void> {
+    try {
+      const { getCachedQuery } = await import('./offline-db');
+      const stored = await getCachedQuery('sync:cursors');
+      if (stored) {
+        this.pullCursors = stored as Record<string, string>;
+      }
+    } catch {
+      // First sync, no cursors
+    }
+  }
+
+  private async savePullCursors(): Promise<void> {
+    try {
+      const { setCachedQuery } = await import('./offline-db');
+      await setCachedQuery('sync:cursors', this.pullCursors, 365 * 24 * 60 * 60 * 1000);
+    } catch {
+      // Non-critical
     }
   }
 }

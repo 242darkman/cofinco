@@ -447,5 +447,37 @@ class NetworkManager {
 
 export const networkManager = new NetworkManager();
 
+/**
+ * Simple boolean: is the network usable? (online or unstable)
+ * Drop-in replacement for connectivityService.getStatus()
+ */
+export function isNetworkUsable(): boolean {
+  const s = networkManager.getState().status;
+  return s === 'online' || s === 'unstable';
+}
+
+/**
+ * Wait for the network to become usable.
+ * Drop-in replacement for connectivityService.waitForOnline()
+ */
+export function waitForOnline(timeoutMs: number = 30000): Promise<boolean> {
+  if (isNetworkUsable()) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      unsubscribe();
+      resolve(false);
+    }, timeoutMs);
+
+    const unsubscribe = networkManager.subscribe((state) => {
+      if (state.status === 'online' || state.status === 'unstable') {
+        clearTimeout(timeout);
+        unsubscribe();
+        resolve(true);
+      }
+    });
+  });
+}
+
 // Export config for testing/debugging
 export { CONFIG as NETWORK_CONFIG };

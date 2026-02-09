@@ -14,7 +14,8 @@ import AgentPlanning from './AgentPlanning';
 import EnqueteCreditForm from '../finance/credits/EnqueteCreditForm';
 import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
-import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useIsOnline } from '@/contexts/NetworkContext';
+import { getOperationStats } from '@/lib/offline-db';
 import { StatutUser, StatutOperationTerrain } from '@shared/enum/status-constants';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { resolveStorageUrl } from '../../lib/format';
@@ -137,7 +138,15 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   useEffect(() => { setAgendaPage(0); }, [pendingEnquetes.length, todayPlannings.length]);
 
   // Offline queue
-  const { isOnline, pendingCount } = useOfflineQueue();
+  const isOnline = useIsOnline();
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    getOperationStats().then((stats) => setPendingCount(stats.pending)).catch(() => {});
+    const interval = setInterval(() => {
+      getOperationStats().then((stats) => setPendingCount(stats.pending)).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     loadAgents();

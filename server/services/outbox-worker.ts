@@ -1,16 +1,19 @@
-import { db } from "../db";
+import { db, pool } from "../db";
 import { evenementsOutbox } from "@shared/schema";
 import { eq, isNull, asc, sql } from "drizzle-orm";
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
+import type pg from "pg";
 
 const logger = createLogger('Outbox');
 
 let isRunning = false;
 let pollInterval: NodeJS.Timeout | null = null;
-const POLL_INTERVAL_MS = 500; // Poll every 500ms
+let listenClient: pg.PoolClient | null = null;
+const POLL_INTERVAL_MS = 5000; // Reduced polling frequency (NOTIFY handles immediate dispatch)
 const MAX_EVENTS_PER_BATCH = 50;
 const MAX_RETRIES = 5;
+const NOTIFY_CHANNEL = 'outbox_events';
 
 export interface OutboxEvent {
   id: string;
@@ -110,7 +113,10 @@ async function processOutboxEvents(): Promise<number> {
 }
 
 /**
- * Start the outbox worker
+ * Start the outbox worker with NOTIFY/LISTEN + polling fallback.
+ *
+ * NOTIFY/LISTEN provides instant event processing (~0ms latency).
+ * Polling runs as a fallback in case LISTEN misses an event (connection drops).
  */
 export function startOutboxWorker(): void {
   if (isRunning) {
@@ -119,17 +125,67 @@ export function startOutboxWorker(): void {
   }
 
   isRunning = true;
-  logger.info('Worker started');
+  logger.info('Worker started (NOTIFY/LISTEN + polling fallback)');
 
   // Initial run
   processOutboxEvents();
 
-  // Set up polling
+  // Set up NOTIFY/LISTEN for instant event processing
+  setupNotifyListener().catch((err) => {
+    logger.warn({ error: err.message }, 'NOTIFY/LISTEN setup failed, using polling only');
+  });
+
+  // Set up polling as fallback (reduced frequency since NOTIFY handles most cases)
   pollInterval = setInterval(async () => {
     if (isRunning) {
       await processOutboxEvents();
     }
   }, POLL_INTERVAL_MS);
+}
+
+/**
+ * Set up PostgreSQL LISTEN on the outbox channel.
+ * When a NOTIFY is received, immediately process pending events.
+ */
+async function setupNotifyListener(): Promise<void> {
+  try {
+    listenClient = await pool.connect();
+
+    listenClient.on('notification', async (msg) => {
+      if (msg.channel === NOTIFY_CHANNEL && isRunning) {
+        // Process events immediately on notification
+        await processOutboxEvents();
+      }
+    });
+
+    listenClient.on('error', (err) => {
+      logger.warn({ error: err.message }, 'LISTEN client error, reconnecting...');
+      cleanupListenClient();
+      // Reconnect after a short delay
+      setTimeout(() => {
+        if (isRunning) {
+          setupNotifyListener().catch(() => {});
+        }
+      }, 2000);
+    });
+
+    await listenClient.query(`LISTEN ${NOTIFY_CHANNEL}`);
+    logger.info(`Listening on channel "${NOTIFY_CHANNEL}" for instant event dispatch`);
+  } catch (err: any) {
+    cleanupListenClient();
+    throw err;
+  }
+}
+
+function cleanupListenClient(): void {
+  if (listenClient) {
+    try {
+      listenClient.release();
+    } catch {
+      // Ignore release errors
+    }
+    listenClient = null;
+  }
 }
 
 /**
@@ -141,11 +197,13 @@ export function stopOutboxWorker(): void {
   }
 
   isRunning = false;
-  
+
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;
   }
+
+  cleanupListenClient();
 
   logger.info('Worker stopped');
 }

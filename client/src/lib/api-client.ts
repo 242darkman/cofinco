@@ -289,10 +289,17 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
   return response.json();
 }
 
+// ============================================================================
+// ETag cache for conditional requests (304 Not Modified)
+// ============================================================================
+const etagCache = new Map<string, { etag: string; data: any }>();
+const MAX_ETAG_CACHE = 200;
+
 /**
  * Requête HTTP sécurisée avec credentials et gestion d'erreur centralisée
  * Injecte automatiquement le header X-Agence-Id si une agence est sélectionnée
  * Injecte automatiquement les headers de device fingerprint pour la sécurité
+ * Supporte les ETags pour les requêtes GET (304 Not Modified)
  */
 async function request<T>(
   endpoint: string,
@@ -321,13 +328,44 @@ async function request<T>(
     }
   }
 
+  // ETag: send If-None-Match for GET requests
+  const isGet = !options?.method || options.method === 'GET';
+  const cacheKey = `${currentAgenceId || ''}:${endpoint}`;
+  if (isGet) {
+    const cached = etagCache.get(cacheKey);
+    if (cached) {
+      headers['If-None-Match'] = cached.etag;
+    }
+  }
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
     credentials: 'include', // Toujours envoyer les cookies de session
   });
 
-  return handleResponse<T>(response, endpoint);
+  // ETag: handle 304 Not Modified
+  if (response.status === 304 && isGet) {
+    const cached = etagCache.get(cacheKey);
+    if (cached) {
+      return cached.data as T;
+    }
+  }
+
+  const result = await handleResponse<T>(response, endpoint);
+
+  // ETag: store response with etag for future conditional requests
+  if (isGet && response.headers.has('etag')) {
+    const etag = response.headers.get('etag')!;
+    // Evict oldest if cache is full
+    if (etagCache.size >= MAX_ETAG_CACHE) {
+      const firstKey = etagCache.keys().next().value;
+      if (firstKey) etagCache.delete(firstKey);
+    }
+    etagCache.set(cacheKey, { etag, data: result });
+  }
+
+  return result;
 }
 
 async function requestPaginated<T>(

@@ -78,7 +78,7 @@ services:
       # Preserve container's node_modules (don't overlay with host's)
       - /app/node_modules
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:5001:5000"
       - "127.0.0.1:5173:5173"
     depends_on:
       db-init:
@@ -110,10 +110,10 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=3d'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=3d"
+      - "--web.enable-lifecycle"
 
   loki:
     ports:

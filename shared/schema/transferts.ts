@@ -53,6 +53,7 @@ export const transferts = pgTable(
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    version: integer("version").notNull().default(1),
   },
   (t) => ({
     idxClientDate: index("idx_transferts_client_date").on(t.clientId, t.createdAt),

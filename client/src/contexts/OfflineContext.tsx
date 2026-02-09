@@ -11,7 +11,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { connectivityService } from '../lib/connectivityService';
+import { networkManager, isNetworkUsable } from '../lib/networkManager';
 import { syncService, SyncStats, SyncProgress, ConflictInfo } from '../lib/syncService';
 import { getStorageStats, getUnresolvedConflicts, OperationType } from '../lib/offline-db';
 
@@ -70,7 +70,7 @@ const OfflineContext = createContext<OfflineContextValue | undefined>(undefined)
 
 export function OfflineProvider({ children }: OfflineProviderProps) {
   // Connectivity state
-  const [isOnline, setIsOnline] = useState(connectivityService.getStatus());
+  const [isOnline, setIsOnline] = useState(isNetworkUsable());
   const [connectionQuality, setConnectionQuality] = useState<'good' | 'slow' | 'offline'>('good');
 
   // Sync state
@@ -92,9 +92,13 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
   // ========== CONNECTIVITY ==========
 
   useEffect(() => {
-    const unsubscribe = connectivityService.subscribe((online) => {
-      setIsOnline(online);
-      setConnectionQuality(online ? 'good' : 'offline');
+    const unsubscribe = networkManager.subscribe((state) => {
+      const usable = state.status === 'online' || state.status === 'unstable';
+      setIsOnline(usable);
+      setConnectionQuality(
+        state.status === 'online' ? 'good' :
+        state.status === 'unstable' ? 'slow' : 'offline'
+      );
     });
 
     // Check if app is installed as PWA

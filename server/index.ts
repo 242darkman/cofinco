@@ -19,6 +19,7 @@ import {
   additionalSecurityHeaders,
 } from "./middleware/security";
 import { csrfProtection } from "./middleware/csrf";
+import { etagMiddleware } from "./middleware/etag";
 import { startOutboxWorker } from "./services/outbox-worker";
 import { startNotificationWorker } from "./services/notifications/notification-worker";
 import { startReminderProcessor } from "./services/notifications/reminder-processor";
@@ -133,6 +134,9 @@ app.use(requestLoggerMiddleware());
 
 // Prometheus metrics middleware (collects HTTP metrics)
 app.use(metricsMiddleware());
+
+// ETag for conditional GET requests (bandwidth optimization)
+app.use("/api", etagMiddleware());
 
 // Register metrics endpoint (/api/metrics) - before auth to allow Prometheus scraping
 registerMetricsRoute(app);

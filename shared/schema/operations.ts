@@ -84,6 +84,7 @@ export const remisesTerrain = pgTable(
     rejectionReason: text("rejection_reason"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
+    version: integer("version").notNull().default(1),
 
     // Mouvements comptables (créés à la validation)
     mouvementCaisseId: uuid("mouvement_caisse_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
@@ -235,6 +236,7 @@ export const prospections = pgTable("prospections", {
   marcheId: uuid("marche_id")
     .references(() => marches.id, { onDelete: "set null" }),
   lastActionAt: timestamp("last_action_at").defaultNow(),
+  version: integer("version").notNull().default(1),
 }, (t) => ({
   idxAgent: index("idx_prospections_agent").on(t.agentId),
   idxStatut: index("idx_prospections_statut").on(t.statut),
@@ -335,6 +337,7 @@ export const paiementsTerrain = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
+    version: integer("version").notNull().default(1),
   },
   (t) => ({
     idxAgentDate: index("idx_paiements_terrain_agent_date").on(t.agentId, t.createdAt),

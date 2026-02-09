@@ -122,6 +122,7 @@ export const clients = pgTable("clients", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
+  version: integer("version").notNull().default(1),
 }, (t) => ({
   // P1.2: Performance indexes for frequently queried columns
   idxUserId: index("idx_clients_user_id").on(t.userId),

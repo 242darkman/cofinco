@@ -34,7 +34,7 @@ export const CRITICAL_OPERATIONS: Record<string, CriticalOperation> = {
     name: 'Dépôt épargne',
     category: 'savings',
     requiresIdempotency: true,
-    offlinePolicy: 'block',
+    offlinePolicy: 'queue',
   },
   retrait_epargne: {
     endpoint: /\/api\/comptes-epargne\/[^/]+\/retrait/,
@@ -60,7 +60,7 @@ export const CRITICAL_OPERATIONS: Record<string, CriticalOperation> = {
     name: 'Remboursement crédit',
     category: 'credit',
     requiresIdempotency: true,
-    offlinePolicy: 'block',
+    offlinePolicy: 'queue',
   },
   remboursement_anticipe: {
     endpoint: /\/api\/credits\/[^/]+\/remboursement-anticipe/,
@@ -148,7 +148,7 @@ export const CRITICAL_OPERATIONS: Record<string, CriticalOperation> = {
     name: 'Cotisation tontine',
     category: 'savings',
     requiresIdempotency: true,
-    offlinePolicy: 'block',
+    offlinePolicy: 'queue',
   },
   paiement_tontine: {
     endpoint: /\/api\/tontines\/[^/]+\/paiements/,

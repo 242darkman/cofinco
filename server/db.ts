@@ -2323,6 +2323,92 @@ export async function ensureCustomFunctions(): Promise<void> {
       console.warn('[DB] ⚠ Failed to create TRIGGER "trg_check_ecriture_balance":', err instanceof Error ? err.message : err);
     }
 
+    // ── Entity versioning (optimistic locking for offline sync) ─────
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_increment_version()
+        RETURNS trigger AS $$
+        BEGIN
+          NEW.version := COALESCE(OLD.version, 0) + 1;
+          NEW.updated_at := NOW();
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] ✓ FUNCTION: fn_increment_version');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create FUNCTION "fn_increment_version":', err instanceof Error ? err.message : err);
+    }
+
+    // Apply version trigger to sync-relevant entities
+    const versionedTables = [
+      'clients', 'credits', 'remboursements', 'comptes',
+      'transferts', 'tontines', 'remises_terrain', 'paiements_terrain', 'prospections'
+    ];
+    for (const tableName of versionedTables) {
+      try {
+        await db.execute(sql.raw(`
+          DROP TRIGGER IF EXISTS trg_version_${tableName} ON ${tableName};
+          CREATE TRIGGER trg_version_${tableName}
+            BEFORE UPDATE ON ${tableName}
+            FOR EACH ROW
+            EXECUTE FUNCTION fn_increment_version();
+        `));
+        objectCount++;
+      } catch (err) {
+        console.warn(`[DB] ⚠ Failed to create version trigger for "${tableName}":`, err instanceof Error ? err.message : err);
+      }
+    }
+    console.log(`[DB] ✓ TRIGGERS: fn_increment_version on ${versionedTables.length} tables`);
+
+    // ── Idempotency keys cleanup ────────────────────────────────────
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_cleanup_expired_idempotency_keys()
+        RETURNS void AS $$
+        BEGIN
+          DELETE FROM idempotency_keys WHERE expires_at <= NOW();
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] ✓ FUNCTION: fn_cleanup_expired_idempotency_keys');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create FUNCTION "fn_cleanup_expired_idempotency_keys":', err instanceof Error ? err.message : err);
+    }
+
+    // ── Outbox NOTIFY trigger (event-driven dispatch) ───────────────
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_notify_outbox_event()
+        RETURNS trigger AS $$
+        BEGIN
+          PERFORM pg_notify('outbox_events', NEW.id::text);
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] ✓ FUNCTION: fn_notify_outbox_event');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create FUNCTION "fn_notify_outbox_event":', err instanceof Error ? err.message : err);
+    }
+
+    try {
+      await db.execute(sql`
+        DROP TRIGGER IF EXISTS trg_outbox_notify ON evenements_outbox;
+        CREATE TRIGGER trg_outbox_notify
+          AFTER INSERT ON evenements_outbox
+          FOR EACH ROW
+          EXECUTE FUNCTION fn_notify_outbox_event();
+      `);
+      console.log('[DB] ✓ TRIGGER: trg_outbox_notify (evenements_outbox → NOTIFY)');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create TRIGGER "trg_outbox_notify":', err instanceof Error ? err.message : err);
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

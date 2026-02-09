@@ -110,7 +110,6 @@ export function NetworkProvider({ children }: NetworkProviderProps) {
   }, [isServerReachable]);
 
   // Note: networkManager already listens to browser online/offline events internally
-  // No need to sync with connectivityService here (would cause duplicate updates)
 
   // Update lastSyncAt when we get a success
   useEffect(() => {

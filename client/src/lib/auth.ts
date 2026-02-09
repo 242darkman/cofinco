@@ -1,4 +1,5 @@
 import { authApi, AuthUser, setOnUnauthorized, PermissionsData, ApiError } from './api-client';
+import { initEncryptionKey, clearEncryptionKey } from './offline-crypto';
 import type { AppModule } from '@shared/config/rbac';
 import { SystemRole, hasRole as hasSystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
@@ -265,6 +266,7 @@ class AuthService {
     this.isAdminUser = false;
     this.permissionsLoaded = false;
     this.stopSessionCheck();
+    clearEncryptionKey();
 
     // Nettoyer l'ancien localStorage (migration)
     localStorage.removeItem('cofin_user');
@@ -358,6 +360,8 @@ class AuthService {
       const user = this.mapAuthUser(authUser);
       this.currentUser = user;
       await this.loadPermissionsFromApi();
+      // Initialize offline encryption key from user ID
+      initEncryptionKey(user.id).catch(() => {});
       this.startSessionCheck();
       return this.currentUser;
     } catch (error) {

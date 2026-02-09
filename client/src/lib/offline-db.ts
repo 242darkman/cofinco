@@ -12,6 +12,7 @@
  */
 
 import Dexie, { type Table } from 'dexie';
+import { encryptValue, decryptValue, hasEncryptionKey } from './offline-crypto';
 
 // ========== OPERATION TYPES (for offline sync queue) ==========
 
@@ -619,9 +620,13 @@ export async function saveClientOffline(client: any, agenceId?: string): Promise
   const uuid = client.uuid || generateUUID();
   const existing = await db.clients.where('uuid').equals(uuid).first();
 
+  // Encrypt sensitive client data if encryption key is available
+  const rawData = JSON.stringify(client);
+  const data = hasEncryptionKey() ? await encryptValue(rawData) : rawData;
+
   if (existing) {
     await db.clients.update(existing.id!, {
-      data: JSON.stringify(client),
+      data,
       localVersion: existing.localVersion + 1,
       isDirty: true,
       agenceId
@@ -630,7 +635,7 @@ export async function saveClientOffline(client: any, agenceId?: string): Promise
     await db.clients.add({
       uuid,
       serverId: client.id,
-      data: JSON.stringify(client),
+      data,
       localVersion: 1,
       serverVersion: client.version,
       isDirty: !client.id, // Dirty if new (no server ID)
@@ -644,7 +649,11 @@ export async function saveClientOffline(client: any, agenceId?: string): Promise
 export async function getClientOffline(uuid: string): Promise<any | null> {
   const record = await db.clients.where('uuid').equals(uuid).first();
   if (record) {
-    return JSON.parse(record.data);
+    // Decrypt if the data was encrypted
+    const data = record.data.startsWith('enc:')
+      ? await decryptValue(record.data)
+      : record.data;
+    return JSON.parse(data);
   }
   return null;
 }
@@ -670,7 +679,12 @@ export async function getClientsOffline(options?: {
     results = results.slice(0, options.limit);
   }
 
-  return results.map((r) => ({ ...JSON.parse(r.data), _offline: { uuid: r.uuid, isDirty: r.isDirty } }));
+  return Promise.all(results.map(async (r) => {
+    const data = r.data.startsWith('enc:')
+      ? await decryptValue(r.data)
+      : r.data;
+    return { ...JSON.parse(data), _offline: { uuid: r.uuid, isDirty: r.isDirty } };
+  }));
 }
 
 export async function markClientSynced(uuid: string, serverId: number, serverVersion?: number): Promise<void> {

@@ -15,7 +15,8 @@ import {
 import { caisseAgentApi, caisseApi } from '@/lib/api-client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
-import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useIsOnline } from '@/contexts/NetworkContext';
+import { addOfflineOperation } from '@/lib/offline-db';
 import { v4 as uuidv4 } from 'uuid';
 import { StatutCaisse } from '@shared/enum/status-constants';
 
@@ -86,7 +87,7 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
     return Object.keys(newErrors).length === 0;
   };
 
-  const { isOnline, addToQueue, pendingCount } = useOfflineQueue();
+  const isOnline = useIsOnline();
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -127,18 +128,22 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
     }
   };
 
-  const handleQueueSubmit = () => {
+  const handleQueueSubmit = async () => {
     if (!validate(true)) return;
 
     const idempotencyKey = uuidv4();
-    addToQueue('SETTLEMENT_CASH', {
-      agentId,
-      destinationCaisseId: formData.destinationCaisseId || null,
-      montant: parseFloat(formData.montant),
-      observations: formData.observations,
-      idempotencyKey,
-      queuedAt: new Date().toISOString()
-    });
+    await addOfflineOperation(
+      'remise',
+      '/api/caisse-agent/settlement-cash',
+      'POST',
+      {
+        agentId,
+        destinationCaisseId: formData.destinationCaisseId || null,
+        montant: parseFloat(formData.montant),
+        observations: formData.observations,
+        idempotencyKey,
+      }
+    );
 
     toast({
       title: "Remise en file d'attente",

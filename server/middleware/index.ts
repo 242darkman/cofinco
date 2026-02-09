@@ -34,6 +34,9 @@ export {
 // Idempotency
 export { idempotencyMiddleware } from "./idempotency";
 
+// ETag conditional responses
+export { etagMiddleware } from "./etag";
+
 // Maintenance mode
 export { checkMaintenanceMode } from "./maintenance";
 

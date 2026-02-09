@@ -118,6 +118,7 @@ export const credits = pgTable(
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
+    version: integer("version").notNull().default(1),
   },
   (t) => ({
     // Index pour recherche par client
@@ -393,6 +394,7 @@ export const remboursements = pgTable(
 
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
+    version: integer("version").notNull().default(1),
   },
   (t) => ({
     idxCredit: index("idx_remboursements_credit_id").on(t.creditId),
@@ -592,6 +594,7 @@ export const comptes = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     deletedAt: timestamp("deleted_at"),
+    version: integer("version").notNull().default(1),
 
     // Clôture
     closedAt: timestamp("closed_at"),

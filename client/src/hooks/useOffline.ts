@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { connectivityService } from '../lib/connectivityService';
+import { networkManager, isNetworkUsable } from '../lib/networkManager';
 import { syncService, SyncStats, SyncProgress } from '../lib/syncService';
 import {
   addOfflineOperation,
@@ -108,7 +108,7 @@ export interface StorageInfo {
 // ========== HOOK ==========
 
 export function useOffline(): UseOfflineResult {
-  const [isOnline, setIsOnline] = useState(connectivityService.getStatus());
+  const [isOnline, setIsOnline] = useState(isNetworkUsable());
   const [connectionQuality, setConnectionQuality] = useState<'good' | 'slow' | 'offline'>('good');
   const [syncStats, setSyncStats] = useState<SyncStats>(syncService.getStats());
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
@@ -119,9 +119,13 @@ export function useOffline(): UseOfflineResult {
   // ========== CONNECTIVITY ==========
 
   useEffect(() => {
-    const unsubConnectivity = connectivityService.subscribe((online) => {
-      setIsOnline(online);
-      setConnectionQuality(online ? 'good' : 'offline');
+    const unsubConnectivity = networkManager.subscribe((state) => {
+      const usable = state.status === 'online' || state.status === 'unstable';
+      setIsOnline(usable);
+      setConnectionQuality(
+        state.status === 'online' ? 'good' :
+        state.status === 'unstable' ? 'slow' : 'offline'
+      );
     });
 
     const unsubSync = syncService.subscribe(setSyncStats);

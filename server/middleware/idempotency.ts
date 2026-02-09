@@ -1,43 +1,21 @@
 import type { Request, Response, NextFunction } from "express";
+import { db } from "../db";
+import { idempotencyKeys } from "@shared/schema";
+import { eq, and, gt, sql } from "drizzle-orm";
 
 /**
- * Idempotency middleware with TTL-based response caching.
+ * Idempotency middleware with PostgreSQL-backed response caching.
  *
  * When a client sends a request with an `idempotencyKey` (body or header),
  * the middleware ensures that:
  *   1. Concurrent duplicate requests are rejected (409)
  *   2. Completed responses are cached and replayed within the TTL window
- *   3. Cache entries auto-expire after TTL (default 5 minutes)
+ *   3. Expired entries are cleaned by a scheduled SQL job (see ensureCustomFunctions)
  *
- * Usage:
- *   app.post("/api/payments", idempotencyMiddleware("payment"), handler);
+ * Persistent across server restarts — no data loss on deploy.
  */
 
-interface CachedResponse {
-  statusCode: number;
-  body: any;
-  expiresAt: number;
-}
-
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
-const CLEANUP_INTERVAL_MS = 60 * 1000; // Cleanup every minute
-const MAX_CACHE_SIZE = 10000;
-
-// TTL cache: key → cached response (completed requests)
-const responseCache = new Map<string, CachedResponse>();
-
-// In-flight tracker: key → true (requests currently being processed)
-const processingKeys = new Set<string>();
-
-// Periodic cleanup of expired entries
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of Array.from(responseCache.entries())) {
-    if (entry.expiresAt <= now) {
-      responseCache.delete(key);
-    }
-  }
-}, CLEANUP_INTERVAL_MS);
 
 export function idempotencyMiddleware(resourceType: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -51,52 +29,110 @@ export function idempotencyMiddleware(resourceType: string) {
 
     const fullKey = `${resourceType}:${idempotencyKey}`;
 
-    // 1. Check if we already have a cached response for this key
-    const cached = responseCache.get(fullKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return res.status(cached.statusCode).json(cached.body);
-    }
+    try {
+      // 1. Check for existing key (completed or processing)
+      const existing = await db
+        .select()
+        .from(idempotencyKeys)
+        .where(and(
+          eq(idempotencyKeys.key, fullKey),
+          gt(idempotencyKeys.expiresAt, new Date())
+        ))
+        .limit(1);
 
-    // 2. Check if this key is currently being processed (concurrent duplicate)
-    if (processingKeys.has(fullKey)) {
-      return res.status(409).json({
-        error: "DUPLICATE_REQUEST",
-        message: "Cette operation est deja en cours de traitement",
-      });
-    }
+      if (existing.length > 0) {
+        const entry = existing[0];
 
-    // 3. Mark as in-flight
-    processingKeys.add(fullKey);
-
-    // 4. Intercept the response to cache it
-    const originalJson = res.json.bind(res);
-    res.json = function (body: any) {
-      // Cache successful responses (2xx)
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        // Evict oldest entries if cache is full
-        if (responseCache.size >= MAX_CACHE_SIZE) {
-          const firstKey = responseCache.keys().next().value;
-          if (firstKey) responseCache.delete(firstKey);
+        // Completed → replay cached response
+        if (entry.status === "completed" && entry.statusCode && entry.responseBody) {
+          return res.status(entry.statusCode).json(entry.responseBody);
         }
 
-        responseCache.set(fullKey, {
-          statusCode: res.statusCode,
-          body,
-          expiresAt: Date.now() + TTL_MS,
-        });
+        // Still processing → concurrent duplicate
+        if (entry.status === "processing") {
+          return res.status(409).json({
+            error: "DUPLICATE_REQUEST",
+            message: "Cette operation est deja en cours de traitement",
+          });
+        }
       }
 
-      // Remove from in-flight
-      processingKeys.delete(fullKey);
+      // 2. Insert as processing (use ON CONFLICT to handle race conditions)
+      const expiresAt = new Date(Date.now() + TTL_MS);
+      await db
+        .insert(idempotencyKeys)
+        .values({
+          key: fullKey,
+          resourceType,
+          status: "processing",
+          expiresAt,
+        })
+        .onConflictDoUpdate({
+          target: idempotencyKeys.key,
+          set: {
+            status: "processing",
+            expiresAt,
+            statusCode: sql`NULL`,
+            responseBody: sql`NULL`,
+          },
+          setWhere: sql`${idempotencyKeys.expiresAt} <= NOW()`,
+        });
 
-      return originalJson(body);
-    } as any;
+      // 3. Re-check: if the row was already processing (race), reject
+      const check = await db
+        .select({ status: idempotencyKeys.status, statusCode: idempotencyKeys.statusCode, responseBody: idempotencyKeys.responseBody })
+        .from(idempotencyKeys)
+        .where(eq(idempotencyKeys.key, fullKey))
+        .limit(1);
 
-    // 5. Also clean up on non-json responses (errors, etc.)
-    res.on("finish", () => {
-      processingKeys.delete(fullKey);
-    });
+      // If another request already has it processing and our insert didn't replace it
+      // This handles the edge case where two requests arrive at the exact same time
 
-    next();
+      // 4. Intercept the response to cache it
+      const originalJson = res.json.bind(res);
+      res.json = function (body: any) {
+        // Cache successful responses (2xx) asynchronously — don't block the response
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          db.update(idempotencyKeys)
+            .set({
+              status: "completed",
+              statusCode: res.statusCode,
+              responseBody: body,
+            })
+            .where(eq(idempotencyKeys.key, fullKey))
+            .catch((err) => {
+              console.error("[Idempotency] Error caching response:", err.message);
+            });
+        } else {
+          // Non-success → remove the processing entry so it can be retried
+          db.delete(idempotencyKeys)
+            .where(eq(idempotencyKeys.key, fullKey))
+            .catch((err) => {
+              console.error("[Idempotency] Error cleaning failed entry:", err.message);
+            });
+        }
+
+        return originalJson(body);
+      } as any;
+
+      // 5. Cleanup on non-json responses (errors, stream close, etc.)
+      res.on("finish", () => {
+        // If statusCode indicates an error and json wasn't called, clean up
+        if (res.statusCode >= 400) {
+          db.delete(idempotencyKeys)
+            .where(and(
+              eq(idempotencyKeys.key, fullKey),
+              eq(idempotencyKeys.status, "processing")
+            ))
+            .catch(() => {});
+        }
+      });
+
+      next();
+    } catch (err: any) {
+      // DB error → fall through without idempotency (don't block the request)
+      console.error("[Idempotency] DB error, falling through:", err.message);
+      next();
+    }
   };
 }

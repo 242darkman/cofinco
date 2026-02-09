@@ -41,6 +41,7 @@ export const tontines = pgTable(
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
+    version: integer("version").notNull().default(1),
   },
   (t) => ({
     // Index pour recherche par statut et agence

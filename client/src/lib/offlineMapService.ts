@@ -18,7 +18,7 @@ import {
   getUnsyncedTrackPoints,
   markTrackPointsSynced
 } from './offline-db';
-import { connectivityService } from './connectivityService';
+import { isNetworkUsable } from './networkManager';
 
 // ========== TYPES ==========
 
@@ -299,7 +299,7 @@ class OfflineMapService {
     const url = getTileUrl(x, y, z, subdomain);
 
     // Check cache first when offline
-    if (!connectivityService.getStatus()) {
+    if (!isNetworkUsable()) {
       return getCachedMapTile(url);
     }
 
@@ -343,7 +343,7 @@ class OfflineMapService {
           if (cachedBlob) {
             tile.src = URL.createObjectURL(cachedBlob);
             done(null, tile);
-          } else if (connectivityService.getStatus()) {
+          } else if (isNetworkUsable()) {
             // Try network
             tile.onload = () => {
               done(null, tile);
@@ -514,7 +514,7 @@ class OfflineMapService {
     const unsyncedPoints = await getUnsyncedTrackPoints(agentId);
     if (unsyncedPoints.length === 0) return 0;
 
-    if (!connectivityService.getStatus()) {
+    if (!isNetworkUsable()) {
       console.log('[OfflineMap] Offline, GPS sync deferred');
       return 0;
     }
