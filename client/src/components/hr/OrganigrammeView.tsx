@@ -182,37 +182,37 @@ const ExportMenu = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="p-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+        className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1"
         title="Exporter"
       >
-        <Download size={18} />
-        <ChevronDown size={14} />
+        <Download size={14} />
+        <ChevronDown size={10} />
       </button>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden min-w-[160px] animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="absolute right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[140px]">
             <button
               onClick={() => { onExportPNG(); setIsOpen(false); }}
-              className="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-slate-700 flex items-center gap-2"
             >
-              <FileImage size={16} className="text-blue-400" />
-              Export PNG
+              <FileImage size={13} className="text-blue-400" />
+              PNG
             </button>
             <button
               onClick={() => { onExportSVG(); setIsOpen(false); }}
-              className="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-slate-700 flex items-center gap-2"
             >
-              <Code size={16} className="text-green-400" />
-              Export SVG
+              <Code size={13} className="text-green-400" />
+              SVG
             </button>
             <button
               onClick={() => { onExportPDF(); setIsOpen(false); }}
-              className="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-slate-700 flex items-center gap-2"
             >
-              <FileText size={16} className="text-red-400" />
-              Export PDF
+              <FileText size={13} className="text-red-400" />
+              PDF
             </button>
           </div>
         </>
@@ -782,138 +782,165 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-full overflow-hidden">
-      {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-800 backdrop-blur-sm sticky top-0 z-30 shadow-xl mb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 sm:p-2.5 bg-blue-500/10 rounded-lg sm:rounded-xl">
-            <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* ── Toolbar ── */}
+      <div className="shrink-0 flex flex-col gap-2 mb-2">
+        {/* Row 1: Title + Search + Actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Title area */}
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
+            <Building2 size={18} className="text-indigo-400 shrink-0" />
+            <h3 className="text-sm font-bold text-white whitespace-nowrap">Organigramme</h3>
+            <span className="hidden sm:inline text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-full font-medium">
+              {stats.total} collab.
+            </span>
           </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-white leading-tight">Organigramme</h3>
-            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-slate-500">
-              <span className="flex items-center gap-1">
-                <Users size={12} />
-                {stats.total} employés
-              </span>
-              <span>•</span>
-              <span>MAJ: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              {canEditOrganigramme && (
-                <>
-                  <span>•</span>
-                  <span className="text-cyan-500 font-medium">Cliquez pour réassigner</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Search */}
-          <div className="relative group flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 group-focus-within:text-blue-400 transition-colors" />
+          {/* Search — fills available space */}
+          <div className="relative flex-1 max-w-[240px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
             <input
               type="text"
               placeholder="Rechercher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-40 lg:w-52 bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-all"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
             />
           </div>
 
-          <div className="hidden sm:block h-8 w-px bg-slate-700 mx-1" />
+          {/* Spacer */}
+          <div className="flex-1 hidden sm:block" />
 
-          {/* Zoom Controls */}
-          <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+          {/* Controls group */}
+          <div className="flex items-center gap-1">
+            {/* Zoom controls */}
+            <div className="hidden sm:flex items-center bg-slate-900 rounded-lg border border-slate-800">
+              <button
+                onClick={handleZoomOut}
+                className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition"
+                title="Zoom arrière"
+              >
+                <ZoomOut size={14} />
+              </button>
+              <span className="text-[10px] text-slate-500 min-w-[36px] text-center font-mono tabular-nums">
+                {zoomLevel}%
+              </span>
+              <button
+                onClick={handleZoomIn}
+                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                title="Zoom avant"
+              >
+                <ZoomIn size={14} />
+              </button>
+              <div className="w-px h-4 bg-slate-700" />
+              <button
+                onClick={handleFit}
+                className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition"
+                title="Ajuster à la vue"
+              >
+                <Maximize2 size={14} />
+              </button>
+            </div>
+
+            {/* Expand/Collapse */}
+            <div className="hidden sm:flex items-center bg-slate-900 rounded-lg border border-slate-800">
+              <button
+                onClick={handleExpandAll}
+                className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition"
+                title="Tout développer"
+              >
+                <Plus size={14} />
+              </button>
+              <button
+                onClick={handleCollapseAll}
+                className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition"
+                title="Tout réduire"
+              >
+                <Minus size={14} />
+              </button>
+            </div>
+
+            {/* Export */}
+            <ExportMenu
+              onExportPNG={handleExportPNG}
+              onExportSVG={handleExportSVG}
+              onExportPDF={handleExportPDF}
+              disabled={exporting || data.length === 0}
+            />
+
+            {/* Refresh */}
             <button
-              onClick={handleZoomOut}
-              className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white transition"
-              title="Zoom arrière"
+              onClick={fetchOrgChart}
+              disabled={loading}
+              className="p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition disabled:opacity-50"
+              title="Actualiser"
             >
-              <ZoomOut size={16} />
-            </button>
-            <span className="flex items-center px-2 text-xs text-slate-400 min-w-[40px] justify-center">
-              {zoomLevel}%
-            </span>
-            <button
-              onClick={handleZoomIn}
-              className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white transition"
-              title="Zoom avant"
-            >
-              <ZoomIn size={16} />
-            </button>
-            <button
-              onClick={handleFit}
-              className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white transition"
-              title="Ajuster à la vue"
-            >
-              <Maximize2 size={16} />
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
+        </div>
 
-          {/* Expand/Collapse */}
-          <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-            <button
-              onClick={handleExpandAll}
-              className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white transition"
-              title="Tout développer"
-            >
-              <Plus size={16} />
-            </button>
-            <button
-              onClick={handleCollapseAll}
-              className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white transition"
-              title="Tout réduire"
-            >
-              <Minus size={16} />
-            </button>
+        {/* Row 2: Mobile-only zoom + contextual hint */}
+        <div className="flex items-center justify-between sm:hidden">
+          <div className="flex items-center gap-1">
+            <div className="flex items-center bg-slate-900 rounded-lg border border-slate-800">
+              <button onClick={handleZoomOut} className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition">
+                <ZoomOut size={14} />
+              </button>
+              <span className="text-[10px] text-slate-500 min-w-[36px] text-center font-mono">{zoomLevel}%</span>
+              <button onClick={handleZoomIn} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white transition">
+                <ZoomIn size={14} />
+              </button>
+              <div className="w-px h-4 bg-slate-700" />
+              <button onClick={handleFit} className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition">
+                <Maximize2 size={14} />
+              </button>
+            </div>
+            <div className="flex items-center bg-slate-900 rounded-lg border border-slate-800">
+              <button onClick={handleExpandAll} className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition">
+                <Plus size={14} />
+              </button>
+              <button onClick={handleCollapseAll} className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition">
+                <Minus size={14} />
+              </button>
+            </div>
           </div>
-
-          {/* Export */}
-          <ExportMenu
-            onExportPNG={handleExportPNG}
-            onExportSVG={handleExportSVG}
-            onExportPDF={handleExportPDF}
-            disabled={exporting || data.length === 0}
-          />
-
-          {/* Refresh */}
-          <button
-            onClick={fetchOrgChart}
-            disabled={loading}
-            className="p-2 sm:p-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg shadow-lg shadow-blue-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Actualiser"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <span className="text-[10px] text-slate-600">{stats.total} collab.</span>
         </div>
       </div>
 
-      {/* Chart Container */}
-      <div className="flex-1 relative min-h-0 bg-slate-950/50 rounded-xl border border-slate-800 overflow-hidden">
+      {/* ── Chart Container ── */}
+      <div className="flex-1 relative min-h-0 bg-slate-950/50 rounded-lg border border-slate-800 overflow-hidden">
         {loading && data.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-            <p className="text-slate-400 animate-pulse">Chargement de la structure...</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+            <div className="w-10 h-10 border-3 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+            <p className="text-xs text-slate-500">Chargement de la structure...</p>
           </div>
         ) : data.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-            <Users size={64} className="text-slate-700 mb-4" />
-            <p className="text-slate-400 font-medium">Aucune structure hiérarchique définie.</p>
-            <p className="text-slate-600 text-sm mt-1">Commencez par ajouter des managers et des employés.</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+            <Users size={40} className="text-slate-700 mb-3" />
+            <p className="text-sm text-slate-400 font-medium">Aucune structure définie</p>
+            <p className="text-xs text-slate-600 mt-1">Ajoutez des managers et employés pour commencer.</p>
           </div>
         ) : (
           <div
             ref={containerRef}
-            className="w-full h-full min-h-[500px] sm:min-h-[600px] lg:min-h-[700px]"
+            className="w-full h-full"
             style={{ background: 'transparent' }}
           />
         )}
 
+        {/* Contextual hint for edit mode */}
+        {canEditOrganigramme && data.length > 0 && !loading && (
+          <div className="absolute bottom-2 left-2 text-[10px] text-slate-600 bg-slate-900/80 backdrop-blur-sm px-2 py-1 rounded-md border border-slate-800">
+            Cliquez sur un noeud pour réassigner
+          </div>
+        )}
+
         {/* Loading overlay */}
         {loading && data.length > 0 && (
-          <div className="absolute top-4 right-4 bg-slate-800/90 px-3 py-2 rounded-lg flex items-center gap-2 text-sm text-slate-300">
-            <Loader2 size={14} className="animate-spin" />
+          <div className="absolute top-2 right-2 bg-slate-800/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs text-slate-400">
+            <Loader2 size={12} className="animate-spin" />
             Actualisation...
           </div>
         )}
