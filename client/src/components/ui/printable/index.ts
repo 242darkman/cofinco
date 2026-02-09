@@ -13,3 +13,4 @@ export { InvoiceTemplate } from './InvoiceTemplate';
 export { TransferHistoryPrintTemplate } from './TransferHistoryPrintTemplate';
 export type { TransferHistoryData } from './TransferHistoryPrintTemplate';
 export { CreditSchedulePDF } from './CreditScheduleTemplate';
+export { ClosingReportTemplate } from './ClosingReportTemplate';

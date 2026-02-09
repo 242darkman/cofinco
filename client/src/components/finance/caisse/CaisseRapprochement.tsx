@@ -1008,12 +1008,24 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                   >
                     Tout garder
                   </button>
-                  <button
-                    onClick={() => handleSplitAmount(500000)}
-                    className="px-3 py-1.5 text-xs font-medium bg-slate-500/10 text-slate-400 border border-slate-500/30 rounded-lg hover:bg-slate-500/20 transition-colors"
-                  >
-                    Garder 500k
-                  </button>
+                  {montantPhysique > 0 && (() => {
+                    // Round down to nearest 100k, keep ~50% as suggested amount
+                    const suggested = Math.floor(montantPhysique / 2 / 100000) * 100000;
+                    if (suggested > 0 && suggested < montantPhysique) {
+                      const label = suggested >= 1000000
+                        ? `${(suggested / 1000000).toFixed(suggested % 1000000 === 0 ? 0 : 1)}M`
+                        : `${suggested / 1000}k`;
+                      return (
+                        <button
+                          onClick={() => handleSplitAmount(suggested)}
+                          className="px-3 py-1.5 text-xs font-medium bg-slate-500/10 text-slate-400 border border-slate-500/30 rounded-lg hover:bg-slate-500/20 transition-colors"
+                        >
+                          Garder {label}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Amount Inputs */}

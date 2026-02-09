@@ -1,11 +1,13 @@
 /**
  * Bouton pour générer le rapport PDF de clôture de session caisse
+ * Ouvre un aperçu modal avec options d'impression et téléchargement
  */
 
 import React, { useState } from 'react';
-import { FileDown, Loader2, FileCheck } from 'lucide-react';
+import { FileDown } from 'lucide-react';
 import Button from '../../ui/Button';
-import { useClosurePDF, ClosureReportData } from '../../../hooks/finance/useClosurePDF';
+import { type ClosureReportData } from '../../../hooks/finance/useClosurePDF';
+import { ClosingReportViewer } from './ClosingReportViewer';
 import { SessionCaisse } from '../../../types/finance';
 
 interface ClosureReportButtonProps {
@@ -35,91 +37,96 @@ export default function ClosureReportButton({
   className = '',
   showLabel = true,
 }: ClosureReportButtonProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const { generateClosureReport } = useClosurePDF();
+  const [showViewer, setShowViewer] = useState(false);
+  const [reportData, setReportData] = useState<ClosureReportData | null>(null);
 
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-    try {
-      // Normalize session fields
-      const soldeOuverture = Number(
-        session.montantOuverture ||
-        session.soldeInitial ||
-        0
-      );
-      const soldeTheorique = Number(
-        session.montantFermetureTheorique ||
-        session.soldeTheorique ||
-        0
-      );
-      const soldePhysique = Number(
-        session.montantPhysique ||
-        session.soldeReel ||
-        0
-      ) || calculateBilletageTotal(billetage);
+  const handleOpen = () => {
+    // Normalize session fields
+    const soldeOuverture = Number(
+      session.montantOuverture ||
+      session.soldeInitial ||
+      0
+    );
+    const soldeTheorique = Number(
+      session.montantFermetureTheorique ||
+      session.soldeTheorique ||
+      0
+    );
+    const soldePhysique = Number(
+      session.montantPhysique ||
+      session.soldeReel ||
+      0
+    ) || calculateBilletageTotal(billetage);
 
-      const openedAt = session.openedAt || new Date().toISOString();
-      const closedAt = session.closedAt || new Date().toISOString();
+    const openedAt = session.openedAt || new Date().toISOString();
+    const closedAt = session.closedAt || new Date().toISOString();
 
-      // Calculate totals from operations if available
-      let totalEntrees = 0;
-      let totalSorties = 0;
-      if ((session as any).operations && Array.isArray((session as any).operations)) {
-        for (const op of (session as any).operations) {
-          const montant = Number(op.montant || 0);
-          const type = (op.typeOperation || '').toLowerCase();
-          if (type.includes('retrait') || type.includes('sortie') || type.includes('disbursement')) {
-            totalSorties += montant;
-          } else {
-            totalEntrees += montant;
-          }
+    // Calculate totals from operations if available
+    let totalEntrees = 0;
+    let totalSorties = 0;
+    if ((session as any).operations && Array.isArray((session as any).operations)) {
+      for (const op of (session as any).operations) {
+        const montant = Number(op.montant || 0);
+        const type = (op.typeOperation || '').toLowerCase();
+        if (type.includes('retrait') || type.includes('sortie') || type.includes('disbursement')) {
+          totalSorties += montant;
+        } else {
+          totalEntrees += montant;
         }
-      } else {
-        // Fallback calculation
-        totalEntrees = Math.max(0, soldeTheorique - soldeOuverture);
-        totalSorties = Math.max(0, totalEntrees - (soldeTheorique - soldeOuverture));
       }
-
-      const reportData: ClosureReportData = {
-        sessionId: session.id,
-        caisseNom: session.caisseNom || 'Caisse',
-        agenceNom: session.agenceNom || 'Agence',
-        agenceCode: session.agenceCode,
-        caissierNom: session.caissierNom || 'Caissier',
-        caissierId: session.caissierId || '',
-        openedAt,
-        closedAt,
-        soldeOuverture,
-        totalEntrees,
-        totalSorties,
-        soldeTheorique,
-        soldePhysique,
-        ecart: soldePhysique - soldeTheorique,
-        ecartJustification,
-        billetage,
-        montantVersCoffre,
-        montantReporte,
-        mmReconciliation,
-        observations,
-      };
-
-      await generateClosureReport(reportData);
-    } finally {
-      setIsGenerating(false);
+    } else {
+      // Fallback calculation
+      totalEntrees = Math.max(0, soldeTheorique - soldeOuverture);
+      totalSorties = Math.max(0, totalEntrees - (soldeTheorique - soldeOuverture));
     }
+
+    const data: ClosureReportData = {
+      sessionId: session.id,
+      caisseNom: session.caisseNom || 'Caisse',
+      agenceNom: session.agenceNom || 'Agence',
+      agenceCode: session.agenceCode,
+      caissierNom: session.caissierNom || 'Caissier',
+      caissierId: session.caissierId || '',
+      openedAt,
+      closedAt,
+      soldeOuverture,
+      totalEntrees,
+      totalSorties,
+      soldeTheorique,
+      soldePhysique,
+      ecart: soldePhysique - soldeTheorique,
+      ecartJustification,
+      billetage,
+      montantVersCoffre,
+      montantReporte,
+      mmReconciliation,
+      observations,
+    };
+
+    setReportData(data);
+    setShowViewer(true);
   };
 
   return (
-    <Button
-      variant={variant}
-      size={size}
-      onClick={handleGenerate}
-      disabled={isGenerating}
-      className={className}
-      icon={isGenerating ? Loader2 : FileDown}
-    >
-      {showLabel && (isGenerating ? 'Génération...' : 'Rapport PDF')}
-    </Button>
+    <>
+      <Button
+        variant={variant}
+        size={size}
+        onClick={handleOpen}
+        className={className}
+        icon={FileDown}
+      >
+        {showLabel && 'Rapport PDF'}
+      </Button>
+
+      {showViewer && reportData && (
+        <ClosingReportViewer
+          isOpen={showViewer}
+          onClose={() => setShowViewer(false)}
+          data={reportData}
+        />
+      )}
+    </>
   );
 }
 
