@@ -7,6 +7,34 @@ export interface Avantage {
   montantParDefaut: number;
   description: string;
   eligibleContrats?: string[] | any;
+  modeCalcul: string;
+  pourcentage?: string | null;
+  plafond?: number | null;
+  frequence: string;
+  dateDebut?: string | null;
+  dateFin?: string | null;
+  imposable: boolean;
+  soumisCnss: boolean;
+  autoAttribution: boolean;
+  categorie: string;
+}
+
+export interface AvantageFormData {
+  nom: string;
+  type: string;
+  montantParDefaut: number;
+  description?: string;
+  eligibleContrats?: string[];
+  modeCalcul?: string;
+  pourcentage?: number;
+  plafond?: number;
+  frequence?: string;
+  dateDebut?: string;
+  dateFin?: string;
+  imposable?: boolean;
+  soumisCnss?: boolean;
+  autoAttribution?: boolean;
+  categorie?: string;
 }
 
 export function useAvantages() {
@@ -28,7 +56,7 @@ export function useAvantages() {
     }
   };
 
-  const createAvantage = async (data: { nom: string; type: string; montantParDefaut: number; description?: string; eligibleContrats?: string[] }) => {
+  const createAvantage = async (data: AvantageFormData) => {
     try {
       const response = await fetch('/api/hr/avantages', {
         method: 'POST',

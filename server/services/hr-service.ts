@@ -17,16 +17,18 @@ import {
   hrAuditLog,
   presences,
   avantagesEmployes,
+  avantages,
   employes,
   LeaveStatus,
   BulletinStatus,
   IprBracket,
+  type BenefitBreakdownItem,
   type LeaveBalance,
   type PayrollConfig,
   type InsertHrAuditLog,
 } from "@shared/schema";
 import { users } from "@shared/schema/auth";
-import { eq, and, or, sql, gte, lte, desc } from "drizzle-orm";
+import { eq, and, or, sql, gte, lte, desc, isNull } from "drizzle-orm";
 
 // ============================================
 // TYPES
@@ -39,6 +41,16 @@ interface PayrollInput {
   tauxHoraire?: number;
   tauxJournalier?: number;
   dateEmbauche?: string;
+  typeContrat?: string;
+}
+
+interface BenefitsResolution {
+  items: BenefitBreakdownItem[];
+  total: number;
+  imposable: number;
+  nonImposable: number;
+  soumisCnss: number;
+  exemptCnss: number;
 }
 
 interface PayrollResult {
@@ -47,6 +59,7 @@ interface PayrollResult {
   primeTransport: number;
   primeRendement: number;
   autresPrimes: number;
+  benefitBreakdown: BenefitBreakdownItem[];
   salaireBrut: number;
   cnssEmploye: number;
   cnssPatronale: number;
@@ -475,6 +488,137 @@ export class HrService {
   }
 
   /**
+   * Compute benefit amount for a single avantage, applying frequency/date/mode filters
+   */
+  private computeBenefitAmount(
+    av: typeof avantages.$inferSelect,
+    overrideMontant: number | null,
+    salaireBase: number,
+    month: string,
+    dateAttribution: string | null,
+    source: 'ASSIGNED' | 'AUTO'
+  ): BenefitBreakdownItem | null {
+    const [, monthNum] = month.split('-').map(Number);
+
+    // Date validity check
+    if (av.dateDebut && month < av.dateDebut.substring(0, 7)) return null;
+    if (av.dateFin && month > av.dateFin.substring(0, 7)) return null;
+
+    // Frequency check
+    const freq = av.frequence || 'MENSUEL';
+    switch (freq) {
+      case 'MENSUEL': break;
+      case 'TRIMESTRIEL':
+        if (monthNum % 3 !== 0) return null;
+        break;
+      case 'ANNUEL':
+        if (monthNum !== 12) return null;
+        break;
+      case 'PONCTUEL':
+        if (!dateAttribution || dateAttribution.substring(0, 7) !== month) return null;
+        break;
+    }
+
+    // Amount calculation
+    let montantCalcule: number;
+    const mode = av.modeCalcul || 'FIXE';
+
+    if (mode === 'POURCENTAGE') {
+      const pct = Number(av.pourcentage) || 0;
+      montantCalcule = Math.round((pct / 100) * salaireBase);
+      if (av.plafond && montantCalcule > av.plafond) {
+        montantCalcule = av.plafond;
+      }
+    } else {
+      montantCalcule = overrideMontant ?? (av.montantParDefaut || 0);
+    }
+
+    if (montantCalcule <= 0) return null;
+
+    return {
+      avantageId: av.id,
+      nom: av.nom,
+      categorie: av.categorie || 'AUTRE',
+      modeCalcul: mode,
+      montantCalcule,
+      imposable: av.imposable ?? true,
+      soumisCnss: av.soumisCnss ?? true,
+      source,
+    };
+  }
+
+  /**
+   * Resolve all applicable benefits for an employee in a given month.
+   * Handles both manually assigned and auto-attributed benefits.
+   */
+  private async resolveBenefits(
+    employeId: string,
+    typeContrat: string | undefined,
+    salaireBase: number,
+    month: string
+  ): Promise<BenefitsResolution> {
+    // 1. Get manually assigned active benefits (with catalog data)
+    const assigned = await db
+      .select({ ae: avantagesEmployes, av: avantages })
+      .from(avantagesEmployes)
+      .innerJoin(avantages, eq(avantagesEmployes.avantageId, avantages.id))
+      .where(
+        and(
+          eq(avantagesEmployes.employeId, employeId),
+          eq(avantagesEmployes.statut, 'ACTIVE'),
+          eq(avantages.actif, true),
+          isNull(avantages.deletedAt)
+        )
+      );
+
+    const assignedAvantageIds = new Set(assigned.map(a => a.av.id));
+
+    // 2. Get auto-attributed benefits not already manually assigned
+    let autoAttributed: (typeof avantages.$inferSelect)[] = [];
+    if (typeContrat) {
+      const allAuto = await db
+        .select()
+        .from(avantages)
+        .where(
+          and(
+            eq(avantages.autoAttribution, true),
+            eq(avantages.actif, true),
+            isNull(avantages.deletedAt)
+          )
+        );
+
+      autoAttributed = allAuto.filter(av => {
+        if (assignedAvantageIds.has(av.id)) return false;
+        const eligible = av.eligibleContrats as string[] | null;
+        if (!eligible || eligible.length === 0) return true;
+        return eligible.includes(typeContrat);
+      });
+    }
+
+    // 3. Compute amounts for each benefit
+    const items: BenefitBreakdownItem[] = [];
+
+    for (const { ae, av } of assigned) {
+      const item = this.computeBenefitAmount(av, ae.montant, salaireBase, month, ae.dateAttribution, 'ASSIGNED');
+      if (item) items.push(item);
+    }
+
+    for (const av of autoAttributed) {
+      const item = this.computeBenefitAmount(av, null, salaireBase, month, null, 'AUTO');
+      if (item) items.push(item);
+    }
+
+    // 4. Aggregate
+    const total = items.reduce((s, i) => s + i.montantCalcule, 0);
+    const imposable = items.filter(i => i.imposable).reduce((s, i) => s + i.montantCalcule, 0);
+    const nonImposable = items.filter(i => !i.imposable).reduce((s, i) => s + i.montantCalcule, 0);
+    const soumisCnss = items.filter(i => i.soumisCnss).reduce((s, i) => s + i.montantCalcule, 0);
+    const exemptCnss = items.filter(i => !i.soumisCnss).reduce((s, i) => s + i.montantCalcule, 0);
+
+    return { items, total, imposable, nonImposable, soumisCnss, exemptCnss };
+  }
+
+  /**
    * Calculate payroll for a single employee
    */
   async calculatePayroll(
@@ -482,18 +626,7 @@ export class HrService {
     month: string,
     config: PayrollConfig
   ): Promise<PayrollResult> {
-    // 1. Get employee advantages
-    const avantages = await db
-      .select()
-      .from(avantagesEmployes)
-      .where(
-        and(
-          eq(avantagesEmployes.employeId, input.employeId),
-          eq(avantagesEmployes.statut, 'ACTIVE')
-        )
-      );
-
-    // 2. Get presences for the month (for hourly/daily calculation)
+    // 1. Get presences for the month (for hourly/daily calculation)
     const [year, monthNum] = month.split('-').map(Number);
     const startDate = new Date(year, monthNum - 1, 1);
     const endDate = new Date(year, monthNum, 0);
@@ -509,53 +642,64 @@ export class HrService {
         )
       );
 
-    // 3. Calculate base salary based on mode
+    // 2. Calculate base salary based on mode
     let salaireBase = 0;
     switch (input.modeCalculPaie) {
       case 'MONTHLY':
         salaireBase = input.salaireBase;
         break;
-      case 'HOURLY':
+      case 'HOURLY': {
         const heuresTravaillees = monthPresences.reduce(
           (sum, p) => sum + ((p.heuresTravaillees || 0) / 60),
           0
         );
         salaireBase = Math.round((input.tauxHoraire || 0) * heuresTravaillees);
         break;
-      case 'DAILY':
+      }
+      case 'DAILY': {
         const joursTravailles = monthPresences.filter(
           (p) => p.statut === 'Présent'
         ).length;
         salaireBase = Math.round((input.tauxJournalier || 0) * joursTravailles);
         break;
+      }
     }
 
-    // 4. Calculate bonuses
+    // 3. Calculate fixed bonuses
     const primeTransport = Number(config.transportAllowance) || 0;
     const primeAnciennete = this.calculateSeniorityBonus(input.dateEmbauche, salaireBase);
-    const autresPrimes = avantages.reduce((sum, a) => sum + (a.montant || 0), 0);
 
-    // 5. Calculate overtime
+    // 4. Calculate overtime
     const heuresSupp = monthPresences.reduce(
       (sum, p) => sum + ((p.heuresSupplementaires || 0) / 60),
       0
     );
-    const tauxHoraire = input.tauxHoraire || Math.round(salaireBase / 173); // 173 = avg hours/month
+    const tauxHoraire = input.tauxHoraire || Math.round(salaireBase / 173);
     const primeRendement = Math.round(heuresSupp * tauxHoraire * Number(config.overtimeRate || 1.5));
+
+    // 5. Resolve benefits (auto-attributed + manually assigned, with frequency/date/mode/tax filters)
+    const benefits = await this.resolveBenefits(
+      input.employeId,
+      input.typeContrat,
+      salaireBase,
+      month
+    );
+    const autresPrimes = benefits.total;
 
     // 6. Gross salary
     const salaireBrut = salaireBase + primeTransport + primeAnciennete + autresPrimes + primeRendement;
 
-    // 7. CNSS contributions
-    const cnssEmploye = Math.round(salaireBrut * Number(config.cnssEmployeeRate));
-    const cnssPatronale = Math.round(salaireBrut * Number(config.cnssEmployerRate));
+    // 7. CNSS contributions (only on components subject to CNSS)
+    const baseCnss = salaireBase + primeTransport + primeAnciennete + primeRendement + benefits.soumisCnss;
+    const cnssEmploye = Math.round(baseCnss * Number(config.cnssEmployeeRate));
+    const cnssPatronale = Math.round(baseCnss * Number(config.cnssEmployerRate));
 
-    // 8. IPR calculation
-    const baseImposable = salaireBrut - cnssEmploye;
-    const ipr = this.calculateIPR(baseImposable, config.iprBrackets as IprBracket[]);
+    // 8. IPR calculation (exclude non-taxable benefits from taxable base)
+    const baseImposable = salaireBrut - cnssEmploye - benefits.nonImposable;
+    const ipr = this.calculateIPR(Math.max(0, baseImposable), config.iprBrackets as IprBracket[]);
 
     // 9. Total deductions
-    const autresRetenues = 0; // Can be extended for loans, etc.
+    const autresRetenues = 0;
     const totalRetenues = cnssEmploye + ipr + autresRetenues;
 
     // 10. Net salary
@@ -567,6 +711,7 @@ export class HrService {
       primeTransport,
       primeRendement,
       autresPrimes,
+      benefitBreakdown: benefits.items,
       salaireBrut,
       cnssEmploye,
       cnssPatronale,
@@ -635,6 +780,7 @@ export class HrService {
           tauxHoraire: employe.tauxHoraire || undefined,
           tauxJournalier: employe.tauxJournalier || undefined,
           dateEmbauche: employe.dateEmbauche || undefined,
+          typeContrat: employe.typeContrat || undefined,
         },
         month,
         config
@@ -652,6 +798,7 @@ export class HrService {
           primeTransport: payroll.primeTransport.toString(),
           primeRendement: payroll.primeRendement.toString(),
           autresPrimes: payroll.autresPrimes.toString(),
+          detailAvantages: payroll.benefitBreakdown,
           salaireBrut: payroll.salaireBrut.toString(),
           cnssEmploye: payroll.cnssEmploye.toString(),
           ipr: payroll.ipr.toString(),

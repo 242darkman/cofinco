@@ -98,7 +98,13 @@ export async function getAvantagesEmploye(employeId: string): Promise<any[]> {
         nom: avantages.nom,
         type: avantages.type,
         montant: avantagesEmployes.montant,
-        dateAttribution: avantagesEmployes.dateAttribution
+        dateAttribution: avantagesEmployes.dateAttribution,
+        modeCalcul: avantages.modeCalcul,
+        pourcentage: avantages.pourcentage,
+        frequence: avantages.frequence,
+        imposable: avantages.imposable,
+        soumisCnss: avantages.soumisCnss,
+        categorie: avantages.categorie,
     })
     .from(avantagesEmployes)
     .innerJoin(avantages, eq(avantagesEmployes.avantageId, avantages.id))

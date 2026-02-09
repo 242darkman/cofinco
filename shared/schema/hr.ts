@@ -25,6 +25,18 @@ import { agences } from "./agences";
  * - payrollConfig: Configuration paramètres paie
  */
 
+// Interface pour le détail des avantages dans un bulletin de paie
+export interface BenefitBreakdownItem {
+  avantageId: number;
+  nom: string;
+  categorie: string;
+  modeCalcul: string;
+  montantCalcule: number;
+  imposable: boolean;
+  soumisCnss: boolean;
+  source: 'ASSIGNED' | 'AUTO';
+}
+
 // Demandes de congés
 export const demandesConges = pgTable("demandes_conges", {
   id: serial("id").primaryKey(),
@@ -293,6 +305,7 @@ export const bulletinsPaie = pgTable("bulletins_paie", {
   totalRetenues: varchar("total_retenues").notNull(),
   salaireNet: varchar("salaire_net").notNull(),
   cnssPatronale: varchar("cnss_patronale").notNull(),
+  detailAvantages: json("detail_avantages").$type<BenefitBreakdownItem[]>(), // Détail des avantages calculés
   pdfUrl: varchar("pdf_url"), // URL du PDF généré stocké dans Loge Cloud
   pdfHash: varchar("pdf_hash"), // Hash SHA256 pour vérifier l'intégrité
   genereParId: uuid("genere_par_id"), // User ID qui a généré
@@ -314,6 +327,21 @@ export const avantages = pgTable("avantages", {
   montantParDefaut: integer("montant_par_defaut").default(0),
   description: text("description"),
   eligibleContrats: json("eligible_contrats").$type<string[]>(), // Tableau des types de contrats éligibles ex: ["CDI", "CDD"]
+  // Mode de calcul
+  modeCalcul: varchar("mode_calcul", { length: 20 }).default("FIXE"), // 'FIXE' | 'POURCENTAGE'
+  pourcentage: numeric("pourcentage", { precision: 5, scale: 2 }), // ex: 5.00 pour 5% du salaire base
+  plafond: integer("plafond"), // Montant max pour mode pourcentage
+  // Fréquence & validité
+  frequence: varchar("frequence", { length: 20 }).default("MENSUEL"), // 'MENSUEL' | 'TRIMESTRIEL' | 'ANNUEL' | 'PONCTUEL'
+  dateDebut: date("date_debut"), // Début de validité
+  dateFin: date("date_fin"), // Fin de validité
+  // Fiscalité
+  imposable: boolean("imposable").default(true), // Soumis à l'IPR ?
+  soumisCnss: boolean("soumis_cnss").default(true), // Soumis à la CNSS ?
+  // Auto-attribution
+  autoAttribution: boolean("auto_attribution").default(false), // Attribuer auto aux employés éligibles
+  // Catégorie granulaire
+  categorie: varchar("categorie", { length: 30 }).default("AUTRE"),
   actif: boolean("actif").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"), // Soft delete
@@ -620,6 +648,35 @@ export const LeaveType = {
   SPECIAL: 'Congé Spécial',
 } as const;
 export type LeaveTypeType = typeof LeaveType[keyof typeof LeaveType];
+
+export const ModeCalculAvantage = {
+  FIXE: 'FIXE',
+  POURCENTAGE: 'POURCENTAGE',
+} as const;
+export type ModeCalculAvantageType = typeof ModeCalculAvantage[keyof typeof ModeCalculAvantage];
+
+export const FrequenceAvantage = {
+  MENSUEL: 'MENSUEL',
+  TRIMESTRIEL: 'TRIMESTRIEL',
+  ANNUEL: 'ANNUEL',
+  PONCTUEL: 'PONCTUEL',
+} as const;
+export type FrequenceAvantageType = typeof FrequenceAvantage[keyof typeof FrequenceAvantage];
+
+export const CategorieAvantage = {
+  TRANSPORT: 'TRANSPORT',
+  LOGEMENT: 'LOGEMENT',
+  REPAS: 'REPAS',
+  TELECOMMUNICATION: 'TELECOMMUNICATION',
+  SCOLAIRE: 'SCOLAIRE',
+  MEDICAL: 'MEDICAL',
+  PERFORMANCE: 'PERFORMANCE',
+  ANCIENNETE: 'ANCIENNETE',
+  RISQUE: 'RISQUE',
+  REPRESENTATION: 'REPRESENTATION',
+  AUTRE: 'AUTRE',
+} as const;
+export type CategorieAvantageType = typeof CategorieAvantage[keyof typeof CategorieAvantage];
 
 // ============================================
 // VALIDATION SCHEMAS (with refinements)

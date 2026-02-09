@@ -2745,7 +2745,11 @@ hrRouter.post("/avantages/assign", getAuthUser, async (req, res) => {
 // POST /api/hr/avantages - Créer un avantage
 hrRouter.post("/avantages", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
-        const { nom, type, montantParDefaut, description, eligibleContrats } = req.body;
+        const {
+            nom, type, montantParDefaut, description, eligibleContrats,
+            modeCalcul, pourcentage, plafond, frequence, dateDebut, dateFin,
+            imposable, soumisCnss, autoAttribution, categorie
+        } = req.body;
         if (!nom || !type) {
             return res.status(400).json({ error: "Nom et type requis" });
         }
@@ -2756,6 +2760,16 @@ hrRouter.post("/avantages", getAuthUser, attachAbility, requireAbility(Actions.M
             montantParDefaut: montantParDefaut ? parseInt(montantParDefaut) : 0,
             description: description || null,
             eligibleContrats: eligibleContrats || null,
+            modeCalcul: modeCalcul || 'FIXE',
+            pourcentage: pourcentage != null ? String(pourcentage) : null,
+            plafond: plafond ? parseInt(plafond) : null,
+            frequence: frequence || 'MENSUEL',
+            dateDebut: dateDebut || null,
+            dateFin: dateFin || null,
+            imposable: imposable !== undefined ? imposable : true,
+            soumisCnss: soumisCnss !== undefined ? soumisCnss : true,
+            autoAttribution: autoAttribution || false,
+            categorie: categorie || 'AUTRE',
             actif: true,
         }).returning();
 
@@ -2775,7 +2789,11 @@ hrRouter.post("/avantages", getAuthUser, attachAbility, requireAbility(Actions.M
 hrRouter.patch("/avantages/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         const avantageId = parseInt(req.params.id);
-        const { nom, type, montantParDefaut, description, eligibleContrats } = req.body;
+        const {
+            nom, type, montantParDefaut, description, eligibleContrats,
+            modeCalcul, pourcentage, plafond, frequence, dateDebut, dateFin,
+            imposable, soumisCnss, autoAttribution, categorie
+        } = req.body;
 
         const updates: Record<string, any> = {};
         if (nom !== undefined) updates.nom = nom;
@@ -2783,6 +2801,16 @@ hrRouter.patch("/avantages/:id", getAuthUser, attachAbility, requireAbility(Acti
         if (montantParDefaut !== undefined) updates.montantParDefaut = parseInt(montantParDefaut);
         if (description !== undefined) updates.description = description;
         if (eligibleContrats !== undefined) updates.eligibleContrats = eligibleContrats;
+        if (modeCalcul !== undefined) updates.modeCalcul = modeCalcul;
+        if (pourcentage !== undefined) updates.pourcentage = pourcentage != null ? String(pourcentage) : null;
+        if (plafond !== undefined) updates.plafond = plafond ? parseInt(plafond) : null;
+        if (frequence !== undefined) updates.frequence = frequence;
+        if (dateDebut !== undefined) updates.dateDebut = dateDebut || null;
+        if (dateFin !== undefined) updates.dateFin = dateFin || null;
+        if (imposable !== undefined) updates.imposable = imposable;
+        if (soumisCnss !== undefined) updates.soumisCnss = soumisCnss;
+        if (autoAttribution !== undefined) updates.autoAttribution = autoAttribution;
+        if (categorie !== undefined) updates.categorie = categorie;
 
         const [updated] = await db.update(avantages)
             .set(updates)
