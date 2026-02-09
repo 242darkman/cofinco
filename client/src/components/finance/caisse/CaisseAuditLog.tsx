@@ -232,7 +232,7 @@ export default function CaisseAuditLog() {
                 className="w-full p-3 flex items-center gap-3 text-left"
               >
                 {/* Action badge */}
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getActionStyle(log.action)}`}>
+                <span className={`inline-flex items-center justify-center w-40 shrink-0 h-6 px-2.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getActionStyle(log.action)} whitespace-nowrap`}>
                   {getActionLabel(log.action)}
                 </span>
 
