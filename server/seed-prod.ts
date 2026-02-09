@@ -291,8 +291,11 @@ const PLAN_COMPTABLE_DATA = [
   { num: '411300', label: 'Clients - Épargne', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '411400', label: 'Clients - Tontines', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '419000', label: 'Clients - Avances et acomptes', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4191', label: 'Fonds tontine — cotisations', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4192', label: 'Fonds tontine — pénalités', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '42', label: 'Personnel', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '421', label: 'Personnel — rémunérations dues', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4211', label: 'Avances et acomptes au personnel', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '43', label: 'Sécurité Sociale', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '431', label: 'Sécurité Sociale — cotisations dues', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '44', label: 'État', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
@@ -317,22 +320,28 @@ const PLAN_COMPTABLE_DATA = [
   { num: '5731', label: 'Caisse agents terrain - Collecte', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '581', label: 'Virements internes', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '581000', label: 'Compte de liaison général', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '5781', label: 'Caisse Mobile Money MTN', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '5782', label: 'Caisse Mobile Money Airtel', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '585', label: 'Virements Mobile Money', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
-  { num: '585100', label: 'Mobile Money - MTN', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
-  { num: '585200', label: 'Mobile Money - Airtel', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '585100', label: 'Mobile Money - MTN (transit)', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '585200', label: 'Mobile Money - Airtel (transit)', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
 
   // Classe 6: Charges
   { num: '601', label: 'Achats marchandises', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '61', label: 'Transports', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '62', label: 'Services extérieurs', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '627100', label: 'Commissions Mobile Money', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '6272', label: 'Commissions Mobile Money', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '627200', label: 'Frais bancaires', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '63', label: 'Impôts et taxes', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '66', label: 'Charges de personnel', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '661', label: 'Rémunérations du personnel', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '664', label: 'Charges sociales', classe: 6, type: 'Charge', sens: 'Débit', isSystem: false },
   { num: '658', label: 'Charges diverses', classe: 6, type: 'Charge', sens: 'Débit', isSystem: false },
+  { num: '6611', label: 'Intérêts versés sur dépôts', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '6615', label: 'Charges de personnel — primes', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '669', label: 'Autres charges financières', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '672', label: 'Pertes sur créances irrécouvrables', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '681', label: 'Dotations amortissements', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '691', label: 'Provisions créances douteuses', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
 
@@ -350,6 +359,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '708300', label: 'Commissions de gestion', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708400', label: 'Pénalités de retard', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '758', label: 'Produits divers de gestion courante', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: false },
+  { num: '772', label: 'Produits sur transit', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '76', label: 'Produits financiers', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '79', label: 'Reprises provisions', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
 ];
@@ -1334,6 +1344,134 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '581',   // Virements internes (transit)
     creditAccount: '772',  // Produits sur transit (produits exceptionnels)
     descriptionTemplate: 'Écart évacuation coffre — excédent constaté',
+    priority: 100,
+  },
+
+  // --- Commission tontine ---
+  {
+    code: 'COMMISSION_TONTINE',
+    name: 'Commission tontine — frais de gestion',
+    description: 'Prélèvement de frais/commissions sur fonds tontine vers institution',
+    sourceType: 'MOUVEMENT',
+    eventType: 'COMMISSION',
+    journalCode: 'TON',
+    debitAccount: '4191',   // Fonds tontine (money leaves tontine)
+    creditAccount: '708300', // Commissions de gestion (revenue)
+    descriptionTemplate: 'Commission tontine — frais de gestion',
+    priority: 100,
+  },
+
+  // --- Capitalisation intérêts épargne ---
+  {
+    code: 'INTEREST_PAYMENT_SAVINGS',
+    name: 'Capitalisation intérêts épargne',
+    description: 'Intérêts mensuels capitalisés sur comptes épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'INTEREST_PAYMENT',
+    journalCode: 'EPGN',
+    debitAccount: '6611',   // Intérêts versés sur dépôts (charge)
+    creditAccount: '4112',  // Dépôts épargne (credited to client)
+    descriptionTemplate: 'Capitalisation intérêts épargne — {clientName}',
+    priority: 100,
+  },
+
+  // --- Liquidation caisse ---
+  {
+    code: 'LIQUIDATION_CAISSE',
+    name: 'Liquidation caisse',
+    description: 'Fermeture définitive d\'une caisse avec transfert du solde vers coffre',
+    sourceType: 'MOUVEMENT',
+    eventType: 'LIQUIDATION',
+    journalCode: 'OD',
+    debitAccount: '531',   // Coffre (reçoit)
+    creditAccount: '521',  // Caisse (envoie)
+    descriptionTemplate: 'Liquidation caisse — transfert solde vers coffre',
+    priority: 100,
+  },
+
+  // --- Avance sur salaire ---
+  {
+    code: 'SALARY_ADVANCE_CASH',
+    name: 'Avance sur salaire — espèces',
+    description: 'Versement d\'avance sur salaire en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SALARY_ADVANCE',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4211',   // Avances au personnel (actif)
+    creditAccount: '521',   // Caisse (cash sort)
+    descriptionTemplate: 'Avance sur salaire — {employeeName}',
+    priority: 100,
+  },
+  {
+    code: 'SALARY_ADVANCE_TRANSFER',
+    name: 'Avance sur salaire — virement',
+    description: 'Versement d\'avance sur salaire par virement',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SALARY_ADVANCE',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'OD',
+    debitAccount: '4211',   // Avances au personnel (actif)
+    creditAccount: '512',   // Banque (virement sort)
+    descriptionTemplate: 'Avance sur salaire virement — {employeeName}',
+    priority: 100,
+  },
+
+  // --- Reversals Mobile Money ---
+  {
+    code: 'REVERSAL_COLLECTION_MTN',
+    name: 'Annulation collecte Mobile Money MTN',
+    description: 'Annulation/reversal d\'un dépôt Mobile Money MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'REVERSAL_COLLECTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '4112',   // Dépôts épargne (money leaves client)
+    creditAccount: '5781',  // Mobile Money MTN (money returns)
+    descriptionTemplate: 'Annulation collecte MTN — {clientName}',
+    priority: 100,
+  },
+  {
+    code: 'REVERSAL_COLLECTION_AIRTEL',
+    name: 'Annulation collecte Mobile Money Airtel',
+    description: 'Annulation/reversal d\'un dépôt Mobile Money Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'REVERSAL_COLLECTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '4112',   // Dépôts épargne (money leaves client)
+    creditAccount: '5782',  // Mobile Money Airtel (money returns)
+    descriptionTemplate: 'Annulation collecte Airtel — {clientName}',
+    priority: 100,
+  },
+  {
+    code: 'REVERSAL_PAYOUT_MTN',
+    name: 'Annulation payout Mobile Money MTN',
+    description: 'Annulation/reversal d\'un retrait Mobile Money MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'REVERSAL_PAYOUT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',   // Mobile Money MTN (money returns)
+    creditAccount: '4112',  // Dépôts épargne (restored to client)
+    descriptionTemplate: 'Annulation payout MTN — {clientName}',
+    priority: 100,
+  },
+  {
+    code: 'REVERSAL_PAYOUT_AIRTEL',
+    name: 'Annulation payout Mobile Money Airtel',
+    description: 'Annulation/reversal d\'un retrait Mobile Money Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'REVERSAL_PAYOUT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',   // Mobile Money Airtel (money returns)
+    creditAccount: '4112',  // Dépôts épargne (restored to client)
+    descriptionTemplate: 'Annulation payout Airtel — {clientName}',
     priority: 100,
   },
 ];

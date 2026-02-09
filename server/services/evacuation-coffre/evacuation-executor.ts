@@ -215,24 +215,16 @@ export async function executeDispatch(
         })
         .where(eq(coffresForts.id, evacuation.coffreSourceId));
 
-      // 8. GL Posting: eventType = EVACUATION_COFFRE_OUT
-      try {
-        const glResult = await postGlForMouvement(tx, mouvementTransit, agenceId, userId, {
-          evacuationCoffreId: evacuationId,
-          direction: "DISPATCH",
-          coffreSourceCode: coffreSource.code as string,
-          eventType: "EVACUATION_COFFRE_OUT",
-        });
-        if (glResult) {
-          await tx.update(mouvementsFinanciers)
-            .set({ glPostingStatus: "POSTED", glPostingError: null })
-            .where(eq(mouvementsFinanciers.id, mouvementTransit.id));
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Unknown GL error";
-        logger.error({ evacuationId, error: message }, "GL dispatch failed");
+      // 8. GL Posting: eventType = EVACUATION_COFFRE_OUT (STRICT)
+      const glResultDispatch = await postGlForMouvement(tx, mouvementTransit, agenceId, userId, {
+        evacuationCoffreId: evacuationId,
+        direction: "DISPATCH",
+        coffreSourceCode: coffreSource.code as string,
+        eventType: "EVACUATION_COFFRE_OUT",
+      });
+      if (glResultDispatch) {
         await tx.update(mouvementsFinanciers)
-          .set({ glPostingStatus: "FAILED", glPostingError: message })
+          .set({ glPostingStatus: "POSTED", glPostingError: null })
           .where(eq(mouvementsFinanciers.id, mouvementTransit.id));
       }
 
@@ -403,24 +395,16 @@ export async function executeDeposit(
           .where(eq(coffresForts.id, evacuation.coffreDestinationId));
       }
 
-      // 6. GL Posting
-      try {
-        const glResult = await postGlForMouvement(tx, mouvementDepot, evacuation.agenceId, userId, {
-          evacuationCoffreId: evacuationId,
-          direction: "DEPOSIT",
-          typeDestination: evacuation.typeDestination,
-          eventType,
-        });
-        if (glResult) {
-          await tx.update(mouvementsFinanciers)
-            .set({ glPostingStatus: "POSTED", glPostingError: null })
-            .where(eq(mouvementsFinanciers.id, mouvementDepot.id));
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Unknown GL error";
-        logger.error({ evacuationId, error: message }, "GL deposit failed");
+      // 6. GL Posting (STRICT — failure rolls back transaction)
+      const glResultDeposit = await postGlForMouvement(tx, mouvementDepot, evacuation.agenceId, userId, {
+        evacuationCoffreId: evacuationId,
+        direction: "DEPOSIT",
+        typeDestination: evacuation.typeDestination,
+        eventType,
+      });
+      if (glResultDeposit) {
         await tx.update(mouvementsFinanciers)
-          .set({ glPostingStatus: "FAILED", glPostingError: message })
+          .set({ glPostingStatus: "POSTED", glPostingError: null })
           .where(eq(mouvementsFinanciers.id, mouvementDepot.id));
       }
 

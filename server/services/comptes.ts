@@ -39,6 +39,7 @@ import {
   type SensMouvement,
   type MouvementFinancier,
 } from "./ledger";
+import { postGlForMouvement } from "./accounting-posting-service";
 import {
   deriveSensFromType,
   formatTransactionDescription,
@@ -1471,6 +1472,19 @@ export async function createCompteWithInitialDeposit(
         createdBy: userId,
         metadata: { description: `Virement ouverture depuis ${compteSource.numeroCompte}` }
       }).returning();
+
+      // B2. Post GL entry (blocking — rollback if GL fails)
+      if (data.agenceId) {
+        await postGlForMouvement(tx, mouvement, data.agenceId, userId, {
+          type: "INITIAL_DEPOSIT",
+          compteSourceNumero: compteSource.numeroCompte,
+          compteDestNumero: compte.numeroCompte,
+          description: `Virement ouverture depuis ${compteSource.numeroCompte}`,
+        });
+        await tx.update(mouvementsFinanciers)
+          .set({ glPostingStatus: "POSTED" })
+          .where(eq(mouvementsFinanciers.id, mouvement.id));
+      }
 
       // C. Transaction 1: DEBIT Source Account
       await tx.insert(transactionsCompte).values({

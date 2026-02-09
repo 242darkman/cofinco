@@ -44,13 +44,13 @@ export async function validateAccountingRule(
   if (!ruleExists) {
     const errorMessage = `Règle comptable manquante pour l'événement: ${eventType}`;
 
-    // Mode STRICT: bloquer l'opération
-    if (process.env.GL_POSTING_MODE === 'STRICT') {
+    // Mode STRICT (défaut): bloquer l'opération
+    if (isGLStrictMode()) {
       logger.error({ eventType, agenceId }, errorMessage);
       throw new Error(errorMessage);
     }
 
-    // Mode LENIENT: logger un warning mais continuer
+    // Mode LENIENT (explicite): logger un warning mais continuer
     logger.warn({ eventType, agenceId }, `${errorMessage} (mode LENIENT - opération autorisée)`);
     return false;
   }
@@ -59,10 +59,11 @@ export async function validateAccountingRule(
 }
 
 /**
- * Vérifie si le mode GL strict est activé
+ * Vérifie si le mode GL strict est activé.
+ * STRICT par défaut — seul GL_POSTING_MODE=LENIENT le désactive explicitement.
  */
 export function isGLStrictMode(): boolean {
-  return process.env.GL_POSTING_MODE === 'STRICT';
+  return process.env.GL_POSTING_MODE !== 'LENIENT';
 }
 
 /**

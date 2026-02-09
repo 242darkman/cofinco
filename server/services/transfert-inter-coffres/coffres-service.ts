@@ -8,7 +8,7 @@ import {
   mouvementsFinanciers,
 } from "@shared/schema";
 import { StatutCoffre } from "@shared/enum/status-constants";
-import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
+import { postGlForMouvement } from "../accounting-posting-service";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "../../lib/logger";
 
@@ -385,41 +385,22 @@ export class CoffresFortsService {
         })
         .returning();
 
-      // 2. Poster au Grand Livre
-      let glPosted = false;
-      try {
-        const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, {
-          eventType: 'ENTREE_COFFRE', // Match accounting rule
-          operationType: 'ABONDEMENT_COFFRE',
-          coffreId,
-        });
+      // 2. Poster au Grand Livre (STRICT — failure rolls back transaction)
+      const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, {
+        eventType: 'ENTREE_COFFRE',
+        operationType: 'ABONDEMENT_COFFRE',
+        coffreId,
+      });
 
-        if (glResult) {
-          logger.info({ mouvementId, numeroPiece: glResult.numeroPiece }, 'GL posted for coffre abondement');
-          glPosted = true;
-        }
-
-        await tx
-          .update(mouvementsFinanciers)
-          .set({ glPostingStatus: "POSTED" })
-          .where(eq(mouvementsFinanciers.id, mouvementId));
-      } catch (glError: unknown) {
-        const message = glError instanceof Error ? glError.message : "Unknown GL error";
-        const status = glError instanceof AccountingRuleNotFoundError ? "SKIPPED" : "FAILED";
-
-        logger.warn({ mouvementId, error: message }, `GL ${status.toLowerCase()} for coffre abondement`);
-
-        await tx
-          .update(mouvementsFinanciers)
-          .set({ glPostingStatus: status, glPostingError: message })
-          .where(eq(mouvementsFinanciers.id, mouvementId));
-
-        // Si la règle comptable n'existe pas, on continue (rétrocompatibilité)
-        // Mais on log un warning pour investigation
-        if (!(glError instanceof AccountingRuleNotFoundError)) {
-          logger.error({ mouvementId, error: message }, 'Critical GL posting error for coffre abondement');
-        }
+      const glPosted = !!glResult;
+      if (glResult) {
+        logger.info({ mouvementId, numeroPiece: glResult.numeroPiece }, 'GL posted for coffre abondement');
       }
+
+      await tx
+        .update(mouvementsFinanciers)
+        .set({ glPostingStatus: "POSTED" })
+        .where(eq(mouvementsFinanciers.id, mouvementId));
 
       // 3. Mettre à jour le solde du coffre
       const [updated] = await tx

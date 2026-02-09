@@ -93,7 +93,7 @@ async function executeAutomaticRepayment(credit: any) {
       creditId: credit.id,
       compteId: sourceAccountId, // Determines which account is debited in the event logic?
       
-      typePaiement: "Remboursement Automatique",
+      typePaiement: "CREDIT_REPAYMENT",
       methodePaiement: "TRANSFER",
       referenceExterne: `AUTO-${generateReference("CREDIT")}`,
       metadata: {

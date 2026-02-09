@@ -71,6 +71,7 @@ services:
       DISABLE_CRON_JOBS: "false"
       BALANCE_RECONCILIATION_INTERVAL_MINUTES: ${BALANCE_RECONCILIATION_INTERVAL_MINUTES:-60}
       ENABLE_BALANCE_AUTO_CORRECTION: ${ENABLE_BALANCE_AUTO_CORRECTION:-false}
+      GL_POSTING_MODE: ${GL_POSTING_MODE:-STRICT}
     volumes:
       # Source code mounted from host → hot reload
       - .:/app

@@ -2127,6 +2127,93 @@ export async function ensureCustomFunctions(): Promise<void> {
       console.warn('[DB] ⚠ Failed to create MATERIALIZED VIEW "permission_usage_stats":', err instanceof Error ? err.message : err);
     }
 
+    // ============================================================
+    // BALANCE GUARD — prevents direct balance updates without mouvement
+    // ============================================================
+    // Two-part mechanism:
+    //   1. AFTER INSERT on mouvements_financiers → sets transaction-local flag
+    //   2. BEFORE UPDATE on balance tables → blocks if flag is absent
+    //
+    // Bypass for seeds/migrations: SET LOCAL "app.balance_guard_bypass" = 'true';
+    // ============================================================
+
+    // Part 1: Auto-flag when mouvement is created in the current transaction
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_mouvement_flag()
+        RETURNS TRIGGER AS $t$
+        BEGIN
+          PERFORM set_config('app.mouvement_created', 'true', true);
+          RETURN NEW;
+        END;
+        $t$ LANGUAGE plpgsql;
+      `);
+      await db.execute(sql`
+        DROP TRIGGER IF EXISTS trg_mouvement_flag ON mouvements_financiers;
+        CREATE TRIGGER trg_mouvement_flag
+          AFTER INSERT ON mouvements_financiers
+          FOR EACH ROW EXECUTE FUNCTION fn_mouvement_flag();
+      `);
+      console.log('[DB] ✓ TRIGGER: trg_mouvement_flag (mouvements_financiers)');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create TRIGGER "trg_mouvement_flag":', err instanceof Error ? err.message : err);
+    }
+
+    // Part 2: Guard function — rejects balance updates unless mouvement flag or bypass is set
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_guard_balance_update()
+        RETURNS TRIGGER AS $t$
+        BEGIN
+          -- Allow if mouvement was created in this transaction
+          IF current_setting('app.mouvement_created', true) = 'true' THEN
+            RETURN NEW;
+          END IF;
+
+          -- Allow if guard explicitly bypassed (seeds, migrations, admin ops)
+          IF current_setting('app.balance_guard_bypass', true) = 'true' THEN
+            RETURN NEW;
+          END IF;
+
+          RAISE EXCEPTION 'BALANCE_GUARD: direct balance update on % (id=%) blocked — create a mouvement_financier first',
+            TG_TABLE_NAME, NEW.id
+            USING ERRCODE = 'P0001';
+        END;
+        $t$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] ✓ FUNCTION: fn_guard_balance_update');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create FUNCTION "fn_guard_balance_update":', err instanceof Error ? err.message : err);
+    }
+
+    // Part 3: Attach guard triggers to all balance-bearing tables
+    const balanceGuardTargets = [
+      { table: 'comptes',      column: 'solde_courant' },
+      { table: 'caisses',      column: 'solde' },
+      { table: 'coffres_forts', column: 'solde' },
+      { table: 'tontines',     column: 'solde' },
+      { table: 'credits',      column: 'solde_restant' },
+    ];
+
+    for (const { table, column } of balanceGuardTargets) {
+      try {
+        await db.execute(sql.raw(`
+          DROP TRIGGER IF EXISTS trg_guard_balance ON ${table};
+          CREATE TRIGGER trg_guard_balance
+            BEFORE UPDATE ON ${table}
+            FOR EACH ROW
+            WHEN (OLD.${column} IS DISTINCT FROM NEW.${column})
+            EXECUTE FUNCTION fn_guard_balance_update();
+        `));
+        console.log(`[DB] ✓ TRIGGER: trg_guard_balance (${table}.${column})`);
+        objectCount++;
+      } catch (err) {
+        console.warn(`[DB] ⚠ Failed to create TRIGGER "trg_guard_balance" on ${table}:`, err instanceof Error ? err.message : err);
+      }
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

@@ -686,20 +686,16 @@ export class RemiseSettlementService {
           .limit(1);
 
         if (mouvementClient && paiement.agenceId) {
-          try {
-            await postFromMouvement({
-              mouvement: mouvementClient,
-              agenceId: paiement.agenceId,
-              userId: postedBy,
-              additionalMetadata: {
-                source: "remise_terrain",
-                typePaiement,
-              },
-            });
-          } catch (error) {
-            // Log but don't fail - accounting can be reconciled later
-            logger.error({ paiementId: paiement.id, err: error }, 'Error posting payment');
-          }
+          // STRICT — GL failure rolls back the entire transaction
+          await postFromMouvement({
+            mouvement: mouvementClient,
+            agenceId: paiement.agenceId,
+            userId: postedBy,
+            additionalMetadata: {
+              source: "remise_terrain",
+              typePaiement,
+            },
+          });
         }
       }
     }

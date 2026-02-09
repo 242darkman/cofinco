@@ -13,7 +13,7 @@ import { comptes, mouvementsFinanciers, transactionsCompte } from "@shared/schem
 import { eq, sql } from "drizzle-orm";
 import { canDeposit, canWithdraw } from "./comptes";
 import { StatutTransaction } from "@shared/enum/status-constants";
-import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-posting-service";
+import { postGlForMouvement } from "./accounting-posting-service";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger('CompteTransfers');
@@ -160,45 +160,23 @@ export async function executeCompteTransfer({
     const mouvementId = mouvementResult[0].id;
     const mouvement = mouvementResult[0];
 
-    // Post GL entry (non-blocking - failures don't stop the transfer)
+    // Post GL entry (STRICT — failure rolls back the entire transaction)
     const agenceId = compteSource.agence_id;
-    if (agenceId) {
-      try {
-        const glResult = await postGlForMouvement(tx, mouvement, agenceId, createdBy || undefined, {
-          type: "VIREMENT_INTERNE",
-          compteSourceNumero: compteSource.numero_compte,
-          compteDestNumero: compteDest.numero_compte,
-        });
-        if (glResult) {
-          logger.info({ mouvementId, numeroPiece: glResult.numeroPiece }, 'GL posted for compte transfer');
-        }
-        await tx
-          .update(mouvementsFinanciers)
-          .set({ glPostingStatus: "POSTED" })
-          .where(eq(mouvementsFinanciers.id, mouvementId));
-      } catch (glError: unknown) {
-        const message = glError instanceof Error ? glError.message : "Unknown GL error";
-        if (glError instanceof AccountingRuleNotFoundError) {
-          logger.warn({ mouvementId, error: message }, 'GL skipped for compte transfer: no accounting rule');
-          await tx
-            .update(mouvementsFinanciers)
-            .set({ glPostingStatus: "SKIPPED", glPostingError: message })
-            .where(eq(mouvementsFinanciers.id, mouvementId));
-        } else {
-          logger.error({ mouvementId, error: message }, 'GL posting failed for compte transfer');
-          await tx
-            .update(mouvementsFinanciers)
-            .set({ glPostingStatus: "FAILED", glPostingError: message })
-            .where(eq(mouvementsFinanciers.id, mouvementId));
-        }
-      }
-    } else {
-      logger.warn({ mouvementId }, 'GL posting skipped: no agenceId on source account');
-      await tx
-        .update(mouvementsFinanciers)
-        .set({ glPostingStatus: "SKIPPED", glPostingError: "No agenceId on source account" })
-        .where(eq(mouvementsFinanciers.id, mouvementId));
+    if (!agenceId) {
+      throw new Error(`GL posting impossible: no agenceId on source account ${compteSource.numero_compte}`);
     }
+    const glResult = await postGlForMouvement(tx, mouvement, agenceId, createdBy || undefined, {
+      type: "VIREMENT_INTERNE",
+      compteSourceNumero: compteSource.numero_compte,
+      compteDestNumero: compteDest.numero_compte,
+    });
+    if (glResult) {
+      logger.info({ mouvementId, numeroPiece: glResult.numeroPiece }, 'GL posted for compte transfer');
+    }
+    await tx
+      .update(mouvementsFinanciers)
+      .set({ glPostingStatus: "POSTED" })
+      .where(eq(mouvementsFinanciers.id, mouvementId));
 
     const nouveauSoldeSource = (soldeSource - montant).toString();
     const nouveauSoldeDest = (soldeDest + montant).toString();

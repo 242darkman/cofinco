@@ -51,7 +51,8 @@ export type AnomalyType =
   | "DUPLICATE_TRANSACTION"
   | "SESSION_BALANCE_MISMATCH"
   | "NEGATIVE_BALANCE"
-  | "MISSING_MOUVEMENT_ID";
+  | "MISSING_MOUVEMENT_ID"
+  | "MOUVEMENT_WITHOUT_GL";
 
 export interface ReconciliationResult {
   runAt: Date;
@@ -433,6 +434,61 @@ async function checkDuplicates(options: ReconciliationOptions): Promise<Reconcil
   return anomalies;
 }
 
+/**
+ * Check 7: Mouvements without GL posting link
+ * Every POSTED mouvement should have a corresponding gl_posting_links entry.
+ * Mouvements without GL = potential accounting gap.
+ */
+async function checkMouvementsWithoutGl(options: ReconciliationOptions): Promise<ReconciliationAnomaly[]> {
+  const anomalies: ReconciliationAnomaly[] = [];
+
+  const dateConditions: string[] = [];
+  if (options.dateFrom) {
+    dateConditions.push(`mf.created_at >= '${options.dateFrom.toISOString()}'`);
+  }
+  if (options.dateTo) {
+    dateConditions.push(`mf.created_at <= '${options.dateTo.toISOString()}'`);
+  }
+
+  const whereExtra = dateConditions.length > 0 ? `AND ${dateConditions.join(' AND ')}` : '';
+
+  const orphans = await db.execute(sql.raw(`
+    SELECT mf.id, mf.reference, mf.montant, mf.sens, mf.type_paiement,
+           mf.source_module, mf.gl_posting_status, mf.created_at
+    FROM mouvements_financiers mf
+    LEFT JOIN gl_posting_links gpl ON gpl.mouvement_id = mf.id
+    WHERE mf.statut = 'POSTED'
+      AND gpl.id IS NULL
+      AND mf.gl_posting_status IS DISTINCT FROM 'POSTED'
+      ${whereExtra}
+    ORDER BY mf.created_at DESC
+    LIMIT ${options.limit || 200}
+  `));
+
+  for (const row of orphans.rows as any[]) {
+    anomalies.push({
+      type: "MOUVEMENT_WITHOUT_GL",
+      severity: "critical",
+      entityType: "mouvement_financier",
+      entityId: row.id,
+      description: `Mouvement POSTED sans écriture GL (${row.type_paiement}, ${row.montant} FCFA)`,
+      details: {
+        reference: row.reference,
+        montant: row.montant,
+        sens: row.sens,
+        typePaiement: row.type_paiement,
+        sourceModule: row.source_module,
+        glPostingStatus: row.gl_posting_status,
+        createdAt: row.created_at,
+      },
+      detectedAt: new Date(),
+      autoFixable: false,
+    });
+  }
+
+  return anomalies;
+}
+
 // ============================================================================
 // FIX FUNCTIONS
 // ============================================================================
@@ -469,6 +525,7 @@ const CHECK_FUNCTIONS: Record<string, (options: ReconciliationOptions) => Promis
   missingMouvement: checkTransactionsWithoutMouvement,
   sessionBalance: checkSessionBalances,
   duplicates: checkDuplicates,
+  mouvementsWithoutGl: checkMouvementsWithoutGl,
 };
 
 export async function runReconciliation(options: ReconciliationOptions = {}): Promise<ReconciliationResult> {

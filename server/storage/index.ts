@@ -242,17 +242,6 @@ export interface IStorage {
     // Distributions Tontine
     getDistributionsByTontine(tontineId: string): Promise<any[]>;
     getDistribution(id: string): Promise<any | undefined>;
-    createTontineDistribution(data: {
-      tontineId: string;
-      membreId: string;
-      tourNumero: number;
-      montantTotal: string;
-      dateDistribution?: Date;
-      modePaiement?: string;
-      referencePaiement?: string;
-      notes?: string;
-    }, userId?: string): Promise<any>;
-    cancelTontineDistribution(id: string): Promise<boolean>;
     getDistributionStats(tontineId: string): Promise<{
       totalDistribue: number;
       nombreDistributions: number;

@@ -47,7 +47,7 @@ import {
 import { StatutTransaction, TypeCompte, TypeOperationCaisse, type TypeOperationCaisseType } from "@shared/enum/status-constants";
 import { eq, sql, and, isNull } from "drizzle-orm";
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
-import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
+import { postGlForMouvement } from "../accounting-posting-service";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Type pour les résultats d'approbation
@@ -102,44 +102,19 @@ async function tryPostGl(
   additionalMetadata?: Record<string, any>
 ): Promise<boolean> {
   if (!agenceId) {
-    logger.warn({ mouvementId: mouvement.id }, 'GL posting skipped: no agenceId');
-    await tx
-      .update(mouvementsFinanciers)
-      .set({ glPostingStatus: "SKIPPED", glPostingError: "No agenceId available" })
-      .where(eq(mouvementsFinanciers.id, mouvement.id));
-    return false;
+    throw new Error(`GL posting impossible: no agenceId for mouvement ${mouvement.id}`);
   }
 
-  try {
-    const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, additionalMetadata);
-    if (glResult) {
-      logger.info({ mouvementId: mouvement.id, numeroPiece: glResult.numeroPiece }, 'GL posted for mouvement');
-    }
-    await tx
-      .update(mouvementsFinanciers)
-      .set({ glPostingStatus: "POSTED" })
-      .where(eq(mouvementsFinanciers.id, mouvement.id));
-    return true;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown GL error";
-
-    if (error instanceof AccountingRuleNotFoundError) {
-      // No accounting rule - mark as SKIPPED (non-critical for approval flow)
-      logger.warn({ mouvementId: mouvement.id, error: message }, 'GL skipped: no accounting rule');
-      await tx
-        .update(mouvementsFinanciers)
-        .set({ glPostingStatus: "SKIPPED", glPostingError: message })
-        .where(eq(mouvementsFinanciers.id, mouvement.id));
-    } else {
-      // Other error - mark as FAILED
-      logger.error({ mouvementId: mouvement.id, error: message }, 'GL posting failed');
-      await tx
-        .update(mouvementsFinanciers)
-        .set({ glPostingStatus: "FAILED", glPostingError: message })
-        .where(eq(mouvementsFinanciers.id, mouvement.id));
-    }
-    return false;
+  // STRICT — GL failure rolls back the entire transaction
+  const glResult = await postGlForMouvement(tx, mouvement, agenceId, userId, additionalMetadata);
+  if (glResult) {
+    logger.info({ mouvementId: mouvement.id, numeroPiece: glResult.numeroPiece }, 'GL posted for mouvement');
   }
+  await tx
+    .update(mouvementsFinanciers)
+    .set({ glPostingStatus: "POSTED" })
+    .where(eq(mouvementsFinanciers.id, mouvement.id));
+  return true;
 }
 
 export class ApprovalService {

@@ -39,6 +39,7 @@ import { startLateInstallmentsJob } from "./cron/late-installments-job";
 import { scheduleGlReconciliationMonitoring } from "./cron/gl-reconciliation-monitor";
 import { scheduleAutoFix } from "./cron/gl-auto-fix";
 import { startAccessCodeCleanupCron } from "./cron/access-code-cleanup";
+import { startDailyIntegrityAuditCron } from "./cron/daily-integrity-audit";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -189,6 +190,14 @@ app.get("/api/health", async (_req, res) => {
     logger.info('Skipping ensureCustomFunctions (pgbouncer detected — handled by db-init)');
   }
 
+  // GL STRICT mode boot guard
+  const glMode = process.env.GL_POSTING_MODE || 'STRICT';
+  if (glMode === 'LENIENT') {
+    logger.warn('⚠️  GL_POSTING_MODE=LENIENT — les opérations sans règle comptable ne seront PAS bloquées');
+  } else {
+    logger.info('GL_POSTING_MODE=STRICT — toute opération sans règle comptable sera bloquée avec rollback');
+  }
+
   // Setup auth first (creates session table and middleware)
   await setupAuth(app);
 
@@ -315,7 +324,11 @@ app.get("/api/health", async (_req, res) => {
     lateInstallmentsJob.start();
     logger.info('Late installments marking job started (hourly)');
 
-    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments');
+    // Start Daily Integrity Audit (4 AM — detects mouvements without GL, balance mismatches)
+    startDailyIntegrityAuditCron();
+    logger.info('Daily integrity audit cron started (04:00)');
+
+    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit');
 
     // Start Account Cleanup Cron
     const { accountCleanup } = await import("./services/account-cleanup");

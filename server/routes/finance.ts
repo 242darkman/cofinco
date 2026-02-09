@@ -24,7 +24,7 @@ import {
 } from "@shared/schema";
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
-import { postGlForMouvement, AccountingRuleNotFoundError } from "../services/accounting-posting-service";
+import { postGlForMouvement } from "../services/accounting-posting-service";
 import { getComptesByClient } from "../storage/finance";
 import { DecaissementInsufficientFundsError } from "../storage/errors";
 
@@ -4035,35 +4035,20 @@ export function registerFinanceRoutes(app: Express) {
             createdBy: user.id
           });
 
-          // GL Posting for coffre debit
-          if (refundDataLocked.agenceId) {
-            try {
-              await postGlForMouvement(tx, coffreMouvement, refundDataLocked.agenceId, user.id, {
-                refundId: refundDataLocked.id,
-                type: 'REFUND_SOURCE',
-              });
-            } catch (error) {
-              if (error instanceof AccountingRuleNotFoundError) {
-                logger.warn({ mouvementId: coffreMouvement.id, error: (error as Error).message }, "No GL rule for refund coffre debit");
-              } else {
-                throw error;
-              }
-            }
-
-            // GL Posting for client account credit
-            try {
-              await postGlForMouvement(tx, mouvement, refundDataLocked.agenceId, user.id, {
-                refundId: refundDataLocked.id,
-                type: 'REFUND_PAYMENT',
-              });
-            } catch (error) {
-              if (error instanceof AccountingRuleNotFoundError) {
-                logger.warn({ mouvementId: mouvement.id, error: (error as Error).message }, "No GL rule for refund deposit");
-              } else {
-                throw error;
-              }
-            }
+          // GL Posting for coffre debit (STRICT — failure rolls back transaction)
+          if (!refundDataLocked.agenceId) {
+            throw new Error(`GL posting impossible: no agenceId on refund ${refundDataLocked.id}`);
           }
+          await postGlForMouvement(tx, coffreMouvement, refundDataLocked.agenceId, user.id, {
+            refundId: refundDataLocked.id,
+            type: 'REFUND_SOURCE',
+          });
+
+          // GL Posting for client account credit (STRICT)
+          await postGlForMouvement(tx, mouvement, refundDataLocked.agenceId, user.id, {
+            refundId: refundDataLocked.id,
+            type: 'REFUND_PAYMENT',
+          });
 
           paymentRefString = `VIREMENT-${mouvement.reference}`;
 
@@ -4178,22 +4163,15 @@ export function registerFinanceRoutes(app: Express) {
              ? `MOMO-${op.reference}`
              : `CASH-${op.reference}`;
 
-          // GL Posting
-          if (refundData.agenceId) {
-            try {
-              await postGlForMouvement(tx, mouvement, refundData.agenceId, user.id, {
-                refundId: refundData.id,
-                operationId: op.id,
-                type: 'REFUND_CAISSE_PAYMENT',
-              });
-            } catch (error) {
-              if (error instanceof AccountingRuleNotFoundError) {
-                logger.warn({ mouvementId: mouvement.id, error: (error as Error).message }, "No GL rule for caisse refund");
-              } else {
-                throw error;
-              }
-            }
+          // GL Posting (STRICT — failure rolls back transaction)
+          if (!refundData.agenceId) {
+            throw new Error(`GL posting impossible: no agenceId on refund ${refundData.id}`);
           }
+          await postGlForMouvement(tx, mouvement, refundData.agenceId, user.id, {
+            refundId: refundData.id,
+            operationId: op.id,
+            type: 'REFUND_CAISSE_PAYMENT',
+          });
 
           // 5. Update refund to PAID
           await tx.update(creditRefundRequests).set({
@@ -4327,11 +4305,28 @@ export function registerFinanceRoutes(app: Express) {
       
       if (!coffre) return res.status(400).json({ error: "Aucun coffre-fort trouvé pour cette agence." });
 
-      // 3. Transfer Balance Logique
+      // 3. Transfer Balance via Ledger (GL-tracked)
       const amount = Number(caisse.solde);
-      
+
       await db.transaction(async (tx) => {
         if (amount > 0) {
+            // Create mouvement financier via ledger service
+            const mouvement = await createMouvementFinancier(tx, {
+                montant: amount.toString(),
+                sens: "DEBIT",
+                sourceModule: "CAISSE",
+                sourceId: caisse.id,
+                typePaiement: "CAISSE_TO_COFFRE",
+                agenceId: caisse.agenceId,
+                metadata: {
+                    type: "LIQUIDATION_CAISSE",
+                    caisseId: caisse.id,
+                    coffreId: coffre.id,
+                    caisseNom: caisse.nom,
+                    description: `Liquidation Caisse ${caisse.nom} -> Coffre`,
+                },
+            }, userId);
+
             // Debit Caisse
             await tx.update(schema.caisses)
                 .set({ solde: "0" })
@@ -4342,23 +4337,20 @@ export function registerFinanceRoutes(app: Express) {
                 .set({ solde: sql`${schema.coffresForts.solde} + ${amount}` })
                 .where(eq(schema.coffresForts.id, coffre.id));
 
-            // Mouvement
-            await tx.insert(schema.mouvementsFinanciers).values({
-                typeMouvement: "LIQUIDATION_CAISSE",
-                montant: amount.toString(),
-                sourceId: caisse.id,
-                destinationId: coffre.id,
-                status: "COMPLETED",
-                description: `Liquidation Caisse ${caisse.nom} -> Coffre`,
-                createdBy: userId,
-                sens: "DEBIT", // Débit from caisse perspective
-                sourceModule: "CAISSE",
-                agenceId: caisse.agenceId
-            } as any);
+            // GL Posting (bloquant — échoue si pas de règle comptable)
+            if (caisse.agenceId) {
+                await postGlForMouvement(tx, mouvement, caisse.agenceId, userId, {
+                    type: "LIQUIDATION_CAISSE",
+                    caisseId: caisse.id,
+                    coffreId: coffre.id,
+                });
+            }
         }
 
-        // 4. Delete Caisse
-        await tx.delete(schema.caisses).where(eq(schema.caisses.id, id));
+        // 4. Soft-delete Caisse (preserve audit trail)
+        await tx.update(schema.caisses)
+            .set({ deletedAt: new Date() })
+            .where(eq(schema.caisses.id, id));
       });
 
       await logAudit(req, "LIQUIDATE", "caisses", id, { amount });
