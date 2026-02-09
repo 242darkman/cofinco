@@ -39,6 +39,70 @@ export interface PaginatedResponse<T> {
 // Callback pour session expirée (injecté depuis authService)
 let onUnauthorizedCallback: (() => void) | null = null;
 
+// ============================================
+// SESSION REVALIDATION GUARD
+// Prevents false logouts by verifying /me before disconnecting
+// ============================================
+
+let revalidationInFlight: Promise<boolean> | null = null;
+let lastRevalidationTime = 0;
+const REVALIDATION_COOLDOWN_MS = 3000; // 3s between revalidation attempts
+
+/**
+ * Revalidates session via /api/auth/me before triggering logout.
+ * Debounced singleton: multiple concurrent 401s trigger only ONE /me check.
+ * Returns true if session is actually invalid (confirmed 401 from /me).
+ */
+async function revalidateSessionBeforeLogout(reason: string): Promise<boolean> {
+  // If already revalidating, reuse the in-flight promise
+  if (revalidationInFlight) {
+    return revalidationInFlight;
+  }
+
+  // Cooldown: don't re-check if we just checked
+  const now = Date.now();
+  if (now - lastRevalidationTime < REVALIDATION_COOLDOWN_MS) {
+    return false; // Assume still valid, we just checked
+  }
+
+  revalidationInFlight = (async () => {
+    try {
+      lastRevalidationTime = Date.now();
+      const response = await fetch(`${API_BASE}/auth/me`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        // Session is VALID — the 401 was transient or endpoint-specific
+        console.log('[API] Session revalidation: OK — ignoring transient 401');
+        return false;
+      }
+
+      if (response.status === 401) {
+        // Session is truly invalid — proceed with logout
+        console.warn(`[API] Session revalidation: CONFIRMED invalid (reason: ${reason})`);
+        broadcastSessionInvalid(reason);
+        if (onUnauthorizedCallback) {
+          onUnauthorizedCallback();
+        }
+        return true;
+      }
+
+      // Server error (5xx) — DON'T logout, assume session might still be valid
+      console.warn(`[API] Session revalidation: server error ${response.status} — keeping session`);
+      return false;
+    } catch (error) {
+      // Network error — DON'T logout
+      console.warn('[API] Session revalidation: network error — keeping session', error);
+      return false;
+    } finally {
+      revalidationInFlight = null;
+    }
+  })();
+
+  return revalidationInFlight;
+}
+
 // ID de l'agence actuellement sélectionnée (injecté depuis AgenceContext)
 let currentAgenceId: string | null = null;
 
@@ -189,18 +253,17 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
       // Ignore JSON parse errors
     }
 
-    // Pour les autres routes, c'est une expiration de session
-    // Exclure les endpoints d'auth qui peuvent retourner 401 normalement (utilisateur non connecté)
+    // Pour les autres routes, c'est potentiellement une expiration de session
+    // Exclure les endpoints d'auth qui peuvent retourner 401 normalement
     const isAuthEndpoint = endpoint.includes('/auth/me') ||
                            endpoint.includes('/auth/session-info') ||
                            endpoint.includes('/auth/refresh');
     if (!isAuthEndpoint) {
-      console.warn(`[API] Session expirée - déconnexion automatique (reason: ${reason})`);
-      // Broadcast to other tabs
-      broadcastSessionInvalid(reason);
-      if (onUnauthorizedCallback) {
-        onUnauthorizedCallback();
-      }
+      // NE PAS logout immédiatement — revalider via /me d'abord
+      // La revalidation est debounced (singleton) : N requêtes 401 simultanées
+      // ne déclenchent qu'UN seul appel /me
+      console.warn(`[API] 401 reçu sur ${endpoint} — revalidation session en cours...`);
+      revalidateSessionBeforeLogout(reason);
     }
     throw new ApiError('Session expirée - veuillez vous reconnecter', 401, { reason });
   }
@@ -411,8 +474,8 @@ export const authApi = {
    */
   checkPinStatus: () => request<{ hasPinConfigured: boolean }>('/auth/pin-status'),
   /**
-   * Validate current session - returns true if valid, false if invalid
-   * Used at app boot to check if session is still valid
+   * Validate current session - returns true if valid, false only on confirmed 401
+   * Network errors / 5xx → assume valid (server is source of truth, not errors)
    */
   validateSession: async (): Promise<{ valid: boolean; user?: AuthUser; reason?: string }> => {
     try {
@@ -422,8 +485,8 @@ export const authApi = {
       if (error instanceof ApiError && error.status === 401) {
         return { valid: false, reason: error.data?.reason || 'session_invalid' };
       }
-      // For other errors (network, server down), consider session valid but return error info
-      return { valid: false, reason: 'network_error' };
+      // Network/5xx errors: DON'T invalidate — session cookie may still be valid
+      return { valid: true, reason: 'network_error' };
     }
   },
 

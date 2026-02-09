@@ -1,4 +1,4 @@
-import { authApi, AuthUser, setOnUnauthorized, PermissionsData } from './api-client';
+import { authApi, AuthUser, setOnUnauthorized, PermissionsData, ApiError } from './api-client';
 import type { AppModule } from '@shared/config/rbac';
 import { SystemRole, hasRole as hasSystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
@@ -281,6 +281,10 @@ class AuthService {
   /**
    * Vérifier la session auprès du serveur
    * Retourne true si la session est valide
+   *
+   * IMPORTANT: Ne déconnecte que sur 401 confirmé.
+   * Les erreurs réseau/5xx/timeout ne déclenchent PAS de logout
+   * (le serveur est la source de vérité, pas les erreurs transitoires).
    */
   async verifySession(): Promise<boolean> {
     try {
@@ -293,11 +297,20 @@ class AuthService {
 
       return true;
     } catch (error) {
-      this.clearSession();
-      if (this.onSessionExpired) {
-        this.onSessionExpired();
+      // ONLY logout on confirmed 401 (session truly invalid)
+      if (error instanceof ApiError && error.status === 401) {
+        console.warn('[Auth] verifySession: 401 confirmed — session invalid');
+        this.clearSession();
+        if (this.onSessionExpired) {
+          this.onSessionExpired();
+        }
+        return false;
       }
-      return false;
+
+      // Network error, 5xx, timeout → DON'T logout
+      // The session cookie might still be valid, the server is just unreachable
+      console.warn('[Auth] verifySession: non-auth error — keeping session', error);
+      return true;
     }
   }
 
