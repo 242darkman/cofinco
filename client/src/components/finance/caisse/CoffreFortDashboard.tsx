@@ -276,6 +276,35 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     }
   };
 
+  // --- Shared detail card for confirm dialogs ---
+  const accentStyles: Record<string, string> = {
+    slate: 'border-slate-500/20 bg-slate-500/5',
+    emerald: 'border-emerald-500/20 bg-emerald-500/5',
+    red: 'border-red-500/20 bg-red-500/5',
+    cyan: 'border-cyan-500/20 bg-cyan-500/5',
+  };
+  const TransfertDetailCard = ({ rows, accentColor = 'slate' }: { rows: { label: string; value: React.ReactNode; highlight?: boolean }[]; accentColor?: string }) => (
+    <div className={`rounded-xl border overflow-hidden ${accentStyles[accentColor] || accentStyles.slate}`}>
+      {rows.map((row, i) => (
+        <div key={i} className={`flex items-center justify-between gap-3 px-3 sm:px-4 py-2 sm:py-2.5 ${i > 0 ? 'border-t border-slate-700/40' : ''}`}>
+          <span className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider shrink-0 whitespace-nowrap">{row.label}</span>
+          <span className={`text-xs sm:text-sm font-medium text-right whitespace-nowrap ${row.highlight ? 'text-white font-bold font-mono tabular-nums sm:text-base' : 'text-slate-200'}`}>{row.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const DirectionBadge = ({ type }: { type: string }) => (
+    <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold ${
+      type === "COFFRE_VERS_CAISSE"
+        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+    }`}>
+      {type === "COFFRE_VERS_CAISSE" ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}
+      {type === "COFFRE_VERS_CAISSE" ? "Coffre → Caisse" : "Caisse → Coffre"}
+    </span>
+  );
+
   const getConfirmDialogConfig = () => {
     if (!confirmAction) return { title: '', message: '', variant: 'info' as const, confirmText: '' };
 
@@ -290,23 +319,16 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         return {
           title: 'Valider le transfert',
           message: (
-            <>
-              <span className="block mb-3">Vous êtes sur le point de <strong className="text-emerald-400">valider</strong> ce transfert :</span>
-              <span className="block bg-slate-800/50 rounded-lg p-3 space-y-2">
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Montant</span>
-                  <span className="font-bold text-white">{montantFormatted} FCFA</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Caisse</span>
-                  <span className="text-white">{caisse}</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Demandé par</span>
-                  <span className="text-white">{transfert.requestedByNom}</span>
-                </span>
-              </span>
-            </>
+            <div className="space-y-3">
+              <TransfertDetailCard accentColor="emerald" rows={[
+                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-slate-400">FCFA</span></>, highlight: true },
+                { label: 'Caisse', value: caisse },
+                { label: 'Demandé par', value: transfert.requestedByNom },
+              ]} />
+              <div className="flex items-center gap-1.5">
+                <DirectionBadge type={transfert.typeTransfert} />
+              </div>
+            </div>
           ),
           variant: 'success' as const,
           confirmText: 'Valider le transfert'
@@ -315,23 +337,17 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         return {
           title: 'Rejeter le transfert',
           message: (
-            <>
-              <span className="block mb-3">Vous êtes sur le point de <strong className="text-red-400">rejeter</strong> ce transfert :</span>
-              <span className="block bg-slate-800/50 rounded-lg p-3 space-y-2 mb-3">
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Montant</span>
-                  <span className="font-bold text-white">{montantFormatted} FCFA</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Caisse</span>
-                  <span className="text-white">{caisse}</span>
-                </span>
-              </span>
-              <span className="text-amber-400 text-sm flex items-center gap-2">
-                <AlertTriangle size={14} />
-                Cette action est irréversible.
-              </span>
-            </>
+            <div className="space-y-3">
+              <TransfertDetailCard accentColor="red" rows={[
+                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-slate-400">FCFA</span></>, highlight: true },
+                { label: 'Caisse', value: caisse },
+                { label: 'Demandé par', value: transfert.requestedByNom },
+              ]} />
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-red-500/5 border border-red-500/15">
+                <AlertTriangle size={14} className="text-red-400 shrink-0" />
+                <span className="text-xs text-red-300">Cette action est irréversible. Le demandeur sera notifié.</span>
+              </div>
+            </div>
           ),
           variant: 'danger' as const,
           confirmText: 'Rejeter le transfert'
@@ -340,29 +356,21 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         return {
           title: 'Exécuter le transfert',
           message: (
-            <>
-              <span className="block mb-3">Vous êtes sur le point d'<strong className="text-cyan-400">exécuter</strong> ce transfert :</span>
-              <span className="block bg-slate-800/50 rounded-lg p-3 space-y-2 mb-3">
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Montant</span>
-                  <span className="font-bold text-white">{montantFormatted} FCFA</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Caisse</span>
-                  <span className="text-white">{caisse}</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Type</span>
-                  <span className="text-white">
-                    {transfert.typeTransfert === "COFFRE_VERS_CAISSE" ? "Coffre → Caisse" : "Caisse → Coffre"}
-                  </span>
-                </span>
-              </span>
-              <span className="text-emerald-400 text-sm flex items-center gap-2">
-                <CheckCircle2 size={14} />
-                Les fonds seront immédiatement transférés.
-              </span>
-            </>
+            <div className="space-y-3">
+              <div className="text-center py-1.5">
+                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white">{montantFormatted}</span>
+                <span className="text-xs sm:text-sm text-slate-400 ml-1">FCFA</span>
+              </div>
+              <TransfertDetailCard accentColor="cyan" rows={[
+                { label: 'Caisse', value: caisse },
+                { label: 'Direction', value: <DirectionBadge type={transfert.typeTransfert} /> },
+                ...(transfert.reference ? [{ label: 'Réf.', value: <span className="font-mono text-[10px] text-slate-400">{transfert.reference}</span> }] : []),
+              ]} />
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                <Play size={13} className="text-emerald-400 shrink-0" />
+                <span className="text-xs text-emerald-300">Les fonds seront immédiatement transférés.</span>
+              </div>
+            </div>
           ),
           variant: 'info' as const,
           confirmText: 'Exécuter maintenant'
@@ -371,27 +379,20 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         return {
           title: "Valider la demande d'ouverture",
           message: (
-            <>
-              <span className="block mb-3">Vous êtes sur le point de <strong className="text-emerald-400">valider</strong> cette demande d'ouverture de caisse :</span>
-              <span className="block bg-slate-800/50 rounded-lg p-3 space-y-2 mb-3">
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Montant demandé</span>
-                  <span className="font-bold text-white">{montantFormatted} FCFA</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Caisse</span>
-                  <span className="text-white">{transfert.caisseDestinationNom || caisse}</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Caissier</span>
-                  <span className="text-white">{transfert.caissierNom || transfert.requestedByNom}</span>
-                </span>
-              </span>
-              <span className="text-emerald-400 text-sm flex items-center gap-2">
-                <KeyRound size={14} />
-                Le caissier pourra alors confirmer la réception et ouvrir sa session.
-              </span>
-            </>
+            <div className="space-y-3">
+              <div className="text-center py-1.5">
+                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white">{montantFormatted}</span>
+                <span className="text-xs sm:text-sm text-slate-400 ml-1">FCFA</span>
+              </div>
+              <TransfertDetailCard accentColor="emerald" rows={[
+                { label: 'Caisse', value: transfert.caisseDestinationNom || caisse },
+                { label: 'Caissier', value: transfert.caissierNom || transfert.requestedByNom },
+              ]} />
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                <KeyRound size={13} className="text-emerald-400 shrink-0" />
+                <span className="text-xs text-emerald-300">Le caissier pourra confirmer la réception et ouvrir sa session.</span>
+              </div>
+            </div>
           ),
           variant: 'success' as const,
           confirmText: 'Valider et envoyer les fonds'
@@ -400,27 +401,17 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         return {
           title: "Rejeter la demande d'ouverture",
           message: (
-            <>
-              <span className="block mb-3">Vous êtes sur le point de <strong className="text-red-400">rejeter</strong> cette demande d'ouverture :</span>
-              <span className="block bg-slate-800/50 rounded-lg p-3 space-y-2 mb-3">
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Montant demandé</span>
-                  <span className="font-bold text-white">{montantFormatted} FCFA</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Caisse</span>
-                  <span className="text-white">{transfert.caisseDestinationNom || caisse}</span>
-                </span>
-                <span className="flex justify-between">
-                  <span className="text-slate-400">Caissier</span>
-                  <span className="text-white">{transfert.caissierNom || transfert.requestedByNom}</span>
-                </span>
-              </span>
-              <span className="text-amber-400 text-sm flex items-center gap-2">
-                <AlertTriangle size={14} />
-                Le caissier sera notifié et devra soumettre une nouvelle demande.
-              </span>
-            </>
+            <div className="space-y-3">
+              <TransfertDetailCard accentColor="red" rows={[
+                { label: 'Montant demandé', value: <>{montantFormatted} <span className="text-xs text-slate-400">FCFA</span></>, highlight: true },
+                { label: 'Caisse', value: transfert.caisseDestinationNom || caisse },
+                { label: 'Caissier', value: transfert.caissierNom || transfert.requestedByNom },
+              ]} />
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+                <span className="text-xs text-amber-300">Le caissier sera notifié et devra soumettre une nouvelle demande.</span>
+              </div>
+            </div>
           ),
           variant: 'danger' as const,
           confirmText: 'Rejeter la demande'
@@ -445,34 +436,57 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     {
       key: 'createdAt',
       label: 'Date',
-      hideOnMobile: true,
       format: (_: any, row: any) => (
-        <span className="text-xs sm:text-sm text-slate-300">
-           {format(new Date(row.createdAt), "dd/MM/yyyy HH:mm", { locale: fr })}
+        <span className="text-xs text-slate-300 whitespace-nowrap">
+           {format(new Date(row.createdAt), "dd/MM HH:mm", { locale: fr })}
         </span>
-      )
+      ),
+      mobileFormat: (_: any, row: any) => (
+        <span className="text-[10px] text-slate-400">
+          {format(new Date(row.createdAt), "dd/MM/yy HH:mm", { locale: fr })}
+        </span>
+      ),
     },
     {
       key: 'typeTransfert',
       label: 'Type',
+      primary: true,
       format: (_: any, row: any) => (
-        <div className="flex flex-col xs:flex-row xs:items-center gap-0.5 xs:gap-2">
+        <div className="flex items-center gap-1.5">
             {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
-                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px] w-[70px] justify-center" />
+                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px] w-[60px] justify-center" />
             ) : (
-                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px] w-[70px] justify-center" />
+                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px] w-[60px] justify-center" />
             )}
-            <span className="text-[10px] sm:text-xs text-slate-400">
+            <span className="text-[10px] text-slate-400 hidden xl:inline">
                 {row.typeTransfert === "COFFRE_VERS_CAISSE" ? "Vers Caisse" : "De Caisse"}
             </span>
         </div>
-      )
+      ),
+      mobileFormat: (_: any, row: any) => (
+        <div className="flex items-center gap-2">
+          {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
+            <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px]" />
+          ) : (
+            <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px]" />
+          )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold text-white truncate">
+              {Number(row.montant).toLocaleString()} FCFA
+            </span>
+            <span className="text-[10px] text-slate-400 truncate">
+              {row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}
+            </span>
+          </div>
+        </div>
+      ),
     },
     {
       key: 'trajet',
       label: 'Caisse',
+      hideOnMobile: true,
       format: (_: any, row: any) => (
-        <span className="font-medium text-white text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none block">
+        <span className="font-medium text-white text-xs truncate max-w-[140px] block" title={row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}>
           {row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}
         </span>
       )
@@ -481,8 +495,9 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       key: 'montant',
       label: 'Montant',
       align: 'right' as const,
+      hideOnMobile: true,
       format: (val: any) => (
-        <span className="font-bold font-mono text-white text-xs sm:text-sm whitespace-nowrap">
+        <span className="font-bold font-mono text-white text-xs whitespace-nowrap tabular-nums">
             {Number(val).toLocaleString()} <span className="text-[10px] text-slate-400">FCFA</span>
         </span>
       )
@@ -490,12 +505,16 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     {
       key: 'requestedByNom',
       label: 'Initié par',
-      hideOnMobile: true,
       format: (_: any, row: any) => (
-        <span className="text-xs sm:text-sm text-slate-400 truncate max-w-[100px] block">
+        <span className="text-xs text-slate-400 truncate max-w-[120px] block" title={`${row.requestedByNom} ${row.requestedByPrenom || ''}`}>
             {row.requestedByNom} {row.requestedByPrenom?.charAt(0)}.
         </span>
-      )
+      ),
+      mobileFormat: (_: any, row: any) => (
+        <span className="text-[10px] text-slate-400">
+          par {row.requestedByNom} {row.requestedByPrenom?.charAt(0)}.
+        </span>
+      ),
     },
     {
       key: 'statut',
@@ -506,7 +525,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         if (row.statut === StatutTransfertCoffre.REQUESTED) variant = 'warning';
         if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) variant = 'danger';
 
-        return <Badge variant={variant} value={row.statut} className="text-[9px] sm:text-xs w-[80px] justify-center" />;
+        return <Badge variant={variant} value={row.statut} className="text-[9px] sm:text-[10px]" />;
       }
     },
   ];
@@ -745,27 +764,33 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             <>
             {/* Header Stats - Compact & Responsive */}
             <div className="grid grid-cols-1 xs:grid-cols-3 gap-2">
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2 sm:p-2.5 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Solde Coffre</span>
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Solde Coffre</span>
                   <div className="flex items-center gap-1.5">
-                     <Wallet className="text-blue-500 hidden xs:block" size={14} />
-                     <div className="text-sm sm:text-base font-bold text-white max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
-                        {isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}
+                     <Wallet className="text-blue-400 shrink-0" size={15} />
+                     <div className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono tabular-nums max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
+                        {isLoadingStats ? "..." : <>{(statsData?.solde || 0).toLocaleString()} <span className="text-[10px] sm:text-xs text-slate-400 font-sans">FCFA</span></>}
                      </div>
                   </div>
                </div>
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2 sm:p-2.5 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">En Attente</span>
+               {(() => {
+                  const totalPending = pendingCount + (pendingOpeningRequests?.length || 0);
+                  const hasPending = totalPending > 0;
+                  return (
+                    <div className={`rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1 border transition-colors ${hasPending ? 'bg-amber-500/10 border-amber-500/40' : 'bg-slate-800/40 border-slate-700/50'}`}>
+                       <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Opérations en attente</span>
+                       <div className="flex items-center gap-1.5">
+                          <Clock className={`shrink-0 ${hasPending ? 'text-amber-400' : 'text-slate-500'}`} size={15} />
+                          <div className={`text-sm sm:text-base lg:text-lg font-bold font-mono tabular-nums ${hasPending ? 'text-amber-300' : 'text-white'}`}>{totalPending}</div>
+                       </div>
+                    </div>
+                  );
+               })()}
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Mouvements du Jour</span>
                   <div className="flex items-center gap-1.5">
-                     <Clock className="text-amber-500 hidden xs:block" size={14} />
-                     <div className="text-sm sm:text-base font-bold text-white">{pendingCount + (pendingOpeningRequests?.length || 0)} FCFA</div>
-                  </div>
-               </div>
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2 sm:p-2.5 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Mouvements J</span>
-                  <div className="flex items-center gap-1.5">
-                     <ArrowRightLeft className="text-emerald-500 hidden xs:block" size={14} />
-                     <div className="text-sm sm:text-base font-bold text-white truncate">{todayVolume.toLocaleString()} <span className="text-[10px] text-slate-400">FCFA</span></div>
+                     <ArrowRightLeft className="text-emerald-400 shrink-0" size={15} />
+                     <div className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono tabular-nums max-w-full truncate">{todayVolume.toLocaleString()} <span className="text-[10px] sm:text-xs text-slate-400 font-sans">FCFA</span></div>
                   </div>
                </div>
             </div>
@@ -960,31 +985,36 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             )}
 
             <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-              <div className="p-2 border-b border-slate-800 flex justify-between items-center">
+              <div className="p-2.5 border-b border-slate-800 flex justify-between items-center">
                    <div className="flex items-center gap-2">
-                      <ArrowRightLeft className="text-blue-500" size={14} />
-                      <h3 className="font-bold text-white text-xs">Transferts</h3>
+                      <ArrowRightLeft className="text-blue-400" size={14} />
+                      <h3 className="font-bold text-white text-xs sm:text-sm">Transferts</h3>
+                      {transferts.length > 0 && (
+                        <span className="text-[9px] text-slate-500 font-medium">{transferts.length}</span>
+                      )}
                    </div>
-                   <Button 
-                      variant="ghost" 
-                      size="sm" 
+                   <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => refetch()}
                       disabled={isRefetchingTransferts}
                       className="h-7 px-2 text-[10px] text-slate-400 hover:text-white"
                    >
-                      <Loader2 
-                          size={12} 
-                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
+                      <Loader2
+                          size={12}
+                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-blue-400' : 'text-slate-400'}`}
                       />
-                      Act.
+                      <span className="hidden xs:inline">Actualiser</span>
+                      <span className="xs:hidden">Act.</span>
                    </Button>
               </div>
-              
+
               <ResponsiveTable
                   data={transferts}
                   columns={columns}
                   emptyMessage="Aucune demande de transfert en cours."
                   density="compact"
+                  mobileBreakpoint="md"
                   onRowClick={(row) => setSelectedTransfert(row)}
                   actions={(row) => renderRowActions(row)}
               />

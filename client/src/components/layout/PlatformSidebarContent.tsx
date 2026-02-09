@@ -12,6 +12,7 @@ import { useOperationsBadge } from '../../hooks/useOperationsBadge';
 import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 import { useProspectionBadge } from '../../hooks/useProspectionBadge';
 import { useEnqueteBadge } from '../../hooks/useEnqueteBadge';
+import { useCoffreBadge } from '../../hooks/useCoffreBadge';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -54,6 +55,9 @@ export default function PlatformSidebarContent({
 
   // Combined badge for Agent Modules (prospections + enquêtes)
   const agentModulesBadge = activeProspectionCount + pendingEnqueteCount;
+
+  // Pending coffre transfers badge
+  const { pendingCount: pendingCoffreCount } = useCoffreBadge();
 
   // Fetch Pending Refunds Count (Restitutions Frais)
   const fetchPendingRefundsCount = async () => {
@@ -331,6 +335,12 @@ export default function PlatformSidebarContent({
             {agentModulesBadge > 99 ? '99+' : agentModulesBadge}
           </div>
         )}
+        {/* Real-time Badge for Collapsed Sidebar - Coffre-Fort */}
+        {!sidebarOpen && route.key === 'coffre' && pendingCoffreCount > 0 && (
+          <div className="absolute top-1 right-2 bg-amber-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+            {pendingCoffreCount > 99 ? '99+' : pendingCoffreCount}
+          </div>
+        )}
 
         {sidebarOpen && (
           <>
@@ -355,6 +365,11 @@ export default function PlatformSidebarContent({
             {route.key === 'agentModules' && agentModulesBadge > 0 && (
               <span className="bg-violet-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {agentModulesBadge > 99 ? '99+' : agentModulesBadge}
+              </span>
+            )}
+            {route.key === 'coffre' && pendingCoffreCount > 0 && (
+              <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+                {pendingCoffreCount > 99 ? '99+' : pendingCoffreCount}
               </span>
             )}
             {isDisabled && (

@@ -17,6 +17,7 @@ import { postGlForMouvement } from "../accounting-posting-service";
 import { balanceService } from "../balance-service";
 import { createLogger } from "../../lib/logger";
 import { validateAccountingRule, handleGLPostingFailure } from "../accounting-validation";
+import { randomInt } from "crypto";
 
 const logger = createLogger('CoffreTransfer');
 import {
@@ -30,9 +31,7 @@ import {
 
 import type { TransfertCoffreCaisse } from "@shared/schema";
 
-// Helper for reference generation if not imported
 function generateReference(prefix: string): string {
-    const { randomInt } = require('crypto');
     const timestamp = Date.now().toString().slice(-6);
     const random = randomInt(0, 1000).toString().padStart(3, "0");
     return `${prefix}-${timestamp}${random}`;
