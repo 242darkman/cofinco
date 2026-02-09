@@ -542,20 +542,20 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
   return (
     <div
-      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 font-sans animate-in fade-in duration-200"
+      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4 font-sans animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-slate-900 border border-slate-700/50 w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl shadow-black/50 flex flex-col">
+      <div className="bg-slate-900 border border-slate-700/50 w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/50 flex flex-col">
         {/* Header with Stepper */}
-        <header className="shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-indigo-900/30 to-purple-900/30">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/30">
-                <Lock size={20} className="text-indigo-400" />
+        <header className="shrink-0 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-slate-800 bg-gradient-to-r from-indigo-900/30 to-purple-900/30">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30">
+                <Lock size={18} className="text-indigo-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Fermeture Sécurisée</h3>
+                <h3 className="text-base font-bold text-white leading-tight">Fermeture Sécurisée</h3>
                 <p className="text-xs text-slate-400">
                   {step === 'freeze' && 'Étape 1: Gel de la session'}
                   {step === 'count' && 'Étape 2: Comptage physique'}
@@ -565,9 +565,9 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
@@ -590,7 +590,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-3 py-3 sm:p-4 space-y-3 sm:space-y-4">
           {/* Error Display */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
@@ -603,19 +603,19 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
           {/* ========== STEP 1: FREEZE ========== */}
           {step === 'freeze' && (
-            <div className="space-y-6">
-              <div className="text-center py-8">
-                <div className="mx-auto w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mb-4 ring-2 ring-amber-500/30">
-                  <Lock className="w-10 h-10 text-amber-400" />
+            <div className="space-y-4">
+              <div className="text-center py-5">
+                <div className="mx-auto w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mb-3 ring-2 ring-amber-500/30">
+                  <Lock className="w-8 h-8 text-amber-400" />
                 </div>
-                <h4 className="text-xl font-bold text-white mb-2">Prêt à fermer la session ?</h4>
-                <p className="text-slate-400 max-w-md mx-auto">
+                <h4 className="text-lg font-bold text-white mb-1.5">Prêt à fermer la session ?</h4>
+                <p className="text-sm text-slate-400 max-w-md mx-auto">
                   Une fois la fermeture initiée, <strong className="text-amber-400">aucune nouvelle transaction</strong> ne sera autorisée.
                   Assurez-vous d'avoir terminé toutes les opérations en cours.
                 </p>
               </div>
 
-              <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+              <div className="bg-slate-800/50 rounded-xl p-3 space-y-2.5">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">Solde théorique actuel</span>
                   <span className="font-bold text-white">{formatMoney(soldeTheorique)}</span>
@@ -630,7 +630,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 </div>
               </div>
 
-              <label className="flex items-start gap-3 p-4 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50 transition-colors">
+              <label className="flex items-start gap-3 p-3 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50 transition-colors">
                 <input
                   type="checkbox"
                   checked={freezeConfirmed}
@@ -646,31 +646,31 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
           {/* ========== STEP 2: COUNT ========== */}
           {step === 'count' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Stats Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3.5">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Théorique</p>
-                  <p className="text-lg font-bold text-slate-200">{formatMoney(soldeTheorique)}</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-2.5">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Théorique</p>
+                  <p className="text-base font-bold text-slate-200">{formatMoney(soldeTheorique)}</p>
                 </div>
 
-                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3.5">
-                  <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-1">Compté</p>
-                  <p className="text-lg font-bold text-indigo-400">{formatMoney(soldeCalcule)}</p>
+                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-2.5">
+                  <p className="text-[10px] font-semibold text-indigo-300 uppercase tracking-wider mb-0.5">Compté</p>
+                  <p className="text-base font-bold text-indigo-400">{formatMoney(soldeCalcule)}</p>
                 </div>
 
-                <div className={`col-span-2 md:col-span-1 border rounded-xl p-3.5 ${
+                <div className={`col-span-2 md:col-span-1 border rounded-lg p-2.5 ${
                   soldeCalcule === 0 ? 'bg-slate-800/30 border-slate-700/50' :
                   soldeCalcule - soldeTheorique === 0 ? 'bg-emerald-500/10 border-emerald-500/20' :
                   Math.abs(soldeCalcule - soldeTheorique) <= 100 ? 'bg-cyan-500/10 border-cyan-500/20' :
                   'bg-rose-500/10 border-rose-500/20'
                 }`}>
-                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${
+                  <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${
                     soldeCalcule === 0 ? 'text-slate-400' :
                     soldeCalcule - soldeTheorique === 0 ? 'text-emerald-400' :
                     Math.abs(soldeCalcule - soldeTheorique) <= 100 ? 'text-cyan-400' : 'text-rose-400'
                   }`}>Écart</p>
-                  <p className={`text-lg font-bold ${
+                  <p className={`text-base font-bold ${
                     soldeCalcule === 0 ? 'text-slate-500' :
                     soldeCalcule - soldeTheorique === 0 ? 'text-emerald-400' :
                     Math.abs(soldeCalcule - soldeTheorique) <= 100 ? 'text-cyan-300' : 'text-rose-400'
@@ -682,7 +682,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
               {/* Ecart Warning */}
               {soldeCalcule > 0 && Math.abs(soldeCalcule - soldeTheorique) > 0 && (
-                <div className={`rounded-xl p-4 flex items-start gap-3 border ${
+                <div className={`rounded-xl p-3 flex items-start gap-2.5 border ${
                   Math.abs(soldeCalcule - soldeTheorique) <= 100
                     ? 'bg-cyan-950/30 border-cyan-500/30 text-cyan-200'
                     : 'bg-rose-950/30 border-rose-500/30 text-rose-200'
@@ -710,10 +710,10 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
               {/* Billetage */}
               <div>
-                <div className="flex items-center justify-between gap-2 mb-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-2">
-                    <Calculator size={18} className="text-slate-400" />
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">Billetage</h4>
+                    <Calculator size={16} className="text-slate-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Billetage</h4>
                   </div>
 
                   {/* Template actions */}
@@ -804,7 +804,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                   {DENOMINATIONS.map((denom) => {
                     const count = billetage[denom.name];
                     const total = count * denom.value;
@@ -846,9 +846,9 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
               {/* Weight Verification */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Scale size={18} className="text-slate-400" />
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Vérification par poids</h4>
+                <div className="flex items-center gap-2 mb-2">
+                  <Scale size={16} className="text-slate-400" />
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Vérification par poids</h4>
                   <span className="text-[10px] text-slate-500">(optionnel)</span>
                   <div className="h-px bg-slate-800 flex-1 ml-2" />
                 </div>
@@ -859,18 +859,18 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
           {/* ========== STEP 3: TRANSFER ========== */}
           {step === 'transfer' && (
-            <div className="space-y-6">
+            <div className="space-y-3">
               {/* Summary */}
-              <div className="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <CheckCircle className="text-emerald-400" size={24} />
+              <div className="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-xl p-3">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle className="text-emerald-400" size={20} />
                   <div>
-                    <h4 className="text-white font-bold">Comptage validé</h4>
-                    <p className="text-sm text-slate-400">Montant physique total: <strong className="text-emerald-400">{formatMoney(montantPhysique)}</strong></p>
+                    <h4 className="text-white font-bold text-sm">Comptage validé</h4>
+                    <p className="text-xs text-slate-400">Montant physique total: <strong className="text-emerald-400">{formatMoney(montantPhysique)}</strong></p>
                   </div>
                 </div>
                 {Math.abs(ecart) > 0 && (
-                  <div className="text-sm text-amber-400 flex items-center gap-2">
+                  <div className="text-xs text-amber-400 flex items-center gap-2 mt-2">
                     <AlertTriangle size={14} />
                     Écart de {formatMoney(ecart)} enregistré
                   </div>
@@ -881,10 +881,10 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
               {(mmReconciliation || loadingMmReconciliation) && (
                 <div className="animate-in fade-in duration-300">
                   {loadingMmReconciliation ? (
-                    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                      <div className="flex items-center gap-3 text-slate-400">
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span className="text-sm">Vérification des soldes Mobile Money...</span>
+                    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-xs">Vérification des soldes Mobile Money...</span>
                       </div>
                     </div>
                   ) : mmReconciliation && (
@@ -904,7 +904,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
               <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setShowVerification(!showVerification)}
-                  className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-800/60 transition"
+                  className="w-full px-3 py-2.5 flex items-center justify-between text-left hover:bg-slate-800/60 transition"
                 >
                   <div className="flex items-center gap-2">
                     <UserCheck size={16} className="text-blue-400" />
@@ -921,7 +921,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 </button>
 
                 {showVerification && (
-                  <div className="px-4 pb-4 space-y-3 border-t border-slate-700/50">
+                  <div className="px-3 pb-3 space-y-2 border-t border-slate-700/50">
                     {verificationSubmitted && verificationResult ? (
                       <div className={`mt-3 rounded-lg p-3 ${verificationResult.matched ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                         <p className="text-sm text-white font-medium mb-1">
@@ -983,15 +983,16 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
               </div>
 
               {/* Transfer Decision */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <FileText size={16} className="text-slate-400" />
-                  Décision de trésorerie
-                </h4>
-
-                <p className="text-sm text-slate-400">
-                  Répartissez le montant physique entre le coffre-fort et le fonds de roulement pour demain.
-                </p>
+              <div className="space-y-2.5">
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <FileText size={14} className="text-slate-400" />
+                    Décision de trésorerie
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Répartissez le montant physique entre le coffre-fort et le fonds de roulement pour demain.
+                  </p>
+                </div>
 
                 {/* Quick Actions */}
                 <div className="flex flex-wrap gap-2">
@@ -1016,11 +1017,11 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 </div>
 
                 {/* Amount Inputs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Vault className="text-indigo-400" size={18} />
-                      <label className="text-sm font-medium text-slate-300">Vers le Coffre-Fort</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Vault className="text-indigo-400" size={16} />
+                      <label className="text-xs font-medium text-slate-300">Vers le Coffre-Fort</label>
                     </div>
                     <input
                       type="number"
@@ -1030,16 +1031,16 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                         setMontantVersCoffre(Math.max(0, value));
                         setMontantReporte(Math.max(0, montantPhysique - value));
                       }}
-                      className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-lg font-bold text-white text-right focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 outline-none [appearance:textfield]"
+                      className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-base font-bold text-white text-right focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="0"
                     />
-                    <p className="text-xs text-slate-500 mt-2">Sera en attente de validation</p>
+                    <p className="text-[10px] text-slate-500 mt-1.5">Sera en attente de validation</p>
                   </div>
 
-                  <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    <div className="flex items-center gap-2 mb-3">
-                      <PiggyBank className="text-amber-400" size={18} />
-                      <label className="text-sm font-medium text-slate-300">Fonds Reporté (J+1)</label>
+                  <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <PiggyBank className="text-amber-400" size={16} />
+                      <label className="text-xs font-medium text-slate-300">Fonds Reporté (J+1)</label>
                     </div>
                     <input
                       type="number"
@@ -1049,18 +1050,18 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                         setMontantReporte(Math.max(0, value));
                         setMontantVersCoffre(Math.max(0, montantPhysique - value));
                       }}
-                      className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-lg font-bold text-white text-right focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none [appearance:textfield]"
+                      className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-base font-bold text-white text-right focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="0"
                     />
-                    <p className="text-xs text-slate-500 mt-2">Disponible à l'ouverture demain</p>
+                    <p className="text-[10px] text-slate-500 mt-1.5">Disponible à l'ouverture demain</p>
                   </div>
                 </div>
 
                 {/* Validation */}
-                <div className={`rounded-xl p-3 flex items-center justify-between ${
+                <div className={`rounded-lg px-3 py-2 flex items-center justify-between ${
                   isTransferValid ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'
                 }`}>
-                  <span className="text-sm">
+                  <span className="text-xs">
                     Total: <strong className={isTransferValid ? 'text-emerald-400' : 'text-red-400'}>
                       {formatMoney(montantVersCoffre + montantReporte)}
                     </strong> / {formatMoney(montantPhysique)}
@@ -1074,14 +1075,14 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
                 {/* Observations */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block">
                     Observations (optionnel)
                   </label>
                   <textarea
                     value={observations}
                     onChange={(e) => setObservations(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 outline-none transition-all resize-none"
-                    rows={2}
+                    className="w-full px-3 py-2 bg-slate-950/50 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-600 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 outline-none transition-all resize-none"
+                    rows={1}
                     placeholder="Une note à ajouter ?"
                   />
                 </div>
@@ -1091,7 +1092,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
         </div>
 
         {/* Footer Actions */}
-        <footer className="shrink-0 p-4 border-t border-slate-800 bg-slate-900/95 backdrop-blur flex flex-col sm:flex-row gap-3">
+        <footer className="shrink-0 px-3 sm:px-4 py-2.5 sm:py-3 border-t border-slate-800 bg-slate-900/95 backdrop-blur flex flex-col sm:flex-row gap-2">
           {step === 'freeze' && (
             <>
               <Button onClick={onClose} variant="outline" className="w-full sm:w-auto border-slate-700">
