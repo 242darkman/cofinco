@@ -364,35 +364,15 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
         </>
       ) : (
         /* Analytics View */
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col">
           {selectedEmployeeForAnalytics ? (
-            <div className="h-full flex flex-col">
-              <div className="shrink-0 flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                  {selectedEmployeeForAnalytics.nom?.charAt(0)}{selectedEmployeeForAnalytics.prenom?.charAt(0)}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-white">
-                    {selectedEmployeeForAnalytics.nom} {selectedEmployeeForAnalytics.prenom}
-                  </h3>
-                  <p className="text-xs text-slate-400">{selectedEmployeeForAnalytics.poste}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedEmployeeForAnalytics(null)}
-                  className="text-slate-400 hover:text-white"
-                >
-                  Changer
-                </Button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                <AttendanceAnalytics
-                  employeId={selectedEmployeeForAnalytics.id}
-                  employeNom={`${selectedEmployeeForAnalytics.nom} ${selectedEmployeeForAnalytics.prenom}`}
-                />
-              </div>
-            </div>
+              <AttendanceAnalytics
+                employeId={selectedEmployeeForAnalytics.id}
+                employeNom={`${selectedEmployeeForAnalytics.nom} ${selectedEmployeeForAnalytics.prenom}`}
+                employePoste={selectedEmployeeForAnalytics.poste}
+                employeInitials={`${selectedEmployeeForAnalytics.nom?.charAt(0) || ''}${selectedEmployeeForAnalytics.prenom?.charAt(0) || ''}`}
+                onChangeEmployee={() => setSelectedEmployeeForAnalytics(null)}
+              />
           ) : (
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 h-full overflow-y-auto">
               <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">

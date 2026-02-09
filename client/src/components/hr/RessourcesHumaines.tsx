@@ -336,7 +336,7 @@ export default function RessourcesHumaines() {
       </div>
 
       {/* Main Content - Scrollable handled by children */}
-      <div className="flex-1 overflow-hidden p-2 sm:p-4">
+      <div className="flex-1 min-h-0 overflow-hidden p-2 sm:p-4 flex flex-col">
          {renderContent()}
       </div>
 

@@ -107,7 +107,7 @@ export default function AppShell({
           ].join(' ')}
         >
           {/* Content wrapper */}
-          <div className="px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6 flex flex-col min-h-full">
+          <div className="px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6 flex flex-col h-full">
             {children}
           </div>
 

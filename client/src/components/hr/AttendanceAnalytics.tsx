@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Calendar, Clock, TrendingUp, TrendingDown, Download,
+  Calendar, Clock, TrendingUp, Download,
   ChevronLeft, ChevronRight, CheckCircle, XCircle, AlertCircle,
   Coffee, Loader2
 } from 'lucide-react';
-import { Button, Badge, Card, SelectField } from '../ui';
+import { Button, Badge } from '../ui';
 import { toast } from '../../lib/toast';
 import { hrApi } from '../../lib/api-client';
 
@@ -41,6 +41,9 @@ interface AttendanceStats {
 interface AttendanceAnalyticsProps {
   employeId: string;
   employeNom?: string;
+  employePoste?: string;
+  employeInitials?: string;
+  onChangeEmployee?: () => void;
 }
 
 const MONTHS_FR = [
@@ -56,7 +59,13 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; icon: React.Elem
   WEEKEND: { bg: 'bg-slate-800/50', text: 'text-slate-500', icon: Calendar },
 };
 
-export default function AttendanceAnalytics({ employeId, employeNom }: AttendanceAnalyticsProps) {
+export default function AttendanceAnalytics({
+  employeId,
+  employeNom,
+  employePoste,
+  employeInitials,
+  onChangeEmployee,
+}: AttendanceAnalyticsProps) {
   const currentDate = new Date();
   const [year, setYear] = useState(currentDate.getFullYear());
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
@@ -92,7 +101,6 @@ export default function AttendanceAnalytics({ employeId, employeNom }: Attendanc
       if (result.url) {
         window.open(result.url, '_blank');
       } else if (result.data) {
-        // Create downloadable CSV
         const blob = new Blob([result.data], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -110,41 +118,24 @@ export default function AttendanceAnalytics({ employeId, employeNom }: Attendanc
   };
 
   const goToPreviousMonth = () => {
-    if (month === 1) {
-      setMonth(12);
-      setYear(year - 1);
-    } else {
-      setMonth(month - 1);
-    }
+    if (month === 1) { setMonth(12); setYear(year - 1); }
+    else setMonth(month - 1);
   };
 
   const goToNextMonth = () => {
-    if (month === 12) {
-      setMonth(1);
-      setYear(year + 1);
-    } else {
-      setMonth(month + 1);
-    }
+    if (month === 12) { setMonth(1); setYear(year + 1); }
+    else setMonth(month + 1);
   };
 
-  // Generate calendar grid for current month
   const calendarDays = useMemo(() => {
     const daysInMonth = new Date(year, month, 0).getDate();
     const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
     const days: Array<{ date: number; dayData?: DayData }> = [];
-
-    // Add empty cells for days before the first of the month
-    for (let i = 0; i < firstDayOfWeek; i++) {
-      days.push({ date: 0 });
-    }
-
-    // Add days of the month
+    for (let i = 0; i < firstDayOfWeek; i++) days.push({ date: 0 });
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dayData = dailyData.find(dd => dd.date === dateStr);
-      days.push({ date: d, dayData });
+      days.push({ date: d, dayData: dailyData.find(dd => dd.date === dateStr) });
     }
-
     return days;
   }, [year, month, dailyData]);
 
@@ -161,118 +152,143 @@ export default function AttendanceAnalytics({ employeId, employeNom }: Attendanc
     );
   }
 
+  const tauxPresence = stats?.tauxPresence ?? 0;
+
   return (
-    <div className="space-y-4">
-      {/* Header with navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="flex-1 flex flex-col gap-2 min-h-0">
+      {/* ── Row 1: Employee + Month nav + Export ── */}
+      <div className="shrink-0 flex items-center justify-between gap-2">
+        {/* Employee info */}
+        <div className="flex items-center gap-2 min-w-0">
+          {employeInitials && (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-[10px] shrink-0">
+              {employeInitials}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-white truncate">{employeNom}</h3>
+            {employePoste && <p className="text-[10px] text-slate-500 truncate">{employePoste}</p>}
+          </div>
+          {onChangeEmployee && (
+            <button
+              onClick={onChangeEmployee}
+              className="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium shrink-0 ml-1"
+            >
+              Changer
+            </button>
+          )}
+        </div>
+
+        {/* Month nav + export */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={goToPreviousMonth}
-            className="p-2 hover:bg-slate-800 rounded-lg transition text-slate-400 hover:text-white"
+            className="p-1 hover:bg-slate-800 rounded transition text-slate-400 hover:text-white"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={16} />
           </button>
-          <div className="text-center min-w-[150px]">
-            <h3 className="text-lg font-bold text-white">{MONTHS_FR[month - 1]} {year}</h3>
-            {employeNom && <p className="text-xs text-slate-500">{employeNom}</p>}
+          <div className="text-center min-w-[110px]">
+            <span className="text-xs font-bold text-white">{MONTHS_FR[month - 1]} {year}</span>
           </div>
           <button
             onClick={goToNextMonth}
-            className="p-2 hover:bg-slate-800 rounded-lg transition text-slate-400 hover:text-white"
+            className="p-1 hover:bg-slate-800 rounded transition text-slate-400 hover:text-white"
             disabled={year === currentDate.getFullYear() && month >= currentDate.getMonth() + 1}
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={16} />
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="p-1.5 hover:bg-slate-800 rounded-lg transition text-slate-400 hover:text-white disabled:opacity-50 ml-1"
+            title="Exporter"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
           </button>
         </div>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleExport}
-          disabled={exporting}
-        >
-          {exporting ? <Loader2 size={14} className="animate-spin mr-2" /> : <Download size={14} className="mr-2" />}
-          Exporter
-        </Button>
       </div>
 
-      {/* Stats summary */}
+      {/* ── Row 2: Inline stats ── */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center">
-            <CheckCircle size={20} className="mx-auto text-green-400 mb-1" />
-            <p className="text-xl font-bold text-white">{stats.totalPresents}</p>
-            <p className="text-[10px] text-slate-400">Jours présents</p>
+        <div className="shrink-0 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/30 rounded-lg px-2.5 py-1.5">
+            <CheckCircle size={12} className="text-green-400" />
+            <span className="text-xs font-bold text-white">{stats.totalPresents}</span>
+            <span className="text-[9px] text-slate-500 hidden sm:inline">Présents</span>
           </div>
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
-            <XCircle size={20} className="mx-auto text-red-400 mb-1" />
-            <p className="text-xl font-bold text-white">{stats.totalAbsents}</p>
-            <p className="text-[10px] text-slate-400">Absences</p>
+          <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/30 rounded-lg px-2.5 py-1.5">
+            <XCircle size={12} className="text-red-400" />
+            <span className="text-xs font-bold text-white">{stats.totalAbsents}</span>
+            <span className="text-[9px] text-slate-500 hidden sm:inline">Absences</span>
           </div>
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-center">
-            <AlertCircle size={20} className="mx-auto text-amber-400 mb-1" />
-            <p className="text-xl font-bold text-white">{stats.totalRetards}</p>
-            <p className="text-[10px] text-slate-400">Retards</p>
+          <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+            <AlertCircle size={12} className="text-amber-400" />
+            <span className="text-xs font-bold text-white">{stats.totalRetards}</span>
+            <span className="text-[9px] text-slate-500 hidden sm:inline">Retards</span>
           </div>
-          <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3 text-center">
-            <TrendingUp size={20} className="mx-auto text-indigo-400 mb-1" />
-            <p className="text-xl font-bold text-white">{stats.tauxPresence.toFixed(0)}%</p>
-            <p className="text-[10px] text-slate-400">Taux présence</p>
+          <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-2.5 py-1.5">
+            <TrendingUp size={12} className="text-indigo-400" />
+            <span className="text-xs font-bold text-white">{tauxPresence.toFixed(0)}%</span>
+            <span className="text-[9px] text-slate-500 hidden sm:inline">Taux</span>
           </div>
         </div>
       )}
 
-      {/* Calendar heatmap */}
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map(day => (
-            <div key={day} className="text-center text-[10px] text-slate-500 font-medium py-1">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((day, index) => {
-            if (day.date === 0) {
-              return <div key={`empty-${index}`} className="aspect-square" />;
-            }
-
-            const style = getStatusStyle(day.dayData?.statut);
-            const Icon = style.icon;
-
-            return (
-              <div
-                key={day.date}
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center ${style.bg} transition hover:ring-1 hover:ring-slate-600 cursor-default group relative`}
-                title={day.dayData?.statut || 'Weekend/Férié'}
-              >
-                <span className={`text-xs font-medium ${day.dayData?.statut ? style.text : 'text-slate-500'}`}>
-                  {day.date}
-                </span>
-                {day.dayData?.statut && (
-                  <Icon size={10} className={style.text} />
-                )}
-                {day.dayData?.heureArrivee && (
-                  <span className="text-[8px] text-slate-500">
-                    {day.dayData.heureArrivee.substring(0, 5)}
-                  </span>
-                )}
+      {/* ── Row 3: Calendar (fills remaining space) ── */}
+      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 p-2 sm:p-3 flex flex-col">
+          {/* Day headers */}
+          <div className="shrink-0 grid grid-cols-7 gap-0.5 mb-1">
+            {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((day, i) => (
+              <div key={i} className="text-center text-[9px] text-slate-600 font-bold py-0.5">
+                {day}
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div className="flex-1 grid grid-cols-7 gap-0.5 auto-rows-fr">
+            {calendarDays.map((day, index) => {
+              if (day.date === 0) {
+                return <div key={`empty-${index}`} />;
+              }
+
+              const style = getStatusStyle(day.dayData?.statut);
+              const isToday =
+                day.date === currentDate.getDate() &&
+                month === currentDate.getMonth() + 1 &&
+                year === currentDate.getFullYear();
+
+              return (
+                <div
+                  key={day.date}
+                  className={`rounded flex flex-col items-center justify-center ${style.bg} transition relative ${
+                    isToday ? 'ring-1 ring-cyan-500/50' : ''
+                  }`}
+                  title={day.dayData?.statut || 'Weekend/Férié'}
+                >
+                  <span className={`text-[11px] font-semibold leading-none ${day.dayData?.statut ? style.text : 'text-slate-600'}`}>
+                    {day.date}
+                  </span>
+                  {day.dayData?.heureArrivee && (
+                    <span className="text-[7px] text-slate-500 leading-none mt-0.5">
+                      {day.dayData.heureArrivee.substring(0, 5)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-slate-800">
+        {/* Legend — compact, inside the calendar card */}
+        <div className="shrink-0 flex items-center justify-center gap-3 px-2 py-1.5 border-t border-slate-800 bg-slate-900/80">
           {Object.entries(STATUS_COLORS).filter(([k]) => k !== 'WEEKEND').map(([status, style]) => {
             const Icon = style.icon;
             return (
-              <div key={status} className="flex items-center gap-1.5">
-                <div className={`w-4 h-4 rounded ${style.bg} flex items-center justify-center`}>
-                  <Icon size={10} className={style.text} />
-                </div>
-                <span className="text-[10px] text-slate-400">
+              <div key={status} className="flex items-center gap-1">
+                <Icon size={8} className={style.text} />
+                <span className="text-[8px] text-slate-500">
                   {status === 'PRESENT' ? 'Présent' :
                    status === 'ABSENT' ? 'Absent' :
                    status === 'RETARD' ? 'Retard' : 'Congé'}
@@ -283,39 +299,33 @@ export default function AttendanceAnalytics({ employeId, employeNom }: Attendanc
         </div>
       </div>
 
-      {/* Monthly breakdown table */}
+      {/* ── Monthly breakdown — collapsible, only on larger screens ── */}
       {monthlyData.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-          <div className="p-3 border-b border-slate-800">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <Calendar size={14} className="text-slate-400" />
-              Récapitulatif annuel {year}
-            </h4>
-          </div>
+        <div className="shrink-0 hidden lg:block bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-[10px]">
               <thead>
                 <tr className="bg-slate-800/50">
-                  <th className="px-3 py-2 text-left text-slate-400 font-medium">Mois</th>
-                  <th className="px-3 py-2 text-center text-slate-400 font-medium">Présents</th>
-                  <th className="px-3 py-2 text-center text-slate-400 font-medium">Absents</th>
-                  <th className="px-3 py-2 text-center text-slate-400 font-medium">Retards</th>
-                  <th className="px-3 py-2 text-center text-slate-400 font-medium">Congés</th>
-                  <th className="px-3 py-2 text-center text-slate-400 font-medium">Taux</th>
+                  <th className="px-2 py-1.5 text-left text-slate-500 font-medium">Mois</th>
+                  <th className="px-2 py-1.5 text-center text-slate-500 font-medium">Prés.</th>
+                  <th className="px-2 py-1.5 text-center text-slate-500 font-medium">Abs.</th>
+                  <th className="px-2 py-1.5 text-center text-slate-500 font-medium">Ret.</th>
+                  <th className="px-2 py-1.5 text-center text-slate-500 font-medium">Congés</th>
+                  <th className="px-2 py-1.5 text-center text-slate-500 font-medium">Taux</th>
                 </tr>
               </thead>
               <tbody>
                 {monthlyData.map((m) => (
-                  <tr key={m.mois} className="border-t border-slate-800 hover:bg-slate-800/30">
-                    <td className="px-3 py-2 text-slate-300 font-medium">{MONTHS_FR[m.mois - 1]}</td>
-                    <td className="px-3 py-2 text-center text-green-400">{m.joursPresents}</td>
-                    <td className="px-3 py-2 text-center text-red-400">{m.joursAbsents}</td>
-                    <td className="px-3 py-2 text-center text-amber-400">{m.retards}</td>
-                    <td className="px-3 py-2 text-center text-blue-400">{m.joursConges}</td>
-                    <td className="px-3 py-2 text-center">
+                  <tr key={m.mois} className="border-t border-slate-800/50 hover:bg-slate-800/30">
+                    <td className="px-2 py-1 text-slate-300 font-medium">{MONTHS_FR[m.mois - 1]}</td>
+                    <td className="px-2 py-1 text-center text-green-400">{m.joursPresents}</td>
+                    <td className="px-2 py-1 text-center text-red-400">{m.joursAbsents}</td>
+                    <td className="px-2 py-1 text-center text-amber-400">{m.retards}</td>
+                    <td className="px-2 py-1 text-center text-blue-400">{m.joursConges}</td>
+                    <td className="px-2 py-1 text-center">
                       <Badge
-                        variant={m.tauxPresence >= 90 ? 'success' : m.tauxPresence >= 70 ? 'warning' : 'danger'}
-                        value={`${m.tauxPresence.toFixed(0)}%`}
+                        variant={(m.tauxPresence ?? 0) >= 90 ? 'success' : (m.tauxPresence ?? 0) >= 70 ? 'warning' : 'danger'}
+                        value={`${(m.tauxPresence ?? 0).toFixed(0)}%`}
                         size="xs"
                       />
                     </td>
