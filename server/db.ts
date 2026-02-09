@@ -2269,6 +2269,60 @@ export async function ensureCustomFunctions(): Promise<void> {
       console.warn('[DB] ⚠ Failed to create TRIGGER "trg_guard_period":', err instanceof Error ? err.message : err);
     }
 
+    // Part 5: Debit = Credit constraint — verifies SUM(debit) = SUM(credit) per ecriture
+    // Uses a CONSTRAINT TRIGGER deferred to transaction end so all lines are inserted first
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_check_ecriture_balance()
+        RETURNS TRIGGER AS $t$
+        DECLARE
+          v_total_debit  NUMERIC;
+          v_total_credit NUMERIC;
+          v_line_count   INTEGER;
+          v_num_piece    TEXT;
+        BEGIN
+          SELECT SUM(debit), SUM(credit), COUNT(*)
+          INTO v_total_debit, v_total_credit, v_line_count
+          FROM lignes_ecritures
+          WHERE ecriture_id = NEW.ecriture_id;
+
+          -- Only validate when we have at least 2 lines (complete entry)
+          IF v_line_count >= 2 THEN
+            IF v_total_debit IS DISTINCT FROM v_total_credit THEN
+              SELECT numero_piece INTO v_num_piece
+              FROM ecritures_comptables WHERE id = NEW.ecriture_id;
+
+              RAISE EXCEPTION 'BALANCE_CHECK: ecriture % (%) is unbalanced — debit=% credit=%',
+                NEW.ecriture_id, COALESCE(v_num_piece, 'N/A'), v_total_debit, v_total_credit
+                USING ERRCODE = 'P0003';
+            END IF;
+          END IF;
+
+          RETURN NEW;
+        END;
+        $t$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] ✓ FUNCTION: fn_check_ecriture_balance');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create FUNCTION "fn_check_ecriture_balance":', err instanceof Error ? err.message : err);
+    }
+
+    try {
+      await db.execute(sql`
+        DROP TRIGGER IF EXISTS trg_check_ecriture_balance ON lignes_ecritures;
+        CREATE CONSTRAINT TRIGGER trg_check_ecriture_balance
+          AFTER INSERT ON lignes_ecritures
+          DEFERRABLE INITIALLY DEFERRED
+          FOR EACH ROW
+          EXECUTE FUNCTION fn_check_ecriture_balance();
+      `);
+      console.log('[DB] ✓ TRIGGER: trg_check_ecriture_balance (lignes_ecritures, DEFERRED)');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create TRIGGER "trg_check_ecriture_balance":', err instanceof Error ? err.message : err);
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);
