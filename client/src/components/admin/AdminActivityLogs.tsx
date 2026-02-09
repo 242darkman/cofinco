@@ -67,23 +67,26 @@ export default function AdminActivityLogs({
         if (filterSuccess !== 'all') params.success = filterSuccess;
 
         const data = await auditApi.getAll(params);
-        const mappedLogs: LogEntry[] = (data || []).map((item: any) => ({
-          id: item.id,
-          date: (() => {
-            try {
-              const d = new Date(item.createdAt);
-              return !isNaN(d.getTime()) ? d.toLocaleString('fr-FR') : 'Date invalide';
-            } catch { return 'Date invalide'; }
-          })(),
-          user: item.userName || item.userEmail || 'Système',
-          userEmail: item.userEmail,
-          action: item.action || 'UNKNOWN',
-          module: item.module || item.entityType || 'SYSTEM',
-          details: item.details || {},
-          status: item.success === false ? 'error' : 'success',
-          errorMessage: item.errorMessage,
-          createdAt: item.createdAt,
-        }));
+        const mappedLogs: LogEntry[] = (data || []).map((item: any) => {
+          const ts = item.created_at || item.createdAt;
+          return {
+            id: item.id,
+            date: (() => {
+              try {
+                const d = new Date(ts);
+                return !isNaN(d.getTime()) ? d.toLocaleString('fr-FR') : '—';
+              } catch { return '—'; }
+            })(),
+            user: item.user_nom ? `${item.user_prenom || ''} ${item.user_nom}`.trim() : item.user_email || item.userName || item.userEmail || 'Système',
+            userEmail: item.user_email || item.userEmail,
+            action: item.action || 'UNKNOWN',
+            module: item.resource || item.module || item.entityType || 'SYSTEM',
+            details: item.details || {},
+            status: item.statut === 'FAILURE' || item.success === false ? 'error' : 'success',
+            errorMessage: item.errorMessage,
+            createdAt: ts,
+          };
+        });
         setLogs(mappedLogs);
         setTotal(mappedLogs.length);
       } else {
@@ -94,22 +97,25 @@ export default function AdminActivityLogs({
           search
         });
 
-        const mappedLogs: LogEntry[] = response.data.map((item: any) => ({
-          id: item.id,
-          date: (() => {
-             try {
-               const d = new Date(item.createdAt);
-               return !isNaN(d.getTime()) ? d.toLocaleString('fr-FR') : 'Date invalide';
-             } catch { return 'Date invalide'; }
-          })(),
-          user: item.userName || 'Système',
-          action: item.action || 'UNKNOWN',
-          module: item.module || item.entityType || 'SYSTEM',
-          details: item.details || {},
-          status: item.success === false ? 'error' : 'success',
-          ip: item.ipAddress || 'N/A',
-          userAgent: item.userAgent || ''
-        }));
+        const mappedLogs: LogEntry[] = response.data.map((item: any) => {
+          const ts = item.created_at || item.createdAt;
+          return {
+            id: item.id,
+            date: (() => {
+              try {
+                const d = new Date(ts);
+                return !isNaN(d.getTime()) ? d.toLocaleString('fr-FR') : '—';
+              } catch { return '—'; }
+            })(),
+            user: item.user_nom ? `${item.user_prenom || ''} ${item.user_nom}`.trim() : item.userName || 'Système',
+            action: item.action || 'UNKNOWN',
+            module: item.resource || item.module || item.entityType || 'SYSTEM',
+            details: item.details || {},
+            status: item.statut === 'FAILURE' || item.success === false ? 'error' : 'success',
+            ip: item.ip_address || item.ipAddress || 'N/A',
+            userAgent: item.user_agent || item.userAgent || ''
+          };
+        });
 
         setLogs(mappedLogs);
 
@@ -331,13 +337,13 @@ export default function AdminActivityLogs({
                      <span className="truncate text-slate-200">{log.user}</span>
                   </div>
 
-                  <div className="w-32 hidden md:block">
-                     <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-700 text-slate-400 font-mono">
+                  <div className="w-32 hidden md:block px-2">
+                     <span className="inline-flex items-center justify-center w-full h-6 px-2.5 rounded text-[10px] bg-slate-800 border border-slate-700 text-slate-400 font-mono whitespace-nowrap">
                         {(log.module || '').toUpperCase()}
                      </span>
                   </div>
 
-                  <div className="flex-1">
+                  <div className="flex-1 px-8">
                      <ActionBadge action={log.action} />
                   </div>
 
@@ -493,7 +499,7 @@ function ActionBadge({ action }: { action: string }) {
    else if (action.includes('UPDATE') || action.includes('EDIT')) color = colors.UPDATE;
 
    return (
-      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${color} inline-block`}>
+      <span className={`inline-flex items-center justify-center w-full h-6 px-2.5 rounded-full text-[10px] font-bold border ${color} whitespace-nowrap`}>
          {action}
       </span>
    )
