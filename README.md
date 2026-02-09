@@ -100,6 +100,9 @@ docker compose --profile test run --rm test-unit
 
 # Lancer l'application
 docker compose up -d --build app
+
+# Voir les logs de db-init
+docker compose build db-init 2>&1 | tail -20
 ```
 
 ### 3. Staging (pré-production)

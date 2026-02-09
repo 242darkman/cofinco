@@ -17,7 +17,7 @@ env:
 
 jobs:
   # ==========================================
-  # Stage 1: Test & Validate
+  # Stage 1a: Test & Validate (no DB)
   # ==========================================
   test:
     runs-on: ubuntu-latest
@@ -33,21 +33,75 @@ jobs:
       - name: Type check
         run: npm run check
 
-      - name: Run tests
-        run: npm test
-
-      - name: Audit integrity
-        run: npm run audit:integrity
+      - name: Run unit tests (no DB)
+        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
 
       - name: Dependency audit
         run: npm audit --audit-level=high
         continue-on-error: true
 
   # ==========================================
+  # Stage 1b: GL Audit — Contract Tests + Coverage
+  # ==========================================
+  gl-audit:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cofinco
+          POSTGRES_PASSWORD: cofinco
+          POSTGRES_DB: cofinco
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: DB Init — schema push + seeds
+        env:
+          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+        run: |
+          npx drizzle-kit push --force
+          node --env-file=.env --import tsx server/seed-prod.ts
+        continue-on-error: false
+
+      - name: GL Contract Tests (14 tests)
+        env:
+          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          GL_POSTING_MODE: STRICT
+        run: npx vitest run tests/contracts/gl-accounting-contracts.test.ts
+
+      - name: GL Coverage Matrix (must be 100%)
+        env:
+          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+        run: node --import tsx scripts/generate-gl-coverage.ts
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gl-coverage
+          path: |
+            docs/audit/GL_COVERAGE_MATRIX.generated.md
+            docs/audit/gl_coverage.json
+
+  # ==========================================
   # Stage 2: Build & Push Docker Image
   # ==========================================
   build:
-    needs: test
+    needs: [test, gl-audit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

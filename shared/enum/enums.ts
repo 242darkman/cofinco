@@ -328,6 +328,15 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "FEE",
   "BANK_FEE",
   "CASH_TRANSFER",
+  // Composantes remboursement crédit (GL split)
+  "CREDIT_REPAYMENT_INTEREST",
+  "CREDIT_REPAYMENT_PENALTY",
+  "CREDIT_FEE",
+  // Cycle de vie crédit (pénalités, provisions, radiation)
+  "CREDIT_LATE_PENALTY",
+  "CREDIT_PROVISION",
+  "CREDIT_PROVISION_REVERSAL",
+  "CREDIT_WRITEOFF",
 ]);
 
 // ============================================

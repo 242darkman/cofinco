@@ -903,7 +903,12 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
   
   export async function updateCompte(id: string, updateData: Partial<InsertCompte>): Promise<Compte | undefined> {
-    const [compte] = await db.update(comptes).set({ ...updateData, updatedAt: new Date() }).where(eq(comptes.id, id)).returning();
+    // Strip financial fields — balance must only be updated via executeWithLedger()
+    const { soldeCourant, ...safeData } = updateData as any;
+    if (soldeCourant !== undefined) {
+      console.warn(`[GUARD] updateCompte: stripped soldeCourant from generic update (id=${id})`);
+    }
+    const [compte] = await db.update(comptes).set({ ...safeData, updatedAt: new Date() }).where(eq(comptes.id, id)).returning();
     return compte || undefined;
   }
 
@@ -961,8 +966,13 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     id: string,
     updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }
   ): Promise<Compte | undefined> {
+    // Strip financial fields — balance must only be updated via executeWithLedger()
+    const { solde, ...safeData } = updateData;
+    if (solde !== undefined) {
+      console.warn(`[GUARD] updateClientAccount: stripped solde from generic update (id=${id})`);
+    }
     const [compte] = await db.update(comptes)
-      .set({ ...updateData, updatedAt: new Date() } as any)
+      .set({ ...safeData, updatedAt: new Date() } as any)
       .where(eq(comptes.id, id))
       .returning();
     return compte || undefined;

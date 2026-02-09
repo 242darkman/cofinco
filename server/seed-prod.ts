@@ -275,6 +275,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '23', label: 'Bâtiments', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '24', label: 'Matériel', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '2711', label: 'Prêts - Principal', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '2917', label: 'Provisions pour dépréciation des prêts', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
   { num: '28', label: 'Amortissements', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
 
   // Classe 3: Stocks
@@ -351,6 +352,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '706100', label: 'Intérêts sur crédits', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '706200', label: 'Intérêts sur découverts', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '7071', label: 'Intérêts sur prêts', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '7072', label: 'Commissions sur prêts', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '7073', label: 'Pénalités de retard', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '7078', label: 'Produits pénalités tontines', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708', label: 'Produits accessoires', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
@@ -496,6 +498,47 @@ const ACCOUNTING_RULES_DATA = [
     creditAccount: '521',  // Caisse
     descriptionTemplate: 'Paiement salaire net — décaissement',
     priority: 100,
+  },
+  {
+    code: 'PAYROLL_PAYMENT_TRANSFER',
+    name: 'Paiement paie (virement bancaire)',
+    description: 'Décaissement salaire net par virement bancaire',
+    sourceType: 'MOUVEMENT',
+    eventType: 'PAYROLL_PAYMENT',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'BNK',
+    debitAccount: '421',   // Personnel — rémunérations dues
+    creditAccount: '512',  // Banque
+    descriptionTemplate: 'Paiement salaire net — virement bancaire',
+    priority: 90,
+  },
+  {
+    code: 'PAYROLL_PAYMENT_MTN',
+    name: 'Paiement paie (MTN MoMo)',
+    description: 'Décaissement salaire net via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'PAYROLL_PAYMENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '421',   // Personnel — rémunérations dues
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Paiement salaire net — MTN MoMo',
+    priority: 90,
+  },
+  {
+    code: 'PAYROLL_PAYMENT_AIRTEL',
+    name: 'Paiement paie (Airtel Money)',
+    description: 'Décaissement salaire net via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'PAYROLL_PAYMENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '421',   // Personnel — rémunérations dues
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Paiement salaire net — Airtel Money',
+    priority: 90,
   },
 
   // --- Primes Prospection ---
@@ -891,6 +934,34 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Remboursement intérêts crédit #{creditNumber} - {clientName}',
     priority: 20,
   },
+  {
+    code: 'REMBOURS_MTN_INTERET',
+    name: 'Remboursement intérêts MTN',
+    description: 'Remboursement des intérêts via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT_INTEREST',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '7071', // Intérêts sur prêts
+    descriptionTemplate: 'Remboursement intérêts crédit #{creditNumber} MTN - {clientName}',
+    priority: 20,
+  },
+  {
+    code: 'REMBOURS_AIRTEL_INTERET',
+    name: 'Remboursement intérêts Airtel',
+    description: 'Remboursement des intérêts via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT_INTEREST',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '7071', // Intérêts sur prêts
+    descriptionTemplate: 'Remboursement intérêts crédit #{creditNumber} Airtel - {clientName}',
+    priority: 20,
+  },
 
   // --- Pénalités crédit ---
   {
@@ -904,6 +975,34 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '521',   // Caisse centrale
     creditAccount: '7073', // Pénalités de retard
     descriptionTemplate: 'Remboursement pénalités crédit #{creditNumber} - {clientName}',
+    priority: 20,
+  },
+  {
+    code: 'REMBOURS_MTN_PENALITE',
+    name: 'Remboursement pénalités MTN',
+    description: 'Remboursement des pénalités via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT_PENALTY',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '7073', // Pénalités de retard
+    descriptionTemplate: 'Remboursement pénalités crédit #{creditNumber} MTN - {clientName}',
+    priority: 20,
+  },
+  {
+    code: 'REMBOURS_AIRTEL_PENALITE',
+    name: 'Remboursement pénalités Airtel',
+    description: 'Remboursement des pénalités via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_REPAYMENT_PENALTY',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '7073', // Pénalités de retard
+    descriptionTemplate: 'Remboursement pénalités crédit #{creditNumber} Airtel - {clientName}',
     priority: 20,
   },
 
@@ -1119,6 +1218,34 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Frais d\'engagement crédit - {clientName}',
     priority: 10,
   },
+  {
+    code: 'ENGAGEMENT_FEE_MTN',
+    name: 'Frais d\'engagement crédit MTN',
+    description: 'Frais d\'engagement pour ouverture de crédit via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'ENGAGEMENT_FEE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',   // Mobile Money MTN
+    creditAccount: '708100', // Produits des services - Frais d'engagement
+    descriptionTemplate: 'Frais d\'engagement crédit MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'ENGAGEMENT_FEE_AIRTEL',
+    name: 'Frais d\'engagement crédit Airtel',
+    description: 'Frais d\'engagement pour ouverture de crédit via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'ENGAGEMENT_FEE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',   // Mobile Money Airtel
+    creditAccount: '708100', // Produits des services - Frais d'engagement
+    descriptionTemplate: 'Frais d\'engagement crédit Airtel - {clientName}',
+    priority: 10,
+  },
 
   // Dépôt initial ouverture compte
   {
@@ -1132,6 +1259,47 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '521',   // Caisse centrale
     creditAccount: '4112', // Dépôts clients - Comptes épargne
     descriptionTemplate: 'Dépôt initial ouverture compte - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'INITIAL_DEPOSIT_MTN',
+    name: 'Dépôt initial ouverture compte MTN',
+    description: 'Dépôt initial pour ouverture de compte via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'INITIAL_DEPOSIT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '4112', // Dépôts clients - Comptes épargne
+    descriptionTemplate: 'Dépôt initial ouverture compte MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'INITIAL_DEPOSIT_AIRTEL',
+    name: 'Dépôt initial ouverture compte Airtel',
+    description: 'Dépôt initial pour ouverture de compte via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'INITIAL_DEPOSIT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '4112', // Dépôts clients - Comptes épargne
+    descriptionTemplate: 'Dépôt initial ouverture compte Airtel - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'INITIAL_DEPOSIT_TRANSFER',
+    name: 'Dépôt initial ouverture compte virement',
+    description: 'Dépôt initial pour ouverture de compte par virement',
+    sourceType: 'MOUVEMENT',
+    eventType: 'INITIAL_DEPOSIT',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'OD',
+    debitAccount: '581',   // Virements internes
+    creditAccount: '4112', // Dépôts clients - Comptes épargne
+    descriptionTemplate: 'Dépôt initial ouverture compte virement - {clientName}',
     priority: 10,
   },
 
@@ -1292,7 +1460,7 @@ const ACCOUNTING_RULES_DATA = [
     description: 'Dépôt des fonds évacués sur compte bancaire',
     sourceType: 'MOUVEMENT',
     eventType: 'EVACUATION_COFFRE_BANQUE',
-    journalCode: 'BQ',
+    journalCode: 'BNK',
     debitAccount: '512',   // Banque (compte bancaire)
     creditAccount: '581',  // Virements internes (transit)
     descriptionTemplate: 'Évacuation coffre — dépôt bancaire',
@@ -1473,6 +1641,66 @@ const ACCOUNTING_RULES_DATA = [
     creditAccount: '4112',  // Dépôts épargne (restored to client)
     descriptionTemplate: 'Annulation payout Airtel — {clientName}',
     priority: 100,
+  },
+
+  // =====================================================================
+  // CREDIT LIFECYCLE — Pénalités de retard, Provisions, Radiation (C18-C20)
+  // =====================================================================
+
+  // C18: Pénalité de retard (constatation de la pénalité sur crédit en retard)
+  {
+    code: 'CREDIT_LATE_PENALTY',
+    name: 'Pénalité de retard crédit',
+    description: 'Constatation comptable d\'une pénalité de retard sur crédit en souffrance',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_LATE_PENALTY',
+    journalCode: 'CRD',
+    debitAccount: '2711',  // Prêts - Principal (augmentation créance)
+    creditAccount: '7073', // Pénalités de retard (produit)
+    descriptionTemplate: 'Pénalité retard crédit #{creditNumber} - {clientName}',
+    priority: 10,
+  },
+
+  // C19: Provisionnement créances douteuses (dotation provision)
+  {
+    code: 'CREDIT_PROVISION',
+    name: 'Dotation provision créance douteuse',
+    description: 'Provisionnement pour dépréciation d\'un crédit en souffrance',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_PROVISION',
+    journalCode: 'OD',
+    debitAccount: '691',   // Provisions créances douteuses (charge)
+    creditAccount: '2917', // Provisions pour dépréciation des prêts (contra-actif)
+    descriptionTemplate: 'Provision créance douteuse crédit #{creditNumber} - {clientName}',
+    priority: 10,
+  },
+
+  // C19b: Reprise provision (quand le crédit est régularisé ou radié)
+  {
+    code: 'CREDIT_PROVISION_REVERSAL',
+    name: 'Reprise provision créance douteuse',
+    description: 'Reprise de provision suite à régularisation ou radiation d\'un crédit',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_PROVISION_REVERSAL',
+    journalCode: 'OD',
+    debitAccount: '2917',  // Provisions pour dépréciation des prêts (contra-actif)
+    creditAccount: '79',   // Reprises provisions (produit)
+    descriptionTemplate: 'Reprise provision crédit #{creditNumber} - {clientName}',
+    priority: 10,
+  },
+
+  // C20: Radiation crédit irrécouvrable (write-off)
+  {
+    code: 'CREDIT_WRITEOFF',
+    name: 'Radiation crédit irrécouvrable',
+    description: 'Constatation perte sur crédit irrécouvrable (write-off)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_WRITEOFF',
+    journalCode: 'OD',
+    debitAccount: '672',   // Pertes sur créances irrécouvrables (charge)
+    creditAccount: '2711', // Prêts - Principal (sortie de l\'actif)
+    descriptionTemplate: 'Radiation crédit #{creditNumber} - {clientName} — irrécouvrable',
+    priority: 10,
   },
 ];
 
@@ -2141,16 +2369,32 @@ async function seedAccountingBootstrap(context: SeedContext, dryRun: boolean): P
   }
   results.push({ table: 'journaux', action: 'created', count: JOURNAUX_DATA.length });
 
-  // Accounting Rules - upsert by code
+  // Accounting Rules - true upsert by code (updates existing rules if seed data changed)
   let rulesCreated = 0;
+  let rulesUpdated = 0;
   for (const rule of ACCOUNTING_RULES_DATA) {
     const [existing] = await db.select().from(accountingRules).where(eq(accountingRules.code, rule.code));
     if (!existing) {
       await db.insert(accountingRules).values(rule);
       rulesCreated++;
+    } else {
+      // Update if any field differs
+      const needsUpdate =
+        existing.eventType !== rule.eventType ||
+        existing.debitAccount !== rule.debitAccount ||
+        existing.creditAccount !== rule.creditAccount ||
+        existing.journalCode !== rule.journalCode ||
+        existing.sourceType !== rule.sourceType ||
+        existing.paymentMethod !== (rule.paymentMethod ?? null) ||
+        existing.provider !== (rule.provider ?? null) ||
+        existing.priority !== rule.priority;
+      if (needsUpdate) {
+        await db.update(accountingRules).set(rule).where(eq(accountingRules.code, rule.code));
+        rulesUpdated++;
+      }
     }
   }
-  results.push({ table: 'accountingRules', action: 'created', count: rulesCreated, details: `${rulesCreated} new rules (${ACCOUNTING_RULES_DATA.length} total)` });
+  results.push({ table: 'accountingRules', action: 'created', count: rulesCreated, details: `${rulesCreated} new, ${rulesUpdated} updated (${ACCOUNTING_RULES_DATA.length} total)` });
 
   return results;
 }

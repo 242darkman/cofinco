@@ -2214,6 +2214,61 @@ export async function ensureCustomFunctions(): Promise<void> {
       }
     }
 
+    // Part 4: Period guard — prevents GL entries being created in CLOSED/LOCKED periods
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_guard_period_closed()
+        RETURNS TRIGGER AS $t$
+        DECLARE
+          v_period_status TEXT;
+          v_closed_at TIMESTAMPTZ;
+        BEGIN
+          -- Check if the GL period for this entry's agence/date is closed
+          SELECT statut, closed_at INTO v_period_status, v_closed_at
+          FROM gl_periods
+          WHERE agence_id = NEW.agence_id
+            AND year = EXTRACT(YEAR FROM NEW.date_ecriture)::INTEGER
+            AND month = EXTRACT(MONTH FROM NEW.date_ecriture)::INTEGER;
+
+          -- If period exists and is closed/locked, block the insert
+          IF v_period_status IN ('CLOSED', 'LOCKED') THEN
+            -- Allow bypass for explicit administrative corrections
+            IF current_setting('app.period_guard_bypass', true) = 'true' THEN
+              RETURN NEW;
+            END IF;
+
+            RAISE EXCEPTION 'PERIOD_GUARD: cannot create ecriture in CLOSED period (agence=%, year=%, month=%, closed_at=%)',
+              NEW.agence_id,
+              EXTRACT(YEAR FROM NEW.date_ecriture),
+              EXTRACT(MONTH FROM NEW.date_ecriture),
+              v_closed_at
+              USING ERRCODE = 'P0002';
+          END IF;
+
+          RETURN NEW;
+        END;
+        $t$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] ✓ FUNCTION: fn_guard_period_closed');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create FUNCTION "fn_guard_period_closed":', err instanceof Error ? err.message : err);
+    }
+
+    try {
+      await db.execute(sql`
+        DROP TRIGGER IF EXISTS trg_guard_period ON ecritures_comptables;
+        CREATE TRIGGER trg_guard_period
+          BEFORE INSERT ON ecritures_comptables
+          FOR EACH ROW
+          EXECUTE FUNCTION fn_guard_period_closed();
+      `);
+      console.log('[DB] ✓ TRIGGER: trg_guard_period (ecritures_comptables)');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create TRIGGER "trg_guard_period":', err instanceof Error ? err.message : err);
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);
