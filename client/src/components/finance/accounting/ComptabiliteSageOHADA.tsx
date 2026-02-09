@@ -13,6 +13,7 @@ import CompteResultat from './CompteResultat';
 import DeclarationTVA from './DeclarationTVA';
 import TableauTresorerie from './TableauTresorerie';
 import TAFIRE from './TAFIRE';
+import RapportsOHADA from './RapportsOHADA';
 import CoffreOperationsPanel from './CoffreOperationsPanel';
 import PayrollSummaryPanel from './PayrollSummaryPanel';
 import TabGroup from '../../ui/TabGroup';
@@ -937,57 +938,9 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   );
 
   // ============================================
-  // TAB: Liasse fiscale - ADAPTATIF
+  // TAB: Liasse fiscale - États Financiers OHADA
   // ============================================
-  const renderLiasse = () => (
-    <div className="space-y-3">
-      {/* Header compact */}
-      <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-xl p-3">
-        <div className="flex items-center gap-3 overflow-x-auto">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <FileText className="w-5 h-5 text-white" />
-            <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">Liasse Fiscale OHADA</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">États financiers</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* États financiers - grille compacte */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-        {[
-          { id: 'bilan', tab: 'bilan' as TabKey, label: 'Bilan', desc: 'Actif/Passif', icon: PieChart, color: 'from-blue-500 to-blue-600' },
-          { id: 'resultat', tab: 'resultat' as TabKey, label: 'Résultat', desc: 'Charges/Produits', icon: TrendingUp, color: 'from-green-500 to-green-600' },
-          { id: 'tafire', tab: 'tafire' as TabKey, label: 'TAFIRE', desc: 'Tableau financier', icon: Activity, color: 'from-purple-500 to-purple-600' },
-          { id: 'annexes', tab: null, label: 'Annexes', desc: 'Notes', icon: FileText, color: 'from-cyan-500 to-cyan-600' },
-          { id: 'flux', tab: 'tresorerie' as TabKey, label: 'Trésorerie', desc: 'Flux', icon: DollarSign, color: 'from-orange-500 to-orange-600' },
-          { id: 'variation', tab: null, label: 'Variation', desc: 'Capitaux', icon: BarChart3, color: 'from-pink-500 to-pink-600' },
-        ].map((etat) => {
-          const Icon = etat.icon;
-          return (
-            <button
-              key={etat.id}
-              onClick={() => etat.tab && setActiveTab(etat.tab)}
-              className={`
-                bg-gradient-to-br ${etat.color}
-                rounded-lg p-3
-                text-white text-left
-                hover:scale-[1.02] hover:shadow-lg
-                transition-all duration-200
-                ${!etat.tab ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
-              disabled={!etat.tab}
-            >
-              <Icon className="w-5 h-5 mb-2" />
-              <div className="text-xs font-bold">{etat.label}</div>
-              <div className="text-[10px] opacity-80">{etat.desc}</div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  const renderLiasse = () => <RapportsOHADA />;
 
   // ============================================
   // TAB: Rapports - ADAPTATIF avec téléchargements fonctionnels

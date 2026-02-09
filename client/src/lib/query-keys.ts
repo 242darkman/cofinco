@@ -199,6 +199,16 @@ export const comptabiliteKeys = {
   // Périodes comptables
   periods: (year?: number) => ['/api/comptabilite', 'periods', year] as const,
 
+  // OHADA GL Reports
+  journalCentralisateur: (year: number, month: number) =>
+    ['/api/comptabilite', 'reports', 'journal-centralisateur', year, month] as const,
+  bilanOHADA: (dateArret: string) =>
+    ['/api/comptabilite', 'reports', 'bilan', dateArret] as const,
+  compteResultatOHADA: (dateDebut: string, dateFin: string) =>
+    ['/api/comptabilite', 'reports', 'compte-resultat', dateDebut, dateFin] as const,
+  livreInventaire: (dateInventaire: string) =>
+    ['/api/comptabilite', 'reports', 'livre-inventaire', dateInventaire] as const,
+
   // Factures
   factures: () => ['/api/factures'] as const,
 };

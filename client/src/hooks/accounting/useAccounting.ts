@@ -143,6 +143,46 @@ export function useCompteResultat(exercice: string, options?: { enabled?: boolea
 }
 
 // ============================================
+// OHADA GL Reports
+// ============================================
+
+export function useJournalCentralisateur(year: number, month: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: comptabiliteKeys.journalCentralisateur(year, month),
+    queryFn: () => comptabiliteApi.getJournalCentralisateur({ year, month }),
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useBilanOHADA(dateArret: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: comptabiliteKeys.bilanOHADA(dateArret),
+    queryFn: () => comptabiliteApi.getBilanOHADA(dateArret),
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useCompteResultatOHADA(dateDebut: string, dateFin: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: comptabiliteKeys.compteResultatOHADA(dateDebut, dateFin),
+    queryFn: () => comptabiliteApi.getCompteResultatOHADA({ dateDebut, dateFin }),
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useLivreInventaire(dateInventaire: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: comptabiliteKeys.livreInventaire(dateInventaire),
+    queryFn: () => comptabiliteApi.getLivreInventaire(dateInventaire),
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+// ============================================
 // Périodes Comptables
 // ============================================
 

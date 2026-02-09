@@ -2315,6 +2315,19 @@ export const comptabiliteApi = {
   getEntriesBySource: (sourceType: string, params?: { page?: number; pageSize?: number }) =>
     request<PostedEntryApi[]>(`/comptabilite/entries-by-source/${sourceType}?page=${params?.page || 1}&pageSize=${params?.pageSize || 50}`),
 
+  // OHADA GL Reports
+  getJournalCentralisateur: (params: { year: number; month: number }) =>
+    request<any>(`/comptabilite/reports/journal-centralisateur?year=${params.year}&month=${params.month}`),
+
+  getBilanOHADA: (dateArret: string) =>
+    request<any>(`/comptabilite/reports/bilan?dateArret=${dateArret}`),
+
+  getCompteResultatOHADA: (params: { dateDebut: string; dateFin: string }) =>
+    request<any>(`/comptabilite/reports/compte-resultat?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}`),
+
+  getLivreInventaire: (dateInventaire: string) =>
+    request<any>(`/comptabilite/reports/livre-inventaire?dateInventaire=${dateInventaire}`),
+
   // Create manual entry (v2)
   createEntry: (data: {
     journalCode: string;
