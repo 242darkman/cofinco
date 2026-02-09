@@ -29,6 +29,9 @@ import {
 } from "@shared/schema";
 import { users } from "@shared/schema/auth";
 import { eq, and, or, sql, gte, lte, desc, isNull } from "drizzle-orm";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger('Service:HR');
 
 // ============================================
 // TYPES
@@ -741,6 +744,8 @@ export class HrService {
       ? and(eq(employes.statut, 'ACTIVE'), eq(employes.agenceId, agenceId))
       : eq(employes.statut, 'ACTIVE');
 
+    logger.info({ month, generatedBy, agenceId: agenceId || 'TOUTES' }, 'Génération paie: démarrage');
+
     const employeesList = await db
       .select({
         employe: employes,
@@ -749,6 +754,19 @@ export class HrService {
       .from(employes)
       .innerJoin(users, eq(employes.userId, users.id))
       .where(whereConditions);
+
+    logger.info({
+      month,
+      agenceId: agenceId || 'TOUTES',
+      employesTrouves: employeesList.length,
+      employesDetails: employeesList.map(({ employe, user }) => ({
+        employeId: employe.id,
+        userId: employe.userId,
+        nom: `${user.nom} ${user.prenom || ''}`.trim(),
+        statut: employe.statut,
+        agenceId: employe.agenceId,
+      })),
+    }, `Génération paie: ${employeesList.length} employé(s) éligible(s)`);
 
     const results: any[] = [];
     let skipped = 0;
@@ -767,6 +785,7 @@ export class HrService {
         .limit(1);
 
       if (existing.length > 0) {
+        logger.debug({ employeId: employe.id, nom: `${user.nom} ${user.prenom || ''}`.trim(), month }, 'Génération paie: bulletin déjà existant, ignoré');
         skipped++;
         continue;
       }
@@ -813,6 +832,14 @@ export class HrService {
 
       results.push(bulletin);
     }
+
+    logger.info({
+      month,
+      agenceId: agenceId || 'TOUTES',
+      generated: results.length,
+      skipped,
+      total: employeesList.length,
+    }, `Génération paie terminée: ${results.length} généré(s), ${skipped} ignoré(s) sur ${employeesList.length} éligible(s)`);
 
     return {
       generated: results.length,

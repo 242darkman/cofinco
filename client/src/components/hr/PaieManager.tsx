@@ -31,14 +31,14 @@ export default function PaieManager() {
   };
 
   const columns = [
-    { key: 'mois', label: 'Mois', primary: true, render: (val: string) => <span className="font-mono font-medium">{val}</span> },
+    { key: 'mois', label: 'Mois', primary: true, format: (val: string) => <span className="font-mono font-medium">{val}</span> },
     { key: 'employeNom', label: 'Employé', hideOnMobile: true },
-    { key: 'salaireNet', label: 'Net à Payer', render: (val: string) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{parseInt(val).toLocaleString()} FCFA</span> },
-    { key: 'statut', label: 'Statut', badge: true, render: (val: string) => (
+    { key: 'salaireNet', label: 'Net à Payer', format: (val: string) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{parseInt(val).toLocaleString()} FCFA</span> },
+    { key: 'statut', label: 'Statut', format: (val: string) => (
         <Badge variant={val === StatutBulletin.VALIDATED || val === StatutBulletin.PAID ? 'success' : 'warning'} value={STATUT_BULLETIN_LABELS[val as keyof typeof STATUT_BULLETIN_LABELS] || val} />
     )},
-    { key: 'actions', label: 'Actions', render: (val: any, item: BulletinPaie) => (
-        <Button variant="ghost" size="sm" icon={Download} onClick={(e) => { e.stopPropagation(); handleDownload(item); }} />
+    { key: 'actions', label: 'Actions', format: (_val: any, item: BulletinPaie) => (
+        <Button variant="ghost" size="sm" icon={Download} onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDownload(item); }} />
     )}
   ];
 

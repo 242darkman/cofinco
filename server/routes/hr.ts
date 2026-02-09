@@ -2507,13 +2507,107 @@ hrRouter.get("/paie/my", getAuthUser, async (req, res) => {
         // Résoudre l'employeId à partir du userId
         const employe = await storage.getEmployeByUserId(userId);
         if (!employe) {
+            logger.warn({ userId, userName: req.user?.nom }, 'Mes bulletins: aucun profil employé trouvé pour cet utilisateur');
             return res.status(404).json({ error: "Profil employé non trouvé" });
         }
 
+        logger.info({
+            userId,
+            employeId: employe.id,
+            employeStatut: employe.statut,
+            employeAgenceId: employe.agenceId,
+        }, 'Mes bulletins: recherche des bulletins');
+
         const bulletins = await storage.getBulletins(employe.id);
+
+        logger.info({
+            userId,
+            employeId: employe.id,
+            bulletinsCount: bulletins.length,
+        }, `Mes bulletins: ${bulletins.length} bulletin(s) trouvé(s)`);
+
         res.json(bulletins);
     } catch (error) {
         logger.error({ err: error }, 'Erreur récupération mes bulletins');
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/paie/diagnostic - Diagnostic paie pour l'utilisateur connecté
+hrRouter.get("/paie/diagnostic", getAuthUser, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: "Non authentifié" });
+
+        const diagnostic: Record<string, any> = {
+            userId,
+            userName: req.user?.nom,
+            userAgenceId: req.user?.agenceId,
+        };
+
+        // 1. Vérifier si l'utilisateur a un profil employé
+        const employe = await storage.getEmployeByUserId(userId);
+        if (!employe) {
+            diagnostic.employe = null;
+            diagnostic.probleme = 'AUCUN_PROFIL_EMPLOYE';
+            diagnostic.explication = "Cet utilisateur n'a pas de fiche dans la table 'employes'. La paie ne peut pas être générée ni consultée.";
+            return res.json(diagnostic);
+        }
+
+        diagnostic.employe = {
+            id: employe.id,
+            statut: employe.statut,
+            agenceId: employe.agenceId,
+            salaireBase: employe.salaireBase,
+            modeCalculPaie: employe.modeCalculPaie,
+        };
+
+        // 2. Vérifier le statut
+        if (employe.statut !== 'ACTIVE') {
+            diagnostic.probleme = 'STATUT_NON_ACTIF';
+            diagnostic.explication = `Le statut de l'employé est '${employe.statut}'. Seuls les employés avec statut 'ACTIVE' sont inclus dans la génération de paie.`;
+        }
+
+        // 3. Vérifier les bulletins existants
+        const bulletins = await storage.getBulletins(employe.id);
+        diagnostic.bulletinsCount = bulletins.length;
+        diagnostic.bulletins = bulletins.map((b: any) => ({
+            id: b.id,
+            mois: b.mois,
+            statut: b.statut,
+            salaireNet: b.salaireNet,
+        }));
+
+        // 4. Vérifier la correspondance d'agence avec la config paie
+        if (employe.agenceId) {
+            const [configAgence] = await db
+                .select()
+                .from(payrollConfig)
+                .where(eq(payrollConfig.agenceId, employe.agenceId))
+                .limit(1);
+            diagnostic.configPaieAgence = configAgence ? 'OK' : 'MANQUANTE';
+            if (!configAgence) {
+                diagnostic.probleme = diagnostic.probleme || 'CONFIG_PAIE_MANQUANTE';
+                diagnostic.explication = (diagnostic.explication || '') + ` Aucune configuration paie trouvée pour l'agence ${employe.agenceId}.`;
+            }
+        } else {
+            diagnostic.probleme = diagnostic.probleme || 'AGENCE_MANQUANTE';
+            diagnostic.explication = (diagnostic.explication || '') + " L'employé n'a pas d'agence assignée (agenceId null). Il sera exclu si le générateur filtre par agence.";
+        }
+
+        if (!diagnostic.probleme && bulletins.length === 0) {
+            diagnostic.probleme = 'AUCUN_BULLETIN';
+            diagnostic.explication = "Le profil employé est correct et actif, mais aucun bulletin n'a été généré. Vérifiez que la génération de paie a été lancée pour l'agence de cet employé.";
+        }
+
+        if (!diagnostic.probleme) {
+            diagnostic.probleme = null;
+            diagnostic.explication = 'Tout semble correct. Les bulletins sont disponibles.';
+        }
+
+        res.json(diagnostic);
+    } catch (error) {
+        logger.error({ err: error }, 'Erreur diagnostic paie');
         res.status(500).json({ error: "Erreur serveur" });
     }
 });
