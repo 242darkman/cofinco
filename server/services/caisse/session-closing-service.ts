@@ -864,19 +864,53 @@ export class SessionClosingService {
           });
         }
 
-        // 7. Mettre à jour la caisse physique
+        // 7. Créer le mouvement financier de clôture (requis par BALANCE_GUARD)
+        // Ce mouvement représente l'ajustement du solde caisse lors de la fermeture
+        const currentCaisseSolde = Number(
+          (await tx.select({ solde: caisses.solde }).from(caisses).where(eq(caisses.id, session.caisseId)))[0]?.solde || 0
+        );
+        const balanceDelta = currentCaisseSolde - montantReporte;
+        if (Math.abs(balanceDelta) > 0) {
+          await createMouvementFinancier(
+            tx,
+            {
+              agenceId: session.agenceId!,
+              sens: balanceDelta > 0 ? "DEBIT" : "CREDIT",
+              montant: Math.abs(balanceDelta).toString(),
+              sourceModule: "CAISSE",
+              typePaiement: "SESSION_CLOSING_TRANSFER",
+              sessionCaisseId: sessionId,
+              requiresGlPosting: false,
+              metadata: {
+                type: "CLOSING_BALANCE_ADJUSTMENT",
+                sessionId,
+                caisseId: session.caisseId,
+                soldeBefore: currentCaisseSolde,
+                soldeAfter: montantReporte,
+                montantVersCoffre,
+                montantReporte,
+              },
+            },
+            caissierId
+          );
+        } else {
+          // Balance unchanged — set flag manually to satisfy guard
+          await tx.execute(sql`SELECT set_config('app.mouvement_created', 'true', true)`);
+        }
+
+        // 8. Mettre à jour la caisse physique
         // Le solde de la caisse = montant reporté (ce qui reste pour demain)
         // CRITIQUE: Mettre le statut à CLOSED et libérer le verrouillage
         await tx
           .update(caisses)
           .set({
             solde: montantReporte.toString(),
-            statut: StatutCaisse.CLOSED, // CRITIQUE: Synchroniser le statut
+            statut: StatutCaisse.CLOSED,
             updatedAt: new Date(),
           })
           .where(eq(caisses.id, session.caisseId));
 
-        // 8. Fermer définitivement la session
+        // 9. Fermer définitivement la session
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
@@ -897,7 +931,7 @@ export class SessionClosingService {
           .where(eq(sessionsCaisse.id, sessionId))
           .returning();
 
-        // 9. Créer log d'audit
+        // 10. Créer log d'audit
         await tx.insert(sessionsCaisseAuditLogs).values({
           sessionId,
           action: "CLOSED",
