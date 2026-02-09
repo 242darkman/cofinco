@@ -22,7 +22,9 @@ import {
   Eye,
   Vault,
   User,
-  KeyRound
+  KeyRound,
+  Info,
+  X
 } from "lucide-react";
 import { toast } from 'sonner';
 
@@ -48,6 +50,14 @@ interface ConfirmAction {
   type: 'validate' | 'reject' | 'execute' | 'validate-opening' | 'reject-opening';
   transfert: any;
 }
+
+const TAB_HELP: Record<string, string> = {
+  operations: 'Demandez, validez et exécutez les transferts entre le coffre et les caisses. Chaque transfert suit un workflow : Demande → Validation → Exécution.',
+  intercoffres: 'Envoyez et recevez des fonds entre coffres de différentes agences. Idéal pour les rééquilibrages de trésorerie entre sites.',
+  historique: 'Consultez l\'historique complet de tous les mouvements du coffre : entrées, sorties, provisions et compensations.',
+  supervision: 'Vue consolidée des soldes et mouvements de toutes les agences. Comparez les performances et exportez les rapports.',
+  admin: 'Configurez les seuils d\'alerte, les plafonds de transfert et les règles de validation du coffre-fort.',
+};
 
 export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   // Fetch transferts
@@ -85,6 +95,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
 
   const [activeTab, setActiveTab] = useState('operations');
+  const [showHelp, setShowHelp] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showProvisionModal, setShowProvisionModal] = useState(false);
@@ -626,65 +637,91 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
 
   return (
-    <div className="flex flex-col h-full overflow-hidden pt-1 space-y-2">
-      <div className="shrink-0 z-40 px-2 sm:px-1 py-2 sm:py-1 bg-slate-950/80 backdrop-blur-md border-b border-white/5">
-        <div className="flex flex-col gap-2">
-          {/* Row 1: Title + Approvisionner button */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3">
-                <div className="bg-blue-600/20 p-1.5 rounded-lg shrink-0">
-                   <Vault className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
-                </div>
-                 <div>
-                    <h2 className="text-base sm:text-lg font-bold tracking-tight text-white">Coffre-Fort</h2>
-                    <p className="text-[9px] sm:text-[10px] text-slate-400 hidden xs:block">Gestion centralisée des fonds</p>
-                 </div>
-            </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Nav bar ── */}
+      <div className="shrink-0 flex items-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2 border-b border-slate-800/60">
+        {/* Balance chip — always visible */}
+        <div className="hidden xs:flex items-center gap-1.5 bg-blue-500/8 border border-blue-500/15 rounded-lg px-2 py-1.5 shrink-0 mr-0.5">
+          <Vault size={13} className="text-blue-400" />
+          <span className="text-[11px] font-bold text-white font-mono tabular-nums">
+            {isLoadingStats ? '···' : (statsData?.solde || 0).toLocaleString()}
+          </span>
+          <span className="text-[9px] text-slate-500">FCFA</span>
+        </div>
 
-            {canConfigure && (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                    onClick={() => setShowProvisionModal(true)}
+        {/* Tabs — underline style, scrollable */}
+        <nav className="flex-1 min-w-0 overflow-x-auto scrollbar-hide" role="tablist">
+          <div className="flex items-center">
+            {[
+              { id: 'operations', label: 'Transferts', icon: ArrowRightLeft },
+              { id: 'intercoffres', label: 'Inter-Coffres', icon: Vault },
+              { id: 'historique', label: 'Historique', icon: Clock },
+              ...(canSupervise ? [{ id: 'supervision', label: 'Supervision', icon: Shield }] : []),
+              ...(canConfigure ? [{ id: 'admin', label: 'Admin', icon: Settings }] : [])
+            ].map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    relative flex items-center gap-1.5 px-2.5 py-2.5 text-[11px] font-medium whitespace-nowrap transition-colors
+                    ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}
+                  `}
                 >
-                    <ArrowDownRight size={12} className="sm:mr-1.5" />
-                    <span className="hidden sm:inline">Approvisionner</span>
-                </Button>
+                  <tab.icon size={13} />
+                  {tab.label}
+                  {tab.id === 'operations' && pendingCount > 0 && (
+                    <span className="px-1 min-w-[16px] text-center rounded-full bg-amber-500 text-white text-[9px] font-bold leading-[16px]">
+                      {pendingCount}
+                    </span>
+                  )}
+                  {isActive && (
+                    <span className="absolute bottom-0 inset-x-1.5 h-[2px] bg-blue-500 rounded-full" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Help popover */}
+        {TAB_HELP[activeTab] && (
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowHelp(v => !v)}
+              className={`p-1.5 rounded-md transition ${showHelp ? 'text-blue-400 bg-blue-500/10' : 'text-slate-600 hover:text-slate-400'}`}
+              aria-label="Aide"
+            >
+              <Info size={14} />
+            </button>
+            {showHelp && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowHelp(false)} />
+                <div className="absolute right-0 top-full mt-1.5 w-72 p-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <p className="text-[11px] text-slate-300 leading-relaxed">{TAB_HELP[activeTab]}</p>
+                </div>
+              </>
             )}
           </div>
+        )}
 
-          {/* Row 2: Tabs */}
-          <div className="overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
-             <div className="flex space-x-0.5 sm:space-x-1 bg-slate-900/50 p-0.5 rounded-lg border border-white/5 w-fit">
-                {[
-                  { id: 'operations', label: 'Transferts', icon: ArrowRightLeft, short: 'Transf.' },
-                  { id: 'intercoffres', label: 'Inter-Coffres', icon: Vault, short: 'Inter' },
-                  { id: 'historique', label: 'Historique', icon: Clock, short: 'Hist.' },
-                  ...(canSupervise ? [{ id: 'supervision', label: 'Supervision', icon: Shield, short: 'Sup.' }] : []),
-                  ...(canConfigure ? [{ id: 'admin', label: 'Admin', icon: Settings, short: 'Admin' }] : [])
-                ].map(tab => (
-                 <button
-                   key={tab.id}
-                   onClick={() => setActiveTab(tab.id)}
-                   className={`
-                      relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 text-[10px] sm:text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap
-                      ${activeTab === tab.id
-                        ? 'text-white bg-blue-600/90 shadow-lg shadow-blue-900/20'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'}
-                   `}
-                 >
-                   <tab.icon size={12} className={`sm:w-3.5 sm:h-3.5 ${activeTab === tab.id ? 'animate-in zoom-in-50 duration-200' : ''}`} />
-                   <span className="hidden md:inline">{tab.label}</span>
-                   <span className="md:hidden">{tab.short}</span>
-                 </button>
-                ))}
-            </div>
-          </div>
-        </div>
+        {/* Approvisionner */}
+        {canConfigure && (
+          <button
+            onClick={() => setShowProvisionModal(true)}
+            className="shrink-0 flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/10 transition whitespace-nowrap"
+          >
+            <ArrowDownRight size={13} />
+            <span className="hidden sm:inline">Approvisionner</span>
+          </button>
+        )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-1 custom-scrollbar space-y-3">
+      {/* ── Content — fills all remaining space ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 custom-scrollbar space-y-3">
           {activeTab === 'admin' ? (
             <CoffreAdminPanel agenceId={agenceId} />
           ) : activeTab === 'supervision' ? (
@@ -713,7 +750,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                   <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">En Attente</span>
                   <div className="flex items-center gap-1.5">
                      <Clock className="text-amber-500 hidden xs:block" size={14} />
-                     <div className="text-sm sm:text-base font-bold text-white">{pendingCount + (pendingOpeningRequests?.length || 0)}</div>
+                     <div className="text-sm sm:text-base font-bold text-white">{pendingCount + (pendingOpeningRequests?.length || 0)} FCFA</div>
                   </div>
                </div>
                <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2 sm:p-2.5 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center">

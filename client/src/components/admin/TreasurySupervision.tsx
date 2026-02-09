@@ -12,7 +12,6 @@ import {
 import { Card, Button, Badge, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { api } from '../../lib/api-client';
 import { cn } from '@/lib/utils';
-import { TreasuryReconciliationPanel } from './TreasuryReconciliationPanel';
 
 // --- Constants & Helpers ---
 const AGENCY_COLORS = [
@@ -43,7 +42,7 @@ const formatCurrency = (val: number) => {
 
 function ChartSkeleton() {
   return (
-    <div className="w-full h-[160px] bg-slate-100 dark:bg-slate-800/50 rounded-lg animate-pulse flex items-center justify-center">
+    <div className="w-full h-[200px] bg-slate-100 dark:bg-slate-800/50 rounded-lg animate-pulse flex items-center justify-center">
       <TrendingUp size={40} className="opacity-10" />
     </div>
   );
@@ -403,11 +402,6 @@ export function TreasurySupervision() {
           </Card>
         </div>
 
-        {/* Reconciliation Panel - Full Width */}
-        <div className="col-span-12">
-          <TreasuryReconciliationPanel />
-        </div>
-
         {/* Chart Column */}
         <Card className="col-span-12 md:col-span-8 p-2 border-slate-800 bg-slate-950/30">
           <div className="flex items-center justify-between mb-1">
@@ -445,7 +439,7 @@ export function TreasurySupervision() {
               ))}
             </div>
           </div>
-          <div className="h-[120px] w-full">
+          <div className="h-[200px] w-full">
             {isLoadingChart ? <ChartSkeleton /> : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData || []} margin={{ top: 5, right: 10, left: 5, bottom: 0 }}>
