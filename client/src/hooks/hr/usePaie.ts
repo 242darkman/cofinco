@@ -71,6 +71,9 @@ export function usePaie() {
     queryClient.invalidateQueries({ queryKey: ['all-bulletins'] });
     queryClient.invalidateQueries({ queryKey: ['my-bulletins'] });
     queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+    queryClient.invalidateQueries({ queryKey: ['payroll-run'] });
+    queryClient.invalidateQueries({ queryKey: ['gl-payroll-661'] });
+    queryClient.invalidateQueries({ queryKey: ['gl-payroll-421'] });
   };
 
   // ---- Fetch My Bulletins ----

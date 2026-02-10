@@ -2,96 +2,57 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Users, Wallet, Clock, CheckCircle, RefreshCw, TrendingDown } from 'lucide-react';
 import { Card, Badge } from '../../ui';
-import { comptabiliteApi } from '../../../lib/api-client';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { formatMoney } from '../../../lib/format';
 
 interface PayrollSummaryPanelProps {
   className?: string;
 }
 
 /**
- * Panel compact montrant la masse salariale dans la comptabilité
- * Comptes : 661 (Charges personnel) et 421 (Dettes personnel)
+ * Panel compact montrant la masse salariale.
+ * Lit directement les payroll runs du mois en cours.
  */
 export default function PayrollSummaryPanel({ className = '' }: PayrollSummaryPanelProps) {
   const today = new Date();
-  const dateDebut = format(startOfMonth(today), 'yyyy-MM-dd');
-  const dateFin = format(endOfMonth(today), 'yyyy-MM-dd');
+  const currentPeriod = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const monthLabel = today.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
-  // Récupérer les données du compte 661 (Rémunérations)
-  const { data: chargesData, isLoading: loadingCharges } = useQuery({
-    queryKey: ['gl-payroll-661', dateDebut, dateFin],
+  const { data: runs = [], isLoading, refetch } = useQuery({
+    queryKey: ['payroll-runs'],
     queryFn: async () => {
-      const comptes = await comptabiliteApi.getPlanOhada();
-      const compte661 = comptes.find((c: any) => c.numeroCompte === '661' || c.numeroCompte.startsWith('661'));
-      if (!compte661) return null;
-
-      return comptabiliteApi.getGrandLivre(compte661.id, {
-        dateDebut,
-        dateFin,
-        page: 1,
-        pageSize: 20
-      });
+      const res = await fetch('/api/hr/paie/runs');
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data || json;
     },
-    staleTime: 60000,
+    staleTime: 30000,
   });
 
-  // Récupérer les données du compte 421 (Dettes personnel)
-  const { data: dettesData, isLoading: loadingDettes, refetch } = useQuery({
-    queryKey: ['gl-payroll-421', dateDebut, dateFin],
-    queryFn: async () => {
-      const comptes = await comptabiliteApi.getPlanOhada();
-      const compte421 = comptes.find((c: any) => c.numeroCompte === '421' || c.numeroCompte.startsWith('421'));
-      if (!compte421) return null;
-
-      return comptabiliteApi.getGrandLivre(compte421.id, {
-        dateDebut,
-        dateFin,
-        page: 1,
-        pageSize: 20
-      });
-    },
-    staleTime: 60000,
-  });
-
-  const isLoading = loadingCharges || loadingDettes;
-
-  // Calculer les stats
   const stats = useMemo(() => {
-    // Charges de personnel (661) - Débits = charges
-    const totalCharges = chargesData?.totalDebits || 0;
+    // Filter runs for the current month, only latest version (non-cancelled)
+    const monthRuns = (runs as any[]).filter(
+      (r: any) => r.period === currentPeriod && r.status !== 'CANCELLED'
+    );
 
-    // Dettes personnel (421)
-    // Crédit 421 = engagements (salaires dus)
-    // Débit 421 = paiements effectués
-    const engagements = dettesData?.totalCredits || 0;
-    const paiements = dettesData?.totalDebits || 0;
-    const soldeDettes = dettesData?.soldeFinal || 0; // Reste à payer
+    // Take the highest version run
+    const latestRun = monthRuns.sort((a: any, b: any) => b.version - a.version)[0];
 
-    // Nb bulletins approximatif (nb écritures sur 661)
-    const nbBulletins = chargesData?.entries?.length || 0;
+    if (!latestRun) {
+      return { totalBrut: 0, totalNet: 0, totalChargesPatronales: 0, totalChargesSalariales: 0, employeeCount: 0, status: null as string | null };
+    }
 
     return {
-      masseSalariale: totalCharges,
-      engagements,
-      paiements,
-      resteAPayer: Math.abs(soldeDettes),
-      nbBulletins
+      totalBrut: Number(latestRun.totalBrut) || 0,
+      totalNet: Number(latestRun.totalNet) || 0,
+      totalChargesPatronales: Number(latestRun.totalChargesPatronales) || 0,
+      totalChargesSalariales: Number(latestRun.totalChargesSalariales) || 0,
+      employeeCount: latestRun.employeeCount || 0,
+      status: latestRun.status as string | null,
     };
-  }, [chargesData, dettesData]);
+  }, [runs, currentPeriod]);
 
-  const formatMoney = (amount: number) => {
-    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-    if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
-    return amount.toLocaleString();
-  };
-
-  // Dernières écritures de paie
-  const recentPayroll = useMemo(() => {
-    const entries = chargesData?.entries || [];
-    return entries.slice(0, 4);
-  }, [chargesData]);
+  const isPaid = stats.status === 'PAID';
+  const isValidated = stats.status === 'VALIDATED';
 
   if (isLoading) {
     return (
@@ -105,7 +66,7 @@ export default function PayrollSummaryPanel({ className = '' }: PayrollSummaryPa
 
   return (
     <Card className={`p-4 ${className}`}>
-      {/* Header compact */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-indigo-500/10">
@@ -113,7 +74,7 @@ export default function PayrollSummaryPanel({ className = '' }: PayrollSummaryPa
           </div>
           <div>
             <h3 className="text-sm font-semibold text-white">Masse Salariale</h3>
-            <p className="text-[10px] text-slate-500">{format(today, 'MMMM yyyy', { locale: fr })}</p>
+            <p className="text-[10px] text-slate-500">{monthLabel}</p>
           </div>
         </div>
         <button
@@ -125,15 +86,14 @@ export default function PayrollSummaryPanel({ className = '' }: PayrollSummaryPa
         </button>
       </div>
 
-      {/* Stats grid - 2x2 ultra compact */}
+      {/* Stats grid */}
       <div className="grid grid-cols-2 gap-2 mb-3">
         <div className="bg-indigo-500/10 rounded-lg p-2">
           <div className="flex items-center gap-1 mb-0.5">
             <TrendingDown className="w-3 h-3 text-indigo-400" />
             <span className="text-[9px] text-indigo-400 uppercase">Charges</span>
           </div>
-          <span className="text-sm font-bold text-indigo-400">{formatMoney(stats.masseSalariale)}</span>
-          <span className="text-[9px] text-slate-500 ml-1">FCFA</span>
+          <span className="text-sm font-bold text-indigo-400">{formatMoney(stats.totalBrut + stats.totalChargesPatronales, { compact: true })}</span>
         </div>
 
         <div className="bg-amber-500/10 rounded-lg p-2">
@@ -141,8 +101,7 @@ export default function PayrollSummaryPanel({ className = '' }: PayrollSummaryPa
             <Clock className="w-3 h-3 text-amber-400" />
             <span className="text-[9px] text-amber-400 uppercase">À payer</span>
           </div>
-          <span className="text-sm font-bold text-amber-400">{formatMoney(stats.resteAPayer)}</span>
-          <span className="text-[9px] text-slate-500 ml-1">FCFA</span>
+          <span className="text-sm font-bold text-amber-400">{formatMoney(isPaid ? 0 : stats.totalNet, { compact: true })}</span>
         </div>
 
         <div className="bg-emerald-500/10 rounded-lg p-2">
@@ -150,8 +109,7 @@ export default function PayrollSummaryPanel({ className = '' }: PayrollSummaryPa
             <CheckCircle className="w-3 h-3 text-emerald-400" />
             <span className="text-[9px] text-emerald-400 uppercase">Payés</span>
           </div>
-          <span className="text-sm font-bold text-emerald-400">{formatMoney(stats.paiements)}</span>
-          <span className="text-[9px] text-slate-500 ml-1">FCFA</span>
+          <span className="text-sm font-bold text-emerald-400">{formatMoney(isPaid ? stats.totalNet : 0, { compact: true })}</span>
         </div>
 
         <div className="bg-slate-700/50 rounded-lg p-2">
@@ -159,44 +117,45 @@ export default function PayrollSummaryPanel({ className = '' }: PayrollSummaryPa
             <Wallet className="w-3 h-3 text-slate-400" />
             <span className="text-[9px] text-slate-400 uppercase">Bulletins</span>
           </div>
-          <span className="text-sm font-bold text-white">{stats.nbBulletins}</span>
+          <span className="text-sm font-bold text-white">{stats.employeeCount}</span>
           <span className="text-[9px] text-slate-500 ml-1">ce mois</span>
         </div>
       </div>
 
-      {/* Recent payroll entries - compact */}
-      {recentPayroll.length > 0 ? (
-        <div className="space-y-1.5">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wide">Dernières écritures</div>
-          {recentPayroll.map((op: any, idx: number) => (
-            <div
-              key={op.id || idx}
-              className="flex items-center justify-between py-1.5 px-2 bg-slate-800/50 rounded text-xs"
-            >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Badge value="RH" variant="info" size="xs" />
-                <span className="truncate text-slate-300" title={op.ecritureLibelle || op.ligneLibelle}>
-                  {(op.ecritureLibelle || op.ligneLibelle || 'Paie').slice(0, 28)}
-                </span>
-              </div>
-              <span className="font-mono font-medium text-rose-400 whitespace-nowrap">
-                {formatMoney(op.debit || 0)}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-4 text-slate-500 text-xs">
-          Aucune écriture de paie ce mois
+      {/* Details */}
+      {stats.status && (
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between py-1 px-2 bg-slate-800/50 rounded">
+            <span className="text-slate-400">Brut total</span>
+            <span className="font-mono text-white">{formatMoney(stats.totalBrut)}</span>
+          </div>
+          <div className="flex justify-between py-1 px-2 bg-slate-800/50 rounded">
+            <span className="text-slate-400">Charges salariales</span>
+            <span className="font-mono text-red-400">{formatMoney(stats.totalChargesSalariales)}</span>
+          </div>
+          <div className="flex justify-between py-1 px-2 bg-slate-800/50 rounded">
+            <span className="text-slate-400">Charges patronales</span>
+            <span className="font-mono text-slate-300">{formatMoney(stats.totalChargesPatronales)}</span>
+          </div>
+          <div className="flex justify-between py-1 px-2 bg-emerald-500/10 rounded font-bold">
+            <span className="text-emerald-400">Net à payer</span>
+            <span className="font-mono text-emerald-400">{formatMoney(stats.totalNet)}</span>
+          </div>
         </div>
       )}
 
-      {/* Footer - comptes GL */}
+      {!stats.status && (
+        <div className="text-center py-4 text-slate-500 text-xs">
+          Aucun run de paie ce mois
+        </div>
+      )}
+
+      {/* Footer */}
       <div className="mt-3 pt-2 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-500">
-        <span>GL: 661 (Charges) / 421 (Dettes)</span>
+        <span>GL: 6611 (Charges) / 4211 (Dettes)</span>
         <Badge
-          value={stats.resteAPayer > 0 ? 'Solde dû' : 'À jour'}
-          variant={stats.resteAPayer > 0 ? 'warning' : 'success'}
+          value={isPaid ? 'Payé' : isValidated ? 'Validé' : stats.status === 'DRAFT' ? 'Brouillon' : 'À jour'}
+          variant={isPaid ? 'success' : isValidated ? 'info' : 'warning'}
           size="xs"
         />
       </div>
