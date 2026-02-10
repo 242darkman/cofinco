@@ -21,6 +21,7 @@ import {
   StatutCredit,
   StatutParticipationTontine,
   StatutTransaction,
+  SegmentClient,
 } from "@shared/enum/status-constants";
 
 // ============================================================================
@@ -635,10 +636,10 @@ function calculerScoreAnciennete(
   }
 
   // Bonus pour segment VIP/Premium
-  if (client.segment === 'VIP') {
+  if (client.segment === SegmentClient.VIP) {
     score += 2;
     atouts.push("Client VIP");
-  } else if (client.segment === 'Premium') {
+  } else if (client.segment === SegmentClient.PREMIUM) {
     score += 1;
   }
 
@@ -687,10 +688,10 @@ export async function mettreAJourScoreClient(clientId: string): Promise<{ score:
   });
 
   // Déterminer le segment basé sur le score
-  let segment = 'Standard';
-  if (result.score >= 75) segment = 'VIP';
-  else if (result.score >= 60) segment = 'Premium';
-  else if (result.score < 40) segment = 'Risque';
+  let segment: string = SegmentClient.STANDARD;
+  if (result.score >= 75) segment = SegmentClient.VIP;
+  else if (result.score >= 60) segment = SegmentClient.PREMIUM;
+  else if (result.score < 40) segment = SegmentClient.RISQUE;
 
   // Mettre à jour le client
   await db.update(clients)

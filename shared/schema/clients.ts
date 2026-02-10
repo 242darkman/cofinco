@@ -86,7 +86,7 @@ export const clients = pgTable("clients", {
 
   // Classification
   typeMarcheId: uuid("type_marche_id").references(() => typesMarches.id),
-  segment: text("segment").notNull().default("STANDARD"),
+  segment: text("segment").notNull().default("Standard"),
   frequenceCarte: text("frequence_carte").default("DAILY"),
 
   // Géolocalisation

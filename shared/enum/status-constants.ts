@@ -189,6 +189,27 @@ export const STATUT_CLIENT_LABELS: Record<StatutClientType, string> = {
 };
 
 
+// ============================================
+// SEGMENT CLIENT
+// ============================================
+
+export const SegmentClient = {
+  STANDARD: "Standard",
+  PREMIUM: "Premium",
+  VIP: "VIP",
+  RISQUE: "Risque",
+} as const;
+
+export type SegmentClientType = (typeof SegmentClient)[keyof typeof SegmentClient];
+
+/** Labels FR pour l'UI des segments client */
+export const SEGMENT_CLIENT_LABELS: Record<SegmentClientType, string> = {
+  [SegmentClient.STANDARD]: "Standard",
+  [SegmentClient.PREMIUM]: "Premium",
+  [SegmentClient.VIP]: "VIP",
+  [SegmentClient.RISQUE]: "Risqué",
+};
+
 
 // ============================================
 // STATUT CREDIT (Prêts actifs)

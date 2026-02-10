@@ -135,17 +135,25 @@ export const PROSPECTION_STATUS_COLORS: Record<string, string> = {
 
 // --- Segment Client ---
 export const CLIENT_SEGMENT_LABELS: Record<string, string> = {
+  Standard: "Standard",
+  Premium: "Premium",
+  VIP: "VIP",
+  Risque: "Risqué",
+  // Legacy uppercase fallbacks
   STANDARD: "Standard",
   PREMIUM: "Premium",
-  VIP: "VIP",
   RISQUE: "Risqué",
   RISKY: "Risqué",
 };
 
 export const CLIENT_SEGMENT_COLORS: Record<string, string> = {
+  Standard: "bg-slate-500/10 text-slate-500 border-slate-500/20",
+  Premium: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  VIP: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  Risque: "bg-red-500/20 text-red-400 border-red-500/30",
+  // Legacy uppercase fallbacks
   STANDARD: "bg-slate-500/10 text-slate-500 border-slate-500/20",
   PREMIUM: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  VIP: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   RISQUE: "bg-red-500/20 text-red-400 border-red-500/30",
   RISKY: "bg-red-500/20 text-red-400 border-red-500/30",
 };

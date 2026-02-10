@@ -239,7 +239,18 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
     );
   }
 
-  const { summary, distribution, monthlyTrend } = analytics;
+  const distribution = analytics.distribution || [];
+  const monthlyTrend = { savingsGrowth: '0', creditEvolution: '0', ...analytics.monthlyTrend };
+  const summary = {
+    totalSavings: 0,
+    totalCreditDue: 0,
+    activeLoansCount: 0,
+    savingsAccountsCount: 0,
+    activeTontinesCount: 0,
+    fidelityPoints: 0,
+    repaymentRate: 0,
+    ...analytics.summary,
+  };
   const totalValue = distribution.reduce((sum, item) => sum + item.value, 0);
   const memberDays = client.dateInscription ? Math.floor((new Date().getTime() - new Date(client.dateInscription).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 

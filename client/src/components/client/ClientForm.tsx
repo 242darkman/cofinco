@@ -13,7 +13,7 @@ import { isAdminRole, SystemRole } from '@shared/types/roles';
 import { agenceApi, employeApi, villeApi } from '../../lib/api-client';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl } from '../../lib/format';
-import { StatutClient, StatutAgence } from '@shared/enum/status-constants';
+import { StatutClient, StatutAgence, SegmentClient, SEGMENT_CLIENT_LABELS } from '@shared/enum/status-constants';
 
 interface ClientFormProps {
   client?: ClientWithIdentity | null;
@@ -126,7 +126,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     photoUrl: '',
     photoProfile: '',
     statut: StatutClient.ACTIVE,
-    segment: 'Standard',
+    segment: SegmentClient.STANDARD,
     score: 50,
     creditTotal: '0',
     epargneTotal: '0',
@@ -622,9 +622,14 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           <SelectField
             label="Segment"
             name="segment"
-            value={formData.segment ?? 'Standard'}
+            value={formData.segment ?? SegmentClient.STANDARD}
             onChange={(e) => handleChange('segment', e.target.value)}
-            options={[{ value: 'Standard', label: 'Standard' }, { value: 'Premium', label: 'Premium' }, { value: 'VIP', label: 'VIP' }]}
+            options={[
+              { value: SegmentClient.STANDARD, label: SEGMENT_CLIENT_LABELS[SegmentClient.STANDARD] },
+              { value: SegmentClient.PREMIUM, label: SEGMENT_CLIENT_LABELS[SegmentClient.PREMIUM] },
+              { value: SegmentClient.VIP, label: SEGMENT_CLIENT_LABELS[SegmentClient.VIP] },
+              { value: SegmentClient.RISQUE, label: SEGMENT_CLIENT_LABELS[SegmentClient.RISQUE] },
+            ]}
           />
         </div>
 

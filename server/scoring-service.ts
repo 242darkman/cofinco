@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { clients, credits, comptes } from "@shared/schema";
 import { eq, and, gte, desc, sql } from "drizzle-orm";
+import { SegmentClient } from "@shared/enum/status-constants";
 
 export async function calculateClientScore(clientId: string): Promise<{ score: number; segment: string }> {
   let score = 0;
@@ -68,9 +69,9 @@ export async function calculateClientScore(clientId: string): Promise<{ score: n
   score = Math.max(score, 10); // Minimum score
 
   // Determine Segment
-  let segment = 'Standard';
-  if (score >= 75) segment = 'VIP';
-  else if (score < 40) segment = 'Risque';
+  let segment: string = SegmentClient.STANDARD;
+  if (score >= 75) segment = SegmentClient.VIP;
+  else if (score < 40) segment = SegmentClient.RISQUE;
 
   // Update Database
   await db.update(clients)

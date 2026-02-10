@@ -1,9 +1,9 @@
 import { clients, typesMarches, tags, clientTags, clientActivities, users, agences, historiquePoints, userRoles } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
-import { StatutUser } from "@shared/enum/status-constants";
+import { StatutUser, SegmentClient } from "@shared/enum/status-constants";
 import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User, type InsertHistoriquePoints } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, isNull, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { StorageService } from "../services/storage-service";
 import { normalizeNom, normalizePrenom } from "./name-utils";
@@ -40,6 +40,12 @@ export interface ClientWithUser extends Client {
  * Type étendu retourné par les fonctions de lecture
  * Fusionne les données client + user pour l'API
  */
+export interface ClientTagCompact {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface ClientFull extends Client {
   // Champs d'identité (depuis users)
   nom: string;
@@ -52,6 +58,8 @@ export interface ClientFull extends Client {
   type_marche_nom?: string | null;
   agence_nom?: string | null;
   photoUrl?: string | null;
+  // Tags assignés (eager loaded pour la liste)
+  tags?: ClientTagCompact[];
 }
 
 /**
@@ -83,7 +91,7 @@ export const createClientApiSchema = z.object({
   typeRevenu: z.string().optional().nullable(),
   documents: z.any().optional().nullable(),
   typeMarcheId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
-  segment: z.string().optional().default("STANDARD"),
+  segment: z.string().optional().default(SegmentClient.STANDARD),
   frequenceCarte: z.string().optional().nullable(),
   latitude: z.string().optional().nullable().transform(v => v === '' ? null : v),
   longitude: z.string().optional().nullable().transform(v => v === '' ? null : v),
@@ -150,6 +158,32 @@ export async function getClient(id: string): Promise<ClientFull | undefined> {
 }
 
 /**
+ * Batch-fetch tags pour une liste de clients (évite N+1)
+ * Retourne un Map<clientId, ClientTagCompact[]>
+ */
+async function batchFetchClientTags(clientIds: string[]): Promise<Map<string, ClientTagCompact[]>> {
+  const map = new Map<string, ClientTagCompact[]>();
+  if (clientIds.length === 0) return map;
+
+  const rows = await db.select({
+    clientId: clientTags.clientId,
+    tagId: tags.id,
+    tagName: tags.name,
+    tagColor: tags.color,
+  })
+  .from(clientTags)
+  .innerJoin(tags, and(eq(clientTags.tagId, tags.id), isNull(tags.deletedAt)))
+  .where(inArray(clientTags.clientId, clientIds));
+
+  for (const row of rows) {
+    const arr = map.get(row.clientId) || [];
+    arr.push({ id: row.tagId, name: row.tagName, color: row.tagColor || '#6b7280' });
+    map.set(row.clientId, arr);
+  }
+  return map;
+}
+
+/**
  * Récupérer tous les clients avec données utilisateur fusionnées
  */
 export async function getAllClients(filter: { agence?: string; agenceId?: string } = {}): Promise<ClientFull[]> {
@@ -185,9 +219,8 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
 
   const results = await query.orderBy(desc(clients.createdAt));
 
-  return results.map(r => ({
+  const clientList = results.map(r => ({
     ...r.client,
-    // Champs d'identité depuis users (source de vérité)
     nom: r.user_nom || "Client",
     prenom: r.user_prenom,
     email: r.user_email,
@@ -206,7 +239,14 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
       }
       return url;
     })()
-  }));
+  })) as ClientFull[];
+
+  // Batch-fetch tags
+  const tagsMap = await batchFetchClientTags(clientList.map(c => c.id));
+  for (const client of clientList) {
+    client.tags = tagsMap.get(client.id) || [];
+  }
+  return clientList;
 }
 
 /**
@@ -298,69 +338,74 @@ export async function getClientsPaginated(
     .limit(perPage)
     .offset((page - 1) * perPage);
 
-  return {
-    data: results.map((r) => ({
-      id: r.id,
-      userId: r.userId,
-      adresseDomicile: r.adresseDomicile,
-      lieuActivite: r.lieuActivite,
-      ville: r.ville,
-      pays: r.pays,
-      dateNaissance: r.dateNaissance,
-      numeroPiece: r.numeroPiece,
-      typePiece: r.typePiece,
-      profession: r.profession,
-      employeur: r.employeur,
-      typeActivite: r.typeActivite,
-      revenuMensuel: r.revenuMensuel,
-      revenuJournalier: r.revenuJournalier,
-      typeRevenu: r.typeRevenu,
-      typeMarcheId: r.typeMarcheId,
-      segment: r.segment,
-      frequenceCarte: r.frequenceCarte,
-      latitude: r.latitude,
-      longitude: r.longitude,
-      score: r.score,
-      creditTotal: r.creditTotal,
-      epargneTotal: r.epargneTotal,
-      tauxRemboursement: r.tauxRemboursement,
-      limiteRetraitJournalier: r.limiteRetraitJournalier,
-      limiteRetraitHebdomadaire: r.limiteRetraitHebdomadaire,
-      limiteRetraitMensuel: r.limiteRetraitMensuel,
-      pointsFidelite: r.pointsFidelite,
-      scoreEngagement: r.scoreEngagement,
-      derniereActivite: r.derniereActivite,
-      agenceId: r.agenceId,
-      agentReferentId: r.agentReferentId,
-      dateAdhesion: r.dateAdhesion,
-      dateInscription: r.dateInscription,
-      createdBy: r.createdBy,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-      deletedAt: r.deletedAt,
-      // Identity fields from users
-      nom: r.user_nom || "Client",
-      prenom: r.user_prenom,
-      email: r.user_email,
-      telephone: r.user_telephone,
-      photoProfile: r.user_photo_profile,
-      statut: r.user_statut || StatutUser.ACTIVE,
-      // Enriched fields
-      type_marche_nom: r.type_marche_nom,
-      agence_nom: r.agence_nom,
-      photoUrl: (() => {
-        const url = r.user_photo_profile;
-        if (url && url.trim().startsWith('[')) {
-            try {
-                const parsed = JSON.parse(url);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
-            } catch (e) { /* ignore */ }
-        }
-        return url;
-      })(),
-    })) as ClientFull[],
-    total,
-  };
+  const data = results.map((r) => ({
+    id: r.id,
+    userId: r.userId,
+    adresseDomicile: r.adresseDomicile,
+    lieuActivite: r.lieuActivite,
+    ville: r.ville,
+    pays: r.pays,
+    dateNaissance: r.dateNaissance,
+    numeroPiece: r.numeroPiece,
+    typePiece: r.typePiece,
+    profession: r.profession,
+    employeur: r.employeur,
+    typeActivite: r.typeActivite,
+    revenuMensuel: r.revenuMensuel,
+    revenuJournalier: r.revenuJournalier,
+    typeRevenu: r.typeRevenu,
+    typeMarcheId: r.typeMarcheId,
+    segment: r.segment,
+    frequenceCarte: r.frequenceCarte,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    score: r.score,
+    creditTotal: r.creditTotal,
+    epargneTotal: r.epargneTotal,
+    tauxRemboursement: r.tauxRemboursement,
+    limiteRetraitJournalier: r.limiteRetraitJournalier,
+    limiteRetraitHebdomadaire: r.limiteRetraitHebdomadaire,
+    limiteRetraitMensuel: r.limiteRetraitMensuel,
+    pointsFidelite: r.pointsFidelite,
+    scoreEngagement: r.scoreEngagement,
+    derniereActivite: r.derniereActivite,
+    agenceId: r.agenceId,
+    agentReferentId: r.agentReferentId,
+    dateAdhesion: r.dateAdhesion,
+    dateInscription: r.dateInscription,
+    createdBy: r.createdBy,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    deletedAt: r.deletedAt,
+    // Identity fields from users
+    nom: r.user_nom || "Client",
+    prenom: r.user_prenom,
+    email: r.user_email,
+    telephone: r.user_telephone,
+    photoProfile: r.user_photo_profile,
+    statut: r.user_statut || StatutUser.ACTIVE,
+    // Enriched fields
+    type_marche_nom: r.type_marche_nom,
+    agence_nom: r.agence_nom,
+    photoUrl: (() => {
+      const url = r.user_photo_profile;
+      if (url && url.trim().startsWith('[')) {
+          try {
+              const parsed = JSON.parse(url);
+              if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+          } catch (e) { /* ignore */ }
+      }
+      return url;
+    })(),
+  })) as ClientFull[];
+
+  // Batch-fetch tags
+  const tagsMap = await batchFetchClientTags(data.map(c => c.id));
+  for (const client of data) {
+    client.tags = tagsMap.get(client.id) || [];
+  }
+
+  return { data, total };
 }
 
 // ============================================
@@ -420,7 +465,7 @@ export async function createClient(input: CreateClientApiInput): Promise<Client>
       typeRevenu: input.typeRevenu,
       documents: input.documents,
       typeMarcheId: input.typeMarcheId,
-      segment: input.segment || "STANDARD",
+      segment: input.segment || SegmentClient.STANDARD,
       frequenceCarte: input.frequenceCarte,
       latitude: input.latitude,
       longitude: input.longitude,
@@ -481,7 +526,7 @@ export async function createClientWithExistingUser(userId: string, input: Omit<C
       typeRevenu: input.typeRevenu,
       documents: input.documents,
       typeMarcheId: input.typeMarcheId,
-      segment: input.segment || "STANDARD",
+      segment: input.segment || SegmentClient.STANDARD,
       frequenceCarte: input.frequenceCarte,
       latitude: input.latitude,
       longitude: input.longitude,
@@ -634,7 +679,7 @@ export async function getAllTypesMarches(): Promise<any[]> {
 
 // Tags
 export async function getAllTags(): Promise<Tag[]> {
-  return db.select().from(tags);
+  return db.select().from(tags).where(isNull(tags.deletedAt));
 }
 
 export async function createTag(tag: InsertTag): Promise<Tag> {
@@ -648,7 +693,7 @@ export async function getClientTags(clientId: string): Promise<(ClientTag & { ta
       tag: tags
   })
   .from(clientTags)
-  .innerJoin(tags, eq(clientTags.tagId, tags.id))
+  .innerJoin(tags, and(eq(clientTags.tagId, tags.id), isNull(tags.deletedAt)))
   .where(eq(clientTags.clientId, clientId));
 
   return rows.map(r => ({ ...r.clientTag, tag: r.tag }));
@@ -665,6 +710,14 @@ export async function addClientTag(entry: InsertClientTag): Promise<ClientTag & 
 
 export async function removeClientTag(clientId: string, tagId: string): Promise<boolean> {
     const res = await db.delete(clientTags).where(and(eq(clientTags.clientId, clientId), eq(clientTags.tagId, tagId)));
+    return (res.rowCount || 0) > 0;
+}
+
+export async function deleteTag(tagId: string): Promise<boolean> {
+    // Supprimer d'abord toutes les assignations de ce tag
+    await db.delete(clientTags).where(eq(clientTags.tagId, tagId));
+    // Soft-delete le tag
+    const res = await db.update(tags).set({ deletedAt: new Date() }).where(eq(tags.id, tagId));
     return (res.rowCount || 0) > 0;
 }
 
@@ -851,7 +904,7 @@ export async function createClientWithUser(
       typeRevenu: clientData.typeRevenu,
       documents: clientData.documents,
       typeMarcheId: clientData.typeMarcheId,
-      segment: clientData.segment || "STANDARD",
+      segment: clientData.segment || SegmentClient.STANDARD,
       frequenceCarte: clientData.frequenceCarte,
       latitude: clientData.latitude,
       longitude: clientData.longitude,
@@ -904,7 +957,7 @@ export async function createClientForUser(userId: string, clientData: Omit<Creat
       typeRevenu: clientData.typeRevenu,
       documents: clientData.documents,
       typeMarcheId: clientData.typeMarcheId,
-      segment: clientData.segment || "STANDARD",
+      segment: clientData.segment || SegmentClient.STANDARD,
       frequenceCarte: clientData.frequenceCarte,
       latitude: clientData.latitude,
       longitude: clientData.longitude,
@@ -988,9 +1041,9 @@ export async function getClientStats(filter: { agenceId?: string } = {}): Promis
       activeClients: sql<number>`count(*) filter (where ${users.statut} = 'ACTIVE')`,
       inactiveClients: sql<number>`count(*) filter (where ${users.statut} = 'INACTIVE')`,
       suspendedClients: sql<number>`count(*) filter (where ${users.statut} = 'SUSPENDED')`,
-      vipCount: sql<number>`count(*) filter (where ${clients.segment} = 'VIP')`,
-      premiumCount: sql<number>`count(*) filter (where ${clients.segment} = 'Premium')`,
-      standardCount: sql<number>`count(*) filter (where ${clients.segment} = 'Standard')`,
+      vipCount: sql<number>`count(*) filter (where lower(${clients.segment}) = 'vip')`,
+      premiumCount: sql<number>`count(*) filter (where lower(${clients.segment}) = 'premium')`,
+      standardCount: sql<number>`count(*) filter (where lower(${clients.segment}) = 'standard')`,
       totalCredit: sql<number>`coalesce(sum(cast(${clients.creditTotal} as numeric)), 0)`,
       totalEpargne: sql<number>`coalesce(sum(cast(${clients.epargneTotal} as numeric)), 0)`,
       avgRepaymentRate: sql<number>`coalesce(avg(cast(${clients.tauxRemboursement} as numeric)), 0)`,
@@ -1091,7 +1144,7 @@ export async function createClientsBulk(clientsData: CreateClientApiInput[]): Pr
          typeRevenu: data.typeRevenu,
          documents: data.documents,
          typeMarcheId: data.typeMarcheId,
-         segment: data.segment || "STANDARD",
+         segment: data.segment || SegmentClient.STANDARD,
          frequenceCarte: data.frequenceCarte,
          latitude: data.latitude,
          longitude: data.longitude,

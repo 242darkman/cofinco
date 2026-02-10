@@ -215,10 +215,10 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                 {formatClientName(viewingClient.nom, viewingClient.prenom)}
               </h1>
               <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Badge 
-                  value={getStatusLabel(viewingClient.segment?.toUpperCase(), CLIENT_SEGMENT_LABELS)} 
-                  className={getStatusColor(viewingClient.segment?.toUpperCase(), CLIENT_SEGMENT_COLORS)}
-                  size="sm" 
+                <Badge
+                  value={getStatusLabel(viewingClient.segment, CLIENT_SEGMENT_LABELS)}
+                  className={getStatusColor(viewingClient.segment, CLIENT_SEGMENT_COLORS)}
+                  size="sm"
                 />
                 {(viewingClient.agence || viewingClient.agenceNom) && (
                   <>
@@ -529,12 +529,28 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       headerAlign: 'center',
                       align: 'center',
                       format: (_, item) => (
-                        <div className="flex justify-center">
-                          <Badge 
-                            value={getStatusLabel(item.segment?.toUpperCase(), CLIENT_SEGMENT_LABELS)} 
-                            className={getStatusColor(item.segment?.toUpperCase(), CLIENT_SEGMENT_COLORS)}
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Badge
+                            value={getStatusLabel(item.segment, CLIENT_SEGMENT_LABELS)}
+                            className={getStatusColor(item.segment, CLIENT_SEGMENT_COLORS)}
                             size="sm"
                           />
+                          {item.tags && item.tags.length > 0 && (
+                            <div className="flex items-center gap-0.5 flex-wrap justify-center">
+                              {item.tags.slice(0, 2).map((tag: any) => (
+                                <span
+                                  key={tag.id}
+                                  className="px-1.5 py-0 rounded text-[9px] font-medium leading-relaxed"
+                                  style={{ backgroundColor: `${tag.color}15`, color: tag.color }}
+                                >
+                                  {tag.name}
+                                </span>
+                              ))}
+                              {item.tags.length > 2 && (
+                                <span className="text-[9px] text-slate-500 font-medium">+{item.tags.length - 2}</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     },

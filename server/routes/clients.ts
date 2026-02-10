@@ -8,6 +8,7 @@ import {
   StatutCredit,
   StatutDemande,
   StatutClient,
+  SegmentClient,
   TypeCompte,
   MethodePaiement,
   getTypePaiementForCompte,
@@ -15,7 +16,7 @@ import {
 
 import { StorageService } from '../services/storage-service';
 import { storage } from "../storage";
-import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches, getClientStats, createClientApiSchema, updateClientApiSchema, type ClientFull } from "../storage/clients";
+import { getClientTags, addClientTag, removeClientTag, createTag, deleteTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches, getClientStats, createClientApiSchema, updateClientApiSchema, type ClientFull } from "../storage/clients";
 
 
 import { requireAuth, hashPassword } from "../auth";
@@ -1306,6 +1307,11 @@ export function registerClientRoutes(app: Express) {
       res.json(tag);
   });
 
+  app.delete("/api/tags/:id", requireAuth, async (req, res) => {
+      await deleteTag(req.params.id);
+      res.sendStatus(200);
+  });
+
   // Client Activities
   app.get("/api/clients/:id/activities", requireAuth, async (req, res) => {
       // TODO: Vérifier accès client
@@ -1596,7 +1602,7 @@ export function registerClientRoutes(app: Express) {
         ville: data.ville,
         pays: data.pays,
         profession: data.profession,
-        segment: data.segment || 'STANDARD',
+        segment: data.segment || SegmentClient.STANDARD,
         agenceId: data.agenceId || (req as any).selectedAgenceId,
         statut: 'ACTIVE' as const,
       };

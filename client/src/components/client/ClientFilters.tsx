@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Filter } from 'lucide-react';
 import { SearchInput } from '../ui';
-import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
+import { StatutClient, STATUT_CLIENT_LABELS, SegmentClient, SEGMENT_CLIENT_LABELS } from '@shared/enum/status-constants';
 
 export interface ClientFiltersState {
   searchTerm: string;
@@ -25,10 +25,10 @@ const STATUS_OPTIONS = [
 
 const SEGMENT_OPTIONS = [
   { value: 'all', label: 'Segment' },
-  { value: 'STANDARD', label: 'Standard' },
-  { value: 'PREMIUM', label: 'Premium' },
-  { value: 'VIP', label: 'VIP' },
-  { value: 'RISQUE', label: 'Risqué' },
+  { value: SegmentClient.STANDARD, label: SEGMENT_CLIENT_LABELS[SegmentClient.STANDARD] },
+  { value: SegmentClient.PREMIUM, label: SEGMENT_CLIENT_LABELS[SegmentClient.PREMIUM] },
+  { value: SegmentClient.VIP, label: SEGMENT_CLIENT_LABELS[SegmentClient.VIP] },
+  { value: SegmentClient.RISQUE, label: SEGMENT_CLIENT_LABELS[SegmentClient.RISQUE] },
 ];
 
 export default function ClientFilters({ onFilterChange, initialFilters, className = '' }: ClientFiltersProps) {

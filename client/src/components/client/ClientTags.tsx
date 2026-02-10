@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Plus, X, Hash, Search } from 'lucide-react';
+import { Tag, Plus, X, Hash, Search, Minus } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 interface TagType {
@@ -217,6 +217,34 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
             </div>
 
             <div className="p-4 space-y-4">
+              {/* Tags assignés au client */}
+              {validClientTags.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-medium">Tags assignés</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {validClientTags.map(ct => (
+                      <span
+                        key={ct.id}
+                        className="px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 border border-transparent"
+                        style={{ backgroundColor: `${ct.tag.color}15`, color: ct.tag.color, borderColor: `${ct.tag.color}30` }}
+                      >
+                        {ct.tag.name}
+                        {canDeleteTags && (
+                          <button
+                            onClick={() => handleRemoveTag(ct.tagId, ct.tag.name)}
+                            className="hover:bg-black/20 rounded-full p-0.5"
+                            title="Retirer du client"
+                          >
+                            <Minus size={12} />
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Créer un nouveau tag */}
               {canCreateTags && (
                 <div className="flex gap-2">
                   <input
@@ -242,6 +270,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
                 </div>
               )}
 
+              {/* Recherche et tags disponibles */}
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-3 text-slate-500" />
                 <input
