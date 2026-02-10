@@ -19,13 +19,14 @@ export interface PayslipData {
   bulletin: {
     id: number;
     mois: string;
-    salaireBase: string;
     salaireBrut: string;
     salaireNet: string;
-    cnssEmploye: string;
-    cnssPatronale: string;
-    ipr: string;
+    totalChargesSalariales: string;
+    totalChargesPatronales: string;
+    irpp: string;
     totalRetenues: string;
+    salaireBaseSnapshot: number;
+    version: number;
     statut: string;
     datePaiement: string | null;
     createdAt: string;
@@ -36,6 +37,7 @@ export interface PayslipData {
     matricule: string | null;
     numeroCnss: string | null;
     dateEmbauche: string | null;
+    dateSortie: string | null;
     typeContrat: string | null;
     categorie: string | null;
     coefficient: number | null;
@@ -44,6 +46,8 @@ export interface PayslipData {
     nom: string;
     prenom: string | null;
     jobTitle: string | null;
+    anciennete: string | null;
+    conventionCollective: string | null;
   } | null;
   company: {
     agenceName: string | null;
@@ -63,6 +67,11 @@ export interface PayslipData {
     acquired: number;
     used: number;
     balance: number;
+  } | null;
+  heuresTravaillees: {
+    joursTravailles: number;
+    heuresNormales: number;
+    heuresSupplementaires: number;
   } | null;
 }
 
@@ -128,27 +137,15 @@ interface PayslipTemplateProps {
 
 export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
   ({ data }, ref) => {
-    const { bulletin, lines, employe, company, agence, leaves } = data;
+    const { bulletin, lines, employe, company, agence, leaves, heuresTravaillees } = data;
     const companyName = company?.agenceName || 'COFIN&CO-M';
     const employeeName = employe ? `${employe.nom} ${employe.prenom || ''}`.trim() : 'N/A';
 
-    // Split lines: gains before 2000, retenues between 2000-5000, after 5000
-    const gainLines = lines.filter(l => l.category === 'GAIN' && parseInt(l.code) < 2000);
-    const subtotalBrut = lines.find(l => l.code === '2000');
-    const retenueLines = lines.filter(l =>
-      (l.category === 'RETENUE' || l.category === 'PATRONAL') && parseInt(l.code) > 2000 && parseInt(l.code) < 5000
-    );
-    const subtotalRetenues = lines.find(l => l.code === '5000');
-    const afterRetenueGains = lines.filter(l => l.category === 'GAIN' && parseInt(l.code) > 5000);
-    const netLine = lines.find(l => l.code === '9999');
-
-    const allTableLines = [
-      ...gainLines,
-      ...(subtotalBrut ? [subtotalBrut] : []),
-      ...retenueLines,
-      ...(subtotalRetenues ? [subtotalRetenues] : []),
-      ...afterRetenueGains,
-    ];
+    // Sort lines by sortOrder for proper section display (GAIN → SUBTOTAL brut → RETENUE → SUBTOTAL → PATRONAL → NET)
+    const allTableLines = [...lines]
+      .filter(l => l.category !== 'NET')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const netLine = lines.find(l => l.category === 'NET');
 
     // Fill empty rows to maintain consistent height
     const MIN_ROWS = 16;
@@ -210,17 +207,20 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
             {/* Identité contrat */}
             <div className="border border-slate-700 rounded-sm overflow-hidden text-[9px]">
               <div className="grid grid-cols-[auto_1fr]">
-                {[
+                {([
                   ['Matricule', employe?.matricule || 'N/A'],
                   ['Emploi', employe?.jobTitle || 'N/A'],
                   ['Contrat', employe?.typeContrat || 'CDI'],
                   ['Catégorie', [employe?.categorie, employe?.coefficient ? `Coeff ${employe.coefficient}` : null].filter(Boolean).join(' - ') || 'N/A'],
-                ].map(([label, value], i) => (
+                  employe?.conventionCollective ? ['Convention', employe.conventionCollective] : null,
+                  employe?.anciennete ? ['Ancienneté', employe.anciennete] : null,
+                  employe?.dateSortie ? ['Sortie', new Date(employe.dateSortie).toLocaleDateString('fr-FR')] : null,
+                ] as ([string, string] | null)[]).filter((row): row is [string, string] => row !== null).map(([label, value], i) => (
                   <React.Fragment key={i}>
                     <div className={`bg-blue-50 px-1.5 py-0.5 font-bold border-r border-slate-700 ${i > 0 ? 'border-t border-slate-300' : ''}`}>
                       {label}
                     </div>
-                    <div className={`px-1.5 py-0.5 ${i > 0 ? 'border-t border-slate-300' : ''}`}>
+                    <div className={`px-1.5 py-0.5 ${i > 0 ? 'border-t border-slate-300' : ''} ${label === 'Sortie' ? 'text-red-600 font-bold' : ''}`}>
                       {value}
                     </div>
                   </React.Fragment>
@@ -228,7 +228,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
               </div>
             </div>
 
-            {/* Adresse employé */}
+            {/* Identité employé */}
             <div className="border border-slate-700 rounded-sm p-2 bg-slate-50 flex-1">
               <div className="font-bold text-xs uppercase">{employeeName}</div>
               {employe?.numeroCnss && (
@@ -262,12 +262,12 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
             <tr className="bg-blue-100 text-slate-900">
               <th className="border border-slate-700 px-1 py-0.5 w-10 text-center">Code</th>
               <th className="border border-slate-700 px-1 py-0.5 text-left">Libellé</th>
-              <th className="border border-slate-700 px-1 py-0.5 w-16 text-right">Base</th>
+              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Base<br/><span className="font-normal text-slate-500">(FCFA)</span></div></th>
               <th className="border border-slate-700 px-1 py-0.5 w-12 text-center">Taux</th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right">Gains</th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right">Retenues</th>
+              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Gains<br/><span className="font-normal text-slate-500">(FCFA)</span></div></th>
+              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Retenues<br/><span className="font-normal text-slate-500">(FCFA)</span></div></th>
               <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right bg-slate-200">
-                <div className="text-[8px] leading-tight text-center">Cotis. Patronales</div>
+                <div className="text-[8px] leading-tight text-center">Cotis. Pat.<br/><span className="font-normal text-slate-500">(FCFA)</span></div>
               </th>
             </tr>
           </thead>
@@ -327,10 +327,24 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
           </tbody>
         </table>
 
-        {/* ── PIED : CONGÉS + TOTAUX + NET ────────────────── */}
+        {/* ── PIED : ACTIVITÉ + CONGÉS + TOTAUX + NET ──── */}
         <div className="flex gap-3 items-stretch mb-4">
-          {/* Congés */}
+          {/* Activité + Congés + Récap */}
           <div className="flex-1 flex flex-col gap-2">
+            {/* Heures travaillées */}
+            {heuresTravaillees && (
+              <div className="border border-slate-700 rounded-sm p-2 text-[9px]">
+                <div className="font-bold border-b border-slate-300 mb-1 pb-0.5">Activité du mois</div>
+                <div className="flex justify-between">
+                  <span>Jours: <b>{heuresTravaillees.joursTravailles}</b></span>
+                  <span>Heures: <b>{Math.floor(heuresTravaillees.heuresNormales / 60)}h{String(heuresTravaillees.heuresNormales % 60).padStart(2, '0')}</b></span>
+                  {heuresTravaillees.heuresSupplementaires > 0 && (
+                    <span>H. Sup: <b className="text-amber-600">{Math.floor(heuresTravaillees.heuresSupplementaires / 60)}h{String(heuresTravaillees.heuresSupplementaires % 60).padStart(2, '0')}</b></span>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Congés */}
             {leaves && (
               <div className="border border-slate-700 rounded-sm p-2 text-[9px]">
                 <div className="font-bold border-b border-slate-300 mb-1 pb-0.5">Compteur Congés</div>
@@ -346,15 +360,15 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
               <div className="space-y-0.5">
                 <div className="flex justify-between">
                   <span>Brut S.S.</span>
-                  <span className="font-mono">{fmt(bulletin.salaireBrut)}</span>
+                  <span className="font-mono">{fmt(bulletin.salaireBrut)} FCFA</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Retenues</span>
-                  <span className="font-mono text-red-600">{fmt(bulletin.totalRetenues)}</span>
+                  <span className="font-mono text-red-600">{fmt(bulletin.totalRetenues)} FCFA</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Cotis. Patronales</span>
-                  <span className="font-mono text-slate-500">{fmt(bulletin.cnssPatronale)}</span>
+                  <span className="font-mono text-slate-500">{fmt(bulletin.totalChargesPatronales)} FCFA</span>
                 </div>
               </div>
             </div>

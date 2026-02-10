@@ -27,6 +27,14 @@ export interface SmsProvider {
   ): Promise<{ status: string; rawResponse: unknown }>;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+  /** Content-ID for inline images (e.g. "company-logo" → <img src="cid:company-logo">) */
+  cid?: string;
+}
+
 export interface EmailProvider {
   readonly name: string;
   send(
@@ -38,6 +46,7 @@ export interface EmailProvider {
       fromEmail?: string;
       fromName?: string;
       replyTo?: string;
+      attachments?: EmailAttachment[];
     }
   ): Promise<SendResult>;
 }

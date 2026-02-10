@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { createLogger } from "../lib/logger";
 import { db } from "../db";
 
@@ -38,6 +38,11 @@ import {
   jobPositions,
   avantages,
   payslipLines,
+  payrollRuns,
+  PayrollRunStatus,
+  payrollRunIssues,
+  conventionsCollectives,
+  qualificationCoefficients,
 } from "@shared/schema";
 import { systemSettings } from "@shared/schema/settings";
 import { agences } from "@shared/schema/agences";
@@ -52,11 +57,14 @@ import { hrService } from "../services/hr-service";
 import { hiringApprovalService } from "../services/hiring-approval-service";
 import { sanctionEscalationService } from "../services/sanction-escalation-service";
 import { onboardingService } from "../services/onboarding-service";
-import { postPayrollEngagement, postPayrollPayment, postAdvancePayment, postAdvanceDeduction } from "../services/hr-accounting-service";
+import { postRunEngagement, postRunPayment, reverseRunGL, postAdvancePaymentGL } from "../services/hr-accounting-service";
+import { generatePayrollRun } from "../services/payroll-engine";
+import { generatePayslipPdf, type PayslipPdfData } from "../services/payslip-pdf-service";
 import { users } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { z } from "zod";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { enqueueNotification } from "../services/notifications/notification-service";
 import multer from "multer";
 import { importEmployees, parseCsv } from "../services/hr-import-service";
 import { StorageService } from "../services/storage-service";
@@ -93,7 +101,7 @@ export const hrRouter = Router();
 // HELPER: Standardized HR WebSocket broadcast
 // ============================================
 interface HrEventPayload {
-  entity: 'employe' | 'conge' | 'presence' | 'paie' | 'bulletin' | 'formation' | 'sanction' | 'avantage' | 'candidature' | 'organigramme';
+  entity: 'employe' | 'conge' | 'presence' | 'paie' | 'bulletin' | 'formation' | 'sanction' | 'avantage' | 'candidature' | 'organigramme' | 'payroll_run';
   action: 'created' | 'updated' | 'approved' | 'rejected' | 'paid' | 'deleted' | 'assigned' | 'generated' | 'validated';
   id: string | number;
   agenceId?: string;
@@ -154,6 +162,237 @@ const roleIn = (role: string | null | undefined, allowed: string[]): boolean => 
     .filter((value): value is string => !!value);
   return allowedTokens.includes(roleToken);
 };
+
+// ============================================
+// HELPER: Calculate ancienneté (seniority) from dateEmbauche
+// ============================================
+
+function computeAnciennete(dateEmbauche: string | null, refDate?: string): string | null {
+  if (!dateEmbauche) return null;
+  const start = new Date(dateEmbauche);
+  const end = refDate ? new Date(refDate) : new Date();
+  if (isNaN(start.getTime())) return null;
+
+  let years = end.getFullYear() - start.getFullYear();
+  let months = end.getMonth() - start.getMonth();
+  if (months < 0) { years--; months += 12; }
+
+  if (years > 0 && months > 0) return `${years} an${years > 1 ? 's' : ''} ${months} mois`;
+  if (years > 0) return `${years} an${years > 1 ? 's' : ''}`;
+  if (months > 0) return `${months} mois`;
+  return 'Moins d\'1 mois';
+}
+
+// ============================================
+// HELPER: Generate payslip PDFs + send emails after validation
+// ============================================
+
+type BulletinRow = typeof bulletinsPaie.$inferSelect;
+
+async function generatePdfsAndSendEmails(
+  runId: number | string,
+  bulletins: BulletinRow[],
+  agenceId?: string
+): Promise<void> {
+  if (bulletins.length === 0) return;
+
+  // 1. Fetch shared data (company settings, agence)
+  const [settings] = await db.select().from(systemSettings);
+  const company = settings ? {
+    agenceName: settings.agenceName,
+    adresse: settings.adresse,
+    telephone: settings.telephone,
+    niu: settings.niu || null,
+    rccm: settings.rccm || null,
+  } : null;
+
+  // 2. Fetch all employee + user data for this batch
+  const employeIds = bulletins.map(b => b.employeId);
+  const employeRows = await db
+    .select({ employe: employes, user: users })
+    .from(employes)
+    .innerJoin(users, eq(employes.userId, users.id))
+    .where(sql`${employes.id} IN ${employeIds}`);
+  type EmpRow = (typeof employeRows)[number];
+  const employeMap = new Map<string, EmpRow>(employeRows.map((r: EmpRow) => [r.employe.id, r]));
+
+  // 3. Fetch all payslip lines for all bulletins in one query
+  const bulletinIds = bulletins.map(b => b.id);
+  const allLines = await db
+    .select()
+    .from(payslipLines)
+    .where(sql`${payslipLines.bulletinId} IN ${bulletinIds}`)
+    .orderBy(payslipLines.sortOrder);
+  const linesByBulletin = new Map<number, (typeof allLines[number])[]>();
+  for (const line of allLines) {
+    const arr = linesByBulletin.get(line.bulletinId) || [];
+    arr.push(line);
+    linesByBulletin.set(line.bulletinId, arr);
+  }
+
+  const formatCurrency = (val: string | number) => {
+    const num = typeof val === 'string' ? parseInt(val, 10) : val;
+    return new Intl.NumberFormat('fr-FR').format(num || 0);
+  };
+
+  // 4. Process each bulletin: generate PDF → store → enqueue email
+  for (const bulletin of bulletins) {
+    try {
+      const empData = employeMap.get(bulletin.employeId);
+      if (!empData?.user?.email) continue;
+
+      const bulletinLines = linesByBulletin.get(bulletin.id) || [];
+
+      // Fetch agence for this employee
+      let agenceInfo = null;
+      if (empData.employe.agenceId) {
+        const [ag] = await db.select().from(agences).where(eq(agences.id, empData.employe.agenceId));
+        agenceInfo = ag ? { nom: ag.nom, adresse: ag.adresse, telephone: ag.telephone } : null;
+      }
+
+      // Fetch job title
+      let jobTitle = null;
+      if (empData.employe.jobPositionId) {
+        const [jp] = await db.select().from(jobPositions).where(eq(jobPositions.id, empData.employe.jobPositionId));
+        jobTitle = jp?.name || null;
+      }
+
+      // Fetch leave balance
+      let leaves = null;
+      const year = parseInt(bulletin.mois.split('-')[0]);
+      const [lb] = await db.select().from(leaveBalances).where(
+        and(eq(leaveBalances.employeId, empData.employe.id), eq(leaveBalances.year, year))
+      );
+      if (lb) {
+        leaves = { acquired: lb.acquired || 0, used: lb.used || 0, balance: (lb.acquired || 0) - (lb.used || 0) };
+      }
+
+      // Convention collective (via categorie + coefficient)
+      let ccLabel: string | null = null;
+      if (empData.employe.categorie && empData.employe.coefficient) {
+        const [qc] = await db.select().from(qualificationCoefficients)
+          .where(and(
+            eq(qualificationCoefficients.categorie, empData.employe.categorie),
+            eq(qualificationCoefficients.coefficient, empData.employe.coefficient)
+          ))
+          .limit(1);
+        if (qc?.conventionCollectiveId) {
+          const [cc] = await db.select().from(conventionsCollectives)
+            .where(eq(conventionsCollectives.id, qc.conventionCollectiveId));
+          ccLabel = cc?.libelle || null;
+        }
+      }
+
+      // Ancienneté
+      const anciennete = computeAnciennete(empData.employe.dateEmbauche, bulletin.mois + '-01');
+
+      // Heures travaillées du mois
+      let htData = null;
+      const [yStr, mStr] = bulletin.mois.split('-');
+      const mStart = `${yStr}-${mStr}-01`;
+      const lastD = new Date(Number(yStr), Number(mStr), 0).getDate();
+      const mEnd = `${yStr}-${mStr}-${String(lastD).padStart(2, '0')}`;
+      const pRows = await db.select().from(presences).where(
+        and(eq(presences.employeId, empData.employe.id), gte(presences.date, mStart), lte(presences.date, mEnd))
+      );
+      if (pRows.length > 0) {
+        htData = {
+          joursTravailles: pRows.filter(p => p.statut === 'Présent' || p.statut === 'Mission').length,
+          heuresNormales: pRows.reduce((s, p) => s + (p.heuresTravaillees || 0), 0),
+          heuresSupplementaires: pRows.reduce((s, p) => s + (p.heuresSupplementaires || 0), 0),
+        };
+      }
+
+      // Build PDF data
+      const pdfData: PayslipPdfData = {
+        bulletin: {
+          id: bulletin.id,
+          mois: bulletin.mois,
+          salaireBrut: bulletin.salaireBrut,
+          salaireNet: bulletin.salaireNet,
+          totalChargesSalariales: bulletin.totalChargesSalariales,
+          totalChargesPatronales: bulletin.totalChargesPatronales,
+          irpp: bulletin.irpp,
+          totalRetenues: bulletin.totalRetenues,
+          salaireBaseSnapshot: bulletin.salaireBaseSnapshot,
+          version: bulletin.version,
+          statut: bulletin.statut || 'VALIDATED',
+          datePaiement: bulletin.datePaiement,
+          createdAt: bulletin.createdAt?.toISOString() || new Date().toISOString(),
+        },
+        lines: bulletinLines.map(l => ({
+          code: l.code,
+          libelle: l.libelle,
+          category: l.category,
+          base: l.base,
+          taux: l.taux,
+          montantGain: l.montantGain || 0,
+          montantRetenue: l.montantRetenue || 0,
+          montantPatronal: l.montantPatronal || 0,
+          sortOrder: l.sortOrder,
+        })),
+        employe: {
+          matricule: empData.employe.matricule,
+          nom: empData.user.nom || '',
+          prenom: empData.user.prenom || null,
+          typeContrat: empData.employe.typeContrat,
+          dateEmbauche: empData.employe.dateEmbauche,
+          dateSortie: empData.employe.dateSortie || null,
+          numeroCnss: empData.employe.numeroCnss,
+          categorie: empData.employe.categorie || null,
+          coefficient: empData.employe.coefficient || null,
+          paymentMethod: empData.employe.paymentMethod || 'CASH',
+          jobTitle,
+          anciennete,
+          conventionCollective: ccLabel,
+        },
+        company,
+        agence: agenceInfo,
+        leaves,
+        heuresTravaillees: htData,
+      };
+
+      // Generate PDF
+      const pdfBuffer = await generatePayslipPdf(pdfData);
+
+      // Store in MinIO (private bucket)
+      const pdfFilename = `bulletin_${empData.employe.matricule || empData.employe.id}_${bulletin.mois}_v${bulletin.version}.pdf`;
+      const storageKey = await StorageService.uploadBuffer(
+        pdfBuffer, pdfFilename, 'application/pdf', `payslips/${bulletin.mois}`
+      );
+
+      // Update bulletin with PDF storage key
+      await db.update(bulletinsPaie)
+        .set({ pdfUrl: storageKey })
+        .where(eq(bulletinsPaie.id, bulletin.id));
+
+      // Enqueue email with PDF attachment reference
+      const employeeName = `${empData.user.prenom || ''} ${empData.user.nom || ''}`.trim();
+      await enqueueNotification({
+        channel: 'EMAIL',
+        templateCode: 'BULLETIN_PAIE',
+        recipient: empData.user.email,
+        payload: {
+          employeeName,
+          period: bulletin.mois,
+          salaireNet: formatCurrency(bulletin.salaireNet),
+          _attachments: [{
+            storageKey,
+            filename: pdfFilename,
+            contentType: 'application/pdf',
+          }],
+        },
+        userId: empData.employe.id,
+        agenceId: agenceId,
+        correlationId: `payslip-${runId}-${bulletin.id}`,
+      });
+
+      logger.info({ bulletinId: bulletin.id, email: empData.user.email }, 'Payslip PDF generated and email enqueued');
+    } catch (err: any) {
+      logger.warn({ err, bulletinId: bulletin.id }, 'Failed to generate/send payslip for employee');
+    }
+  }
+}
 
 /**
  * ========================================
@@ -2242,7 +2481,53 @@ hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
     let jobTitle = null;
     if (employeData?.employe.jobPositionId) {
       const [jp] = await db.select().from(jobPositions).where(eq(jobPositions.id, employeData.employe.jobPositionId));
-      jobTitle = jp?.titre || null;
+      jobTitle = jp?.name || null;
+    }
+
+    // Fetch convention collective via employee's categorie + coefficient
+    let conventionCollective: string | null = null;
+    if (employeData?.employe.categorie && employeData?.employe.coefficient) {
+      const [qc] = await db.select().from(qualificationCoefficients)
+        .where(
+          and(
+            eq(qualificationCoefficients.categorie, employeData.employe.categorie),
+            eq(qualificationCoefficients.coefficient, employeData.employe.coefficient)
+          )
+        )
+        .limit(1);
+      if (qc?.conventionCollectiveId) {
+        const [cc] = await db.select().from(conventionsCollectives)
+          .where(eq(conventionsCollectives.id, qc.conventionCollectiveId));
+        conventionCollective = cc?.libelle || null;
+      }
+    }
+
+    // Compute ancienneté
+    const anciennete = computeAnciennete(employeData?.employe.dateEmbauche || null, bulletin.mois + '-01');
+
+    // Fetch heures travaillées for the month
+    let heuresTravaillees = null;
+    if (employeData) {
+      const [yearStr, monthStr] = bulletin.mois.split('-');
+      const monthStart = `${yearStr}-${monthStr}-01`;
+      const lastDay = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+      const monthEnd = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+
+      const presenceRows = await db.select().from(presences).where(
+        and(
+          eq(presences.employeId, employeData.employe.id),
+          gte(presences.date, monthStart),
+          lte(presences.date, monthEnd)
+        )
+      );
+
+      const joursTravailles = presenceRows.filter(p => p.statut === 'Présent' || p.statut === 'Mission').length;
+      const heuresNormales = presenceRows.reduce((sum, p) => sum + (p.heuresTravaillees || 0), 0);
+      const heuresSupplementaires = presenceRows.reduce((sum, p) => sum + (p.heuresSupplementaires || 0), 0);
+
+      if (presenceRows.length > 0) {
+        heuresTravaillees = { joursTravailles, heuresNormales, heuresSupplementaires };
+      }
     }
 
     res.json({
@@ -2253,23 +2538,26 @@ hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
         matricule: employeData.employe.matricule,
         numeroCnss: employeData.employe.numeroCnss,
         dateEmbauche: employeData.employe.dateEmbauche,
+        dateSortie: employeData.employe.dateSortie || null,
         typeContrat: employeData.employe.typeContrat,
-        categorie: (employeData.employe as any).categorie || null,
-        coefficient: (employeData.employe as any).coefficient || null,
-        paymentMethod: (employeData.employe as any).paymentMethod || 'CASH',
-        paymentDetails: (employeData.employe as any).paymentDetails || null,
+        categorie: employeData.employe.categorie || null,
+        coefficient: employeData.employe.coefficient || null,
+        paymentMethod: employeData.employe.paymentMethod || 'CASH',
+        paymentDetails: employeData.employe.paymentDetails || null,
         nom: employeData.user.nom,
         prenom: employeData.user.prenom,
         jobTitle,
+        anciennete,
+        conventionCollective,
       } : null,
       company: settings ? {
         agenceName: settings.agenceName,
         adresse: settings.adresse,
         telephone: settings.telephone,
-        niu: (settings as any).niu || null,
-        cnssMembership: (settings as any).cnssMembership || null,
-        rccm: (settings as any).rccm || null,
-        logoUrl: (settings as any).logoUrl || null,
+        niu: settings.niu || null,
+        cnssMembership: settings.cnssMembership || null,
+        rccm: settings.rccm || null,
+        logoUrl: settings.logoUrl || null,
       } : null,
       agence: agence ? {
         nom: agence.nom,
@@ -2277,6 +2565,7 @@ hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
         telephone: agence.telephone,
       } : null,
       leaves,
+      heuresTravaillees,
     });
   } catch (error) {
     logger.error({ err: error }, 'Erreur récupération bulletin détaillé');
@@ -2284,26 +2573,23 @@ hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
   }
 });
 
-// POST /api/hr/paie/generate - Générer les fiches de paie pour un mois
+// POST /api/hr/paie/generate - Générer un run de paie pour un mois
 hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actions.GENERATE, Subjects.PAIE), async (req, res) => {
     try {
         const { mois } = req.body;
         const userId = req.user?.id;
         const agenceId = req.user?.agenceId;
 
-        // Validate input
         const validation = generatePayrollSchema.safeParse({ mois });
         if (!validation.success) {
           return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Format de mois invalide (YYYY-MM attendu)'));
         }
 
-        // Use the new HR service for payroll generation
-        const results = await hrService.generateMonthlyPayroll(mois, userId!, agenceId || undefined);
+        const result = await generatePayrollRun(mois, userId!, agenceId || undefined);
 
-        // Audit log
         await hrService.logAction(
-          'paie',
-          mois,
+          'payroll_run',
+          String(result.run.id),
           'generated',
           {
             userId: req.user?.id,
@@ -2312,28 +2598,29 @@ hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actio
             agenceId: req.user?.agenceId ?? undefined,
           },
           null,
-          { generated: results.generated, skipped: results.skipped },
+          { generated: result.generated, skipped: result.skipped, issues: result.issues, runId: result.run.id, version: result.run.version },
           undefined,
           'info'
         );
 
-        // Broadcast HR Update
         broadcastHrUpdate(
           {
-            entity: 'paie',
+            entity: 'payroll_run',
             action: 'generated',
-            id: mois,
+            id: String(result.run.id),
             agenceId: agenceId ?? undefined,
-            extra: { month: mois, count: results.generated, skipped: results.skipped },
+            extra: { month: mois, count: result.generated, skipped: result.skipped, version: result.run.version },
           },
           req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
         );
 
         res.status(201).json(successResponse({
-          message: `${results.generated} fiches de paie générées (${results.skipped} déjà existantes)`,
-          generated: results.generated,
-          skipped: results.skipped,
-          bulletins: results.bulletins,
+          message: `${result.generated} fiches de paie générées (${result.skipped} ignorées, ${result.issues} alertes)`,
+          run: result.run,
+          generated: result.generated,
+          skipped: result.skipped,
+          issues: result.issues,
+          bulletins: result.bulletins,
         }));
     } catch (error) {
         logger.error({ err: error }, 'Erreur génération paie');
@@ -2345,7 +2632,20 @@ hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actio
 hrRouter.get("/paie/config", getAuthUser, async (req, res) => {
   try {
     const agenceId = req.user?.agenceId;
-    const config = await hrService.getPayrollConfig(agenceId || undefined);
+    // Try agency-specific config first, then global
+    let config = null;
+    if (agenceId) {
+      const [agencyConfig] = await db.select().from(payrollConfig)
+        .where(and(eq(payrollConfig.agenceId, agenceId), eq(payrollConfig.isActive, true)))
+        .orderBy(desc(payrollConfig.effectiveFrom)).limit(1);
+      config = agencyConfig || null;
+    }
+    if (!config) {
+      const [globalConfig] = await db.select().from(payrollConfig)
+        .where(and(sql`${payrollConfig.agenceId} IS NULL`, eq(payrollConfig.isActive, true)))
+        .orderBy(desc(payrollConfig.effectiveFrom)).limit(1);
+      config = globalConfig || null;
+    }
 
     if (!config) {
       return res.status(404).json(errorResponse('NOT_FOUND', 'Configuration paie non trouvée'));
@@ -2451,50 +2751,60 @@ hrRouter.put("/paie/config", getAuthUser, attachAbility, requireAbility(Actions.
   }
 });
 
-// PATCH /api/hr/paie/validate - Valider des bulletins
+// PATCH /api/hr/paie/validate - Valider un run de paie (DRAFT → VALIDATED + GL engagement)
 hrRouter.patch("/paie/validate", getAuthUser, attachAbility, requireAbility(Actions.APPROVE, Subjects.PAIE), async (req, res) => {
   try {
-    const { bulletinIds } = req.body;
+    const { runId } = req.body;
 
-    if (!bulletinIds || !Array.isArray(bulletinIds) || bulletinIds.length === 0) {
-      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Liste de bulletins requise'));
+    if (!runId) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId requis'));
     }
 
-    // Update bulletins to VALIDATED + GL posting (within transaction)
     const agenceId = req.user?.agenceId;
     const userId = req.user?.id || "system";
 
-    const updated = await db.transaction(async (tx) => {
-      const rows = await tx
-        .update(bulletinsPaie)
-        .set({ statut: BulletinStatus.VALIDATED })
-        .where(
-          and(
-            sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
-            eq(bulletinsPaie.statut, BulletinStatus.DRAFT)
-          )
+    // Get the run
+    const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
+    if (!run) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Run non trouvé'));
+    }
+    if (run.status !== PayrollRunStatus.DRAFT) {
+      return res.status(400).json(errorResponse('INVALID_STATUS', `Le run est en statut ${run.status}, seul DRAFT peut être validé`));
+    }
+
+    // Update run status
+    await db.update(payrollRuns).set({
+      status: PayrollRunStatus.VALIDATED,
+      validatedBy: userId,
+      validatedAt: new Date(),
+    }).where(eq(payrollRuns.id, runId));
+
+    // Update all bulletins to VALIDATED
+    const updated = await db
+      .update(bulletinsPaie)
+      .set({ statut: BulletinStatus.VALIDATED })
+      .where(
+        and(
+          eq(bulletinsPaie.payrollRunId, runId),
+          eq(bulletinsPaie.statut, BulletinStatus.DRAFT),
+          eq(bulletinsPaie.cancelled, false)
         )
-        .returning();
+      )
+      .returning();
 
-      // Post GL engagement for each validated bulletin
-      if (agenceId) {
-        for (const bulletin of rows) {
-          try {
-            await postPayrollEngagement(tx, bulletin, agenceId, userId);
-          } catch (glError) {
-            logger.error({ err: glError, bulletinId: bulletin.id }, 'GL engagement failed for bulletin');
-            // Don't block validation — GL status tracked on mouvement
-          }
-        }
+    // Post ventilated GL entries
+    let glResult = null;
+    if (agenceId) {
+      const freshRun = (await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)))[0];
+      glResult = await postRunEngagement(freshRun, agenceId, userId);
+      if (glResult.errors.length > 0) {
+        logger.warn({ runId, errors: glResult.errors }, 'GL engagement posted with warnings');
       }
+    }
 
-      return rows;
-    });
-
-    // Audit log
     await hrService.logAction(
-      'paie',
-      bulletinIds.join(','),
+      'payroll_run',
+      String(runId),
       'validated',
       {
         userId: req.user?.id,
@@ -2502,79 +2812,95 @@ hrRouter.patch("/paie/validate", getAuthUser, attachAbility, requireAbility(Acti
         userRole: req.user?.role,
         agenceId: req.user?.agenceId ?? undefined,
       },
-      { statut: BulletinStatus.DRAFT },
-      { statut: BulletinStatus.VALIDATED, count: updated.length }
+      { statut: PayrollRunStatus.DRAFT },
+      { statut: PayrollRunStatus.VALIDATED, bulletinsValidated: updated.length }
     );
 
-    // Broadcast
     broadcastHrUpdate(
       {
-        entity: 'bulletin',
+        entity: 'payroll_run',
         action: 'validated',
-        id: bulletinIds.join(','),
+        id: String(runId),
         extra: { count: updated.length },
       },
       req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
     );
 
-    res.json(successResponse({ validated: updated.length, bulletins: updated }));
+    // Générer les PDFs et envoyer par email (fire-and-forget, non-bloquant)
+    if (updated.length > 0) {
+      generatePdfsAndSendEmails(runId, updated, agenceId || undefined).catch(err => {
+        logger.warn({ err, runId }, 'Erreur génération PDF / envoi email bulletins');
+      });
+    }
+
+    res.json(successResponse({
+      validated: updated.length,
+      bulletins: updated,
+      glErrors: glResult?.errors || [],
+    }));
   } catch (error) {
     logger.error({ err: error }, 'Erreur validation paie');
     res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
 
-// PATCH /api/hr/paie/pay - Marquer des bulletins comme payés
+// PATCH /api/hr/paie/pay - Payer un run de paie (VALIDATED → PAID + GL paiement)
 hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
   try {
-    const { bulletinIds, datePaiement } = req.body;
+    const { runId, datePaiement } = req.body;
 
-    if (!bulletinIds || !Array.isArray(bulletinIds) || bulletinIds.length === 0) {
-      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Liste de bulletins requise'));
+    if (!runId) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId requis'));
     }
 
     const paymentDate = datePaiement ? new Date(datePaiement) : new Date();
     const agenceId = req.user?.agenceId;
     const userId = req.user?.id || "system";
 
-    // Update bulletins to PAID + GL posting (within transaction)
-    const updated = await db.transaction(async (tx) => {
-      const rows = await tx
-        .update(bulletinsPaie)
-        .set({
-          statut: BulletinStatus.PAID,
-          datePaiement: paymentDate.toISOString().split('T')[0],
-        })
-        .where(
-          and(
-            sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
-            eq(bulletinsPaie.statut, BulletinStatus.VALIDATED)
-          )
+    const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
+    if (!run) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Run non trouvé'));
+    }
+    if (run.status !== PayrollRunStatus.VALIDATED) {
+      return res.status(400).json(errorResponse('INVALID_STATUS', `Le run est en statut ${run.status}, seul VALIDATED peut être payé`));
+    }
+
+    // Update run status
+    await db.update(payrollRuns).set({
+      status: PayrollRunStatus.PAID,
+      paidBy: userId,
+      paidAt: new Date(),
+    }).where(eq(payrollRuns.id, runId));
+
+    // Update all bulletins to PAID
+    const updated = await db
+      .update(bulletinsPaie)
+      .set({
+        statut: BulletinStatus.PAID,
+        datePaiement: paymentDate.toISOString().split('T')[0],
+      })
+      .where(
+        and(
+          eq(bulletinsPaie.payrollRunId, runId),
+          eq(bulletinsPaie.statut, BulletinStatus.VALIDATED),
+          eq(bulletinsPaie.cancelled, false)
         )
-        .returning();
+      )
+      .returning();
 
-      // Post GL payment for each paid bulletin
-      if (agenceId) {
-        for (const bulletin of rows) {
-          try {
-            await postPayrollPayment(tx, bulletin, agenceId, userId);
-          } catch (glError) {
-            logger.error({ err: glError, bulletinId: bulletin.id }, 'GL payment failed for bulletin');
-            // Don't block payment — GL status tracked on mouvement
-          }
-        }
-      }
+    const totalPaid = updated.reduce((sum, b) => sum + Number(b.salaireNet), 0);
 
-      return rows;
-    });
+    // Post GL payment
+    let glError: string | null = null;
+    if (agenceId) {
+      const freshRun = (await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)))[0];
+      const payResult = await postRunPayment(freshRun, agenceId, userId);
+      glError = payResult.error;
+    }
 
-    // Calculate total paid
-    const totalPaid = updated.reduce((sum, b) => sum + parseInt(b.salaireNet || '0'), 0);
-
-    // Audit log
     await hrService.logAction(
-      'paie',
-      bulletinIds.join(','),
+      'payroll_run',
+      String(runId),
       'paid',
       {
         userId: req.user?.id,
@@ -2582,26 +2908,149 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
         userRole: req.user?.role,
         agenceId: req.user?.agenceId ?? undefined,
       },
-      { statut: BulletinStatus.VALIDATED },
-      { statut: BulletinStatus.PAID, count: updated.length, totalPaid, datePaiement: paymentDate },
+      { statut: PayrollRunStatus.VALIDATED },
+      { statut: PayrollRunStatus.PAID, count: updated.length, totalPaid, datePaiement: paymentDate },
       undefined,
       'critical'
     );
 
-    // Broadcast
     broadcastHrUpdate(
       {
-        entity: 'paie',
+        entity: 'payroll_run',
         action: 'paid',
-        id: bulletinIds.join(','),
+        id: String(runId),
         extra: { count: updated.length, total: totalPaid },
       },
       req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
     );
 
-    res.json(successResponse({ paid: updated.length, totalPaid, bulletins: updated }));
+    res.json(successResponse({ paid: updated.length, totalPaid, bulletins: updated, glError }));
   } catch (error) {
     logger.error({ err: error }, 'Erreur paiement paie');
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// GET /api/hr/paie/runs - Lister les runs de paie
+hrRouter.get("/paie/runs", getAuthUser, async (req: Request, res: Response) => {
+  try {
+    const agenceId = req.user?.agenceId;
+    const { period } = req.query;
+
+    let conditions = agenceId
+      ? eq(payrollRuns.agenceId, agenceId)
+      : sql`1=1`;
+
+    if (period && typeof period === 'string') {
+      conditions = and(conditions, eq(payrollRuns.period, period))!;
+    }
+
+    const runs = await db
+      .select()
+      .from(payrollRuns)
+      .where(conditions)
+      .orderBy(desc(payrollRuns.createdAt));
+
+    res.json(successResponse(runs));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur récupération runs paie');
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// GET /api/hr/paie/runs/:id - Détail d'un run avec bulletins
+hrRouter.get("/paie/runs/:id", getAuthUser, async (req: Request, res: Response) => {
+  try {
+    const runId = parseInt(req.params.id);
+    const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
+    if (!run) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Run non trouvé'));
+    }
+
+    const bulletins = await db
+      .select()
+      .from(bulletinsPaie)
+      .where(eq(bulletinsPaie.payrollRunId, runId));
+
+    const issues = await db
+      .select()
+      .from(payrollRunIssues)
+      .where(eq(payrollRunIssues.payrollRunId, runId));
+
+    res.json(successResponse({ run, bulletins, issues }));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur détail run paie');
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// POST /api/hr/paie/rerun - Re-run: contrepasser + recalculer
+hrRouter.post("/paie/rerun", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req: Request, res: Response) => {
+  try {
+    const { runId, reason } = req.body;
+    const userId = req.user?.id!;
+    const agenceId = req.user?.agenceId;
+
+    if (!runId || !reason) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId et reason requis'));
+    }
+
+    const [oldRun] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
+    if (!oldRun) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Run non trouvé'));
+    }
+
+    if (oldRun.status === PayrollRunStatus.CLOSED) {
+      return res.status(400).json(errorResponse('INVALID_STATUS', 'Impossible de re-run un run clôturé'));
+    }
+
+    // 1. Reverse GL entries if the run was validated or paid
+    if (agenceId && (oldRun.status === PayrollRunStatus.VALIDATED || oldRun.status === PayrollRunStatus.PAID)) {
+      await reverseRunGL(oldRun, reason, agenceId, userId);
+    }
+
+    // 2. Cancel old run and its bulletins
+    await db.update(payrollRuns).set({
+      status: PayrollRunStatus.CANCELLED,
+      cancelledAt: new Date(),
+      cancelledReason: reason,
+    }).where(eq(payrollRuns.id, runId));
+
+    await db.update(bulletinsPaie).set({
+      cancelled: true,
+      cancelledAt: new Date(),
+      cancelledReason: `Re-run: ${reason}`,
+    }).where(eq(bulletinsPaie.payrollRunId, runId));
+
+    // 3. Generate new run
+    const newResult = await generatePayrollRun(oldRun.period, userId, agenceId || undefined);
+
+    await hrService.logAction(
+      'payroll_run',
+      String(runId),
+      'rerun',
+      {
+        userId: req.user?.id,
+        userName: req.user?.nom,
+        userRole: req.user?.role,
+        agenceId: req.user?.agenceId ?? undefined,
+      },
+      { oldRunId: runId, oldVersion: oldRun.version, status: oldRun.status },
+      { newRunId: newResult.run.id, newVersion: newResult.run.version, reason },
+      reason,
+      'critical'
+    );
+
+    res.json(successResponse({
+      message: `Re-run effectué. Ancien run #${runId} annulé, nouveau run #${newResult.run.id} v${newResult.run.version} créé.`,
+      oldRunId: runId,
+      newRun: newResult.run,
+      generated: newResult.generated,
+      skipped: newResult.skipped,
+      issues: newResult.issues,
+    }));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur re-run paie');
     res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
@@ -4018,10 +4467,10 @@ hrRouter.patch("/avances/:id/pay", getAuthUser, attachAbility, requireAbility(Ac
                 .where(eq(avancesSalaire.id, id))
                 .returning();
 
-            // Post GL entry: Debit 425 (Avances personnel) / Credit 521 (Caisse)
+            // Post GL entry: Debit 4212 (Avances personnel) / Credit 521 (Caisse)
             if (agenceId && userId) {
                 try {
-                    await postAdvancePayment(tx, row, employeNom, agenceId, userId);
+                    await postAdvancePaymentGL(row.id, row.montant, employeNom, agenceId, userId);
                 } catch (glError) {
                     logger.error({ err: glError, advanceId: id }, 'GL posting failed for advance payment');
                 }
@@ -4077,14 +4526,8 @@ hrRouter.patch("/avances/:id/deduct", getAuthUser, attachAbility, requireAbility
                 .where(eq(avancesSalaire.id, id))
                 .returning();
 
-            // Post GL entry: Credit 425 (reverse advance receivable)
-            if (agenceId && userId) {
-                try {
-                    await postAdvanceDeduction(tx, row, employeNom, resolvedMois, agenceId, userId);
-                } catch (glError) {
-                    logger.error({ err: glError, advanceId: id }, 'GL posting failed for advance deduction');
-                }
-            }
+            // Advance deduction GL is now handled within payroll bulletin (code 4500)
+            // No separate GL posting needed here
 
             return row;
         });

@@ -1163,6 +1163,7 @@ export function registerAuthRoutes(app: Express) {
         const employeWithDetails = await storage.getEmployeWithUser(employeBase.id);
         if (employeWithDetails) {
           employeData = {
+            employeId: employeBase.id,
             matricule: employeWithDetails.matricule,
             jobPositionId: employeWithDetails.jobPositionId,
             dateEmbauche: employeWithDetails.dateEmbauche,

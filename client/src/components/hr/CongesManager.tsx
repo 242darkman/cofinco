@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock, RefreshCw, AlertCircle, Wifi, WifiOff, List, CalendarDays } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock, RefreshCw, AlertCircle, Wifi, WifiOff, List, CalendarDays, Search } from 'lucide-react';
 import { DemandeConge } from '../../hooks/hr/useConges';
 import { Card, Button, Modal, FormField, SelectField, Badge, StatCard, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -10,6 +10,7 @@ import { useHrRealtime, useHrSyncStatus } from '../../hooks/hr/useHrRealtime';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api-client';
 import LeaveCalendar from './LeaveCalendar';
+import type { Employe } from '../../hooks/hr/useEmployes';
 
 interface LeaveBalanceByType {
   type: string;
@@ -50,7 +51,8 @@ interface CongesManagerProps {
     approuves: number;
     refuses: number;
   };
-  currentEmployeId?: string; // For fetching balance
+  currentEmployeId?: string;
+  employes?: Employe[];
 }
 
 export default function CongesManager({
@@ -59,7 +61,8 @@ export default function CongesManager({
   onReject,
   onCreate,
   stats,
-  currentEmployeId
+  currentEmployeId,
+  employes = [],
 }: CongesManagerProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -67,8 +70,12 @@ export default function CongesManager({
   const canApproveConges = hasPermission('rh', 'approve') || hasPermission('conges', 'approve');
 
   // Hook appelé au niveau racine du composant (règle des hooks respectée)
-  const { user } = useUserProfile();
-  const canApproveActions = canApproveConges || isAdminRole(user?.role);
+  const { user, getFullName } = useUserProfile();
+  const isAdmin = isAdminRole(user?.role);
+  const canApproveActions = canApproveConges || isAdmin;
+
+  // Resolve current employee ID from user profile or prop
+  const resolvedEmployeId = currentEmployeId || user?.employeId;
 
   // Real-time sync
   const { syncStatus, refresh } = useHrRealtime({
@@ -79,9 +86,9 @@ export default function CongesManager({
 
   // Fetch leave balance for current employee
   const { data: leaveBalance } = useQuery<{ success: boolean; data: LeaveBalance }>({
-    queryKey: ['/api/hr/conges/balance', currentEmployeId],
-    queryFn: () => api.get<{ success: boolean; data: LeaveBalance }>(`/api/hr/conges/balance/${currentEmployeId}`),
-    enabled: !!currentEmployeId,
+    queryKey: ['/api/hr/conges/balance', resolvedEmployeId],
+    queryFn: () => api.get<{ success: boolean; data: LeaveBalance }>(`/api/hr/conges/balance/${resolvedEmployeId}`),
+    enabled: !!resolvedEmployeId,
     staleTime: 30000,
   });
 
@@ -95,9 +102,61 @@ export default function CongesManager({
     type: 'Congé Annuel',
     dateDebut: '',
     dateFin: '',
+    demiJournee: '' as '' | 'AM' | 'PM',
     motif: ''
   });
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Employee search for admin mode
+  const [employeSearch, setEmployeSearch] = useState('');
+  const [showEmployeDropdown, setShowEmployeDropdown] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  const filteredEmployes = useMemo(() => {
+    if (!employeSearch.trim()) return employes.filter(e => e.statut === 'ACTIVE').slice(0, 10);
+    const q = employeSearch.toLowerCase();
+    return employes
+      .filter(e => e.statut === 'ACTIVE')
+      .filter(e =>
+        `${e.nom} ${e.prenom}`.toLowerCase().includes(q) ||
+        e.matricule?.toLowerCase().includes(q) ||
+        e.poste?.toLowerCase().includes(q)
+      )
+      .slice(0, 10);
+  }, [employes, employeSearch]);
+
+  const selectEmploye = (emp: Employe) => {
+    setFormData(prev => ({
+      ...prev,
+      employeId: emp.id,
+      employeNom: `${emp.nom} ${emp.prenom}`.trim(),
+    }));
+    setEmployeSearch(`${emp.nom} ${emp.prenom}`.trim());
+    setShowEmployeDropdown(false);
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowEmployeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Auto-populate for non-admin when opening form
+  const handleOpenForm = () => {
+    if (!isAdmin && user) {
+      setFormData(prev => ({
+        ...prev,
+        employeId: user.employeId || '',
+        employeNom: getFullName(),
+      }));
+    }
+    setShowForm(true);
+  };
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -108,8 +167,8 @@ export default function CongesManager({
     currentPage * ITEMS_PER_PAGE
   );
 
-  // Calculate requested days
-  const calculateDays = (start: string, end: string) => {
+  // Calculate requested days (supports half-day on last day)
+  const calculateDays = (start: string, end: string, demiJournee: '' | 'AM' | 'PM') => {
     if (!start || !end) return 0;
     const startDate = new Date(start);
     const endDate = new Date(end);
@@ -120,12 +179,14 @@ export default function CongesManager({
       if (day !== 0 && day !== 6) count++; // Exclude weekends
       current.setDate(current.getDate() + 1);
     }
+    // Half-day on last day: subtract 0.5 from total
+    if (demiJournee && count > 0) return count - 0.5;
     return count;
   };
 
   const requestedDays = useMemo(
-    () => calculateDays(formData.dateDebut, formData.dateFin),
-    [formData.dateDebut, formData.dateFin]
+    () => calculateDays(formData.dateDebut, formData.dateFin, formData.demiJournee),
+    [formData.dateDebut, formData.dateFin, formData.demiJournee]
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,15 +199,36 @@ export default function CongesManager({
       return;
     }
 
+    if (!formData.employeId) {
+      setFormError("Veuillez sélectionner un employé");
+      return;
+    }
+
     // Check balance if creating for current user
-    if (formData.employeId === currentEmployeId && leaveBalance?.data) {
+    if (formData.employeId === resolvedEmployeId && leaveBalance?.data) {
       if (requestedDays > leaveBalance.data.available) {
         setFormError(`Solde insuffisant: ${leaveBalance.data.available} jour(s) disponible(s), ${requestedDays} demandé(s)`);
         return;
       }
     }
 
-    const success = await onCreate(formData);
+    // Build motif with half-day info if relevant
+    const motifParts: string[] = [];
+    if (formData.demiJournee) {
+      const period = formData.demiJournee === 'AM' ? 'matin' : 'après-midi';
+      if (formData.dateDebut === formData.dateFin) {
+        motifParts.push(`Demi-journée (${period})`);
+      } else {
+        const lastDay = new Date(formData.dateFin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        motifParts.push(`Dernier jour (${lastDay}) : demi-journée ${period}`);
+      }
+    }
+    if (formData.motif) motifParts.push(formData.motif);
+
+    const success = await onCreate({
+      ...formData,
+      motif: motifParts.join(' — ') || undefined,
+    });
     if (success) {
       setFormData({
         employeId: '',
@@ -154,8 +236,10 @@ export default function CongesManager({
         type: 'Congé Annuel',
         dateDebut: '',
         dateFin: '',
+        demiJournee: '',
         motif: ''
       });
+      setEmployeSearch('');
       setShowForm(false);
     }
   };
@@ -196,8 +280,17 @@ export default function CongesManager({
         format: (_: any, item: DemandeConge) => {
              const start = new Date(item.dateDebut);
              const end = new Date(item.dateFin);
-             const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-             return <span className="text-xs font-mono">{diff}j</span>;
+             let count = 0;
+             const cur = new Date(start);
+             while (cur <= end) {
+               if (cur.getDay() !== 0 && cur.getDay() !== 6) count++;
+               cur.setDate(cur.getDate() + 1);
+             }
+             // Check if motif contains half-day info
+             const isHalf = item.motif?.includes('demi-journée') || item.motif?.includes('Demi-journée');
+             const days = isHalf ? count - 0.5 : count;
+             const display = days % 1 !== 0 ? days.toFixed(1).replace('.', ',') : String(days);
+             return <span className="text-xs font-mono">{display}j</span>;
         }
     },
     {
@@ -361,7 +454,7 @@ export default function CongesManager({
                </button>
              </div>
              {canCreateConges && (
-               <Button variant="primary" size="sm" onClick={() => setShowForm(true)} className="h-7 text-xs px-2">
+               <Button variant="primary" size="sm" onClick={handleOpenForm} className="h-7 text-xs px-2">
                  <Plus size={14} />
                  <span className="hidden sm:inline">Nouvelle Demande</span>
                </Button>
@@ -396,7 +489,7 @@ export default function CongesManager({
       {/* Create Leave Request Modal */}
       <Modal
         isOpen={showForm}
-        onClose={() => { setShowForm(false); setFormError(null); }}
+        onClose={() => { setShowForm(false); setFormError(null); setEmployeSearch(''); }}
         title="Nouvelle Demande de Congé"
         size="md"
       >
@@ -408,23 +501,78 @@ export default function CongesManager({
             </div>
           )}
 
-          <FormField
-            label="Employé (ID)"
-            name="employeId"
-            type="text"
-            value={formData.employeId}
-            onChange={(e) => setFormData({ ...formData, employeId: e.target.value })}
-            required
-          />
-
-          <FormField
-            label="Nom Employé"
-            name="employeNom"
-            type="text"
-            value={formData.employeNom}
-            onChange={(e) => setFormData({ ...formData, employeNom: e.target.value })}
-            required
-          />
+          {/* ── Employee Selection ─────────────────────── */}
+          {isAdmin ? (
+            /* Admin: searchable employee select */
+            <div ref={searchRef} className="relative">
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Employé <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  value={employeSearch}
+                  onChange={(e) => {
+                    setEmployeSearch(e.target.value);
+                    setShowEmployeDropdown(true);
+                    // Clear selection if user edits the text
+                    if (formData.employeId) {
+                      setFormData(prev => ({ ...prev, employeId: '', employeNom: '' }));
+                    }
+                  }}
+                  onFocus={() => setShowEmployeDropdown(true)}
+                  placeholder="Rechercher par nom, matricule..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none text-sm"
+                />
+              </div>
+              {/* Selected badge */}
+              {formData.employeId && (
+                <div className="mt-1.5 flex items-center gap-2 px-2 py-1 bg-cyan-900/30 border border-cyan-800/50 rounded text-xs text-cyan-300">
+                  <CheckCircle size={12} />
+                  <span className="font-medium">{formData.employeNom}</span>
+                  <span className="text-slate-500">({employes.find(e => e.id === formData.employeId)?.matricule})</span>
+                </div>
+              )}
+              {/* Dropdown */}
+              {showEmployeDropdown && !formData.employeId && (
+                <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
+                  {filteredEmployes.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-slate-500">Aucun employé trouvé</div>
+                  ) : (
+                    filteredEmployes.map(emp => (
+                      <button
+                        key={emp.id}
+                        type="button"
+                        onClick={() => selectEmploye(emp)}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-700 transition flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="text-sm text-white">{emp.nom} {emp.prenom}</div>
+                          <div className="text-[10px] text-slate-400">{emp.poste || 'N/A'}</div>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-500">{emp.matricule}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Non-admin: auto-populated, read-only display */
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Employé</label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg">
+                <div className="w-7 h-7 rounded-full bg-cyan-900/50 flex items-center justify-center text-cyan-400 text-xs font-bold">
+                  {user?.prenom?.charAt(0)}{user?.nom?.charAt(0)}
+                </div>
+                <div>
+                  <div className="text-sm text-white font-medium">{getFullName()}</div>
+                  {user?.matricule && <div className="text-[10px] text-slate-400">{user.matricule}</div>}
+                </div>
+              </div>
+            </div>
+          )}
 
           <SelectField
             label="Type de Congé"
@@ -449,7 +597,15 @@ export default function CongesManager({
               name="dateDebut"
               type="date"
               value={formData.dateDebut}
-              onChange={(e) => setFormData({ ...formData, dateDebut: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormData(prev => ({
+                  ...prev,
+                  dateDebut: val,
+                  // Auto-fill end date if empty
+                  dateFin: prev.dateFin || val,
+                }));
+              }}
               required
             />
 
@@ -463,6 +619,44 @@ export default function CongesManager({
             />
           </div>
 
+          {/* Half-day option on last day */}
+          {formData.dateDebut && formData.dateFin && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                {formData.dateDebut === formData.dateFin
+                  ? 'Durée de la journée'
+                  : `Dernier jour (${new Date(formData.dateFin).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })})`
+                }
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { value: '' as const, label: 'Journée entière', icon: '☀️' },
+                  { value: 'AM' as const, label: 'Matin seul.', icon: '🌅' },
+                  { value: 'PM' as const, label: 'Après-midi seul.', icon: '🌇' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, demiJournee: opt.value }))}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5 ${
+                      formData.demiJournee === opt.value
+                        ? 'bg-cyan-600 text-white ring-1 ring-cyan-400'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>{opt.icon}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              {formData.demiJournee && formData.dateDebut !== formData.dateFin && (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Les jours précédents comptent comme journées entières, le dernier jour en demi-journée ({formData.demiJournee === 'AM' ? 'matin' : 'après-midi'}).
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Days Preview */}
           {requestedDays > 0 && (
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
@@ -472,7 +666,10 @@ export default function CongesManager({
                   ? 'text-red-400'
                   : 'text-cyan-400'
               }`}>
-                {requestedDays} jour(s)
+                {requestedDays % 1 !== 0
+                  ? `${requestedDays.toFixed(1).replace('.', ',')} jour(s)`
+                  : `${requestedDays} jour(s)`
+                }
               </span>
             </div>
           )}
@@ -490,7 +687,7 @@ export default function CongesManager({
             <Button
               type="button"
               variant="secondary"
-              onClick={() => { setShowForm(false); setFormError(null); }}
+              onClick={() => { setShowForm(false); setFormError(null); setEmployeSearch(''); }}
             >
               Annuler
             </Button>

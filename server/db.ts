@@ -2409,6 +2409,35 @@ export async function ensureCustomFunctions(): Promise<void> {
       console.warn('[DB] ⚠ Failed to create TRIGGER "trg_outbox_notify":', err instanceof Error ? err.message : err);
     }
 
+    // ========================================================================
+    // HR AUDIT TRIGGERS — attach hr_audit_trigger_fn() to critical HR tables
+    // ========================================================================
+    const hrAuditTables = [
+      'bulletins_paie',
+      'payroll_runs',
+      'avantages_employes',
+      'demandes_conges',
+      'presences',
+      'avances_salaire',
+      'rubrique_definitions',
+      'charge_definitions',
+    ];
+    for (const table of hrAuditTables) {
+      try {
+        await db.execute(sql.raw(`
+          DROP TRIGGER IF EXISTS trg_hr_audit_${table} ON ${table};
+          CREATE TRIGGER trg_hr_audit_${table}
+            AFTER INSERT OR UPDATE OR DELETE ON ${table}
+            FOR EACH ROW
+            EXECUTE FUNCTION hr_audit_trigger_fn();
+        `));
+        objectCount++;
+      } catch (err) {
+        // Table may not exist yet — safe to skip
+      }
+    }
+    console.log(`[DB] ✓ HR audit triggers attached to ${hrAuditTables.length} tables`);
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

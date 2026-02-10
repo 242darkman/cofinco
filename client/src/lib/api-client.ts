@@ -1531,6 +1531,8 @@ export const prospectionApi = {
     request<{ count: number }>(`/prospections/count${params?.agentId ? `?agentId=${params.agentId}` : ''}`),
   countActive: (params?: { agentId?: string }) =>
     request<{ count: number }>(`/prospections/count?statut=REGISTERED,INTERESTED,TO_FOLLOW_UP${params?.agentId ? `&agentId=${params.agentId}` : ''}`),
+  countNew: (params?: { agentId?: string }) =>
+    request<{ count: number }>(`/prospections/count?statut=REGISTERED${params?.agentId ? `&agentId=${params.agentId}` : ''}`),
 };
 
 // Arrondissements & Marchés API

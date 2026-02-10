@@ -1,4 +1,4 @@
-import type { EmailProvider, SendResult } from "./provider.interface";
+import type { EmailProvider, EmailAttachment, SendResult } from "./provider.interface";
 import { db } from "../../../db";
 import { emailProviderSettings } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -78,7 +78,7 @@ export class SmtpEmailProvider implements EmailProvider {
     subject: string,
     html: string,
     text: string,
-    options?: { fromEmail?: string; fromName?: string; replyTo?: string }
+    options?: { fromEmail?: string; fromName?: string; replyTo?: string; attachments?: EmailAttachment[] }
   ): Promise<SendResult> {
     const config = await this.resolveConfig();
 
@@ -111,6 +111,12 @@ export class SmtpEmailProvider implements EmailProvider {
         html,
         text,
         replyTo: options?.replyTo,
+        attachments: options?.attachments?.map(a => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+          cid: a.cid,
+        })),
       });
 
       return {

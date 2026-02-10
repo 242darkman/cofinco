@@ -17,6 +17,7 @@ export interface UserData {
   createdAt?: string;
   photoProfile?: string;
   // Données employé/RH
+  employeId?: string;
   matricule?: string;
   poste?: string;
   departement?: string;

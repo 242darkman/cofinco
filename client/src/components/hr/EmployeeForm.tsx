@@ -758,34 +758,34 @@ export default function EmployeeForm({
             )}
   
             {/* Section 2: Agence et Matricule */}
-            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-lg space-y-3">
-              <div className="flex items-center gap-2">
-                <Building2 size={16} className="text-cyan-400" />
-                <h4 className="text-sm font-semibold text-white">Affectation</h4>
+            <div className="p-6 bg-slate-800/30 border border-slate-700 rounded-xl">
+              <div className="flex items-center gap-2 mb-6 text-white font-bold text-base">
+                <Building2 size={20} className="text-cyan-400" />
+                Affectation
               </div>
-  
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* En mode création: afficher l'agence de l'utilisateur (lecture seule) */}
                 {!editingEmploye ? (
-                  <div className="space-y-1">
-                    <label className="block text-xs font-medium text-slate-300">
-                      Agence <span className="text-red-500">*</span>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">
+                      Agence <span className="text-status-danger ml-1">*</span>
                     </label>
                     {selectedUser ? (
                       selectedUser.agenceId ? (
-                        <div className="flex items-center gap-2 p-2 bg-slate-700/50 rounded border border-slate-600">
+                        <div className="flex items-center gap-2 px-4 h-12 bg-slate-700/50 rounded-lg border border-slate-600">
                           <Building2 size={14} className="text-cyan-400" />
                           <span className="text-white text-sm font-medium">{selectedUser.agenceNom}</span>
                           <span className="text-xs text-slate-400">({selectedUser.agenceCode})</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded border border-amber-500/30">
+                        <div className="flex items-center gap-2 px-4 h-12 bg-amber-500/10 rounded-lg border border-amber-500/30">
                           <AlertTriangle size={14} className="text-amber-400" />
                           <span className="text-amber-400 text-xs">Aucune agence affectée</span>
                         </div>
                       )
                     ) : (
-                      <div className="p-2 bg-slate-800/50 rounded border border-slate-700 text-slate-500 text-xs">
+                      <div className="flex items-center px-4 h-12 bg-slate-800/50 rounded-lg border border-slate-700 text-slate-500 text-xs">
                         Sélectionnez d'abord un utilisateur
                       </div>
                     )}
@@ -802,13 +802,14 @@ export default function EmployeeForm({
                     ]}
                     error={validationErrors.agenceId}
                     required
+                    className="!h-12"
                   />
                 )}
-  
+
                 {/* Matricule */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-slate-300">Matricule</label>
-                  <div className="flex items-center gap-2 p-2 bg-slate-800/50 rounded border border-slate-700 text-slate-300 text-sm">
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">Matricule</label>
+                  <div className="flex items-center gap-2 px-4 h-12 bg-slate-800/50 rounded-lg border border-slate-700 text-slate-300 text-sm font-mono">
                     {editingEmploye && formData.matricule ? formData.matricule : 'Généré automatiquement'}
                   </div>
                 </div>
@@ -968,6 +969,95 @@ export default function EmployeeForm({
               </div>
             </div>
   
+            {/* Section Situation Familiale & Fiscale */}
+            <div className="p-6 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+              <div className="flex items-center gap-2 mb-6 text-white font-bold text-base">
+                <Users size={20} className="text-purple-400" />
+                Situation Familiale & Fiscale
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <SelectField
+                  label="Situation Familiale"
+                  name="situationFamiliale"
+                  value={formData.situationFamiliale || 'CELIBATAIRE'}
+                  onChange={(e) => updateField('situationFamiliale', e.target.value)}
+                  options={[
+                    { value: 'CELIBATAIRE', label: 'Célibataire' },
+                    { value: 'MARIE', label: 'Marié(e)' },
+                    { value: 'VEUF', label: 'Veuf/Veuve' },
+                    { value: 'DIVORCE', label: 'Divorcé(e)' },
+                  ]}
+                  className="!h-12"
+                />
+
+                <FormField
+                  label="Enfants à charge"
+                  name="nombreEnfantsCharge"
+                  type="number"
+                  value={String(formData.nombreEnfantsCharge ?? 0)}
+                  onChange={(e) => updateField('nombreEnfantsCharge', e.target.value)}
+                  min="0"
+                  max="20"
+                  className="!h-12"
+                />
+
+                <FormField
+                  label="NIU (Identifiant Unique)"
+                  name="niu"
+                  type="text"
+                  value={formData.niu || ''}
+                  onChange={(e) => updateField('niu', e.target.value)}
+                  placeholder="Ex: NIU-CG-00123"
+                  className="!h-12"
+                />
+              </div>
+
+              <p className="mt-4 text-[10px] text-purple-400/60 italic">
+                La situation familiale et le nombre d'enfants déterminent le quotient familial pour le calcul de l'IRPP.
+              </p>
+            </div>
+
+            {/* Section Sortie (visible uniquement en édition) */}
+            {editingEmploye && (
+              <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-red-400" />
+                  <h4 className="text-sm font-semibold text-white">Sortie</h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <FormField
+                    label="Date de Sortie"
+                    name="dateSortie"
+                    type="date"
+                    value={formData.dateSortie || ''}
+                    onChange={(e) => updateField('dateSortie', e.target.value || null)}
+                    className="py-1"
+                  />
+
+                  <SelectField
+                    label="Motif de Sortie"
+                    name="motifSortie"
+                    value={formData.motifSortie || ''}
+                    onChange={(e) => updateField('motifSortie', e.target.value || null)}
+                    options={[
+                      { value: '', label: '— Aucun —' },
+                      { value: 'DEMISSION', label: 'Démission' },
+                      { value: 'LICENCIEMENT', label: 'Licenciement' },
+                      { value: 'FIN_CDD', label: 'Fin de CDD' },
+                      { value: 'RETRAITE', label: 'Retraite' },
+                      { value: 'DECES', label: 'Décès' },
+                    ]}
+                  />
+                </div>
+
+                <p className="text-[10px] text-red-400/60">
+                  Si renseignée, la date de sortie permet le calcul du prorata sur le dernier mois de paie.
+                </p>
+              </div>
+            )}
+
             {/* Section Hiérarchie */}
             <div className="pt-2 border-t border-slate-700">
                <div className="grid grid-cols-1 gap-4">

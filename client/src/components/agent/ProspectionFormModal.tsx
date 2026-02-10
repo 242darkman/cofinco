@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Camera, Loader2, UserPlus, Phone, Briefcase, CheckCircle, WifiOff, MapPin, User, TrendingUp, Clock, ArrowRight, ArrowLeft, Check, FileText, Building2, Store } from 'lucide-react';
+import { X, Loader2, UserPlus, Phone, Briefcase, WifiOff, MapPin, User, TrendingUp, Clock, ArrowRight, ArrowLeft, Check, FileText, Building2, Store } from 'lucide-react';
 import { prospectionApi, arrondissementApi, marcheApi, villeApi } from '../../lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 import SearchableSelect, { type SearchableSelectOption } from '../ui/SearchableSelect';
@@ -29,7 +29,6 @@ interface FormData {
   revenuEstime: string;
   revenuJournalier: string;
   chiffreAffairesMensuel: string;
-  photoUrl: string;
   commentairesAgent: string;
   observations: string;
 }
@@ -53,7 +52,6 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<FormData>({
     nomProspect: '',
@@ -72,7 +70,6 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
     revenuEstime: '',
     revenuJournalier: '',
     chiffreAffairesMensuel: '',
-    photoUrl: '',
     commentairesAgent: '',
     observations: '',
   });
@@ -96,10 +93,9 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
         adresseProspect: '', villeId: '', arrondissementId: '', marcheId: '',
         typeActivite: '', activitePrincipale: '', ancienneteActivite: '',
         descriptionActivite: '', typeRevenu: 'Mensuel', revenuEstime: '',
-        revenuJournalier: '', chiffreAffairesMensuel: '', photoUrl: '',
+        revenuJournalier: '', chiffreAffairesMensuel: '',
         commentairesAgent: '', observations: '',
       });
-      setPhotoPreview(null);
     }
   }, [isOpen]);
 
@@ -183,19 +179,6 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
   const handleNext = () => { if (validateStep(step)) setStep(s => Math.min(s + 1, TOTAL_STEPS)); };
   const handleBack = () => setStep(s => Math.max(s - 1, 1));
 
-  // Photo capture
-  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      setPhotoPreview(base64);
-      set('photoUrl', base64);
-    };
-    reader.readAsDataURL(file);
-  };
-
   // Offline save
   const saveOffline = (data: any) => {
     try {
@@ -228,7 +211,6 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
       revenuEstime: formData.revenuEstime.trim() || undefined,
       revenuJournalier: formData.revenuJournalier.trim() || undefined,
       chiffreAffairesMensuel: formData.chiffreAffairesMensuel.trim() || undefined,
-      photoUrl: formData.photoUrl || undefined,
       commentairesAgent: formData.commentairesAgent.trim() || undefined,
       observations: formData.observations.trim() || undefined,
       statut: 'REGISTERED',
@@ -437,18 +419,6 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
                 </div>
               </div>
 
-              {/* Photo */}
-              <div>
-                <input type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} className="hidden" id="photo-capture-step" />
-                <label htmlFor="photo-capture-step"
-                  className={`w-full cursor-pointer border rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${
-                    photoPreview ? 'bg-slate-800 border-violet-500/50' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                  }`}>
-                  {photoPreview
-                    ? <><CheckCircle size={16} className="text-emerald-400" /><span className="text-[10px] font-medium text-emerald-400">Photo capturée</span></>
-                    : <><Camera size={16} /><span className="text-[10px] font-medium">Prendre une photo</span></>}
-                </label>
-              </div>
             </div>
           )}
 

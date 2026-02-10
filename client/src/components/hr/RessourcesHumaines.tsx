@@ -210,6 +210,7 @@ export default function RessourcesHumaines() {
             onReject={rejectConge}
             onCreate={createConge}
             stats={getCongesStats()}
+            employes={employes}
           />
         );
 

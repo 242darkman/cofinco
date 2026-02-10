@@ -162,7 +162,7 @@ const Modal: React.FC<ModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-180px)] text-content-secondary">
+        <div className="p-4 sm:p-6 overflow-y-auto scrollbar-thin max-h-[calc(90vh-180px)] text-content-secondary">
           {children}
         </div>
 

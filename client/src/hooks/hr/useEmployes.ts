@@ -31,8 +31,15 @@ export interface Employe {
     typeAgence: 'MAIN' | 'SECONDARY' | 'KIOSK';
     codeAgence: string;
   } | null;
-  modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY'; // Mode de calcul paie
-  jobPositionId?: string | null; // UUID du poste
+  modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY';
+  jobPositionId?: string | null;
+  // Situation familiale & fiscale (paie Congo-Brazza)
+  situationFamiliale?: 'CELIBATAIRE' | 'MARIE' | 'VEUF' | 'DIVORCE' | null;
+  nombreEnfantsCharge?: number | null;
+  niu?: string | null;
+  // Sortie
+  dateSortie?: string | null;
+  motifSortie?: 'DEMISSION' | 'LICENCIEMENT' | 'FIN_CDD' | 'RETRAITE' | 'DECES' | null;
   jobPosition?: {
     id: string;
     code: string;
@@ -62,12 +69,19 @@ export interface EmployeFormData {
   salaireBase: string;
   numeroCnss: string;
   photoProfile?: string;
-  managerId?: string | null; // ID du supérieur hiérarchique
-  // Nouveaux champs pour le workflow Admin/RH
-  userId?: string | null; // Liaison avec un User existant
-  agenceId?: string | null; // Agence d'affectation
-  modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY'; // Mode de calcul de paie
-  jobPositionId?: string | null; // UUID du poste (remplace poste/departement)
+  managerId?: string | null;
+  // Workflow Admin/RH
+  userId?: string | null;
+  agenceId?: string | null;
+  modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY';
+  jobPositionId?: string | null;
+  // Situation familiale & fiscale (paie Congo-Brazza)
+  situationFamiliale?: 'CELIBATAIRE' | 'MARIE' | 'VEUF' | 'DIVORCE';
+  nombreEnfantsCharge?: string;
+  niu?: string;
+  // Sortie
+  dateSortie?: string | null;
+  motifSortie?: 'DEMISSION' | 'LICENCIEMENT' | 'FIN_CDD' | 'RETRAITE' | 'DECES' | null;
 }
 
 export function useEmployes() {

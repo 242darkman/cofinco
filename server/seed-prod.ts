@@ -68,7 +68,7 @@ import {
   criticalPermissionPatterns,
   rbacVersions,
 } from '@shared/schema';
-import { departments, jobPositions, employes, payrollConfig } from '@shared/schema';
+import { departments, jobPositions, employes, payrollConfig, conventionsCollectives, qualificationCoefficients, chargeDefinitions, rubriqueDefinitions, payrollGlMapping, irppBaremes } from '@shared/schema';
 import { accountingRules } from '@shared/schema/accounting';
 import { caissesAgent } from '@shared/schema/caisse-agent';
 import { agentsTerrain } from '@shared/schema/operations';
@@ -297,10 +297,15 @@ const PLAN_COMPTABLE_DATA = [
   { num: '42', label: 'Personnel', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '421', label: 'Personnel — rémunérations dues', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '4211', label: 'Avances et acomptes au personnel', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '4212', label: 'Personnel — avances déduites sur salaire', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '43', label: 'Sécurité Sociale', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '431', label: 'Sécurité Sociale — cotisations dues', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4311', label: 'CNSS — cotisations à reverser', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '44', label: 'État', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '441', label: 'État — impôts sur salaires (IPR)', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4421', label: 'État — IRPP retenu sur salaires', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '447', label: 'Formation professionnelle', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4471', label: 'Formation — CFC et TAP à reverser', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '443', label: 'TVA Facturée', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '445', label: 'TVA Récupérable', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '47', label: 'Comptes transitoires', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
@@ -1969,7 +1974,7 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
       await db.delete(systemSettings);
     }
     await db.insert(systemSettings).values({
-      agenceName: 'COFIN - Microfinance',
+      agenceName: 'COFIN&CO-M',
       agenceCode: 'COF-PROD',
       devise: 'XAF',
       pays: 'République du Congo',
@@ -2589,36 +2594,224 @@ async function seedHRBootstrap(context: SeedContext, dryRun: boolean): Promise<S
   }
   results.push({ table: 'jobPositions', action: 'created', count: positions.length });
 
-  // Payroll Config Global (CRITIQUE - manquait)
+  // Payroll Config Global — Congo-Brazzaville
   const [existingPayroll] = await db.select().from(payrollConfig).where(isNull(payrollConfig.agenceId));
   if (!existingPayroll) {
     await db.insert(payrollConfig).values({
       agenceId: null, // Global
-      cnssEmployeeRate: '0.0500',
-      cnssEmployerRate: '0.0900',
-      // CNSS breakdown (Congo)
-      cnssAllocFamilialesRate: '0.0000',       // Employé: 0%
-      cnssAllocFamilialesEmployerRate: '0.0650', // Patronal: 6.5%
-      cnssPvidRate: '0.0350',                   // Employé: 3.5%
-      cnssPvidEmployerRate: '0.0050',           // Patronal: 0.5%
-      cnssAtmpRate: '0.0150',                   // Employé: 1.5%
-      cnssAtmpEmployerRate: '0.0150',           // Patronal: 1.5%
+      // CNSS Congo-Brazzaville: salarié = 4% (pension), patronal = 22.28%
+      cnssEmployeeRate: '0.0400',
+      cnssEmployerRate: '0.2228',
+      // Breakdown CNSS employé
+      cnssAllocFamilialesRate: '0.0000',        // Employé: 0% (PF = patronal uniquement)
+      cnssPvidRate: '0.0400',                    // Employé: 4% (Pension vieillesse)
+      cnssAtmpRate: '0.0000',                    // Employé: 0% (AT/MP = patronal uniquement)
+      // Breakdown CNSS patronal
+      cnssAllocFamilialesEmployerRate: '0.1003', // Patronal: 10.03% (Prestations familiales)
+      cnssPvidEmployerRate: '0.0800',            // Patronal: 8% (Pension vieillesse)
+      cnssAtmpEmployerRate: '0.0225',            // Patronal: 2.25% (AT/MP)
+      // IRPP barème progressif Congo-Brazza (legacy — voir irppBaremes pour la version propre)
       iprBrackets: [
-        { min: 0, max: 524000, rate: 0 },
-        { min: 524001, max: 1428000, rate: 0.15 },
-        { min: 1428001, max: 2700000, rate: 0.30 },
-        { min: 2700001, max: null, rate: 0.40 },
+        { min: 0, max: 464000, rate: 0.01 },
+        { min: 464001, max: 1000000, rate: 0.10 },
+        { min: 1000001, max: 3000000, rate: 0.25 },
+        { min: 3000001, max: 8000000, rate: 0.40 },
+        { min: 8000001, max: null, rate: 0.45 },
       ],
       transportAllowance: 50000,
       housingAllowance: 0,
-      overtimeRate: '1.50',
-      nightShiftRate: '1.25',
-      holidayRate: '2.00',
+      overtimeRate: '1.25',  // Congo-Brazza: +25% les 8 premières heures
+      nightShiftRate: '1.50', // Congo-Brazza: +50% heures de nuit
+      holidayRate: '2.00',    // Congo-Brazza: +100% jours fériés
       isActive: true,
     });
     results.push({ table: 'payrollConfig', action: 'created', count: 1 });
   } else {
     results.push({ table: 'payrollConfig', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // ================================================================
+  // CONVENTION COLLECTIVE MICROFINANCE CONGO-BRAZZAVILLE
+  // ================================================================
+  const [existingCC] = await db.select().from(conventionsCollectives).where(eq(conventionsCollectives.code, 'CC_MF_CG'));
+  let ccId: string;
+  if (!existingCC) {
+    const [cc] = await db.insert(conventionsCollectives).values({
+      code: 'CC_MF_CG',
+      libelle: 'Convention Collective Microfinance Congo-Brazzaville',
+      pays: 'CG',
+      secteur: 'MICROFINANCE',
+      dureeEssaiCDI: 90,   // 3 mois
+      dureeEssaiCDD: 30,   // 1 mois
+      congesAnnuels: 26,   // 26 jours ouvrables
+      heuresHebdo: '40.0',
+      defaults: {
+        primeAncienneteParAn: 0.02,  // 2% par an
+        plafondAnciennete: 0.30,     // max 30%
+        heuresParMois: 173,
+      },
+    }).returning();
+    ccId = cc.id;
+    results.push({ table: 'conventionsCollectives', action: 'created', count: 1 });
+  } else {
+    ccId = existingCC.id;
+    results.push({ table: 'conventionsCollectives', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // ================================================================
+  // QUALIFICATION-COEFFICIENTS (Grille microfinance)
+  // ================================================================
+  const qualifData = [
+    { categorie: 'OUVRIER',         echelon: 1, coefficient: 100, salaireMinimum: 90000 },
+    { categorie: 'OUVRIER',         echelon: 2, coefficient: 115, salaireMinimum: 103500 },
+    { categorie: 'OUVRIER',         echelon: 3, coefficient: 130, salaireMinimum: 117000 },
+    { categorie: 'EMPLOYE',         echelon: 1, coefficient: 150, salaireMinimum: 135000 },
+    { categorie: 'EMPLOYE',         echelon: 2, coefficient: 175, salaireMinimum: 157500 },
+    { categorie: 'EMPLOYE',         echelon: 3, coefficient: 200, salaireMinimum: 180000 },
+    { categorie: 'AGENT_MAITRISE',  echelon: 1, coefficient: 250, salaireMinimum: 225000 },
+    { categorie: 'AGENT_MAITRISE',  echelon: 2, coefficient: 300, salaireMinimum: 270000 },
+    { categorie: 'AGENT_MAITRISE',  echelon: 3, coefficient: 350, salaireMinimum: 315000 },
+    { categorie: 'CADRE',           echelon: 1, coefficient: 400, salaireMinimum: 360000 },
+    { categorie: 'CADRE',           echelon: 2, coefficient: 500, salaireMinimum: 450000 },
+    { categorie: 'CADRE',           echelon: 3, coefficient: 600, salaireMinimum: 540000 },
+    { categorie: 'CADRE_SUP',       echelon: 1, coefficient: 700, salaireMinimum: 630000 },
+    { categorie: 'CADRE_SUP',       echelon: 2, coefficient: 800, salaireMinimum: 720000 },
+  ];
+
+  const [existingQualif] = await db.select().from(qualificationCoefficients).limit(1);
+  if (!existingQualif) {
+    for (const q of qualifData) {
+      await db.insert(qualificationCoefficients).values({
+        conventionCollectiveId: ccId,
+        ...q,
+      });
+    }
+    results.push({ table: 'qualificationCoefficients', action: 'created', count: qualifData.length });
+  } else {
+    results.push({ table: 'qualificationCoefficients', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // ================================================================
+  // CHARGES SOCIALES CONGO-BRAZZAVILLE (paramétrables)
+  // ================================================================
+  const chargesData = [
+    { code: 'CNSS_PF',        libelle: 'CNSS - Prestations familiales',          organisme: 'CNSS', side: 'EMPLOYER',  assietteRule: 'BASE_CNSS', rate: '0.1003', plafond: 500000 },
+    { code: 'CNSS_PENSION_E', libelle: 'CNSS - Pension vieillesse (salariale)',   organisme: 'CNSS', side: 'EMPLOYEE',  assietteRule: 'BASE_CNSS', rate: '0.0400', plafond: null },
+    { code: 'CNSS_PENSION_P', libelle: 'CNSS - Pension vieillesse (patronale)',   organisme: 'CNSS', side: 'EMPLOYER',  assietteRule: 'BASE_CNSS', rate: '0.0800', plafond: null },
+    { code: 'CNSS_ATMP',      libelle: 'CNSS - Accidents du travail',            organisme: 'CNSS', side: 'EMPLOYER',  assietteRule: 'BASE_CNSS', rate: '0.0225', plafond: null },
+    { code: 'CFC',            libelle: 'Contribution Formation Continue',         organisme: 'CFC',  side: 'EMPLOYER',  assietteRule: 'BASE_CNSS', rate: '0.0100', plafond: null },
+    { code: 'TAP',            libelle: "Taxe d'Apprentissage et Perfectionnement",organisme: 'CFC',  side: 'EMPLOYER',  assietteRule: 'BASE_CNSS', rate: '0.0100', plafond: null },
+  ];
+
+  const [existingCharge] = await db.select().from(chargeDefinitions).limit(1);
+  if (!existingCharge) {
+    for (const c of chargesData) {
+      await db.insert(chargeDefinitions).values(c as any);
+    }
+    results.push({ table: 'chargeDefinitions', action: 'created', count: chargesData.length });
+  } else {
+    results.push({ table: 'chargeDefinitions', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // ================================================================
+  // BARÈME IRPP CONGO-BRAZZAVILLE 2024
+  // ================================================================
+  const [existingBareme] = await db.select().from(irppBaremes).where(eq(irppBaremes.code, 'CG_2024'));
+  if (!existingBareme) {
+    await db.insert(irppBaremes).values({
+      code: 'CG_2024',
+      pays: 'CG',
+      libelle: 'Barème IRPP Congo-Brazzaville 2024',
+      abattementForfaitaire: '0.2000', // 20%
+      brackets: [
+        { min: 0,       max: 464000,   rate: 0.01 },
+        { min: 464001,  max: 1000000,  rate: 0.10 },
+        { min: 1000001, max: 3000000,  rate: 0.25 },
+        { min: 3000001, max: 8000000,  rate: 0.40 },
+        { min: 8000001, max: null,     rate: 0.45 },
+      ],
+      effectiveFrom: '2024-01-01',
+    });
+    results.push({ table: 'irppBaremes', action: 'created', count: 1 });
+  } else {
+    results.push({ table: 'irppBaremes', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // ================================================================
+  // RUBRIQUES DE PAIE (catalogue paramétrable)
+  // ================================================================
+  const rubriquesData = [
+    // GAINS
+    { code: '100',  libelle: 'Salaire de base',              type: 'GAIN',     calcMode: 'FIXED',     baseSource: null,           priority: 10,  isTaxable: true,  isCnssApplicable: true },
+    { code: '110',  libelle: "Prime d'ancienneté",           type: 'GAIN',     calcMode: 'BASE_RATE', baseSource: 'SALAIRE_BASE', priority: 20,  isTaxable: true,  isCnssApplicable: true },
+    { code: '120',  libelle: 'Indemnité congés payés',       type: 'GAIN',     calcMode: 'FORMULA',   baseSource: null,           priority: 25,  isTaxable: true,  isCnssApplicable: true },
+    { code: '200',  libelle: 'Heures sup 25%',               type: 'GAIN',     calcMode: 'BASE_RATE', baseSource: 'TAUX_HORAIRE', priority: 30,  isTaxable: true,  isCnssApplicable: true, defaultRate: '1.2500' },
+    { code: '201',  libelle: 'Heures sup 50%',               type: 'GAIN',     calcMode: 'BASE_RATE', baseSource: 'TAUX_HORAIRE', priority: 31,  isTaxable: true,  isCnssApplicable: true, defaultRate: '1.5000' },
+    { code: '210',  libelle: 'Heures de nuit',               type: 'GAIN',     calcMode: 'BASE_RATE', baseSource: 'TAUX_HORAIRE', priority: 32,  isTaxable: true,  isCnssApplicable: true, defaultRate: '1.5000' },
+    { code: '220',  libelle: 'Heures jours fériés',          type: 'GAIN',     calcMode: 'BASE_RATE', baseSource: 'TAUX_HORAIRE', priority: 33,  isTaxable: true,  isCnssApplicable: true, defaultRate: '2.0000' },
+    { code: '300',  libelle: 'Prime de transport',            type: 'GAIN',     calcMode: 'FIXED',     baseSource: null,           priority: 40,  isTaxable: false, isCnssApplicable: false },
+    { code: '400',  libelle: 'Commission prospection',        type: 'GAIN',     calcMode: 'FORMULA',   baseSource: null,           priority: 50,  isTaxable: true,  isCnssApplicable: true },
+    // SUBTOTAL BRUT
+    { code: '1000', libelle: 'Salaire brut',                  type: 'SUBTOTAL', calcMode: 'FIXED',     baseSource: null,           priority: 100, isTaxable: false, isCnssApplicable: false },
+    // RETENUES SALARIALES
+    { code: '2001', libelle: 'CNSS Pension (salariale)',       type: 'RETENUE',  calcMode: 'RATE',      baseSource: 'BASE_CNSS',    priority: 110, isTaxable: false, isCnssApplicable: false, defaultRate: '0.0400' },
+    { code: '3000', libelle: 'Total charges salariales',       type: 'SUBTOTAL', calcMode: 'FIXED',     baseSource: null,           priority: 120, isTaxable: false, isCnssApplicable: false },
+    // IRPP
+    { code: '4000', libelle: 'IRPP',                           type: 'RETENUE',  calcMode: 'FORMULA',   baseSource: 'BRUT_IMPOSABLE', priority: 130, isTaxable: false, isCnssApplicable: false },
+    // AVANCE
+    { code: '4500', libelle: 'Avance sur salaire',             type: 'RETENUE',  calcMode: 'FIXED',     baseSource: null,           priority: 140, isTaxable: false, isCnssApplicable: false },
+    // TOTAL RETENUES
+    { code: '5000', libelle: 'Total retenues',                 type: 'SUBTOTAL', calcMode: 'FIXED',     baseSource: null,           priority: 150, isTaxable: false, isCnssApplicable: false },
+    // CHARGES PATRONALES
+    { code: '6000', libelle: 'CNSS PF (patronale)',            type: 'PATRONAL', calcMode: 'RATE',      baseSource: 'BASE_CNSS',    priority: 200, isTaxable: false, isCnssApplicable: false, defaultRate: '0.1003' },
+    { code: '6001', libelle: 'CNSS Pension (patronale)',       type: 'PATRONAL', calcMode: 'RATE',      baseSource: 'BASE_CNSS',    priority: 201, isTaxable: false, isCnssApplicable: false, defaultRate: '0.0800' },
+    { code: '6002', libelle: 'CNSS AT/MP (patronale)',         type: 'PATRONAL', calcMode: 'RATE',      baseSource: 'BASE_CNSS',    priority: 202, isTaxable: false, isCnssApplicable: false, defaultRate: '0.0225' },
+    { code: '6003', libelle: 'CFC (patronale)',                type: 'PATRONAL', calcMode: 'RATE',      baseSource: 'BASE_CNSS',    priority: 203, isTaxable: false, isCnssApplicable: false, defaultRate: '0.0100' },
+    { code: '6004', libelle: 'TAP (patronale)',                type: 'PATRONAL', calcMode: 'RATE',      baseSource: 'BASE_CNSS',    priority: 204, isTaxable: false, isCnssApplicable: false, defaultRate: '0.0100' },
+    // TOTAL PATRONAL
+    { code: '7000', libelle: 'Total charges patronales',       type: 'SUBTOTAL', calcMode: 'FIXED',     baseSource: null,           priority: 250, isTaxable: false, isCnssApplicable: false },
+    // NET
+    { code: '9999', libelle: 'Net à payer',                    type: 'NET',      calcMode: 'FIXED',     baseSource: null,           priority: 999, isTaxable: false, isCnssApplicable: false },
+  ];
+
+  const [existingRubrique] = await db.select().from(rubriqueDefinitions).limit(1);
+  if (!existingRubrique) {
+    for (const r of rubriquesData) {
+      await db.insert(rubriqueDefinitions).values(r as any);
+    }
+    results.push({ table: 'rubriqueDefinitions', action: 'created', count: rubriquesData.length });
+  } else {
+    results.push({ table: 'rubriqueDefinitions', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // ================================================================
+  // MAPPING GL OHADA (rubriques/charges → comptes)
+  // ================================================================
+  const glMappingData = [
+    // ENGAGEMENT (validation) — charges de personnel
+    { sourceType: 'AGGREGATE', sourceCode: 'BRUT',            side: 'DEBIT',  accountNumber: '6611', journalCode: 'OD', description: 'Rémunérations du personnel' },
+    { sourceType: 'AGGREGATE', sourceCode: 'NET_A_PAYER',     side: 'CREDIT', accountNumber: '4211', journalCode: 'OD', description: 'Personnel - rémunérations dues' },
+    { sourceType: 'AGGREGATE', sourceCode: 'CNSS_SALARIALE',  side: 'CREDIT', accountNumber: '4311', journalCode: 'OD', description: 'CNSS - cotisations salariales' },
+    { sourceType: 'AGGREGATE', sourceCode: 'IRPP',            side: 'CREDIT', accountNumber: '4421', journalCode: 'OD', description: 'État - IRPP retenu' },
+    { sourceType: 'AGGREGATE', sourceCode: 'AVANCE_DEDUITE',  side: 'CREDIT', accountNumber: '4212', journalCode: 'OD', description: 'Personnel - avances déduites' },
+    // Charges patronales
+    { sourceType: 'AGGREGATE', sourceCode: 'CNSS_PATRONALE',  side: 'DEBIT',  accountNumber: '6641', journalCode: 'OD', description: 'Charges sociales patronales' },
+    { sourceType: 'AGGREGATE', sourceCode: 'CNSS_PATRONALE',  side: 'CREDIT', accountNumber: '4311', journalCode: 'OD', description: 'CNSS - cotisations patronales' },
+    { sourceType: 'AGGREGATE', sourceCode: 'CFC_TAP',         side: 'DEBIT',  accountNumber: '6651', journalCode: 'OD', description: 'Formation professionnelle' },
+    { sourceType: 'AGGREGATE', sourceCode: 'CFC_TAP',         side: 'CREDIT', accountNumber: '4471', journalCode: 'OD', description: 'Formation - cotisations dues' },
+    // PAIEMENT — décaissement
+    { sourceType: 'AGGREGATE', sourceCode: 'PAIEMENT_NET',    side: 'DEBIT',  accountNumber: '4211', journalCode: 'CAI', description: 'Personnel - dette soldée' },
+    { sourceType: 'AGGREGATE', sourceCode: 'PAIEMENT_NET',    side: 'CREDIT', accountNumber: '521',  journalCode: 'CAI', description: 'Caisse - décaissement salaires' },
+  ];
+
+  const [existingGlMapping] = await db.select().from(payrollGlMapping).limit(1);
+  if (!existingGlMapping) {
+    for (const m of glMappingData) {
+      await db.insert(payrollGlMapping).values(m as any);
+    }
+    results.push({ table: 'payrollGlMapping', action: 'created', count: glMappingData.length });
+  } else {
+    results.push({ table: 'payrollGlMapping', action: 'skipped', count: 0, details: 'exists' });
   }
 
   return results;
@@ -2769,7 +2962,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
 
   // 3. Email Templates — Professional HTML with COFIN&CO-M branding
   // Reusable email layout wrapper
-  const emailWrap = (body: string) => `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>COFIN&CO-M</title></head><body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,Helvetica,sans-serif"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><tr><td style="background:linear-gradient(135deg,#1b2d4b 0%,#0f766e 100%);padding:24px 32px;text-align:center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><span style="font-size:28px;font-weight:bold;color:#fff;letter-spacing:1px">COFIN</span><span style="font-size:28px;font-weight:bold;color:#f5a623">&amp;</span><span style="font-size:28px;font-weight:bold;color:#4ebb6b">CO</span><span style="font-size:28px;font-weight:bold;color:#f0c844">-M</span></td></tr><tr><td align="center" style="padding-top:4px"><span style="font-size:12px;color:rgba(255,255,255,0.8);letter-spacing:2px">La Finance Autrement</span></td></tr></table></td></tr><tr><td style="padding:32px">${body}</td></tr><tr><td style="background:#f8f9fa;padding:20px 32px;border-top:1px solid #e9ecef"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:12px;color:#868e96;line-height:1.5">COFIN&amp;CO-M - Microfinance<br>Boulevard Denis Sassou, Brazzaville<br>+242 06 000 00 00</td><td align="right" style="font-size:11px;color:#adb5bd">Cet email a ete envoye automatiquement.<br>Merci de ne pas y repondre.</td></tr></table></td></tr></table></td></tr></table></body></html>`;
+  const emailWrap = (body: string) => `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>COFIN&CO-M</title></head><body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,Helvetica,sans-serif"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><tr><td style="background:linear-gradient(135deg,#1b2d4b 0%,#0f766e 100%);padding:24px 32px;text-align:center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding-bottom:10px"><img src="cid:company-logo" alt="COFIN&amp;CO-M" width="64" height="64" style="border-radius:10px;display:block;margin:0 auto"></td></tr><tr><td align="center"><span style="font-size:28px;font-weight:bold;color:#fff;letter-spacing:1px">COFIN</span><span style="font-size:28px;font-weight:bold;color:#f5a623">&amp;</span><span style="font-size:28px;font-weight:bold;color:#4ebb6b">CO</span><span style="font-size:28px;font-weight:bold;color:#f0c844">-M</span></td></tr><tr><td align="center" style="padding-top:4px"><span style="font-size:12px;color:rgba(255,255,255,0.8);letter-spacing:2px">La Finance Autrement</span></td></tr></table></td></tr><tr><td style="padding:32px">${body}</td></tr><tr><td style="background:#f8f9fa;padding:20px 32px;border-top:1px solid #e9ecef"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:12px;color:#868e96;line-height:1.5">COFIN&amp;CO-M - Microfinance<br>Boulevard Denis Sassou, Brazzaville<br>+242 06 000 00 00</td><td align="right" style="font-size:11px;color:#adb5bd">Cet email a ete envoye automatiquement.<br>Merci de ne pas y repondre.</td></tr></table></td></tr></table></td></tr></table></body></html>`;
 
   const EMAIL_TEMPLATES_DATA = [
     {
@@ -3210,17 +3403,34 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       placeholders: 'userName,permissionName,permissionCode,revokedBy,reason',
       description: 'Notification de revocation de permission temporaire',
     },
+    // ── Bulletin de paie / Payslip email (PDF en pièce jointe) ──
+    {
+      code: 'BULLETIN_PAIE',
+      nom: 'Bulletin de paie',
+      subject: 'Votre bulletin de paie {{period}} - COFIN&CO-M',
+      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bonjour {{employeeName}},</h2><p style="color:#495057;line-height:1.6">Veuillez trouver ci-joint votre bulletin de paie pour la periode <strong>{{period}}</strong>.</p><div style="text-align:center;margin:24px 0;padding:20px;background:#f0fdf4;border-radius:8px"><p style="color:#868e96;margin:0 0 4px;font-size:12px">NET A PAYER</p><p style="color:#0f766e;margin:0;font-size:28px;font-weight:bold">{{salaireNet}} FCFA</p></div><p style="color:#495057;line-height:1.6;font-size:14px">Le detail complet de votre bulletin est disponible dans le fichier PDF joint a cet email.</p><p style="color:#495057;line-height:1.6">Vous pouvez egalement consulter votre bulletin depuis votre espace personnel sur la plateforme COFIN&amp;CO-M.</p><p style="color:#868e96;font-size:13px;margin-top:24px">Ce document est strictement confidentiel.</p>'),
+      contenuText: 'Bonjour {{employeeName}}, veuillez trouver ci-joint votre bulletin de paie pour {{period}}. Net a payer : {{salaireNet}} FCFA. COFIN&CO-M',
+      placeholders: 'employeeName,period,salaireNet',
+      description: 'Email de bulletin de paie avec PDF en piece jointe, envoye lors de la validation du run',
+    },
   ];
 
   let emailCreated = 0;
+  let emailUpdated = 0;
   for (const tpl of EMAIL_TEMPLATES_DATA) {
     const [existing] = await db.select().from(emailTemplates).where(eq(emailTemplates.code, tpl.code));
     if (!existing) {
       await db.insert(emailTemplates).values(tpl);
       emailCreated++;
+    } else {
+      // Update HTML content to pick up emailWrap changes (logo, layout)
+      await db.update(emailTemplates)
+        .set({ contenuHtml: tpl.contenuHtml, contenuText: tpl.contenuText, subject: tpl.subject, placeholders: tpl.placeholders, description: tpl.description })
+        .where(eq(emailTemplates.code, tpl.code));
+      emailUpdated++;
     }
   }
-  results.push({ table: 'emailTemplates', action: emailCreated > 0 ? 'created' : 'skipped', count: emailCreated, details: `${emailCreated}/${EMAIL_TEMPLATES_DATA.length}` });
+  results.push({ table: 'emailTemplates', action: emailCreated > 0 ? 'created' : emailUpdated > 0 ? 'updated' : 'skipped', count: emailCreated + emailUpdated, details: `${emailCreated} created, ${emailUpdated} updated / ${EMAIL_TEMPLATES_DATA.length}` });
 
   // 4. New SMS Templates (Handlebars syntax)
   const NEW_SMS_TEMPLATES_DATA = [

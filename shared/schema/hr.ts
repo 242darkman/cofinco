@@ -1,4 +1,4 @@
-import { pgTable, varchar, text, date, timestamp, integer, serial, uuid, boolean, json, numeric, inet, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, varchar, text, date, timestamp, integer, serial, uuid, boolean, json, numeric, inet, doublePrecision, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
@@ -287,35 +287,43 @@ export type InsertOnboardingChecklist = typeof onboardingChecklists.$inferInsert
 export type OnboardingInstance = typeof onboardingInstances.$inferSelect;
 export type InsertOnboardingInstance = typeof onboardingInstances.$inferInsert;
 
-// Bulletins de paie (archivage)
+// Bulletins de paie
 export const bulletinsPaie = pgTable("bulletins_paie", {
   id: serial("id").primaryKey(),
+  payrollRunId: integer("payroll_run_id"),                    // FK vers payrollRuns.id (ajouté après déclaration)
   employeId: uuid("employe_id").notNull().references(() => employes.id),
-  employeNom: varchar("employe_nom").notNull(), // Dénormalisé
-  mois: varchar("mois").notNull(), // Format: 'YYYY-MM'
-  salaireBase: varchar("salaire_base").notNull(),
-  primeAnciennete: varchar("prime_anciennete").default("0"),
-  primeTransport: varchar("prime_transport").default("0"),
-  primeRendement: varchar("prime_rendement").default("0"),
-  autresPrimes: varchar("autres_primes").default("0"),
-  salaireBrut: varchar("salaire_brut").notNull(),
-  cnssEmploye: varchar("cnss_employe").notNull(),
-  ipr: varchar("ipr").notNull(), // Impôt
-  autresRetenues: varchar("autres_retenues").default("0"),
-  totalRetenues: varchar("total_retenues").notNull(),
-  salaireNet: varchar("salaire_net").notNull(),
-  cnssPatronale: varchar("cnss_patronale").notNull(),
-  detailAvantages: json("detail_avantages").$type<BenefitBreakdownItem[]>(), // Détail des avantages calculés
-  pdfUrl: varchar("pdf_url"), // URL du PDF généré stocké dans Loge Cloud
-  pdfHash: varchar("pdf_hash"), // Hash SHA256 pour vérifier l'intégrité
-  genereParId: uuid("genere_par_id"), // User ID qui a généré
-  statut: varchar("statut").default("DRAFT"), // 'DRAFT', 'VALIDATED', 'PAID'
+  employeNom: varchar("employe_nom").notNull(),               // Dénormalisé
+  mois: varchar("mois").notNull(),                            // Format: 'YYYY-MM'
+  version: integer("version").notNull().default(1),           // Version du bulletin (re-run)
+  // Totaux calculés par le moteur
+  salaireBrut: numeric("salaire_brut", { precision: 12, scale: 0 }).notNull().default("0"),
+  totalChargesSalariales: numeric("total_charges_salariales", { precision: 12, scale: 0 }).notNull().default("0"),
+  totalChargesPatronales: numeric("total_charges_patronales", { precision: 12, scale: 0 }).notNull().default("0"),
+  irpp: numeric("irpp", { precision: 12, scale: 0 }).notNull().default("0"),
+  totalRetenues: numeric("total_retenues", { precision: 12, scale: 0 }).notNull().default("0"),
+  salaireNet: numeric("salaire_net", { precision: 12, scale: 0 }).notNull().default("0"),
+  // Contexte employé snapshot (immutable au moment du calcul)
+  salaireBaseSnapshot: integer("salaire_base_snapshot").notNull().default(0),
+  situationFamilialeSnapshot: varchar("situation_familiale_snapshot", { length: 20 }),
+  nombreEnfantsSnapshot: integer("nombre_enfants_snapshot").default(0),
+  coefficientProrataSnapshot: numeric("coefficient_prorata_snapshot", { precision: 5, scale: 4 }).default("1.0000"),
+  // PDF
+  pdfUrl: varchar("pdf_url"),
+  pdfHash: varchar("pdf_hash"),
+  // Workflow
+  genereParId: uuid("genere_par_id"),
+  statut: varchar("statut").default("DRAFT"),                 // DRAFT, VALIDATED, PAID, CANCELLED
   datePaiement: date("date_paiement"),
-  // GL Posting tracking (PR-4)
-  engagementMouvementId: uuid("engagement_mouvement_id"), // Set when VALIDATED → mouvement engagement
-  paiementMouvementId: uuid("paiement_mouvement_id"),     // Set when PAID → mouvement décaissement
-  engagementEcritureId: uuid("engagement_ecriture_id"),   // GL écriture for engagement
-  paiementEcritureId: uuid("paiement_ecriture_id"),       // GL écriture for payment
+  // Annulation (re-run)
+  cancelled: boolean("cancelled").default(false),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelledReason: text("cancelled_reason"),
+  previousBulletinId: integer("previous_bulletin_id"),        // Self-ref si re-run
+  // GL Posting tracking
+  engagementMouvementId: uuid("engagement_mouvement_id"),
+  paiementMouvementId: uuid("paiement_mouvement_id"),
+  engagementEcritureId: uuid("engagement_ecriture_id"),
+  paiementEcritureId: uuid("paiement_ecriture_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -323,7 +331,7 @@ export const bulletinsPaie = pgTable("bulletins_paie", {
 export const payslipLines = pgTable("payslip_lines", {
   id: serial("id").primaryKey(),
   bulletinId: integer("bulletin_id").notNull().references(() => bulletinsPaie.id, { onDelete: "cascade" }),
-  code: varchar("code", { length: 10 }).notNull(),          // '100', '2000', '4950', etc.
+  code: varchar("code", { length: 30 }).notNull(),          // '100', '2000', 'CNSS_PENSION_E', etc.
   libelle: varchar("libelle", { length: 100 }).notNull(),
   category: varchar("category", { length: 20 }).notNull(),  // 'GAIN', 'RETENUE', 'PATRONAL', 'SUBTOTAL', 'NET'
   base: integer("base").default(0),
@@ -535,7 +543,7 @@ export const payrollConfig = pgTable("payroll_config", {
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
 });
 
-// Type pour les tranches IPR
+// Legacy IprBracket (kept for payrollConfig backward compat during migration — will be replaced by irppBaremes)
 export interface IprBracket {
   min: number;
   max: number | null;
@@ -627,7 +635,7 @@ export const BulletinStatus = {
   DRAFT: 'DRAFT',
   VALIDATED: 'VALIDATED',
   PAID: 'PAID',
-  ARCHIVED: 'ARCHIVED',
+  CANCELLED: 'CANCELLED',
 } as const;
 export type BulletinStatusType = typeof BulletinStatus[keyof typeof BulletinStatus];
 
@@ -854,3 +862,243 @@ export const insertEmployeeDocumentSchema = createInsertSchema(employeeDocuments
 
 export type InsertEmployeeDocument = z.infer<typeof insertEmployeeDocumentSchema>;
 export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
+
+// =============================================================================
+// PAYROLL ENGINE TABLES — Congo-Brazzaville
+// =============================================================================
+
+// Conventions collectives
+export const conventionsCollectives = pgTable("conventions_collectives", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+  libelle: text("libelle").notNull(),
+  pays: varchar("pays", { length: 5 }).notNull().default("CG"),        // ISO code
+  secteur: varchar("secteur", { length: 50 }).notNull(),
+  dureeEssaiCDI: integer("duree_essai_cdi"),                             // en jours
+  dureeEssaiCDD: integer("duree_essai_cdd"),
+  congesAnnuels: integer("conges_annuels").default(26),                  // jours ouvrables
+  heuresHebdo: numeric("heures_hebdo", { precision: 4, scale: 1 }).default("40.0"),
+  defaults: jsonb("defaults").$type<Record<string, any>>(),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ConventionCollective = typeof conventionsCollectives.$inferSelect;
+
+// Qualification-coefficients (grille convention collective)
+export const qualificationCoefficients = pgTable("qualification_coefficients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conventionCollectiveId: uuid("convention_collective_id").notNull().references(() => conventionsCollectives.id, { onDelete: "cascade" }),
+  categorie: varchar("categorie", { length: 30 }).notNull(),             // OUVRIER, EMPLOYE, AGENT_MAITRISE, CADRE, CADRE_SUP
+  echelon: integer("echelon").notNull(),
+  coefficient: integer("coefficient").notNull(),
+  salaireMinimum: integer("salaire_minimum").notNull(),                  // FCFA
+  description: text("description"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type QualificationCoefficient = typeof qualificationCoefficients.$inferSelect;
+
+// Payroll Runs — concept de traitement groupé avec versioning
+export const payrollRuns = pgTable("payroll_runs", {
+  id: serial("id").primaryKey(),
+  period: varchar("period", { length: 7 }).notNull(),                    // YYYY-MM
+  version: integer("version").notNull().default(1),
+  status: varchar("status", { length: 20 }).notNull().default("DRAFT"), // DRAFT, VALIDATED, PAID, CLOSED, CANCELLED
+  agenceId: uuid("agence_id").references(() => agences.id),
+  // Versioning (re-run)
+  rerunOfRunId: integer("rerun_of_run_id"),                              // Self-ref vers ancien run
+  rerunReason: text("rerun_reason"),
+  // Workflow
+  generatedBy: uuid("generated_by").references(() => users.id, { onDelete: "set null" }),
+  validatedBy: uuid("validated_by").references(() => users.id, { onDelete: "set null" }),
+  validatedAt: timestamp("validated_at"),
+  paidBy: uuid("paid_by").references(() => users.id, { onDelete: "set null" }),
+  paidAt: timestamp("paid_at"),
+  closedAt: timestamp("closed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelledReason: text("cancelled_reason"),
+  // Totaux agrégés
+  totalBrut: numeric("total_brut", { precision: 14, scale: 0 }).default("0"),
+  totalNet: numeric("total_net", { precision: 14, scale: 0 }).default("0"),
+  totalChargesPatronales: numeric("total_charges_patronales", { precision: 14, scale: 0 }).default("0"),
+  totalChargesSalariales: numeric("total_charges_salariales", { precision: 14, scale: 0 }).default("0"),
+  employeeCount: integer("employee_count").default(0),
+  issueCount: integer("issue_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  idxPeriod: index("idx_payroll_runs_period").on(t.period),
+  idxStatus: index("idx_payroll_runs_status").on(t.status),
+}));
+
+export type PayrollRun = typeof payrollRuns.$inferSelect;
+export type InsertPayrollRun = typeof payrollRuns.$inferInsert;
+
+export const PayrollRunStatus = {
+  DRAFT: 'DRAFT',
+  VALIDATED: 'VALIDATED',
+  PAID: 'PAID',
+  CLOSED: 'CLOSED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type PayrollRunStatusType = typeof PayrollRunStatus[keyof typeof PayrollRunStatus];
+
+// Rubrique definitions — catalogue paramétrable
+export const rubriqueDefinitions = pgTable("rubrique_definitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 10 }).notNull().unique(),
+  libelle: varchar("libelle", { length: 120 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(),                      // GAIN, RETENUE, PATRONAL, SUBTOTAL, NET
+  calcMode: varchar("calc_mode", { length: 20 }).notNull().default("FIXED"), // FIXED, RATE, BASE_RATE, FORMULA, LOOKUP
+  baseSource: varchar("base_source", { length: 30 }),                    // SALAIRE_BASE, BRUT, BASE_CNSS, TAUX_HORAIRE, BRUT_IMPOSABLE
+  defaultRate: numeric("default_rate", { precision: 10, scale: 4 }),
+  defaultAmount: integer("default_amount"),
+  roundingRule: varchar("rounding_rule", { length: 10 }).default("ROUND"), // ROUND, FLOOR, CEIL
+  isTaxable: boolean("is_taxable").default(true),
+  isCnssApplicable: boolean("is_cnss_applicable").default(true),
+  priority: integer("priority").notNull().default(100),                  // Ordre de calcul
+  active: boolean("active").default(true),
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxCode: index("idx_rubrique_definitions_code").on(t.code),
+  idxPriority: index("idx_rubrique_definitions_priority").on(t.priority),
+}));
+
+export type RubriqueDefinition = typeof rubriqueDefinitions.$inferSelect;
+
+// Charge definitions — charges sociales/fiscales paramétrables et historisées
+export const chargeDefinitions = pgTable("charge_definitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+  libelle: varchar("libelle", { length: 120 }).notNull(),
+  organisme: varchar("organisme", { length: 20 }).notNull(),             // CNSS, IMPOT, CFC, AUTRE
+  side: varchar("side", { length: 10 }).notNull(),                       // EMPLOYEE, EMPLOYER, BOTH
+  assietteRule: varchar("assiette_rule", { length: 30 }).notNull(),      // BASE_CNSS, BRUT_IMPOSABLE
+  rate: numeric("rate", { precision: 8, scale: 4 }).notNull(),           // ex: 0.0400 pour 4%
+  plafond: integer("plafond"),                                           // Plafond mensuel assiette
+  plancher: integer("plancher"),                                         // Plancher
+  effectiveFrom: date("effective_from").notNull().defaultNow(),
+  effectiveTo: date("effective_to"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxCode: index("idx_charge_definitions_code").on(t.code),
+  idxActive: index("idx_charge_definitions_active").on(t.active),
+}));
+
+export type ChargeDefinition = typeof chargeDefinitions.$inferSelect;
+
+// Overtime log — heures supplémentaires différenciées
+export const overtimeLog = pgTable("overtime_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  hours: numeric("hours", { precision: 5, scale: 2 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(),                      // NORMAL_25, NORMAL_50, NIGHT, HOLIDAY
+  presenceId: integer("presence_id"),                                    // Optionnel FK vers presences
+  approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxEmployeDate: index("idx_overtime_log_employe_date").on(t.employeId, t.date),
+}));
+
+export type OvertimeLogEntry = typeof overtimeLog.$inferSelect;
+
+export const OvertimeType = {
+  NORMAL_25: 'NORMAL_25',     // +25% majoration
+  NORMAL_50: 'NORMAL_50',     // +50% majoration
+  NIGHT: 'NIGHT',             // Heures de nuit
+  HOLIDAY: 'HOLIDAY',         // Jours fériés
+} as const;
+
+// Payroll GL Mapping — mapping paramétrable rubrique/charge → comptes GL
+export const payrollGlMapping = pgTable("payroll_gl_mapping", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceType: varchar("source_type", { length: 20 }).notNull(),          // RUBRIQUE, CHARGE, AGGREGATE
+  sourceCode: varchar("source_code", { length: 20 }).notNull(),          // Code rubrique ou charge
+  side: varchar("side", { length: 10 }).notNull(),                       // DEBIT, CREDIT
+  accountNumber: varchar("account_number", { length: 20 }).notNull(),    // Numéro compte plan comptable
+  journalCode: varchar("journal_code", { length: 10 }).notNull(),
+  description: text("description"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxSource: index("idx_payroll_gl_mapping_source").on(t.sourceType, t.sourceCode),
+}));
+
+export type PayrollGlMappingEntry = typeof payrollGlMapping.$inferSelect;
+
+// Payroll run issues — suivi des blocages par employé/run
+export const payrollRunIssues = pgTable("payroll_run_issues", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  payrollRunId: integer("payroll_run_id").notNull(),                     // FK vers payrollRuns.id
+  employeId: uuid("employe_id").references(() => employes.id, { onDelete: "set null" }),
+  field: varchar("field", { length: 50 }),
+  severity: varchar("severity", { length: 10 }).notNull().default("WARNING"), // WARNING, BLOCKING
+  message: text("message").notNull(),
+  resolved: boolean("resolved").default(false),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxRun: index("idx_payroll_run_issues_run").on(t.payrollRunId),
+}));
+
+export type PayrollRunIssue = typeof payrollRunIssues.$inferSelect;
+
+// IRPP Barème (stocké en DB pour historisation, pas dans payrollConfig)
+export const irppBaremes = pgTable("irpp_baremes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 20 }).notNull(),                      // ex: "CG_2024"
+  pays: varchar("pays", { length: 5 }).notNull().default("CG"),
+  libelle: text("libelle").notNull(),
+  abattementForfaitaire: numeric("abattement_forfaitaire", { precision: 5, scale: 4 }).notNull().default("0.2000"), // 20%
+  brackets: jsonb("brackets").$type<IrppBracket[]>().notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  effectiveTo: date("effective_to"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type IrppBareme = typeof irppBaremes.$inferSelect;
+
+export interface IrppBracket {
+  min: number;
+  max: number | null;
+  rate: number;
+}
+
+// =============================================================================
+// NEW TYPES & SCHEMAS
+// =============================================================================
+
+export const insertPayrollRunSchema = createInsertSchema(payrollRuns).omit({ id: true, createdAt: true });
+export const insertRubriqueDefinitionSchema = createInsertSchema(rubriqueDefinitions).omit({ id: true, createdAt: true });
+export const insertChargeDefinitionSchema = createInsertSchema(chargeDefinitions).omit({ id: true, createdAt: true });
+export const insertOvertimeLogSchema = createInsertSchema(overtimeLog).omit({ id: true, createdAt: true });
+export const insertPayrollGlMappingSchema = createInsertSchema(payrollGlMapping).omit({ id: true, createdAt: true });
+export const insertPayrollRunIssueSchema = createInsertSchema(payrollRunIssues).omit({ id: true, createdAt: true });
+export const insertIrppBaremeSchema = createInsertSchema(irppBaremes).omit({ id: true, createdAt: true });
+export const insertConventionCollectiveSchema = createInsertSchema(conventionsCollectives).omit({ id: true, createdAt: true });
+export const insertQualificationCoefficientSchema = createInsertSchema(qualificationCoefficients).omit({ id: true, createdAt: true });
+
+// Motif sortie
+export const MotifSortie = {
+  DEMISSION: 'DEMISSION',
+  LICENCIEMENT: 'LICENCIEMENT',
+  FIN_CDD: 'FIN_CDD',
+  RETRAITE: 'RETRAITE',
+  DECES: 'DECES',
+} as const;
+
+// Situation familiale (pour calcul parts IRPP)
+export const SituationFamiliale = {
+  CELIBATAIRE: 'CELIBATAIRE',
+  MARIE: 'MARIE',
+  VEUF: 'VEUF',
+  DIVORCE: 'DIVORCE',
+} as const;

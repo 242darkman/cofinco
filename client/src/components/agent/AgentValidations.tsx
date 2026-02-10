@@ -557,9 +557,8 @@ export default function AgentValidations() {
           size="sm"
           onClick={() => loadData(false)}
           disabled={loading || processing}
-          icon={RefreshCw}
-          className={isRefreshing ? 'animate-spin' : ''}
         >
+          <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
           <span className="hidden sm:inline">Actualiser</span>
         </Button>
       </div>

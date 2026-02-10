@@ -50,7 +50,7 @@ export function registerSettingsRoutes(app: Express) {
       if (!result) {
         // Return defaults if no settings exist
         return res.json({
-          agence_name: 'COFIN - Microfinance',
+          agence_name: 'COFIN&CO-M',
           agence_code: 'COF001',
           devise: 'XAF',
           pays: 'République du Congo',

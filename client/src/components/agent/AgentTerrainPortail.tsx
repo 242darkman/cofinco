@@ -43,8 +43,8 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
   const [moduleLoading, setModuleLoading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Prospection badge counts
-  const { totalCount: prospectionCount } = useProspectionBadge();
+  // Prospection badge counts - only show badge for new (REGISTERED) prospects
+  const { newCount: prospectionCount } = useProspectionBadge();
 
   // Admin / Supervisor shared state
   const isAdminOrSupervisor = authService.isAdmin() || authService.hasRole?.('superviseur') || authService.hasRole?.('chef_agence');

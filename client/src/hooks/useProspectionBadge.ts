@@ -16,6 +16,7 @@ import { useIsOnline } from '@/contexts/NetworkContext';
 export interface ProspectionBadgeData {
   totalCount: number;
   activeCount: number;
+  newCount: number;
   isLoading: boolean;
 }
 
@@ -23,19 +24,22 @@ export function useProspectionBadge(agentId?: string) {
   const [data, setData] = useState<ProspectionBadgeData>({
     totalCount: 0,
     activeCount: 0,
+    newCount: 0,
     isLoading: true,
   });
 
   const loadCounts = useCallback(async () => {
     try {
       const params = agentId ? { agentId } : undefined;
-      const [allResult, activeResult] = await Promise.all([
+      const [allResult, activeResult, newResult] = await Promise.all([
         prospectionApi.countAll(params),
         prospectionApi.countActive(params),
+        prospectionApi.countNew(params),
       ]);
       setData({
         totalCount: allResult.count || 0,
         activeCount: activeResult.count || 0,
+        newCount: newResult.count || 0,
         isLoading: false,
       });
     } catch (error) {

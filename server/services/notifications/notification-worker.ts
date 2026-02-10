@@ -10,9 +10,12 @@ import { SmtpEmailProvider } from "./providers/email.provider";
 import type {
   SmsProvider,
   EmailProvider,
+  EmailAttachment,
   SendResult,
 } from "./providers/provider.interface";
 import { createLogger } from "../../lib/logger";
+import { getLogoBuffer } from "../../lib/company-logo";
+import { StorageService } from "../storage-service";
 
 const logger = createLogger('NotifWorker');
 
@@ -185,8 +188,43 @@ async function processEmailJob(job: {
     job.template_code,
     job.payload
   );
+
+  // Build attachments list
+  const attachments: EmailAttachment[] = [];
+
+  // Always include company logo as inline CID (for <img src="cid:company-logo">)
+  const logoBuffer = getLogoBuffer();
+  if (logoBuffer) {
+    attachments.push({
+      filename: 'cofin-logo.png',
+      content: logoBuffer,
+      contentType: 'image/png',
+      cid: 'company-logo',
+    });
+  }
+
+  // Resolve storage-based file attachments from payload._attachments
+  const payloadAttachments = job.payload._attachments;
+  if (Array.isArray(payloadAttachments)) {
+    for (const att of payloadAttachments as Array<{ storageKey: string; filename: string; contentType?: string }>) {
+      try {
+        const obj = await StorageService.getPrivateObject(att.storageKey);
+        const bytes = await obj.Body!.transformToByteArray();
+        attachments.push({
+          filename: att.filename,
+          content: Buffer.from(bytes),
+          contentType: att.contentType || 'application/pdf',
+        });
+      } catch (err) {
+        logger.warn({ err, storageKey: att.storageKey }, 'Failed to fetch attachment from storage');
+      }
+    }
+  }
+
   const provider = getEmailProvider();
-  return provider.send(job.recipient, subject, html, text);
+  return provider.send(job.recipient, subject, html, text,
+    attachments.length > 0 ? { attachments } : undefined
+  );
 }
 
 // ============================================================================

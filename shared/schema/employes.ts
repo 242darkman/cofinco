@@ -46,6 +46,15 @@ export const employes = pgTable("employes", {
   coefficient: integer("coefficient"),                         // Coefficient salarial (ex: 100, 150, 220)
   categorie: varchar("categorie", { length: 20 }),            // Catégorie (ex: 'CADRE', 'AGENT_MAITRISE', 'OUVRIER')
 
+  // Sortie
+  dateSortie: date("date_sortie"),
+  motifSortie: varchar("motif_sortie", { length: 50 }), // DEMISSION, LICENCIEMENT, FIN_CDD, RETRAITE, DECES
+
+  // Fiscal & Social
+  niu: varchar("niu", { length: 30 }),                                          // Numéro d'Identification Unique fiscal
+  situationFamiliale: varchar("situation_familiale", { length: 20 }).default("CELIBATAIRE"), // CELIBATAIRE, MARIE, VEUF, DIVORCE
+  nombreEnfantsCharge: integer("nombre_enfants_charge").default(0),
+
   // Sécurité Caisse
   caissePin: text("caisse_pin"), // PIN hashé pour autorisation caisse
 
