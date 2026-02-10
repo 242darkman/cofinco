@@ -43,9 +43,10 @@ export async function evaluateClientAlerts(clientId: string): Promise<ClientAler
   const client = await storage.getClient(clientId);
   if (!client) return [];
 
-  // Load resolved alert types from client.alerts JSON
-  const resolvedEntries: ResolvedAlertEntry[] = Array.isArray(client.alerts)
-    ? (client.alerts as ResolvedAlertEntry[]).filter((a: any) => a.resolvedAt)
+  // Load resolved alert types from client metadata JSON
+  const clientAny = client as any;
+  const resolvedEntries: ResolvedAlertEntry[] = Array.isArray(clientAny.alerts)
+    ? (clientAny.alerts as ResolvedAlertEntry[]).filter((a: any) => a.resolvedAt)
     : [];
   const resolvedTypes = new Set(resolvedEntries.map((e) => e.alertType));
 
@@ -120,7 +121,7 @@ export async function evaluateClientAlerts(clientId: string): Promise<ClientAler
   try {
     const comptes = await getComptesByClient(clientId);
     const compteCourant = comptes.find(
-      (c) => c.typeCompte === "Courant" && c.statut === StatutCompte.ACTIVE
+      (c) => (c.typeCompte as string) === "Courant" && (c.statut as string) === StatutCompte.ACTIVE
     );
     if (
       compteCourant &&
@@ -156,8 +157,9 @@ export async function resolveClientAlert(
   const client = await storage.getClient(clientId);
   if (!client) return false;
 
-  const existingResolved: ResolvedAlertEntry[] = Array.isArray(client.alerts)
-    ? (client.alerts as ResolvedAlertEntry[])
+  const clientAny = client as any;
+  const existingResolved: ResolvedAlertEntry[] = Array.isArray(clientAny.alerts)
+    ? (clientAny.alerts as ResolvedAlertEntry[])
     : [];
 
   // Don't duplicate

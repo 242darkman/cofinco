@@ -31,7 +31,7 @@ export function registerTontineRoutes(app: Express) {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
       // On passe le filtre directement au storage qui l'applique en SQL
-      const filter = agenceFilter ? { agenceId: agenceFilter.agenceId } : {};
+      const filter = agenceFilter ? { agence: agenceFilter.agenceId } : {};
       const tontines = await storage.getAllTontines(filter);
 
       res.json(tontines);

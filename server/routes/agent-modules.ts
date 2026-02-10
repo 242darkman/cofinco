@@ -1006,7 +1006,7 @@ export function registerAgentModulesRoutes(app: Express) {
         formateur: "Auto-Assignment", // Default or required field
         duree: `${duree_heures} heures`, // Legacy/Display field
         statut: "PLANNED",
-        dateDebut: new Date().toISOString().slice(0, 10), // Required by schema, defaulting to today
+        dateDebut: new Date(), // Required by schema, defaulting to today
       }).returning();
 
       logAudit(req, "CREATE", "agent_formation", String(row.id), { titre });

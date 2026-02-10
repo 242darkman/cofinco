@@ -29,6 +29,7 @@ export interface StatCardProps {
   subtitle?: React.ReactNode;
   className?: string;
   onClick?: () => void;
+  compact?: boolean;
 }
 
 const StatCard: React.FC<StatCardProps> = ({

@@ -1667,6 +1667,7 @@ export const STATUT_CANDIDATURE_LABELS: Record<StatutCandidatureType, string> = 
 
 export const StatutEcheanceCredit = {
   UPCOMING: "UPCOMING",
+  DUE: "DUE",
   PAID: "PAID",
   LATE: "LATE",
   SETTLED: "SETTLED",
@@ -1678,6 +1679,7 @@ export type StatutEcheanceCreditType = (typeof StatutEcheanceCredit)[keyof typeo
 /** Labels FR pour l'UI des statuts d'échéance */
 export const STATUT_ECHEANCE_CREDIT_LABELS: Record<StatutEcheanceCreditType, string> = {
   [StatutEcheanceCredit.UPCOMING]: "A venir",
+  [StatutEcheanceCredit.DUE]: "Dû",
   [StatutEcheanceCredit.PAID]: "Payé",
   [StatutEcheanceCredit.LATE]: "Retard",
   [StatutEcheanceCredit.SETTLED]: "Soldé",

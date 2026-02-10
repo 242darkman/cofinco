@@ -27,10 +27,18 @@ const AdminVirementsProgrammes = lazy(() => import('@/components/admin/AdminVire
 // const ReconciliationPage = lazy(() => import('@/pages/finance/ReconciliationPage')); // Masqué temporairement
 const TresoreriePage = lazy(() => import('@/pages/finance/TresoreriePage'));
 
+/**
+ * Mapping sous-route URL → sous-module interne
+ */
+export interface SubRouteMapping {
+  path: string;
+  subModule: string;
+  label: string;
+}
 
 export interface RouteConfig {
   key: string;
-  path: string;
+  path: string; // Chemin URL réel (source unique de vérité)
   component: React.LazyExoticComponent<ComponentType<any>> | null;
   requiredModule?: AppModule; // Module from MODULE_ACCESS (source unique de vérité)
   requiredRoles?: SystemRole[]; // Override manuel (cas particuliers uniquement)
@@ -43,17 +51,22 @@ export interface RouteConfig {
   group?: 'Principal' | 'Services Clients' | 'Opérations' | 'Gestion' | 'Système';
   children?: RouteConfig[];
   defaultChild?: string;
+  /** Sous-routes URL pour ce module (tabs, sous-vues). N'apparaissent pas dans la sidebar. */
+  subRoutes?: SubRouteMapping[];
 }
 
 /**
- * Configuration centrale des routes avec protection RBAC et sous-routes
- * Les routes utilisent désormais requiredModule qui référence MODULE_ACCESS
+ * Configuration centrale des routes — SOURCE UNIQUE DE VÉRITÉ
+ *
+ * Le champ `path` contient le vrai chemin URL visible par l'utilisateur.
+ * Le champ `subRoutes` définit les sous-chemins URL (tabs, sous-vues).
+ * Les fonctions getModuleFromPath() et getPathForModule() dérivent de ce tableau.
  */
 export const ROUTES: RouteConfig[] = [
   // --- Tableau de bord ---
   {
     key: 'dashboard',
-    path: '/dashboard',
+    path: '/',
     component: Dashboard,
     requiredModule: 'Dashboard',
     label: 'Tableau de bord',
@@ -70,6 +83,9 @@ export const ROUTES: RouteConfig[] = [
     label: 'Clients',
     labelKey: 'menuClients',
     group: 'Services Clients',
+    subRoutes: [
+      { path: '/clients/nouveau', subModule: 'new', label: 'Nouveau client' },
+    ],
   },
   {
     key: 'credits',
@@ -79,6 +95,10 @@ export const ROUTES: RouteConfig[] = [
     label: 'Crédits',
     labelKey: 'menuCredits',
     group: 'Services Clients',
+    subRoutes: [
+      { path: '/credits/demandes', subModule: 'demandes', label: 'Demandes de crédit' },
+      { path: '/credits/portefeuille', subModule: 'portefeuille', label: 'Portefeuille' },
+    ],
   },
   {
     key: 'remboursements',
@@ -97,6 +117,9 @@ export const ROUTES: RouteConfig[] = [
     label: 'Comptes',
     labelKey: 'menuCompte',
     group: 'Services Clients',
+    subRoutes: [
+      { path: '/epargnes/comptes', subModule: 'comptes', label: 'Tous les comptes' },
+    ],
   },
   {
     key: 'tontines',
@@ -117,10 +140,18 @@ export const ROUTES: RouteConfig[] = [
     label: 'Caisse',
     labelKey: 'menuCaisse',
     group: 'Opérations',
+    subRoutes: [
+      { path: '/caisse/mobile-money', subModule: 'mobile-money', label: 'Mobile Money' },
+      { path: '/caisse/especes', subModule: 'especes', label: 'Espèces' },
+      { path: '/caisse/historique', subModule: 'historique', label: 'Historique' },
+      { path: '/caisse/etats', subModule: 'etats', label: 'États de caisse' },
+      { path: '/caisse/supervision', subModule: 'supervision', label: 'Supervision' },
+      { path: '/caisse/audit', subModule: 'audit', label: 'Audit' },
+    ],
   },
   {
     key: 'agentTerrain',
-    path: '/terrain',
+    path: '/agent-terrain',
     component: AgentTerrain,
     requiredModule: 'Agent Terrain',
     label: 'Collecte terrain',
@@ -129,7 +160,7 @@ export const ROUTES: RouteConfig[] = [
   },
   {
     key: 'agentModules',
-    path: '/terrain/modules',
+    path: '/agent-terrain/modules',
     component: AgentTerrainPortail,
     requiredModule: 'Agent Terrain',
     label: 'Gestion Agent',
@@ -138,7 +169,7 @@ export const ROUTES: RouteConfig[] = [
   },
   {
     key: 'agentValidations',
-    path: '/terrain/validations',
+    path: '/agent-terrain/validations',
     component: AgentValidations,
     requiredRoles: [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR],
     label: 'Validations',
@@ -147,7 +178,7 @@ export const ROUTES: RouteConfig[] = [
   },
   {
     key: 'transfert',
-    path: '/transfert',
+    path: '/transferts',
     component: TransfertArgent,
     requiredModule: 'Communications',
     label: 'Transferts',
@@ -156,7 +187,7 @@ export const ROUTES: RouteConfig[] = [
   },
   {
     key: 'coffre',
-    path: '/coffre',
+    path: '/coffre-fort',
     component: CoffreFortDashboard,
     requiredModule: 'Coffre-Fort',
     label: 'Coffre-Fort',
@@ -165,7 +196,7 @@ export const ROUTES: RouteConfig[] = [
   },
   {
     key: 'tresorerie',
-    path: '/finance/tresorerie',
+    path: '/tresorerie',
     component: TresoreriePage,
     requiredModule: 'Caisse',
     label: 'Trésorerie',
@@ -174,7 +205,7 @@ export const ROUTES: RouteConfig[] = [
   },
   // {
   //   key: 'reconciliation',
-  //   path: '/finance/reconciliation',
+  //   path: '/reconciliation',
   //   component: ReconciliationPage,
   //   requiredModule: 'Administration',
   //   label: 'Réconciliation MM',
@@ -183,7 +214,7 @@ export const ROUTES: RouteConfig[] = [
   // }, // Masqué temporairement
   {
     key: 'virements_programmes',
-    path: '/virements',
+    path: '/virements-programmes',
     component: AdminVirementsProgrammes,
     requiredModule: 'Virements Programmes',
     label: 'Virements Programmés',
@@ -200,6 +231,11 @@ export const ROUTES: RouteConfig[] = [
     label: 'Comptabilité',
     labelKey: 'menuComptabilite',
     group: 'Gestion',
+    subRoutes: [
+      { path: '/comptabilite/journal', subModule: 'journal', label: 'Journal' },
+      { path: '/comptabilite/grand-livre', subModule: 'grand-livre', label: 'Grand Livre' },
+      { path: '/comptabilite/balance', subModule: 'balance', label: 'Balance' },
+    ],
   },
   {
     key: 'rapports',
@@ -212,22 +248,56 @@ export const ROUTES: RouteConfig[] = [
   },
   {
     key: 'rh',
-    path: '/rh',
+    path: '/ressources-humaines',
     component: RessourcesHumaines,
     requiredModule: 'Administration',
     label: 'Personnel',
     labelKey: 'menuRH',
     group: 'Gestion',
+    subRoutes: [
+      { path: '/ressources-humaines/tableau-de-bord', subModule: 'dashboard', label: 'Tableau de bord' },
+      { path: '/ressources-humaines/employes', subModule: 'list', label: 'Employés' },
+      { path: '/ressources-humaines/presence', subModule: 'presence', label: 'Présence' },
+      { path: '/ressources-humaines/conges', subModule: 'conges', label: 'Congés' },
+      { path: '/ressources-humaines/formations', subModule: 'formations', label: 'Formations' },
+      { path: '/ressources-humaines/sanctions', subModule: 'sanctions', label: 'Sanctions' },
+      { path: '/ressources-humaines/avantages', subModule: 'avantages', label: 'Avantages' },
+      { path: '/ressources-humaines/paie', subModule: 'paie', label: 'Paie & Docs' },
+      { path: '/ressources-humaines/recrutement', subModule: 'recrutement', label: 'Recrutement' },
+      { path: '/ressources-humaines/organigramme', subModule: 'organigramme', label: 'Organigramme' },
+    ],
   },
   // --- Système ---
   {
     key: 'administrateur',
-    path: '/admin',
+    path: '/administration',
     component: AdminModuleComplet,
     requiredModule: 'Administration',
     label: 'Administration',
     labelKey: 'menuAdmin',
     group: 'Système',
+    subRoutes: [
+      { path: '/administration/dashboard', subModule: 'dashboard', label: 'Dashboard' },
+      { path: '/administration/personnel', subModule: 'profils', label: 'Personnel' },
+      { path: '/administration/utilisateurs', subModule: 'users', label: 'Utilisateurs' },
+      { path: '/administration/logs', subModule: 'logs', label: 'Logs' },
+      { path: '/administration/sessions', subModule: 'sessions', label: 'Sessions' },
+      { path: '/administration/acces', subModule: 'roles', label: 'Gestion des Accès' },
+      { path: '/administration/maintenance', subModule: 'maintenance', label: 'Maintenance' },
+      { path: '/administration/caisses', subModule: 'caisses', label: 'Caisses' },
+      { path: '/administration/credits', subModule: 'credits', label: 'Crédits' },
+      { path: '/administration/tontines', subModule: 'tontines', label: 'Tontines' },
+      { path: '/administration/agences', subModule: 'agences', label: 'Agences' },
+      { path: '/administration/zones', subModule: 'zones', label: 'Zones' },
+      { path: '/administration/notifications', subModule: 'notifications', label: 'Notifications' },
+      { path: '/administration/version', subModule: 'updates', label: 'Version' },
+      { path: '/administration/codes-caisse', subModule: 'codes', label: 'Codes Caisse' },
+      { path: '/administration/regularisation', subModule: 'regularisation', label: 'Régularisation' },
+      { path: '/administration/acces-clients', subModule: 'client-credentials', label: 'Accès Clients' },
+      { path: '/administration/taux-produits', subModule: 'product-rates', label: 'Taux Produits' },
+      { path: '/administration/zones-commerciales', subModule: 'zones-commerciales', label: 'Arrondissements & Marchés' },
+      { path: '/administration/primes-config', subModule: 'primes-config', label: 'Config Primes' },
+    ],
   },
   {
     key: 'messages',
@@ -377,7 +447,80 @@ export function getRouteByKey(key: string): RouteConfig | undefined {
  * Trouve la route parente d'une sous-route
  */
 export function getParentRoute(childKey: string): RouteConfig | undefined {
-  return ROUTES.find(route => 
+  return ROUTES.find(route =>
     route.children?.some(child => child.key === childKey)
   );
+}
+
+// ============================================================
+// URL ↔ Module mapping (source unique de vérité)
+// Remplace l'ancien fichier config/routes.tsx
+// ============================================================
+
+interface UrlRouteEntry {
+  path: string;
+  moduleKey: string;
+  subModule?: string;
+}
+
+/**
+ * Table de mapping URL plate dérivée de ROUTES + leurs subRoutes.
+ * Triée du plus spécifique (chemin le plus long) au plus générique.
+ */
+const _urlMap: UrlRouteEntry[] = ROUTES.flatMap(route => {
+  const entries: UrlRouteEntry[] = [
+    { path: route.path, moduleKey: route.key },
+  ];
+  if (route.subRoutes) {
+    entries.push(
+      ...route.subRoutes.map(sr => ({
+        path: sr.path,
+        moduleKey: route.key,
+        subModule: sr.subModule,
+      }))
+    );
+  }
+  return entries;
+}).sort((a, b) => b.path.length - a.path.length);
+
+/**
+ * Obtenir la configuration module à partir d'un chemin URL.
+ * Match exact uniquement (pas de prefix matching pour l'instant).
+ */
+export function getModuleFromPath(path: string): { moduleKey: string; subModule?: string } | null {
+  const match = _urlMap.find(r => r.path === path);
+  if (match) {
+    return { moduleKey: match.moduleKey, subModule: match.subModule };
+  }
+  return null;
+}
+
+/**
+ * Obtenir le chemin URL pour un module donné, avec sous-module optionnel.
+ */
+export function getPathForModule(moduleKey: string, subModule?: string): string {
+  if (subModule) {
+    const route = ROUTES.find(r => r.key === moduleKey);
+    const sub = route?.subRoutes?.find(sr => sr.subModule === subModule);
+    if (sub) return sub.path;
+  }
+  const route = ROUTES.find(r => r.key === moduleKey);
+  return route?.path || '/';
+}
+
+/**
+ * Vérifier si un chemin correspond à un module/sous-module.
+ */
+export function isActiveRoute(
+  currentPath: string,
+  moduleKey: string,
+  subModule?: string
+): boolean {
+  if (subModule) {
+    const route = ROUTES.find(r => r.key === moduleKey);
+    const sub = route?.subRoutes?.find(sr => sr.subModule === subModule);
+    return sub?.path === currentPath;
+  }
+  const route = ROUTES.find(r => r.key === moduleKey);
+  return route?.path === currentPath;
 }

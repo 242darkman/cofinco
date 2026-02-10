@@ -357,7 +357,7 @@ export async function getActiveTemporaryPermissionCodes(userId: string): Promise
     .where(and(
       eq(temporaryPermissions.userId, userId),
       eq(temporaryPermissions.isActive, true),
-      lte(now, temporaryPermissions.expiresAt)
+      gte(temporaryPermissions.expiresAt, now)
     ));
 
   return perms.map(p => p.code).filter(Boolean) as string[];

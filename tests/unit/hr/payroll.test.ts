@@ -46,7 +46,7 @@ describe('HrService - Payroll Calculations', () => {
     ];
 
     it('should return 0 for income below first bracket', () => {
-      const ipr = hrService.calculateIPR(400000, defaultBrackets);
+      const ipr = (hrService as any).calculateIPR(400000, defaultBrackets);
       expect(ipr).toBe(0);
     });
 
@@ -54,7 +54,7 @@ describe('HrService - Payroll Calculations', () => {
       // 800,000 CDF
       // First 524,000 = 0
       // Next 276,000 at 15% = 41,400
-      const ipr = hrService.calculateIPR(800000, defaultBrackets);
+      const ipr = (hrService as any).calculateIPR(800000, defaultBrackets);
       expect(ipr).toBe(41400);
     });
 
@@ -64,7 +64,7 @@ describe('HrService - Payroll Calculations', () => {
       // Next 904,000 (to 1,428,000) at 15% = 135,600
       // Next 572,000 at 30% = 171,600
       // Total = 307,200
-      const ipr = hrService.calculateIPR(2000000, defaultBrackets);
+      const ipr = (hrService as any).calculateIPR(2000000, defaultBrackets);
       expect(ipr).toBe(307200);
     });
 
@@ -75,22 +75,22 @@ describe('HrService - Payroll Calculations', () => {
       // Next 1,272,000 at 30% = 381,600
       // Next 800,000 at 40% = 320,000
       // Total = 837,200
-      const ipr = hrService.calculateIPR(3500000, defaultBrackets);
+      const ipr = (hrService as any).calculateIPR(3500000, defaultBrackets);
       expect(ipr).toBe(837200);
     });
 
     it('should handle zero income', () => {
-      const ipr = hrService.calculateIPR(0, defaultBrackets);
+      const ipr = (hrService as any).calculateIPR(0, defaultBrackets);
       expect(ipr).toBe(0);
     });
 
     it('should handle exactly at bracket boundaries', () => {
       // Exactly at first bracket boundary
-      const ipr1 = hrService.calculateIPR(524000, defaultBrackets);
+      const ipr1 = (hrService as any).calculateIPR(524000, defaultBrackets);
       expect(ipr1).toBe(0);
 
       // Exactly at second bracket boundary
-      const ipr2 = hrService.calculateIPR(1428000, defaultBrackets);
+      const ipr2 = (hrService as any).calculateIPR(1428000, defaultBrackets);
       // 904,000 * 0.15 = 135,600
       expect(ipr2).toBe(135600);
     });
@@ -126,7 +126,7 @@ describe('HrService - Payroll Calculations', () => {
       // 5 years = 10%
       const fiveYearsAgo = new Date();
       fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-      const bonus5 = hrService.calculateSeniorityBonus(
+      const bonus5 = (hrService as any).calculateSeniorityBonus(
         fiveYearsAgo.toISOString().split('T')[0],
         baseSalary
       );
@@ -135,7 +135,7 @@ describe('HrService - Payroll Calculations', () => {
       // 10 years = 20%
       const tenYearsAgo = new Date();
       tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-      const bonus10 = hrService.calculateSeniorityBonus(
+      const bonus10 = (hrService as any).calculateSeniorityBonus(
         tenYearsAgo.toISOString().split('T')[0],
         baseSalary
       );
@@ -144,7 +144,7 @@ describe('HrService - Payroll Calculations', () => {
       // 15 years = 30% (at cap)
       const fifteenYearsAgo = new Date();
       fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
-      const bonus15 = hrService.calculateSeniorityBonus(
+      const bonus15 = (hrService as any).calculateSeniorityBonus(
         fifteenYearsAgo.toISOString().split('T')[0],
         baseSalary
       );
@@ -153,7 +153,7 @@ describe('HrService - Payroll Calculations', () => {
       // 25 years = still 30% (capped)
       const twentyFiveYearsAgo = new Date();
       twentyFiveYearsAgo.setFullYear(twentyFiveYearsAgo.getFullYear() - 25);
-      const bonus25 = hrService.calculateSeniorityBonus(
+      const bonus25 = (hrService as any).calculateSeniorityBonus(
         twentyFiveYearsAgo.toISOString().split('T')[0],
         baseSalary
       );
@@ -173,7 +173,7 @@ describe('HrService - Payroll Calculations', () => {
       const taxableBase = grossSalary - cnssEmployee;
 
       // Using default brackets for IPR
-      const ipr = hrService.calculateIPR(taxableBase, [
+      const ipr = (hrService as any).calculateIPR(taxableBase, [
         { min: 0, max: 524000, rate: 0 },
         { min: 524001, max: 1428000, rate: 0.15 },
         { min: 1428001, max: 2700000, rate: 0.30 },
@@ -224,7 +224,7 @@ describe('HrService - Payroll Calculations', () => {
     it('should handle zero salary', () => {
       const grossSalary = 0;
       const cnss = Math.round(grossSalary * 0.05);
-      const ipr = hrService.calculateIPR(grossSalary, [
+      const ipr = (hrService as any).calculateIPR(grossSalary, [
         { min: 0, max: 524000, rate: 0 },
       ]);
 
@@ -239,7 +239,7 @@ describe('HrService - Payroll Calculations', () => {
 
       expect(cnss).toBe(500000);
 
-      const ipr = hrService.calculateIPR(grossSalary - cnss, [
+      const ipr = (hrService as any).calculateIPR(grossSalary - cnss, [
         { min: 0, max: 524000, rate: 0 },
         { min: 524001, max: 1428000, rate: 0.15 },
         { min: 1428001, max: 2700000, rate: 0.30 },

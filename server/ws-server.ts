@@ -65,7 +65,7 @@ setInterval(() => {
  * Types de messages WebSocket unifiés
  * SOURCE UNIQUE DE VERITE - Synchronisé avec client/src/contexts/WebSocketContext.tsx
  */
-type GlobalMessage = {
+export type GlobalMessage = {
   type:
     // =============================================
     // MESSAGING
@@ -140,6 +140,22 @@ type GlobalMessage = {
     // =============================================
     | "SCHEDULED_TRANSFER_UPDATED" | "SCHEDULED_TRANSFER_EXECUTED"
     | "SCHEDULED_TRANSFERS_BATCH_COMPLETED"
+
+    // =============================================
+    // CRÉDITS & REMBOURSEMENTS
+    // =============================================
+    | "CREDIT_REPAYMENT_CREATED" | "CREDIT_SCHEDULE_UPDATED" | "CREDIT_BALANCE_UPDATED"
+    | "REPAYMENT_ALLOCATED" | "REPAYMENT_REVERSED"
+
+    // =============================================
+    // TRÉSORERIE — RÉCONCILIATION
+    // =============================================
+    | "TREASURY_RECONCILIATION_ALERT" | "TREASURY_RECONCILIATION_COMPLETE"
+
+    // =============================================
+    // AUDIT & INTÉGRITÉ
+    // =============================================
+    | "INTEGRITY_AUDIT_ALERT"
 
     // =============================================
     // MIGRATION D'AGENCE

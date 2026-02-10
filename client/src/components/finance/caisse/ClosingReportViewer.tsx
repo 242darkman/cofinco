@@ -26,6 +26,7 @@ export const ClosingReportViewer: React.FC<ClosingReportViewerProps> = ({
   const { downloadPDF, print } = useReceiptPDF({
     filename,
     format: 'a4',
+    contentRef: printRef,
   });
 
   const handleDownload = async () => {
@@ -39,7 +40,7 @@ export const ClosingReportViewer: React.FC<ClosingReportViewerProps> = ({
 
   const handlePrint = () => {
     if (printRef.current) {
-      print(undefined, () => printRef.current);
+      print();
     }
   };
 

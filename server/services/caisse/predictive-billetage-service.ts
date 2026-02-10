@@ -13,8 +13,8 @@ import {
   operationsCaisse,
   denominationTemplates,
   caisses,
-  comptageBillets,
 } from "@shared/schema/finance";
+import { comptageBillets } from "@shared/schema/operations";
 import { agences } from "@shared/schema";
 import { eq, and, gte, lte, desc, sql, count, avg, sum } from "drizzle-orm";
 import { createLogger } from "../../lib/logger";

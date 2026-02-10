@@ -107,7 +107,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
 
       // Charger les opérations
       const response = await caisseAgentApi.listOperations(filters);
-      setOperations(response.data || []);
+      setOperations(response.operations || []);
       setTotalCount(response.total || 0);
 
     } catch (error: any) {
@@ -130,7 +130,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
   const handleApprove = async (operation: OperationTerrainWithRelations) => {
     setProcessingId(operation.id);
     try {
-      await caisseAgentApi.approveOperation(operation.id);
+      await caisseAgentApi.approveOperation(operation.id, '');
       toast.success('Opération approuvée', {
         description: 'Les écritures comptables ont été postées.'
       });

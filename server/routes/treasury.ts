@@ -101,7 +101,7 @@ export function registerTreasuryRoutes(app: Express) {
     "/api/treasury/v2/encaisse/reconcile",
     requireAuth,
     attachAbility,
-    requireAbility(Actions.READ, Subjects.ACCOUNTING),
+    requireAbility(Actions.VIEW, Subjects.ACCOUNTING),
     async (req, res) => {
       try {
         const agenceId = req.query.agenceId as string | undefined;
@@ -155,7 +155,7 @@ export function registerTreasuryRoutes(app: Express) {
     "/api/treasury/v2/encaisse/breakdown",
     requireAuth,
     attachAbility,
-    requireAbility(Actions.READ, Subjects.ACCOUNTING),
+    requireAbility(Actions.VIEW, Subjects.ACCOUNTING),
     async (req, res) => {
       try {
         const agenceId = req.query.agenceId as string | undefined;
@@ -251,7 +251,7 @@ export function registerTreasuryRoutes(app: Express) {
     "/api/treasury/v2/reconciliation/status",
     requireAuth,
     attachAbility,
-    requireAbility(Actions.READ, Subjects.TREASURY),
+    requireAbility(Actions.VIEW, Subjects.TREASURY),
     async (req, res) => {
       try {
         const isRunning = treasuryReconciliationService.isReconciliationRunning();
@@ -293,7 +293,7 @@ export function registerTreasuryRoutes(app: Express) {
     "/api/treasury/v2/reconciliation/report",
     requireAuth,
     attachAbility,
-    requireAbility(Actions.READ, Subjects.ACCOUNTING),
+    requireAbility(Actions.VIEW, Subjects.ACCOUNTING),
     async (req, res) => {
       try {
         const report = treasuryReconciliationService.getLastReport();
@@ -329,7 +329,7 @@ export function registerTreasuryRoutes(app: Express) {
     "/api/treasury/v2/reconciliation/agence/:agenceId",
     requireAuth,
     attachAbility,
-    requireAbility(Actions.READ, Subjects.ACCOUNTING),
+    requireAbility(Actions.VIEW, Subjects.ACCOUNTING),
     async (req, res) => {
       try {
         const { agenceId } = req.params;

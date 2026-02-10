@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
+import { hardRedirectToLogin } from '../lib/navigation';
 import { formatMoney } from '../lib/format';
 import { useServerHealth } from './ServerHealthContext';
 import {
@@ -425,10 +426,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         // Handle forced logout from admin
         if (message.payload.type === 'FORCE_LOGOUT' || message.payload.forceLogout) {
           toast.error('Votre session a été terminée par un administrateur. Vous allez être déconnecté.');
-          // Wait a moment for toast to be visible, then logout
           setTimeout(() => {
             authService.logout();
-            window.location.href = '/login';
+            hardRedirectToLogin('Session terminée par un administrateur');
           }, 2000);
           return;
         }
@@ -788,7 +788,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          });
          setTimeout(() => {
              authService.logout();
-             window.location.href = '/login';
+             hardRedirectToLogin('Session expirée');
          }, 1000);
          break;
 
@@ -801,7 +801,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
            });
            setTimeout(() => {
                authService.logout();
-               window.location.href = '/login';
+               hardRedirectToLogin('Session invalide');
            }, 1000);
          }
          break;

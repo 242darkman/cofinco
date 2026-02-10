@@ -12,7 +12,7 @@ export async function setupVite(server: Server, app: Express) {
   const serverOptions = {
     middlewareMode: true,
     hmr: { server, path: "/vite-hmr" },
-    allowedHosts: true,
+    allowedHosts: 'all',
     cors: false,
   };
 
@@ -26,7 +26,7 @@ export async function setupVite(server: Server, app: Express) {
         process.exit(1);
       },
     },
-    server: serverOptions,
+    server: serverOptions as any,
     appType: "custom",
   });
 

@@ -1,6 +1,7 @@
-import { ReactNode, Suspense, useEffect, useState } from 'react';
-import { Redirect } from 'wouter';
+import { ReactNode, Suspense, useEffect, useState, useMemo } from 'react';
+import { Redirect, useLocation } from 'wouter';
 import { authService } from '@/lib/auth';
+import { buildLoginUrl } from '@/lib/navigation';
 import { canAccessRoute, type RouteConfig } from '@/lib/routes-config';
 import { SystemRole } from '@shared/types/roles';
 import LoadingScreen from '@/components/ui/LoadingScreen';
@@ -25,6 +26,8 @@ export function ProtectedRoute({ route, children }: ProtectedRouteProps) {
   const sessionValid = useIsSessionValid();
   const { isChecking } = useSession();
   const user = authService.getCurrentUser();
+  const [location] = useLocation();
+  const loginUrl = useMemo(() => buildLoginUrl(location), [location]);
 
   // Pendant la vérification initiale, afficher un loader
   if (sessionValid === null || isChecking) {
@@ -35,20 +38,19 @@ export function ProtectedRoute({ route, children }: ProtectedRouteProps) {
     );
   }
 
-  // Session invalide côté serveur → redirection login
+  // Session invalide côté serveur → redirection login avec returnTo
   if (!sessionValid) {
-    return <Redirect to="/login" />;
+    return <Redirect to={loginUrl} replace />;
   }
 
   // Pas d'utilisateur en mémoire (incohérence) → redirection login
   if (!user) {
-    return <Redirect to="/login" />;
+    return <Redirect to={loginUrl} replace />;
   }
 
   // Vérification RBAC de la route
   if (!canAccessRoute(route, user.role)) {
-    // Redirection vers dashboard si accès non autorisé
-    return <Redirect to="/dashboard" />;
+    return <Redirect to="/" replace />;
   }
 
   // Lazy loading avec suspense
@@ -77,11 +79,13 @@ export function SimpleProtectedRoute({
   children,
   requiredRoles,
   requireAdmin,
-  fallbackRoute = '/dashboard',
+  fallbackRoute = '/',
 }: SimpleProtectedRouteProps) {
   const sessionValid = useIsSessionValid();
   const { isChecking } = useSession();
   const user = authService.getCurrentUser();
+  const [location] = useLocation();
+  const loginUrl = useMemo(() => buildLoginUrl(location), [location]);
 
   // Pendant la vérification, afficher un loader
   if (sessionValid === null || isChecking) {
@@ -92,9 +96,9 @@ export function SimpleProtectedRoute({
     );
   }
 
-  // Session invalide → login
+  // Session invalide → login avec returnTo
   if (!sessionValid || !user) {
-    return <Redirect to="/login" />;
+    return <Redirect to={loginUrl} replace />;
   }
 
   // Vérification admin

@@ -174,7 +174,7 @@ export function usePendingSessionSync(
       return;
     }
 
-    const currentStatus = pendingSession.statut;
+    const currentStatus = pendingSession.statut ?? 'UNKNOWN';
     const prevStatus = prevStatusRef.current;
 
     if (prevStatus && prevStatus !== currentStatus) {

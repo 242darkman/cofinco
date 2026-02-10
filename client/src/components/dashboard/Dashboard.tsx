@@ -68,7 +68,7 @@ export default function Dashboard({
   const ability = useAbility();
 
   // Treasury v2: Single Source of Truth depuis le Grand Livre (GL)
-  const { data: encaisse, isLoading: encaisseLoading } = useEncaisse(selectedAgence);
+  const { data: encaisse, isLoading: encaisseLoading } = useEncaisse(selectedAgence?.id);
 
   // Scroll container refs and state for fade indicators
   const mainScrollRef = useRef<HTMLDivElement>(null);

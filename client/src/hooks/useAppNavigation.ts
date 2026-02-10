@@ -5,7 +5,7 @@
 
 import { useLocation } from 'wouter';
 import { useCallback, useMemo } from 'react';
-import { getPathForModule, getModuleFromPath } from '../config/routes';
+import { getPathForModule, getModuleFromPath } from '../lib/routes-config';
 
 export interface NavigationState {
   currentModule: string;
@@ -18,11 +18,21 @@ export function useAppNavigation() {
 
   // Obtenir le module et sous-module actuel à partir de l'URL
   const currentState = useMemo((): NavigationState => {
+    // /login est géré par App.tsx, pas par le router interne
+    if (location === '/login' || location.startsWith('/login?')) {
+      return { currentModule: 'dashboard', currentSubModule: undefined, currentPath: location };
+    }
+
     const moduleConfig = getModuleFromPath(location);
 
+    // URL inconnue → signaler 404 (au lieu de silencieusement afficher dashboard)
+    if (!moduleConfig) {
+      return { currentModule: '__not_found__', currentSubModule: undefined, currentPath: location };
+    }
+
     return {
-      currentModule: moduleConfig?.moduleKey || 'dashboard',
-      currentSubModule: moduleConfig?.subModule,
+      currentModule: moduleConfig.moduleKey,
+      currentSubModule: moduleConfig.subModule,
       currentPath: location,
     };
   }, [location]);

@@ -284,7 +284,7 @@ export default function AdminAgenciesMap({
           maxClusterRadius={50}
           spiderfyOnMaxZoom
           showCoverageOnHover={false}
-          iconCreateFunction={(cluster: L.MarkerCluster) => {
+          iconCreateFunction={(cluster: any) => {
             const count = cluster.getChildCount();
             return L.divIcon({
               html: `<div class="cluster-icon">${count}</div>`,

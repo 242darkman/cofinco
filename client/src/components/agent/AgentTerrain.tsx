@@ -213,7 +213,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       });
 
       const ops = await caisseAgentApi.listOperations({ agentId, limit: 5 });
-      const opsData = Array.isArray(ops) ? ops : ops.data || [];
+      const opsData = Array.isArray(ops) ? ops : ops.operations || [];
       setRecentTransactions(opsData.slice(0, 5).map((op: any) => ({
         id: op.id,
         type: op.type === 'COLLECT_CASH' ? 'Collecte' : 'Remise',

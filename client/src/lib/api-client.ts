@@ -2505,6 +2505,11 @@ export const smsApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  testSend: (data: { provider: string; phoneNumber: string; message: string }) =>
+    request<{ success: boolean; error?: string }>('/sms/test-send', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // Types Marchés API

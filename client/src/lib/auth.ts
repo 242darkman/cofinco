@@ -75,7 +75,10 @@ class AuthService {
           console.log('🔄 Logout triggered from another tab');
           this.clearSession();
           // Force reload to clear React state and redirect to login
-          window.location.href = '/';
+          // Import dynamique pour éviter la dépendance circulaire
+          import('./navigation').then(({ hardRedirectToLogin }) => {
+            hardRedirectToLogin('Déconnecté depuis un autre onglet');
+          });
         }
       };
     }

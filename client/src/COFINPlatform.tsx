@@ -44,6 +44,9 @@ const GlobalSearchModal = lazy(() => import('./components/shared/GlobalSearchMod
 // Dashboard - slightly larger but loads first
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
 
+// 404 page
+const NotFoundPage = lazy(() => import('./components/shared/NotFoundPage'));
+
 // Non-lazy imports (small, always needed)
 import LoadingScreen from './components/ui/LoadingScreen';
 import AppShell from './components/layout/AppShell';
@@ -405,12 +408,17 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             <ReconciliationPage />
           </Suspense>
         );
+      case '__not_found__':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <NotFoundPage />
+          </Suspense>
+        );
       default:
         return (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold mb-4">Module en développement</h2>
-            <p className="text-slate-400">Cette fonctionnalité sera disponible prochainement</p>
-          </div>
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <NotFoundPage />
+          </Suspense>
         );
     }
   };

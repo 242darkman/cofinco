@@ -327,7 +327,7 @@ export default function AdminValidationTerrain() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleSelect(item.id, paginatedData);
+            toggleSelect(item.id);
           }}
           className="p-1 text-slate-400 hover:text-primary transition"
         >
@@ -483,7 +483,7 @@ export default function AdminValidationTerrain() {
        {selectedCount > 0 && (
          <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-xl p-3 flex flex-wrap items-center gap-4">
            <button
-             onClick={() => toggleSelectAll(paginatedData)}
+             onClick={() => toggleSelectAll()}
              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-700/50 transition"
            >
              {isAllSelected ? (

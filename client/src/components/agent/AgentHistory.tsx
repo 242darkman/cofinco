@@ -55,7 +55,7 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
       if (filterStatut !== 'all') filters.statut = filterStatut;
       
       const response = await caisseAgentApi.getAgentOperations(agentId || '', filters);
-      const data = Array.isArray(response) ? response : response.data || [];
+      const data = Array.isArray(response) ? response : response.operations || [];
       setOperations(data);
     } catch (error) {
       console.error('Failed to load agent history:', error);

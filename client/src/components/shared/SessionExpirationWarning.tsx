@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Clock, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { authService } from '@/lib/auth';
+import { hardRedirectToLogin } from '@/lib/navigation';
 import { useWebSocketContext } from '@/contexts/WebSocketContext';
 
 // ============================================
@@ -294,7 +295,7 @@ export function SessionExpirationWarning() {
     // Redirection après délai
     setTimeout(() => {
       authService.logout();
-      window.location.href = '/login';
+      hardRedirectToLogin('Votre session a expiré');
     }, CONFIG.REDIRECT_DELAY_MS);
   }, [broadcast]);
 

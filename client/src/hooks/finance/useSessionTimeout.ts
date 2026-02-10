@@ -28,9 +28,9 @@ export function useSessionTimeout({
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(Math.floor(timeoutMs / 1000));
   const lastActivityRef = useRef(Date.now());
-  const warningTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const countdownRef = useRef<ReturnType<typeof setInterval>>();
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const clearTimers = useCallback(() => {
     if (warningTimerRef.current) clearTimeout(warningTimerRef.current);

@@ -541,7 +541,7 @@ export default function AdminVirementsProgrammes() {
           onSuccess={() => {
               loadData(true);
           }}
-          editTransfer={editingTransfer}
+          editTransfer={editingTransfer as any}
       />
 
       <ConfirmDialog

@@ -659,6 +659,8 @@ export default function EvacuationCoffreModule({
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            canGoPrevious={currentPage > 1}
+            canGoNext={currentPage < totalPages}
           />
         </div>
       )}
@@ -685,29 +687,29 @@ export default function EvacuationCoffreModule({
       {/* Confirm Dialogs */}
       {confirmAction?.type === 'submit' && (
         <ConfirmDialog
-          open
+          isOpen
           title="Soumettre l'évacuation"
           message={`Soumettre l'évacuation ${confirmAction.evacuation.reference} (${formatMoney(confirmAction.evacuation.montant)}) pour approbation ?`}
-          confirmLabel="Soumettre"
+          confirmText="Soumettre"
           onConfirm={executeConfirmAction}
-          onCancel={() => setConfirmAction(null)}
+          onClose={() => setConfirmAction(null)}
         />
       )}
 
       {confirmAction?.type === 'approve' && (
         <ConfirmDialog
-          open
+          isOpen
           title="Approuver l'évacuation"
           message={`Approuver l'évacuation ${confirmAction.evacuation.reference} de ${formatMoney(confirmAction.evacuation.montant)} ?`}
-          confirmLabel="Approuver"
+          confirmText="Approuver"
           onConfirm={executeConfirmAction}
-          onCancel={() => setConfirmAction(null)}
+          onClose={() => setConfirmAction(null)}
         />
       )}
 
       {confirmAction?.type === 'reject' && (
         <ConfirmDialog
-          open
+          isOpen
           title="Rejeter l'évacuation"
           message={
             <div className="space-y-2">
@@ -721,16 +723,16 @@ export default function EvacuationCoffreModule({
               />
             </div>
           }
-          confirmLabel="Rejeter"
-          confirmVariant="danger"
+          confirmText="Rejeter"
+          variant="danger"
           onConfirm={() => { if (rejectReason.trim().length < 5) { toast.error('Motif trop court (min 5 caractères)'); return; } executeConfirmAction(); }}
-          onCancel={() => { setConfirmAction(null); setRejectReason(''); }}
+          onClose={() => { setConfirmAction(null); setRejectReason(''); }}
         />
       )}
 
       {confirmAction?.type === 'cancel' && (
         <ConfirmDialog
-          open
+          isOpen
           title="Annuler l'évacuation"
           message={
             <div className="space-y-2">
@@ -744,10 +746,10 @@ export default function EvacuationCoffreModule({
               />
             </div>
           }
-          confirmLabel="Annuler l'évacuation"
-          confirmVariant="danger"
+          confirmText="Annuler l'évacuation"
+          variant="danger"
           onConfirm={() => { if (cancelReason.trim().length < 5) { toast.error('Motif trop court (min 5 caractères)'); return; } executeConfirmAction(); }}
-          onCancel={() => { setConfirmAction(null); setCancelReason(''); }}
+          onClose={() => { setConfirmAction(null); setCancelReason(''); }}
         />
       )}
     </div>

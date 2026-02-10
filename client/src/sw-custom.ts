@@ -48,7 +48,7 @@ cleanupOutdatedCaches();
 const financialSyncQueue = new Queue('financial-operations', {
   maxRetentionTime: 24 * 60 * 7, // 7 days
   onSync: async ({ queue }) => {
-    let entry;
+    let entry: any;
     while ((entry = await queue.shiftRequest())) {
       try {
         const response = await fetch(entry.request.clone());
@@ -291,7 +291,7 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const options: NotificationOptions = {
+  const options: any = {
     body: data.body || 'Nouvelle notification',
     icon: data.icon || '/icons/icon-192x192.png',
     badge: data.badge || '/icons/badge-72x72.png',

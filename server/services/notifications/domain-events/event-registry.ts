@@ -1,5 +1,5 @@
 import type { DomainEvent, DomainEventType } from "./event-types";
-import { getWsInstance } from "../../../ws-server";
+import { getWsInstance, type GlobalMessage } from "../../../ws-server";
 import { createLogger } from "../../../lib/logger";
 import {
   handleCreditRequestCreated,
@@ -190,11 +190,11 @@ function broadcastDomainEvent(event: DomainEvent): void {
     const wsType = domainEventToWsType[event.type];
     if (wsType) {
       ws.broadcast({
-        type: wsType,
+        type: wsType as GlobalMessage['type'],
         payload: {
           domainEvent: event.type,
-          entity: event.data?.entity || undefined,
-          agenceId: event.data?.agenceId || undefined,
+          entity: (event.data as any)?.entity || undefined,
+          agenceId: (event.data as any)?.agenceId || undefined,
           timestamp: event.timestamp?.toISOString() || new Date().toISOString(),
         },
       });

@@ -414,18 +414,13 @@ async function setupTestData() {
     nom: 'Test',
     prenom: 'User',
     email: 'test@example.com',
-    role: 'admin',
-    agenceId: agence.id
-  }).returning();
+  } as any).returning();
 
   // Créer un client
   const [client] = await db.insert(clients).values({
     userId: user.id,
-    nom: 'Test',
-    prenom: 'Client',
-    numeroClient: 'CLI001',
-    agenceId: agence.id
-  }).returning();
+    agenceId: agence.id,
+  } as any).returning();
 
   // Créer un crédit
   const [credit] = await db.insert(credits).values({

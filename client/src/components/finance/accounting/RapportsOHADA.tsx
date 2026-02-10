@@ -280,7 +280,7 @@ export default function RapportsOHADA() {
         margin: { left: 14, right: 14 },
       });
 
-      y = (doc as any).lastAutoTable?.finalY + 8 ?? y + 80;
+      y = (doc as any).lastAutoTable?.finalY != null ? (doc as any).lastAutoTable.finalY + 8 : y + 80;
 
       // PASSIF section
       doc.setFontSize(12);
@@ -405,7 +405,7 @@ export default function RapportsOHADA() {
         margin: { left: 14, right: 14 },
       });
 
-      y = (doc as any).lastAutoTable?.finalY + 8 ?? y + 60;
+      y = (doc as any).lastAutoTable?.finalY != null ? (doc as any).lastAutoTable.finalY + 8 : y + 60;
 
       // CHARGES section
       doc.setFontSize(12);

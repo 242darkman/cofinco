@@ -594,7 +594,7 @@ export default function RegularizationDashboard() {
             loading={loading}
             emptyMessage="Aucun résultat"
             onRowClick={handleRowClick}
-            compact
+            density="compact"
           />
         ) : (
           <EmptyState

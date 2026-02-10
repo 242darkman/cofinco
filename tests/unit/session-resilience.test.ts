@@ -23,8 +23,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // This avoids needing jsdom while testing the critical decision logic
 
 describe("Session Resilience — revalidateSessionBeforeLogout pattern", () => {
-  let onUnauthorizedCallback: ReturnType<typeof vi.fn>;
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let onUnauthorizedCallback: any;
+  let fetchMock: any;
   let revalidationInFlight: Promise<boolean> | null;
   let lastRevalidationTime: number;
   const REVALIDATION_COOLDOWN_MS = 3000;
@@ -189,9 +189,9 @@ describe("Session Resilience — revalidateSessionBeforeLogout pattern", () => {
 // ============================================================================
 
 describe("Session Resilience — verifySession pattern (auth.ts)", () => {
-  let clearSessionMock: ReturnType<typeof vi.fn>;
-  let onSessionExpiredMock: ReturnType<typeof vi.fn>;
-  let getMeMock: ReturnType<typeof vi.fn>;
+  let clearSessionMock: any;
+  let onSessionExpiredMock: any;
+  let getMeMock: any;
 
   class MockApiError extends Error {
     public readonly status: number;
@@ -371,7 +371,7 @@ describe("Session Resilience — validateSession (api-client.ts)", () => {
     }
   }
 
-  let requestMock: ReturnType<typeof vi.fn>;
+  let requestMock: any;
 
   async function validateSession(): Promise<{ valid: boolean; reason?: string }> {
     try {

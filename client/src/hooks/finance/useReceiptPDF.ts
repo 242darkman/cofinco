@@ -7,10 +7,11 @@ import { toast } from 'sonner';
 interface UseReceiptPDFOptions {
   filename?: string;
   format?: 'a4' | 'ticket';
+  contentRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const useReceiptPDF = (options: UseReceiptPDFOptions = {}) => {
-  const { filename = 'recu', format = 'a4' } = options;
+  const { filename = 'recu', format = 'a4', contentRef } = options;
 
   /**
    * Generate and download PDF from a React ref
@@ -177,6 +178,7 @@ onclone: (doc) => {
    * Print using browser's print dialog
    */
   const print = useReactToPrint({
+    contentRef: contentRef as React.RefObject<HTMLElement>,
     documentTitle: filename,
   });
 

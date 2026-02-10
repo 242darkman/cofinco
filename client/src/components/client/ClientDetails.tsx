@@ -128,7 +128,7 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
             {/* Credits - Clickable Drill-down */}
             <div 
                 className="group bg-slate-800/30 hover:bg-slate-800/60 rounded-lg p-3 flex items-center justify-between border border-slate-700/30 transition-colors cursor-pointer"
-                onClick={() => setLocation(`/finance/credits?client=${client.id}`)}
+                onClick={() => setLocation(`/credits?client=${client.id}`)}
             >
                 <div>
                     <p className="text-[10px] uppercase text-slate-500 mb-0.5 flex items-center gap-2">
@@ -234,7 +234,7 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
              </div>
 
              <div className="space-y-2">
-                 {distribution.map((item, idx) => (
+                 {distribution.map((item: { label: string; value: number; color: string }, idx: number) => (
                       <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700/30">
                           <div className="flex items-center gap-3">
                               <div className="p-2 rounded-full bg-slate-800 text-slate-400">

@@ -93,7 +93,7 @@ describe('HR Payroll Integration', () => {
 
     it('POST /api/hr/paie/generate should trigger payroll generation', async () => {
         // hrService.generateMonthlyPayroll returns { generated, skipped, bulletins }
-        (hrService.generateMonthlyPayroll as any).mockResolvedValue({
+        (hrService as any).generateMonthlyPayroll.mockResolvedValue({
             generated: 1,
             skipped: 0,
             bulletins: [{ id: 1, salaireNet: 1000 }]
@@ -102,7 +102,7 @@ describe('HR Payroll Integration', () => {
         const res = await request(app).post('/api/hr/paie/generate').send({ mois: '2026-01' });
 
         expect(res.status).toBe(201);
-        expect(hrService.generateMonthlyPayroll).toHaveBeenCalledWith('2026-01', 'test-user', undefined);
+        expect((hrService as any).generateMonthlyPayroll).toHaveBeenCalledWith('2026-01', 'test-user', undefined);
         // Response wrapped in successResponse: { success: true, data: { bulletins: [...] } }
         expect(res.body.data.bulletins).toHaveLength(1);
     });

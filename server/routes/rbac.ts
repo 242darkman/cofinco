@@ -1113,7 +1113,7 @@ export function registerRbacRoutes(app: Express) {
         entityType: 'role' as const,
         entityId: normalizedRole,
         permissionId: update.permissionId,
-        action: (update.granted ? 'BULK_GRANT' : 'BULK_REVOKE') as const,
+        action: update.granted ? 'BULK_GRANT' as const : 'BULK_REVOKE' as const,
         beforeState: null,
         afterState: { granted: update.granted },
       }));

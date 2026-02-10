@@ -1,11 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { db } from '../../server/db';
-import { users, sessions } from '../../shared/schema/auth';
+import { users, activeSessions } from '../../shared/schema/auth';
 import { clients } from '../../shared/schema/clients';
 import { demandesCredit, enquetesCredit, credits } from '../../shared/schema/finance';
 import { agentActivities } from '../../shared/schema/agent-activities';
 import { agences } from '../../shared/schema/agences';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 // Test data
@@ -71,7 +71,9 @@ async function cleanupTestData() {
   await db.delete(agentActivities).where(eq(agentActivities.assignedAgentId, testAgent.id));
   await db.delete(demandesCredit).where(eq(demandesCredit.clientId, testClient.id));
   await db.delete(clients).where(eq(clients.id, testClient.id));
-  await db.delete(users).where(eq(users.agenceId, testAgence.id));
+  await db.delete(users).where(eq(users.id, testSupervisor.id));
+  await db.delete(users).where(eq(users.id, testAgent.id));
+  await db.delete(users).where(eq(users.id, testCaissier.id));
   await db.delete(agences).where(eq(agences.id, testAgence.id));
 }
 
@@ -444,7 +446,7 @@ test.describe('Credit Workflow with Investigation', () => {
         .select()
         .from(demandesCredit)
         .where(eq(demandesCredit.clientId, testClient.id))
-        .orderBy(demandesCredit.createdAt, 'desc')
+        .orderBy(desc(demandesCredit.createdAt))
         .limit(1);
       
       expect(demande.statut).toBe('REJECTED');

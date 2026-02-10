@@ -1123,7 +1123,7 @@ export default function CaisseDashboard({
       const rData: ReceiptData = {
           title: `Reçu ${tx.typeOperation}`,
           reference: tx.reference,
-          date: new Date(tx.createdAt),
+          date: new Date(tx.createdAt || tx.created_at),
           type: tx.typeOperation,
           client: {
               nom: tx.clientNom || 'Client',
@@ -1131,7 +1131,7 @@ export default function CaisseDashboard({
               telephone: tx.clientTelephone
           },
           items: [{
-              description: tx.description || tx.typeOperation,
+              description: tx.description || tx.typeOperation || tx.type_operation,
               montant: toNumber(tx.montant),
               quantite: 1
           }],

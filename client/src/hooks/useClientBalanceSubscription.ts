@@ -28,7 +28,7 @@ interface UseClientBalanceSubscriptionOptions {
 export function useClientBalanceSubscription(options: UseClientBalanceSubscriptionOptions = {}) {
   const { clientId, compteId, onBalanceUpdate } = options;
   const queryClient = useQueryClient();
-  const { lastMessage, isConnected } = useWebSocketContext();
+  const { socket, isConnected } = useWebSocketContext();
 
   const handleBalanceUpdate = useCallback((payload: BalanceUpdatePayload) => {
     // Invalider les queries liées au solde
@@ -49,19 +49,25 @@ export function useClientBalanceSubscription(options: UseClientBalanceSubscripti
   }, [queryClient, onBalanceUpdate]);
 
   useEffect(() => {
-    if (!lastMessage) return;
+    if (!socket || !isConnected) return;
 
-    // Vérifier si c'est un message de mise à jour de solde
-    if (lastMessage.type === 'BALANCE_UPDATED') {
-      const payload = lastMessage.payload as BalanceUpdatePayload;
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'BALANCE_UPDATED') {
+          const payload = message.payload as BalanceUpdatePayload;
+          if (clientId && payload.clientId !== clientId) return;
+          if (compteId && payload.compteId !== compteId) return;
+          handleBalanceUpdate(payload);
+        }
+      } catch { /* ignore parse errors */ }
+    };
 
-      // Filtrer si un clientId ou compteId spécifique est demandé
-      if (clientId && payload.clientId !== clientId) return;
-      if (compteId && payload.compteId !== compteId) return;
-
-      handleBalanceUpdate(payload);
-    }
-  }, [lastMessage, clientId, compteId, handleBalanceUpdate]);
+    socket.addEventListener('message', handleMessage);
+    return () => {
+      socket.removeEventListener('message', handleMessage);
+    };
+  }, [socket, isConnected, clientId, compteId, handleBalanceUpdate]);
 
   return {
     isConnected,
@@ -74,21 +80,29 @@ export function useClientBalanceSubscription(options: UseClientBalanceSubscripti
  */
 export function useAutoBalanceRefresh() {
   const queryClient = useQueryClient();
-  const { lastMessage } = useWebSocket();
+  const { socket, isConnected } = useWebSocket();
 
   useEffect(() => {
-    if (!lastMessage) return;
+    if (!socket || !isConnected) return;
 
-    if (lastMessage.type === 'BALANCE_UPDATED') {
-      const payload = lastMessage.payload as BalanceUpdatePayload;
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'BALANCE_UPDATED') {
+          const payload = message.payload as BalanceUpdatePayload;
+          queryClient.invalidateQueries({ queryKey: ['client', payload.clientId] });
+          queryClient.invalidateQueries({ queryKey: ['comptes'] });
+          queryClient.invalidateQueries({ queryKey: ['solde'] });
+          queryClient.invalidateQueries({ queryKey: ['caisse'] });
+        }
+      } catch { /* ignore parse errors */ }
+    };
 
-      // Invalider toutes les queries potentiellement affectées
-      queryClient.invalidateQueries({ queryKey: ['client', payload.clientId] });
-      queryClient.invalidateQueries({ queryKey: ['comptes'] });
-      queryClient.invalidateQueries({ queryKey: ['solde'] });
-      queryClient.invalidateQueries({ queryKey: ['caisse'] });
-    }
-  }, [lastMessage, queryClient]);
+    socket.addEventListener('message', handleMessage);
+    return () => {
+      socket.removeEventListener('message', handleMessage);
+    };
+  }, [socket, isConnected, queryClient]);
 }
 
 export default useClientBalanceSubscription;

@@ -1447,7 +1447,7 @@ export function registerFinanceRoutes(app: Express) {
 
       const [enquete] = await db
         .insert(enquetesCredit)
-        .values(enqueteValues)
+        .values(enqueteValues as any)
         .returning();
 
       const wsInstance = getWsInstance();

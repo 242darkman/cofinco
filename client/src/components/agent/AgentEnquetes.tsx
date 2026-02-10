@@ -43,11 +43,24 @@ interface Investigation {
   scoreGlobal?: number;
   recommandation?: string;
   agentRecommendation?: string;
+  categorieActivite?: string;
+  typeActivite?: string;
+  ancienneteActivite?: string;
+  revenuMensuel?: number;
+  revenuJournalier?: number;
+  typeRevenu?: string;
+  chargesMensuelles?: number;
+  descriptionActivite?: string;
   client?: {
     nom?: string;
     prenom?: string;
     telephone?: string;
     adresseDomicile?: string;
+    profession?: string;
+    typeActivite?: string;
+    revenuMensuel?: number;
+    revenuJournalier?: number;
+    typeRevenu?: string;
   };
 }
 

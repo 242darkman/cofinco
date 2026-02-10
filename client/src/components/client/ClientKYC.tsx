@@ -227,7 +227,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   const [uploading, setUploading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newDoc, setNewDoc] = useState({
-    type: 'ID Card' as ClientDocument['document_type'],
+    type: 'ID Card' as ClientDocument['documentType'],
     name: '',
     url: '',
     notes: ''
@@ -480,7 +480,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Type</label>
                 <select
                 value={newDoc.type}
-                onChange={(e) => setNewDoc(prev => ({ ...prev, type: e.target.value as ClientDocument['document_type'] }))}
+                onChange={(e) => setNewDoc(prev => ({ ...prev, type: e.target.value as ClientDocument['documentType'] }))}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none"
                 >
                 <option value="ID Card">Carte d'identité</option>

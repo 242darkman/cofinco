@@ -383,14 +383,9 @@ export class SessionClosingService {
         }
       }
 
-      // Mettre à jour la session avec le statut de réconciliation
+      // Log le statut de réconciliation (les colonnes mm_reconciliation ne sont pas sur sessions_caisse)
       const mmStatus = hasDiscrepancy ? 'DISCREPANCY' : (providers.length > 0 ? 'MATCHED' : 'SKIPPED');
-      await db.update(sessionsCaisse)
-        .set({
-          mmReconciliationStatus: mmStatus,
-          mmReconciliationCompletedAt: new Date(),
-        })
-        .where(eq(sessionsCaisse.id, sessionId));
+      logger.info({ sessionId, mmStatus }, 'MM reconciliation status computed');
 
       return { hasDiscrepancy, providers };
     } catch (error) {

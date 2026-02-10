@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3 } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 
 // Hooks
 import { useEmployes, Employe, EmployeFormData } from '../../hooks/hr/useEmployes';
@@ -46,8 +47,19 @@ export default function RessourcesHumaines() {
   const { hasPermission } = usePermissions();
   const canCreateEmployes = hasPermission('rh', 'create') || hasPermission('employes', 'create');
 
-  // State
-  const [activeTab, setActiveTab] = useState<TabKey>('list');
+  // Tab dérivé de l'URL (sous-module) — refresh-safe et deep-linkable
+  const { currentSubModule, navigateToModule } = useAppNavigation();
+  const VALID_TABS = TABS.map(t => t.key);
+  const activeTab = useMemo<TabKey>(() => {
+    if (currentSubModule && VALID_TABS.includes(currentSubModule)) {
+      return currentSubModule as TabKey;
+    }
+    return 'list'; // default quand on arrive sur /ressources-humaines sans sous-route
+  }, [currentSubModule]);
+
+  const setActiveTab = useCallback((tab: string) => {
+    navigateToModule('rh', tab as TabKey);
+  }, [navigateToModule]);
   const [showForm, setShowForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

@@ -672,8 +672,9 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   // ============================================
   // TAB: Bilan - ADAPTATIF
   // ============================================
-  const handleExportBilanExcel = () => {
+  const handleExportBilanExcel = async () => {
     try {
+      const XLSX = await import('xlsx');
       const data = [
         ['BILAN OHADA - COFIN&CO-M'],
         [`Date: ${new Date().toLocaleDateString('fr-FR')}`],
@@ -702,8 +703,9 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
     }
   };
 
-  const handleExportBilanPDF = () => {
+  const handleExportBilanPDF = async () => {
     try {
+      const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('portrait');
 
       doc.setFontSize(20);

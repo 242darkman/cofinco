@@ -73,7 +73,7 @@ export async function createRemboursementWithAllocation(
       typePaiement: "CREDIT_REPAYMENT",
       idempotencyKey: data.idempotencyKey,
     },
-    async (tx, mouvement) => {
+    async (tx: any, mouvement: any): Promise<any> => {
       // 1. Valider l'utilisateur
       const validatedUserId = await validateUserId(tx, userId);
 
@@ -116,7 +116,7 @@ export async function createRemboursementWithAllocation(
       
       // Si toutes les échéances sont payées, le crédit est soldé
       if (nouveauSoldeRestant === 0 && echeancesNonPayees.length === 0) {
-        nouveauStatutCredit = StatutCredit.SETTLED;
+        nouveauStatutCredit = StatutCredit.PAID;
       }
 
       const [updatedCredit] = await tx.update(credits)
@@ -146,7 +146,7 @@ export async function createRemboursementWithAllocation(
       };
     },
     userId
-  ).then(async ({ result: { remboursement, allocationResult }, mouvement }) => {
+  ).then(async ({ result: { remboursement, allocationResult }, mouvement }: any) => {
     // Générer la facture
     const facture = await createFactureForRemboursement({
       creditId: data.creditId,
@@ -180,7 +180,7 @@ export async function createRemboursementWithAllocation(
         type: 'CREDIT_SCHEDULE_UPDATED',
         payload: {
           creditId: data.creditId,
-          updatedEcheances: allocationResult.updatedEcheances.map(e => ({
+          updatedEcheances: allocationResult.updatedEcheances.map((e: any) => ({
             id: e.id,
             statut: e.statut,
             montantPaye: e.montantPaye,
@@ -213,7 +213,7 @@ export async function createRemboursementWithAllocation(
           numeroCredit: credit.numeroCredit,
           clientId: credit.clientId,
           montantTotal: parseFloat(data.montant),
-          allocations: allocationResult.allocations.map(a => ({
+          allocations: allocationResult.allocations.map((a: any) => ({
             echeanceId: a.echeanceId,
             montant: a.allocatedAmount,
             statut: a.echeanceStatus,
@@ -321,7 +321,7 @@ export async function reverseRemboursement(
     await tx.update(credits)
       .set({
         soldeRestant: soldeRestant.toString(),
-        statut: soldeRestant > 0 ? StatutCredit.ACTIVE as any : StatutCredit.SETTLED as any,
+        statut: soldeRestant > 0 ? StatutCredit.ACTIVE as any : StatutCredit.PAID as any,
         updatedAt: new Date()
       })
       .where(eq(credits.id, remboursement.creditId));

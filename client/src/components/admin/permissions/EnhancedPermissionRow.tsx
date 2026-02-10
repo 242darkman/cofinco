@@ -182,7 +182,7 @@ export default function EnhancedPermissionRow({
 
             {/* Critical Indicator */}
             {isCritical && (
-              <AlertTriangle size={8} className="text-amber-400 shrink-0" title="Permission critique" />
+              <span title="Permission critique"><AlertTriangle size={8} className="text-amber-400 shrink-0" /></span>
             )}
 
             {/* Source Badge */}

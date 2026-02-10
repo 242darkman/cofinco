@@ -26,8 +26,8 @@ export function useOperationsBadge() {
   const loadPendingCount = useCallback(async () => {
     try {
       const response = await caisseAgentApi.listOperations({ statut: 'SUBMITTED' });
-      // Backend returns { data: [...], total } structure
-      const count = response.total || response.data?.length || 0;
+      // Backend returns { operations: [...], total } structure
+      const count = response.total || response.operations?.length || 0;
 
       setBadgeData({
         pendingCount: count,

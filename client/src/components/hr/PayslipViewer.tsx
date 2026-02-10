@@ -48,6 +48,7 @@ export const PayslipViewer: React.FC<PayslipViewerProps> = ({
   const { downloadPDF, print } = useReceiptPDF({
     filename,
     format: 'a4',
+    contentRef: printRef,
   });
 
   const handleDownload = async () => {
@@ -61,7 +62,7 @@ export const PayslipViewer: React.FC<PayslipViewerProps> = ({
 
   const handlePrint = () => {
     if (printRef.current) {
-      print(undefined, () => printRef.current);
+      print();
     }
   };
 

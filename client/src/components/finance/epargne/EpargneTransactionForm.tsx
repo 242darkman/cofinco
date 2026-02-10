@@ -22,9 +22,9 @@ const getTypeCompteLabel = (type: string): string => {
 interface Compte {
   id: string;
   numeroCompte?: string;
-  numero_compte: string;
+  numero_compte?: string;
   typeCompte?: string;
-  type_compte: string;
+  type_compte?: string;
   solde: number;
   statut?: string;
   clients: {
@@ -284,7 +284,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               </div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-slate-400 text-sm">Type de compte</span>
-                <span className="text-white">{getTypeCompteLabel(compte.typeCompte)}</span>
+                <span className="text-white">{getTypeCompteLabel((compte.typeCompte || compte.type_compte) as string)}</span>
               </div>
               {isPendingActivation ? (
                 <>

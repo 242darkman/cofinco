@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { toast } from 'sonner';
 import { useWebSocketContext } from './WebSocketContext';
 import { authService } from '@/lib/auth';
+import { hardRedirectToLogin } from '@/lib/navigation';
 import { StatutUser } from '@shared/enum/status-constants';
 import type { RbacUpdatePayload } from '@shared/ability';
 
@@ -81,8 +82,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         // Force logout after a short delay for toast visibility
         setTimeout(async () => {
           await authService.logout();
-          // Redirect with reason parameter for login page feedback
-          window.location.href = '/auth/login?reason=suspended';
+          hardRedirectToLogin('Votre compte a été suspendu');
         }, 1500);
       }
     }

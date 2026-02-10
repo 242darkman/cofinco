@@ -396,7 +396,7 @@ async function loadCommission(employeId: string, month: string): Promise<number>
       )
     );
 
-  return primes.reduce((sum, p) => sum + (p.montant || 0), 0);
+  return primes.reduce((sum, p) => sum + Number(p.montant || 0), 0);
 }
 
 async function loadAdvanceDeduction(employeId: string, month: string): Promise<number> {

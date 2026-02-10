@@ -104,12 +104,12 @@ describe('HrService - Leave Management', () => {
 
   describe('calculateSeniorityBonus', () => {
     it('should return 0 for null hire date', () => {
-      const bonus = hrService.calculateSeniorityBonus(null, 1000000);
+      const bonus = (hrService as any).calculateSeniorityBonus(null, 1000000);
       expect(bonus).toBe(0);
     });
 
     it('should return 0 for undefined hire date', () => {
-      const bonus = hrService.calculateSeniorityBonus(undefined, 1000000);
+      const bonus = (hrService as any).calculateSeniorityBonus(undefined, 1000000);
       expect(bonus).toBe(0);
     });
 
@@ -118,7 +118,7 @@ describe('HrService - Leave Management', () => {
       const fiveYearsAgo = new Date();
       fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
 
-      const bonus = hrService.calculateSeniorityBonus(
+      const bonus = (hrService as any).calculateSeniorityBonus(
         fiveYearsAgo.toISOString().split('T')[0],
         1000000
       );
@@ -131,7 +131,7 @@ describe('HrService - Leave Management', () => {
       const twentyYearsAgo = new Date();
       twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);
 
-      const bonus = hrService.calculateSeniorityBonus(
+      const bonus = (hrService as any).calculateSeniorityBonus(
         twentyYearsAgo.toISOString().split('T')[0],
         1000000
       );
@@ -143,7 +143,7 @@ describe('HrService - Leave Management', () => {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-      const bonus = hrService.calculateSeniorityBonus(
+      const bonus = (hrService as any).calculateSeniorityBonus(
         sixMonthsAgo.toISOString().split('T')[0],
         1000000
       );

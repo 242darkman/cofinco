@@ -197,9 +197,9 @@ export default function RbacAuditHistoryViewer({
             )}
 
             {/* Bulk changes info */}
-            {isBulk && entry.metadata?.changesCount && (
+            {isBulk && !!entry.metadata?.changesCount && (
               <div className="mt-1 text-[10px] text-slate-500">
-                {entry.metadata.changesCount as number} permissions modifiées
+                {String(entry.metadata.changesCount)} permissions modifiées
               </div>
             )}
 

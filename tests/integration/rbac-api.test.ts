@@ -80,7 +80,7 @@ describe('API-01: Permission Matrix - 403/200 Responses', () => {
   describe('Caisse Module', () => {
     it('should deny caisse.open without permission', () => {
       const rules = buildRulesFromPermissionCodes(['caisse.view']);
-      expect(canWithRules(rules, Actions.OPEN, Subjects.CAISSE)).toBe(false);
+      expect(canWithRules(rules, Actions.OPEN_SESSION, Subjects.CAISSE_SESSION)).toBe(false);
     });
 
     it('should grant caisse.open with permission', () => {
@@ -361,6 +361,6 @@ describe('API-01: Critical Permissions', () => {
     const basicRules = buildRulesFromPermissionCodes(['caisse.view']);
 
     // Paiements are separate from caisse
-    expect(canWithRules(basicRules, Actions.VIEW, Subjects.PAIEMENT)).toBe(false);
+    expect(canWithRules(basicRules, Actions.VIEW, Subjects.PAIEMENT_TERRAIN)).toBe(false);
   });
 });

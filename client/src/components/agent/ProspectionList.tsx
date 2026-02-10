@@ -35,7 +35,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
   // Search (debounced, server-side)
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Filters
   const [filterStatut, setFilterStatut] = useState('');

@@ -3875,7 +3875,6 @@ async function seedMigrationBackfills(context: SeedContext, dryRun: boolean): Pr
         rolesInitiateurs: ['caissier', 'chef_caisse'],
         rolesValideurs: ['chef_agence', 'superviseur'],
         rolesExecuteurs: ['caissier', 'chef_caisse', 'chef_agence'],
-        billetageObligatoire: false,
         actif: true,
       });
       configsCreated++;

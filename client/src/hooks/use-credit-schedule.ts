@@ -4,7 +4,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { useWebSocket } from '@/contexts/WebSocketContext';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -66,8 +66,8 @@ export function useCreditSchedule(creditId: string | undefined) {
     queryFn: async () => {
       if (!creditId) throw new Error('Credit ID required');
       
-      const response = await api.get(`/api/credits/${creditId}/echeances`);
-      const echeances: EcheanceCredit[] = response.data;
+      const response = await api.get<EcheanceCredit[]>(`/api/credits/${creditId}/echeances`);
+      const echeances = response.data ?? [];
       
       // Enrichir avec des champs calculés
       return echeances.map(enrichEcheance).sort((a, b) => 
@@ -83,66 +83,58 @@ export function useCreditSchedule(creditId: string | undefined) {
   useEffect(() => {
     if (!socket || !isConnected || !creditId) return;
 
-    const handleScheduleUpdate = (payload: any) => {
-      if (payload.creditId !== creditId) return;
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
 
-      queryClient.invalidateQueries({ queryKey: ['creditSchedule', creditId] });
-      
-      // Toast pour informer l'utilisateur
-      if (payload.action === 'LATE_MARKED') {
-        toast.warning('Des échéances ont été marquées en retard');
-      } else if (payload.updatedEcheances) {
-        const paidCount = payload.updatedEcheances.filter((e: any) => e.isPaid).length;
-        if (paidCount > 0) {
-          toast.success(`${paidCount} échéance(s) payée(s)`);
-        }
-      }
-    };
-
-    const handleRepaymentAllocated = (payload: any) => {
-      if (payload.creditId !== creditId) return;
-
-      // Mise à jour optimiste des échéances
-      queryClient.setQueryData(['creditSchedule', creditId], (old: EcheanceCredit[] | undefined) => {
-        if (!old) return old;
-
-        const updated = [...old];
-        payload.allocations?.forEach((allocation: RepaymentAllocation) => {
-          const index = updated.findIndex(e => e.id === allocation.echeanceId);
-          if (index >= 0) {
-            // Mettre à jour l'échéance avec les nouvelles données
-            updated[index] = {
-              ...updated[index],
-              statut: allocation.statut as any,
-              montantPaye: allocation.isPaid 
-                ? updated[index].montantTotal 
-                : (Number(updated[index].montantPaye || 0) + allocation.montant).toString(),
-              paidAt: allocation.isPaid ? new Date().toISOString() : undefined,
-              lastPaymentDate: new Date().toISOString()
-            };
+        if (message.type === 'CREDIT_SCHEDULE_UPDATED' && message.payload?.creditId === creditId) {
+          const payload = message.payload;
+          queryClient.invalidateQueries({ queryKey: ['creditSchedule', creditId] });
+          if (payload.action === 'LATE_MARKED') {
+            toast.warning('Des échéances ont été marquées en retard');
+          } else if (payload.updatedEcheances) {
+            const paidCount = payload.updatedEcheances.filter((e: any) => e.isPaid).length;
+            if (paidCount > 0) {
+              toast.success(`${paidCount} échéance(s) payée(s)`);
+            }
           }
-        });
+        }
 
-        return updated.map(enrichEcheance);
-      });
-
-      // Afficher le message d'allocation
-      if (payload.message) {
-        toast.success(payload.message);
-      }
-
-      // Invalider pour rafraîchir depuis le serveur
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['creditSchedule', creditId] });
-      }, 1000);
+        if (message.type === 'REPAYMENT_ALLOCATED' && message.payload?.creditId === creditId) {
+          const payload = message.payload;
+          // Mise à jour optimiste des échéances
+          queryClient.setQueryData(['creditSchedule', creditId], (old: EcheanceCredit[] | undefined) => {
+            if (!old) return old;
+            const updated = [...old];
+            payload.allocations?.forEach((allocation: RepaymentAllocation) => {
+              const index = updated.findIndex(e => e.id === allocation.echeanceId);
+              if (index >= 0) {
+                updated[index] = {
+                  ...updated[index],
+                  statut: allocation.statut as any,
+                  montantPaye: allocation.isPaid
+                    ? updated[index].montantTotal
+                    : (Number(updated[index].montantPaye || 0) + allocation.montant).toString(),
+                  paidAt: allocation.isPaid ? new Date().toISOString() : undefined,
+                  lastPaymentDate: new Date().toISOString()
+                };
+              }
+            });
+            return updated.map(enrichEcheance);
+          });
+          if (payload.message) {
+            toast.success(payload.message);
+          }
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ['creditSchedule', creditId] });
+          }, 1000);
+        }
+      } catch { /* ignore parse errors */ }
     };
 
-    socket.on('CREDIT_SCHEDULE_UPDATED', handleScheduleUpdate);
-    socket.on('REPAYMENT_ALLOCATED', handleRepaymentAllocated);
-
+    socket.addEventListener('message', handleMessage);
     return () => {
-      socket.off('CREDIT_SCHEDULE_UPDATED', handleScheduleUpdate);
-      socket.off('REPAYMENT_ALLOCATED', handleRepaymentAllocated);
+      socket.removeEventListener('message', handleMessage);
     };
   }, [socket, isConnected, creditId, queryClient]);
 
@@ -199,12 +191,12 @@ export function useGenerateSchedule(creditId: string) {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await api.post(`/api/credits/${creditId}/generate-schedule`);
+      const response = await api.post<any[]>(`/api/credits/${creditId}/generate-schedule`, {});
       return response.data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['creditSchedule', creditId] });
-      toast.success(`Échéancier généré: ${data.length} échéances créées`);
+      toast.success(`Échéancier généré: ${data?.length ?? 0} échéances créées`);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Erreur lors de la génération');

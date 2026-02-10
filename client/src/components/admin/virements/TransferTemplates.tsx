@@ -56,7 +56,7 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
     description: '',
     sourceAccountPattern: '',
     destinationAccountPattern: '',
-    frequency: 'once' as const,
+    frequency: 'once' as 'once' | 'daily' | 'weekly' | 'monthly',
     defaultAmount: '',
     isActive: true,
   });

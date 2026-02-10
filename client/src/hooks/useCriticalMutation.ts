@@ -130,7 +130,7 @@ export function useCriticalMutation<
       // Execute the mutation with idempotency key
       return mutationFn(variables, key);
     },
-    onMutate: async (variables) => {
+    onMutate: async (variables, _mutationCtx) => {
       // Generate key early for tracking
       const key =
         getIdempotencyKey?.(variables) ??
@@ -140,14 +140,14 @@ export function useCriticalMutation<
       setCurrentIdempotencyKey(key);
 
       // Call user's onMutate
-      const previousContext = await userOnMutate?.(variables);
+      const previousContext = await (userOnMutate as ((v: TVariables) => Promise<TContext | undefined> | TContext | undefined) | undefined)?.(variables);
 
       return {
         idempotencyKey: key,
         previousContext: previousContext as TContext | undefined,
       };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, context, _mutationCtx) => {
       // Reset key on success
       currentKeyRef.current = null;
       lastVariablesRef.current = null;
@@ -177,9 +177,9 @@ export function useCriticalMutation<
       }
 
       // Call user's onSuccess
-      userOnSuccess?.(data, variables, context?.previousContext as TContext);
+      (userOnSuccess as any)?.(data, variables, context?.previousContext as TContext, _mutationCtx);
     },
-    onError: (error, variables, context) => {
+    onError: (error, variables, context, _mutationCtx) => {
       // Keep key for retry on error
       // Don't reset currentKeyRef
 
@@ -195,10 +195,10 @@ export function useCriticalMutation<
       }
 
       // Call user's onError
-      userOnError?.(error, variables, context?.previousContext as TContext);
+      (userOnError as any)?.(error, variables, context?.previousContext as TContext, _mutationCtx);
     },
-    onSettled: (data, error, variables, context) => {
-      userOnSettled?.(data, error, variables, context?.previousContext as TContext);
+    onSettled: (data, error, variables, context, _mutationCtx) => {
+      (userOnSettled as any)?.(data, error, variables, context?.previousContext as TContext, _mutationCtx);
     },
   });
 

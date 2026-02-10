@@ -7,6 +7,7 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingScreen from './components/ui/LoadingScreen';
 import AppShell from './components/layout/AppShell';
 import { authService } from './lib/auth';
+import { getReturnTo, getPostLoginDestination } from './lib/navigation';
 import LocationTracker from '@/components/agent/LocationTracker';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
@@ -37,7 +38,7 @@ function App() {
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
   const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
   // Show NetworkOverlay only for prolonged offline (not just unstable)
@@ -127,10 +128,11 @@ function App() {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setShowLoadingAfterLogin(true);
-    // Réinitialiser le message d'expiration de session
     setSessionExpiredMessage(null);
 
-    // Précharger la photo de profil immédiatement
+    // Capturer returnTo AVANT que l'URL change
+    const returnTo = getReturnTo();
+
     preloadProfilePhoto(user?.photoProfile);
 
     // Afficher le cercle de chargement pendant 1.5 secondes
@@ -141,26 +143,20 @@ function App() {
 
       // Afficher "Connecté" pendant 3 secondes
       setTimeout(() => {
-        console.log('[App] Login success animation complete. User:', user?.username, 'Role:', user?.role);
         setShowConnectedSuccess(false);
-        // Redirection explicite basée sur le rôle
-        const role = user?.role?.toLowerCase() || '';
-        if (role === 'agent_terrain' || role === 'agent') {
-          console.log('[App] Redirecting to /agent-terrain');
-          setLocation('/agent-terrain');
-        } else {
-          console.log('[App] Redirecting to /');
-          setLocation('/');
-        }
+        const destination = getPostLoginDestination(user?.role || '', returnTo);
+        // replace: true pour ne pas empiler login dans l'historique
+        setLocation(destination, { replace: true });
       }, 3000);
     }, 1500);
   };
   
-  // Debug effect for location change
+  // Rediriger /login vers / si déjà authentifié (évite URL incohérente)
   useEffect(() => {
-    // console.log('[App] Location changed:', window.location.pathname); 
-    // Commented out to avoid noise, but useful if needed.
-  }, []);
+    if (isAuthenticated && location === '/login') {
+      setLocation('/', { replace: true });
+    }
+  }, [isAuthenticated, location, setLocation]);
 
   const handleLogout = () => {
     authService.logout();

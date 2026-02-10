@@ -45,8 +45,8 @@ export interface PermissionAuditEntry {
   permissionId?: string;
   permissionCode?: string;
   action: 'GRANT' | 'REVOKE' | 'BULK_GRANT' | 'BULK_REVOKE';
-  beforeState?: Record<string, any>;
-  afterState?: Record<string, any>;
+  beforeState?: Record<string, any> | null;
+  afterState?: Record<string, any> | null;
   reason?: string;
 }
 
@@ -322,7 +322,7 @@ class AuditTrailService {
         LIMIT ${limit}
       `);
 
-      return (result as any[]).map(row => ({
+      return ((result as any).rows as any[]).map(row => ({
         id: row.id,
         settingsType: row.settings_type,
         version: row.version,
@@ -459,11 +459,11 @@ class AuditTrailService {
         v.reason,
       ]);
 
-      await db.execute(sql.raw(`
+      await (db.execute as any)(sql.raw(`
         INSERT INTO permission_audit_logs
         (entity_type, entity_id, permission_id, permission_code, action, before_state, after_state, changed_by, ip_address, reason)
         VALUES ${valuesPlaceholders}
-      `, flatValues));
+      `), flatValues);
     } catch (error) {
       logger.error({ err: error }, 'Bulk log permission change error');
       // Don't throw - audit failures shouldn't break the main operation
@@ -500,7 +500,7 @@ class AuditTrailService {
         LIMIT ${limit}
       `);
 
-      return result as any[];
+      return (result as any).rows as any[];
     } catch (error) {
       logger.error({ err: error }, 'Get permission audit history error');
       return [];
@@ -643,7 +643,7 @@ class AuditTrailService {
         LIMIT ${limit}
       `);
 
-      return (result as any[]).map(row => ({
+      return ((result as any).rows as any[]).map(row => ({
         id: row.id,
         importType: row.import_type,
         fileName: row.file_name,

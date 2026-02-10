@@ -353,14 +353,13 @@ export async function generateMonthlyPaie(mois: string, genereParId?: string): P
             employeId: emp.employeId,
             employeNom: `${emp.nom} ${emp.prenom || ''}`,
             mois,
-            salaireBase: (salaireBrut - transport).toString(),
-            primeTransport: transport.toString(),
+            salaireBaseSnapshot: salaireBrut - transport,
             salaireBrut: salaireBrut.toString(),
-            cnssEmploye: cnss.toString(),
-            ipr: ipr.toString(),
+            totalChargesSalariales: cnss.toString(),
+            irpp: ipr.toString(),
             totalRetenues: (cnss + ipr).toString(),
             salaireNet: net.toString(),
-            cnssPatronale: Math.round(salaireBrut * 0.1).toString(),
+            totalChargesPatronales: Math.round(salaireBrut * 0.1).toString(),
             statut: StatutBulletin.DRAFT,
             genereParId: genereParId
         };

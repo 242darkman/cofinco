@@ -319,7 +319,7 @@ test.describe('Credit Enquete Workflow UI Tests', () => {
     await test.step('Assign investigation and verify notification', async () => {
       // Supervisor assigns investigation
       await supervisorPage.click('text=Enquêtes crédit');
-      await supervisorPage.click('button:has-text("Assigner")').first();
+      await supervisorPage.locator('button:has-text("Assigner")').first().click();
       await supervisorPage.selectOption('select[name="agentId"]', { index: 1 });
       await supervisorPage.click('button:has-text("Confirmer")');
       

@@ -214,7 +214,7 @@ export function LazyAvatar({
       {/* Avatar image */}
       {src && !hasError && (
         <img
-          src={resolvedSrc}
+          src={resolvedSrc || undefined}
           alt={alt}
           loading="lazy"
           decoding="async"

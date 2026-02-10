@@ -328,12 +328,7 @@ class OnboardingService {
       .insert(employes)
       .values({
         id: employeId,
-        nom: candidature.nom,
-        prenom: candidature.prenom,
-        email: candidature.email,
-        telephone: candidature.telephone,
-        poste: candidature.posteVise,
-        agenceId: employeData.agenceId,
+        userId: employeData.userId!, // Must have a linked user
         dateEmbauche: new Date().toISOString().split('T')[0],
         statut: "ACTIVE",
         ...employeData,
@@ -361,7 +356,7 @@ class OnboardingService {
     return {
       success: true,
       employe,
-      message: `Employé ${employe.prenom} ${employe.nom} créé avec succès`,
+      message: `Employé ${candidature.prenom} ${candidature.nom} créé avec succès`,
     };
   }
 

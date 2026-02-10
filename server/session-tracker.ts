@@ -294,7 +294,7 @@ export async function checkDeviceFingerprint(
       // Mode tolérant: le fingerprint partiel peut correspondre
       // Cela permet les mises à jour mineures du navigateur
       isValid = session.deviceFingerprint === currentFingerprint ||
-                (session.deviceFingerprintPartial && currentFingerprintPartial &&
+                !!(session.deviceFingerprintPartial && currentFingerprintPartial &&
                  session.deviceFingerprintPartial === currentFingerprintPartial);
     }
 
@@ -494,9 +494,9 @@ export async function getUserSessions(userId: string): Promise<{
   sessionId: string;
   loginAt: Date;
   lastActivity: Date;
-  deviceType: string;
-  browser: string;
-  ipAddress: string;
+  deviceType: string | null;
+  browser: string | null;
+  ipAddress: string | null;
 }[]> {
   try {
     const sessions = await db.select({
@@ -556,8 +556,8 @@ export async function enforceSessionLimit(userId: string): Promise<{
 
       terminatedSessions.push({
         sessionId: session.sessionId,
-        deviceType: session.deviceType,
-        browser: session.browser,
+        deviceType: session.deviceType ?? 'unknown',
+        browser: session.browser ?? 'unknown',
       });
 
       // Notify via WebSocket

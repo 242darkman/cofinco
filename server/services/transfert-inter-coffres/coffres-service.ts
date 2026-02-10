@@ -341,7 +341,7 @@ export class CoffresFortsService {
     // Récupérer l'agence du coffre
     let agenceId: string;
     if (coffre.ownerType === 'AGENCE') {
-      agenceId = coffre.ownerId;
+      agenceId = coffre.ownerId!;
     } else {
       // Coffre de type SIEGE - utiliser l'agence par défaut
       const [defaultAgence] = await db
@@ -366,7 +366,7 @@ export class CoffresFortsService {
           id: mouvementId,
           montant: montant.toString(),
           sens: 'DEBIT', // Débit du coffre (augmente l'actif)
-          sourceModule: 'COFFRE_OPERATIONS',
+          sourceModule: 'COFFRE',
           sourceTable: 'coffres_forts',
           sourceId: coffreId,
           agenceId,

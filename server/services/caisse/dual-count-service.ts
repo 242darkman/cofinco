@@ -10,7 +10,8 @@
 
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../db";
-import { comptageBillets, dualCountConfig, sessionsCaisse, DualCountConfig } from "@shared/schema/operations";
+import { sessionsCaisse } from "@shared/schema/finance";
+import { comptageBillets, dualCountConfig, DualCountConfig } from "@shared/schema/operations";
 import { agences } from "@shared/schema/agences";
 
 export interface DualCountCheckResult {

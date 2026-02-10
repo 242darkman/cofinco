@@ -107,11 +107,11 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
 
       // Charger les opérations récentes
       const opsResponse = await caisseAgentApi.getAgentOperations(agentId, { limit: 20 });
-      setOperations(opsResponse.data || []);
+      setOperations(opsResponse.operations || []);
 
       // Charger les opérations en attente
       const pendingResponse = await caisseAgentApi.getAgentOperations(agentId, { statut: StatutOperationTerrain.SUBMITTED });
-      setPendingOperations(pendingResponse.data || []);
+      setPendingOperations(pendingResponse.operations || []);
 
     } catch (error: any) {
       console.error('Erreur chargement données caisse agent:', error);

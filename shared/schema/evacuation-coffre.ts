@@ -235,10 +235,10 @@ export const configEvacuationCoffre = pgTable(
     separationPreparateurDispatcher: boolean("separation_preparateur_dispatcher").notNull().default(false),
 
     // Rôles autorisés
-    rolesCreateurs: json("roles_createurs").$type<string[]>().default('["agent_caisse", "Comptable", "Chef d\'Agence"]'),
-    rolesApprobateurs: json("roles_approbateurs").$type<string[]>().default('["Chef d\'Agence", "Directeur", "Trésorier"]'),
-    rolesPreparateurs: json("roles_preparateurs").$type<string[]>().default('["agent_caisse", "Comptable", "Trésorier"]'),
-    rolesDispatchers: json("roles_dispatchers").$type<string[]>().default('["Chef d\'Agence", "Trésorier"]'),
+    rolesCreateurs: json("roles_createurs").$type<string[]>().default(["agent_caisse", "Comptable", "Chef d'Agence"]),
+    rolesApprobateurs: json("roles_approbateurs").$type<string[]>().default(["Chef d'Agence", "Directeur", "Trésorier"]),
+    rolesPreparateurs: json("roles_preparateurs").$type<string[]>().default(["agent_caisse", "Comptable", "Trésorier"]),
+    rolesDispatchers: json("roles_dispatchers").$type<string[]>().default(["Chef d'Agence", "Trésorier"]),
 
     // Transport
     nombreAgentsTransportMin: numeric("nombre_agents_transport_min").notNull().default("1"),
@@ -247,7 +247,7 @@ export const configEvacuationCoffre = pgTable(
     billetageObligatoire: boolean("billetage_obligatoire").notNull().default(true),
 
     // Destinations autorisées
-    destinationsAutorisees: json("destinations_autorisees").$type<string[]>().default('["BANQUE", "COFFRE_CENTRAL", "TRANSPORTEUR"]'),
+    destinationsAutorisees: json("destinations_autorisees").$type<string[]>().default(["BANQUE", "COFFRE_CENTRAL", "TRANSPORTEUR"]),
 
     // Réconciliation
     delaiMaxReconciliation: numeric("delai_max_reconciliation").default("5"),

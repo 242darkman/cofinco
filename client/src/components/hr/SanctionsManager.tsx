@@ -822,8 +822,8 @@ export default function SanctionsManager({
       <Modal isOpen={!!editingSanction} onClose={() => setEditingSanction(null)} title="Modifier la Sanction" size="md">
         <form onSubmit={handleEditSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SelectField label="Type" name="type" value={editData.type} onChange={(e) => setEditData({ ...editData, type: e.target.value })} options={[{ value: 'Avertissement', label: 'Avertissement' }, { value: 'Blâme', label: 'Blâme' }, { value: 'Mise à pied', label: 'Mise à pied' }, { value: 'Autre', label: 'Autre' }]} required />
-            <SelectField label="Gravité" name="gravite" value={editData.gravite} onChange={(e) => setEditData({ ...editData, gravite: e.target.value })} options={[{ value: 'Faible', label: 'Faible' }, { value: 'Moyenne', label: 'Moyenne' }, { value: 'Grave', label: 'Grave' }]} required />
+            <SelectField label="Type" name="type" value={editData.type} onChange={(e) => setEditData({ ...editData, type: e.target.value as typeof editData.type })} options={[{ value: 'Avertissement', label: 'Avertissement' }, { value: 'Blâme', label: 'Blâme' }, { value: 'Mise à pied', label: 'Mise à pied' }, { value: 'Autre', label: 'Autre' }]} required />
+            <SelectField label="Gravité" name="gravite" value={editData.gravite} onChange={(e) => setEditData({ ...editData, gravite: e.target.value as typeof editData.gravite })} options={[{ value: 'Faible', label: 'Faible' }, { value: 'Moyenne', label: 'Moyenne' }, { value: 'Grave', label: 'Grave' }]} required />
           </div>
           <FormField label="Date" name="date" type="date" value={editData.date} onChange={(e) => setEditData({ ...editData, date: e.target.value })} required />
           <TextareaField label="Motif" name="motif" value={editData.motif} onChange={(e) => setEditData({ ...editData, motif: e.target.value })} rows={4} required />

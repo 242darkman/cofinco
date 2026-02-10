@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin,
   MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock,
@@ -18,6 +18,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 // Constants
 import { ADMIN_TABS, AdminTabId } from '../../constants/admin-constants';
 import { authService } from '../../lib/auth';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 
 // Sub-components
 import AdminGestionUtilisateurs from './AdminGestionUtilisateurs';
@@ -52,7 +53,21 @@ interface AdminModuleCompletProps {
 }
 
 export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
-  const [activeTab, setActiveTab] = useState<AdminTabId>('dashboard');
+  const { currentSubModule, navigateToModule } = useAppNavigation();
+
+  // Dérive l'onglet actif depuis l'URL (source de vérité)
+  const VALID_TAB_IDS = ADMIN_TABS.map(t => t.id) as string[];
+  const activeTab = useMemo<AdminTabId>(() => {
+    if (currentSubModule && VALID_TAB_IDS.includes(currentSubModule)) {
+      return currentSubModule as AdminTabId;
+    }
+    return 'dashboard';
+  }, [currentSubModule]);
+
+  const setActiveTab = useCallback((tab: AdminTabId) => {
+    navigateToModule('administrateur', tab);
+  }, [navigateToModule]);
+
   const [accessViewMode, setAccessViewMode] = useState<'roles' | 'modules' | 'users' | 'temporary' | 'analytics'>('roles');
   const [selectedRole, setSelectedRole] = useState<SystemRole>(SystemRole.ADMIN);
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -94,16 +109,16 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const { users, getUserDisplayName } = useAdminUsers();
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
+  // Legacy: si activeView est passé via l'ancien système (avant URL sync), on redirige
   useEffect(() => {
-    if (activeView) {
+    if (activeView && !currentSubModule) {
       switch (activeView) {
-        case 'admin-users': setActiveTab('users'); break;
-        case 'admin-agences': setActiveTab('agences'); break;
-        case 'admin-audit': setActiveTab('logs'); break;
-        default: setActiveTab('dashboard');
+        case 'admin-users': navigateToModule('administrateur', 'users'); break;
+        case 'admin-agences': navigateToModule('administrateur', 'agences'); break;
+        case 'admin-audit': navigateToModule('administrateur', 'logs'); break;
       }
     }
-  }, [activeView]);
+  }, [activeView, currentSubModule, navigateToModule]);
 
   useEffect(() => {
     fetchRolePermissions();

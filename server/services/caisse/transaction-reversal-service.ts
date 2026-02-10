@@ -16,6 +16,7 @@ import {
   updateSessionSolde,
   generateReference,
   emitBalanceUpdates,
+  type SourceModule,
 } from "../ledger";
 import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
 import { dispatchDomainEvent } from "../notifications/domain-events/event-registry";
@@ -184,7 +185,7 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
       sessionCaisseId: reversalSessionId,
       agenceId: originalMouvement!.agenceId,
       agentId: originalMouvement!.agentId,
-      reference: generateReference(originalMouvement!.sourceModule as "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "AGENT" | "SYSTEME" | "MOBILE_MONEY"),
+      reference: generateReference(originalMouvement!.sourceModule as SourceModule),
       idempotencyKey: `REV-${original.id}-${Date.now()}`,
       metadata: {
         reversalOf: originalMouvement!.id,

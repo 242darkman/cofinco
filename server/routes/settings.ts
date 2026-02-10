@@ -561,7 +561,7 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // Rollback an audited action
-  app.post("/api/audit/:id/rollback", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.AUDIT), async (req, res) => {
+  app.post("/api/audit/:id/rollback", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.AUDIT_LOG), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = req.session?.userId;
@@ -611,7 +611,7 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // Rollback an import batch
-  app.post("/api/import/batches/:id/rollback", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USERS), async (req, res) => {
+  app.post("/api/import/batches/:id/rollback", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = req.session?.userId;
@@ -1136,7 +1136,7 @@ export function registerSettingsRoutes(app: Express) {
         return res.status(404).json({ error: "Template not found" });
       }
 
-      await logAudit(req, "settings", "sms_template_updated", { templateId: req.params.id, changes: req.body });
+      await logAudit(req, "settings", "sms_template_updated", req.params.id, { changes: req.body });
       res.json(updated);
     } catch (error) {
       logger.error({ err: error }, 'Error updating SMS template');
@@ -1195,7 +1195,7 @@ export function registerSettingsRoutes(app: Express) {
         return res.status(404).json({ error: "Template not found" });
       }
 
-      await logAudit(req, "settings", "email_template_updated", { templateId: req.params.id, changes: req.body });
+      await logAudit(req, "settings", "email_template_updated", req.params.id, { changes: req.body });
       res.json(updated);
     } catch (error) {
       logger.error({ err: error }, 'Error updating email template');

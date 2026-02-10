@@ -4,7 +4,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { useWebSocket } from '@/contexts/WebSocketContext';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -83,8 +83,8 @@ export function useRepayments(creditId: string | undefined) {
     queryFn: async () => {
       if (!creditId) throw new Error('Credit ID required');
       
-      const response = await api.get(`/api/credits/${creditId}/remboursements`);
-      const remboursements: Remboursement[] = response.data;
+      const response = await api.get<Remboursement[]>(`/api/credits/${creditId}/remboursements`);
+      const remboursements = response.data ?? [];
       
       // Trier par date décroissante
       return remboursements.sort((a, b) => 
@@ -100,26 +100,23 @@ export function useRepayments(creditId: string | undefined) {
   useEffect(() => {
     if (!socket || !isConnected || !creditId) return;
 
-    const handleRepaymentCreated = (payload: any) => {
-      if (payload.creditId !== creditId) return;
-      
-      queryClient.invalidateQueries({ queryKey: ['repayments', creditId] });
-      toast.success(`Nouveau remboursement de ${Number(payload.montant).toLocaleString('fr-FR')} FCFA enregistré`);
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'CREDIT_REPAYMENT_CREATED' && message.payload?.creditId === creditId) {
+          queryClient.invalidateQueries({ queryKey: ['repayments', creditId] });
+          toast.success(`Nouveau remboursement de ${Number(message.payload.montant).toLocaleString('fr-FR')} FCFA enregistré`);
+        }
+        if (message.type === 'REPAYMENT_REVERSED' && message.payload?.creditId === creditId) {
+          queryClient.invalidateQueries({ queryKey: ['repayments', creditId] });
+          toast.warning('Un remboursement a été extourné');
+        }
+      } catch { /* ignore parse errors */ }
     };
 
-    const handleRepaymentReversed = (payload: any) => {
-      if (payload.creditId !== creditId) return;
-      
-      queryClient.invalidateQueries({ queryKey: ['repayments', creditId] });
-      toast.warning('Un remboursement a été extourné');
-    };
-
-    socket.on('CREDIT_REPAYMENT_CREATED', handleRepaymentCreated);
-    socket.on('REPAYMENT_REVERSED', handleRepaymentReversed);
-
+    socket.addEventListener('message', handleMessage);
     return () => {
-      socket.off('CREDIT_REPAYMENT_CREATED', handleRepaymentCreated);
-      socket.off('REPAYMENT_REVERSED', handleRepaymentReversed);
+      socket.removeEventListener('message', handleMessage);
     };
   }, [socket, isConnected, creditId, queryClient]);
 
@@ -135,7 +132,7 @@ export function useCreateRepayment() {
 
   return useMutation({
     mutationFn: async (data: CreateRemboursementData) => {
-      const response = await api.post('/api/remboursements', data);
+      const response = await api.post<any>('/api/remboursements', data);
       return response.data;
     },
     onSuccess: (data, variables) => {
@@ -184,7 +181,7 @@ export function useReverseRepayment() {
 
   return useMutation({
     mutationFn: async ({ remboursementId, reason }: { remboursementId: string; reason: string }) => {
-      const response = await api.post(`/api/remboursements/${remboursementId}/reverse`, { reason });
+      const response = await api.post<any>(`/api/remboursements/${remboursementId}/reverse`, { reason });
       return response.data;
     },
     onSuccess: (data, variables) => {
