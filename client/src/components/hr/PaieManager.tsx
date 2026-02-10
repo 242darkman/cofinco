@@ -5,7 +5,7 @@ import { Card, Button, ResponsiveTable, Badge, TabGroup } from '../ui';
 import {
   FileText, Play, Download, Calculator, AlertCircle, Banknote, Settings, Eye,
   ShieldCheck, CreditCard, ArrowLeft, RefreshCw, AlertTriangle, Clock, RotateCcw,
-  CheckCircle, Loader2
+  CheckCircle, Loader2, ChevronLeft, ChevronRight, Calendar
 } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
@@ -57,6 +57,36 @@ export default function PaieManager() {
   const [rerunDialogOpen, setRerunDialogOpen] = useState(false);
   const [rerunTargetId, setRerunTargetId] = useState<number | null>(null);
   const [rerunReason, setRerunReason] = useState('');
+
+  // My bulletins: year filter + pagination
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [myPage, setMyPage] = useState(0);
+  const MY_PAGE_SIZE = 12;
+
+  // Available years from bulletins
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    years.add(currentYear);
+    for (const b of (myBulletins || []) as BulletinPaie[]) {
+      const y = parseInt(b.mois?.split('-')[0]);
+      if (!isNaN(y)) years.add(y);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [myBulletins, currentYear]);
+
+  // Filtered + sorted bulletins
+  const filteredBulletins = useMemo(() => {
+    return ((myBulletins || []) as BulletinPaie[])
+      .filter(b => b.mois?.startsWith(String(selectedYear)))
+      .sort((a, b) => b.mois.localeCompare(a.mois));
+  }, [myBulletins, selectedYear]);
+
+  const myTotalPages = Math.max(1, Math.ceil(filteredBulletins.length / MY_PAGE_SIZE));
+  const paginatedBulletins = useMemo(
+    () => filteredBulletins.slice(myPage * MY_PAGE_SIZE, (myPage + 1) * MY_PAGE_SIZE),
+    [filteredBulletins, myPage]
+  );
 
   // Filter runs by selected month, sorted by version desc
   const runsDuMois = useMemo(
@@ -128,8 +158,15 @@ export default function PaieManager() {
   }, [selectedMonth]);
 
   // My bulletins columns
+  const formatMoisLabel = (mois: string) => {
+    const [year, month] = mois.split('-');
+    const d = new Date(Number(year), Number(month) - 1);
+    const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
+
   const myColumns = [
-    { key: 'mois', label: 'Mois', primary: true, format: (val: string) => <span className="font-mono font-medium">{val}</span> },
+    { key: 'mois', label: 'Mois', primary: true, format: (val: string) => <span className="font-medium">{formatMoisLabel(val)}</span> },
     { key: 'salaireNet', label: 'Net à Payer', format: (val: string) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatMoney(val)}</span> },
     { key: 'statut', label: 'Statut', format: (val: string) => {
       const cfg = RUN_STATUS_CONFIG[val] || { variant: 'warning' as const, label: val };
@@ -478,12 +515,24 @@ export default function PaieManager() {
               <FileText size={14} className="text-cyan-400" />
               Mes Bulletins
             </h3>
+            <div className="flex items-center gap-1.5">
+              <Calendar size={13} className="text-slate-500" />
+              <select
+                value={selectedYear}
+                onChange={(e) => { setSelectedYear(Number(e.target.value)); setMyPage(0); }}
+                className="bg-slate-800 border border-slate-700 rounded text-xs text-white px-2 py-1 outline-none focus:ring-1 focus:ring-cyan-500/50"
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex-1 overflow-hidden">
             <ResponsiveTable
-              data={myBulletins || []}
+              data={paginatedBulletins}
               columns={myColumns}
-              emptyMessage="Aucun bulletin de paie disponible."
+              emptyMessage={`Aucun bulletin pour ${selectedYear}.`}
               loading={loadingMyBulletins}
               maxHeight="100%"
               density="compact"
@@ -492,6 +541,32 @@ export default function PaieManager() {
               onRowClick={(item: BulletinPaie) => setViewerBulletinId(item.id)}
             />
           </div>
+          {filteredBulletins.length > MY_PAGE_SIZE && (
+            <div className="shrink-0 px-3 py-1.5 border-t border-slate-800 flex items-center justify-between bg-slate-900/50">
+              <span className="text-[10px] text-slate-500">
+                {filteredBulletins.length} bulletin{filteredBulletins.length > 1 ? 's' : ''} en {selectedYear}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setMyPage(p => Math.max(0, p - 1))}
+                  disabled={myPage === 0}
+                  className="p-0.5 rounded hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-[10px] text-slate-400 font-mono px-1">
+                  {myPage + 1}/{myTotalPages}
+                </span>
+                <button
+                  onClick={() => setMyPage(p => Math.min(myTotalPages - 1, p + 1))}
+                  disabled={myPage >= myTotalPages - 1}
+                  className="p-0.5 rounded hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
