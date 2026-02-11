@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Clock, User, Loader2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  CheckCircle, XCircle, Clock, User, Loader2, RefreshCw,
+  Banknote, Smartphone, CreditCard, AlertTriangle, FileText,
+  Search, ChevronLeft, ChevronRight,
+} from 'lucide-react';
 import { Card, Badge, ConfirmDialog } from '../ui';
 import { toast, handleApiError } from '../../lib/toast';
-import { CLOSURE_PAYOUT_METHOD_LABELS, type ClosurePayoutMethodType } from '@shared/enum/status-constants';
+import { type ClosurePayoutMethodType } from '@shared/enum/status-constants';
 
 interface ClosureRequest {
   id: string;
@@ -26,10 +30,35 @@ interface ClosureApprovalsProps {
   agenceId?: string;
 }
 
+const PAGE_SIZE = 10;
+
+function formatMoney(value: string | number): string {
+  return Number(value).toLocaleString('fr-FR');
+}
+
+function PayoutMethodBadge({ method, phoneNumber }: { method: ClosurePayoutMethodType; phoneNumber?: string }) {
+  if (method === 'CASH') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+        <Banknote size={14} />
+        Espèces — via Caisse
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium">
+      <Smartphone size={14} />
+      Mobile Money{phoneNumber ? ` — ${phoneNumber}` : ''}
+    </span>
+  );
+}
+
 export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
   const [requests, setRequests] = useState<ClosureRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Approve dialog
   const [approveTarget, setApproveTarget] = useState<ClosureRequest | null>(null);
@@ -58,6 +87,26 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
       setLoading(false);
     }
   };
+
+  // Filtered + paginated data
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return requests;
+    const q = searchQuery.toLowerCase().trim();
+    return requests.filter(r =>
+      (r.numeroCompte || '').toLowerCase().includes(q) ||
+      (r.clientNom || '').toLowerCase().includes(q) ||
+      (r.initiatorName || '').toLowerCase().includes(q)
+    );
+  }, [requests, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginated = filtered.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleApprove = async () => {
     if (!approveTarget) return;
@@ -129,80 +178,187 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      {/* Header + Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-slate-400 uppercase flex items-center gap-2">
           <Clock size={14} />
           Clôtures en attente
           <Badge value={String(requests.length)} size="sm" />
         </h4>
-        <button
-          onClick={fetchPending}
-          className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
-          title="Rafraîchir"
-        >
-          <RefreshCw size={14} />
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="N° compte, client..."
+              className="pl-8 pr-3 py-1.5 w-48 sm:w-56 bg-slate-800/60 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition"
+            />
+          </div>
+          <button
+            onClick={fetchPending}
+            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            title="Rafraîchir"
+          >
+            <RefreshCw size={14} />
+          </button>
+        </div>
       </div>
 
-      {requests.map((req) => (
-        <Card key={req.id} variant="default" padding="sm" className="border-purple-500/20">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex-1 min-w-0 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-white font-mono text-sm">{req.numeroCompte || req.compteId.slice(0, 8)}</span>
-                <Badge value="Clôture" size="sm" />
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                <span className="flex items-center gap-1">
-                  <User size={12} />
-                  {req.initiatorName || req.initiatedBy.slice(0, 8)}
-                </span>
-                <span>
-                  {new Date(req.initiatedAt).toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-                <span>
-                  {CLOSURE_PAYOUT_METHOD_LABELS[req.payoutMethod]}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 truncate">{req.reason}</p>
-            </div>
+      {/* Search result count when filtering */}
+      {searchQuery.trim() && (
+        <p className="text-xs text-slate-500">
+          {filtered.length} résultat{filtered.length !== 1 ? 's' : ''} sur {requests.length}
+        </p>
+      )}
 
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-xs text-slate-500">Montant</p>
-                <p className="text-sm font-bold text-white">
-                  {Number(req.payoutAmount).toLocaleString()} FCFA
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setApproveTarget(req)}
-                  disabled={actionLoading === req.id}
-                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-                >
-                  <CheckCircle size={14} />
-                  Approuver
-                </button>
-                <button
-                  onClick={() => setCancelTarget(req)}
-                  disabled={actionLoading === req.id}
-                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-                >
-                  <XCircle size={14} />
-                  Rejeter
-                </button>
-              </div>
-            </div>
-          </div>
+      {/* Cards */}
+      {paginated.length === 0 ? (
+        <Card variant="default" padding="md" className="border-dashed border-slate-700 bg-transparent">
+          <p className="text-center text-sm text-slate-500 py-4">
+            Aucun résultat pour « {searchQuery} »
+          </p>
         </Card>
-      ))}
+      ) : (
+        paginated.map((req) => {
+          const balance = Number(req.balanceAtInitiation);
+          const fee = Number(req.closingFeeAmount);
+          const payout = Number(req.payoutAmount);
+          const isCash = req.payoutMethod === 'CASH';
+
+          return (
+            <Card key={req.id} variant="default" padding="md" className="border-purple-500/20">
+              <div className="space-y-4">
+                {/* Top: Account + Client */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CreditCard size={16} className="text-purple-400" />
+                      <span className="text-white font-mono text-sm font-semibold">
+                        {req.numeroCompte || req.compteId.slice(0, 8)}
+                      </span>
+                    </div>
+                    {req.clientNom && (
+                      <p className="text-sm text-slate-300 pl-6">{req.clientNom}</p>
+                    )}
+                  </div>
+                  <PayoutMethodBadge method={req.payoutMethod} phoneNumber={req.payoutPhoneNumber} />
+                </div>
+
+                {/* Financial details grid */}
+                <div className="grid grid-cols-3 gap-3 bg-slate-800/40 rounded-lg p-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Solde au moment</p>
+                    <p className="text-sm font-semibold text-slate-200">{formatMoney(balance)} <span className="text-[10px] text-slate-500">FCFA</span></p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Frais de clôture</p>
+                    <p className="text-sm font-semibold text-red-400">
+                      {fee > 0 ? `- ${formatMoney(fee)}` : '0'} <span className="text-[10px] text-slate-500">FCFA</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Net à restituer</p>
+                    <p className="text-sm font-bold text-emerald-400">{formatMoney(payout)} <span className="text-[10px] text-slate-500">FCFA</span></p>
+                  </div>
+                </div>
+
+                {/* Cash caisse notice */}
+                {isCash && payout > 0 && (
+                  <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/5 border border-amber-500/15 rounded-lg">
+                    <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-400/90">
+                      La restitution en espèces sera traitée en caisse. Le caissier devra confirmer la remise physique des fonds.
+                    </p>
+                  </div>
+                )}
+
+                {/* Reason */}
+                <div className="flex items-start gap-2 text-xs text-slate-400">
+                  <FileText size={12} className="mt-0.5 shrink-0 text-slate-500" />
+                  <span><span className="text-slate-500">Motif :</span> {req.reason}</span>
+                </div>
+
+                {/* Footer: Initiator + Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-700/50">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <User size={12} />
+                    <span>
+                      Initié par <span className="text-slate-300">{req.initiatorName || req.initiatedBy.slice(0, 8)}</span>
+                      {' — '}
+                      {new Date(req.initiatedAt).toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setApproveTarget(req)}
+                      disabled={actionLoading === req.id}
+                      className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
+                    >
+                      <CheckCircle size={14} />
+                      Approuver
+                    </button>
+                    <button
+                      onClick={() => setCancelTarget(req)}
+                      disabled={actionLoading === req.id}
+                      className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
+                    >
+                      <XCircle size={14} />
+                      Rejeter
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          );
+        })
+      )}
+
+      {/* Pagination */}
+      {filtered.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-slate-500">
+            {(safeCurrentPage - 1) * PAGE_SIZE + 1}–{Math.min(safeCurrentPage * PAGE_SIZE, filtered.length)} sur {filtered.length}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={safeCurrentPage <= 1}
+              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+                  page === safeCurrentPage
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safeCurrentPage >= totalPages}
+              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Approve dialog */}
       <ConfirmDialog
@@ -212,20 +368,56 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         title="Approuver la clôture"
         message={
           approveTarget ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p>
                 Vous allez approuver la clôture du compte{' '}
-                <span className="font-mono text-white">{approveTarget.numeroCompte || approveTarget.compteId.slice(0, 8)}</span>.
+                <span className="font-mono text-white font-semibold">{approveTarget.numeroCompte || approveTarget.compteId.slice(0, 8)}</span>
+                {approveTarget.clientNom && (
+                  <> du client <span className="text-white">{approveTarget.clientNom}</span></>
+                )}.
               </p>
-              <p>
-                Le montant de <span className="text-emerald-400 font-bold">{Number(approveTarget.payoutAmount).toLocaleString()} FCFA</span>{' '}
-                sera restitué par <span className="text-white">{CLOSURE_PAYOUT_METHOD_LABELS[approveTarget.payoutMethod]}</span>.
+
+              {/* Financial summary in dialog */}
+              <div className="grid grid-cols-3 gap-2 bg-slate-800/60 rounded-lg p-3 text-center">
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase">Solde</p>
+                  <p className="text-sm font-semibold text-slate-200">{formatMoney(approveTarget.balanceAtInitiation)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase">Frais</p>
+                  <p className="text-sm font-semibold text-red-400">- {formatMoney(approveTarget.closingFeeAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase">Net</p>
+                  <p className="text-sm font-bold text-emerald-400">{formatMoney(approveTarget.payoutAmount)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-400">Restitution par :</span>
+                <PayoutMethodBadge method={approveTarget.payoutMethod} phoneNumber={approveTarget.payoutPhoneNumber} />
+              </div>
+
+              {approveTarget.payoutMethod === 'CASH' && Number(approveTarget.payoutAmount) > 0 && (
+                <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-400">
+                    La restitution en espèces devra être confirmée en caisse par le caissier.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-amber-400 text-sm flex items-center gap-1.5">
+                <AlertTriangle size={14} />
+                Cette action est irréversible.
               </p>
-              <p className="text-amber-400 text-sm">Cette action est irréversible.</p>
             </div>
           ) : ''
         }
-        confirmText="Approuver et exécuter"
+        confirmText={approveTarget?.payoutMethod === 'CASH' && Number(approveTarget?.payoutAmount) > 0
+          ? "Approuver et envoyer en caisse"
+          : "Approuver et exécuter"
+        }
         variant="success"
         isLoading={!!actionLoading}
       />
@@ -238,7 +430,11 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         title="Rejeter la clôture"
         message={
           <div className="space-y-3">
-            <p>Le compte sera réactivé et la demande annulée.</p>
+            <p>
+              Le compte{' '}
+              <span className="font-mono text-white">{cancelTarget?.numeroCompte || cancelTarget?.compteId.slice(0, 8)}</span>
+              {' '}sera réactivé et la demande annulée.
+            </p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Motif du rejet *</label>
               <textarea
