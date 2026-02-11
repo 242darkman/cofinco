@@ -102,8 +102,9 @@ export default function ClosureWizard({
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.request) {
-          setExistingRequest(data.request);
+        // API returns the request object directly (or null)
+        if (data && data.id) {
+          setExistingRequest(data);
         } else {
           setExistingRequest(null);
         }
