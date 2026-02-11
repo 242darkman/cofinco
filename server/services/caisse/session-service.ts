@@ -13,7 +13,7 @@ import { db } from "../../db";
 import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers, clients, cashOpeningDiscrepancies } from "@shared/schema";
 import { eq, and, sql, desc, lt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
 import { ForcedCloseReason, SessionComputedStatus } from "@shared/enums";
-import { StatutTransaction, StatutSessionCaisse, CaisseOpeningStrictness, type CaisseOpeningStrictnessType } from "@shared/enum/status-constants";
+import { StatutTransaction, StatutSessionCaisse, StatutCaisse, CaisseOpeningStrictness, type CaisseOpeningStrictnessType } from "@shared/enum/status-constants";
 import {
   getOperationDelta,
   CAISSE_THRESHOLDS,
@@ -1114,6 +1114,7 @@ export async function closeExpiredSessions(
 
     // Fermer la session avec raison "timeout"
     // Pour une fermeture automatique, le montant déclaré = théorique (pas de comptage physique)
+    // Tout le solde est reporté (pas de transfert vers coffre)
     await db
       .update(sessionsCaisse)
       .set({
@@ -1121,13 +1122,27 @@ export async function closeExpiredSessions(
         montantFermetureTheorique: soldeTheorique.toString(),
         montantFermetureDeclare: soldeTheorique.toString(), // Égal au théorique pour éviter faux écarts
         montantPhysique: soldeTheorique.toString(),
+        montantReporte: soldeTheorique.toString(),
+        montantVersCoffre: "0",
         ecart: "0", // Pas d'écart pour fermeture auto
         forcedCloseReason: ForcedCloseReason.TIMEOUT_AUTO,
         forceClosedAt: now,
         forceClosedBy: null,
+        fundsKeptInCaisse: soldeTheorique > 0,
         observations: `${session.observations || ""}\n[AUTO-FERMETURE] Session expirée après ${timeoutHours}h d'inactivité. Solde reporté: ${soldeTheorique} FCFA.`.trim(),
       })
       .where(eq(sessionsCaisse.id, session.id));
+
+    // CRITIQUE: Mettre à jour la caisse physique avec le solde théorique comme fond reporté
+    // Sans cela, le fond reporté affiché à la prochaine ouverture est erroné
+    await db
+      .update(caisses)
+      .set({
+        solde: soldeTheorique.toString(),
+        statut: StatutCaisse.CLOSED,
+        updatedAt: now,
+      })
+      .where(eq(caisses.id, session.caisseId));
 
     // Log d'audit
     await db.insert(sessionsCaisseAuditLogs).values({
@@ -1212,6 +1227,7 @@ export async function closeSessionTemporarily(params: TemporaryCloseSessionParam
       .update(caisses)
       .set({
         solde: soldeTheorique.toString(),
+        statut: StatutCaisse.CLOSED,
         updatedAt: now,
       })
       .where(eq(caisses.id, caisse.id));
