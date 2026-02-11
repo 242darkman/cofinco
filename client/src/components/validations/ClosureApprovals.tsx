@@ -22,11 +22,11 @@ interface ClosureRequest {
   initiatorName?: string;
 }
 
-interface PendingClosureApprovalProps {
+interface ClosureApprovalsProps {
   agenceId?: string;
 }
 
-export default function PendingClosureApproval({ agenceId }: PendingClosureApprovalProps) {
+export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
   const [requests, setRequests] = useState<ClosureRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function PendingClosureApproval({ agenceId }: PendingClosureAppro
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur chargement demandes');
       const data = await res.json();
-      setRequests(data.requests || []);
+      setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading closure requests:', error);
     } finally {
@@ -74,6 +74,7 @@ export default function PendingClosureApproval({ agenceId }: PendingClosureAppro
       toast.success('Clôture approuvée et exécutée avec succès.');
       setApproveTarget(null);
       fetchPending();
+      window.dispatchEvent(new CustomEvent('closure-update'));
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors de l\'approbation'));
     } finally {
@@ -99,6 +100,7 @@ export default function PendingClosureApproval({ agenceId }: PendingClosureAppro
       setCancelTarget(null);
       setCancelReason('');
       fetchPending();
+      window.dispatchEvent(new CustomEvent('closure-update'));
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors de l\'annulation'));
     } finally {
@@ -117,7 +119,7 @@ export default function PendingClosureApproval({ agenceId }: PendingClosureAppro
   if (requests.length === 0) {
     return (
       <Card variant="default" padding="lg" className="border-dashed border-slate-700 bg-transparent">
-        <div className="text-center">
+        <div className="text-center py-8">
           <CheckCircle className="text-emerald-500 mx-auto mb-2" size={32} />
           <p className="text-slate-400 text-sm">Aucune demande de clôture en attente</p>
         </div>

@@ -19,9 +19,12 @@ import {
   accountClosureRequests,
   evenementsOutbox,
   credits,
+  clients,
+  users,
   type AccountClosureRequest,
 } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
   updateCompteSolde,
@@ -509,50 +512,55 @@ export async function getClosureRequest(
 
 /**
  * Liste les demandes de clôture en attente (pour l'écran d'approbation)
+ * Retourne les données enrichies (numéro compte, nom client, nom initiateur)
  */
 export async function getPendingClosureRequests(
   agenceId?: string
-): Promise<AccountClosureRequest[]> {
+) {
+  const initiator = alias(users, "initiator");
+  const clientUser = alias(users, "client_user");
+
+  const baseQuery = db
+    .select({
+      id: accountClosureRequests.id,
+      compteId: accountClosureRequests.compteId,
+      initiatedBy: accountClosureRequests.initiatedBy,
+      initiatedAt: accountClosureRequests.initiatedAt,
+      approvedBy: accountClosureRequests.approvedBy,
+      approvedAt: accountClosureRequests.approvedAt,
+      status: accountClosureRequests.status,
+      reason: accountClosureRequests.reason,
+      closingFeeAmount: accountClosureRequests.closingFeeAmount,
+      payoutMethod: accountClosureRequests.payoutMethod,
+      payoutAmount: accountClosureRequests.payoutAmount,
+      payoutPhoneNumber: accountClosureRequests.payoutPhoneNumber,
+      payoutStatus: accountClosureRequests.payoutStatus,
+      payoutMouvementId: accountClosureRequests.payoutMouvementId,
+      payoutPaymentIntentId: accountClosureRequests.payoutPaymentIntentId,
+      balanceAtInitiation: accountClosureRequests.balanceAtInitiation,
+      cancelledBy: accountClosureRequests.cancelledBy,
+      cancelledAt: accountClosureRequests.cancelledAt,
+      cancelReason: accountClosureRequests.cancelReason,
+      createdAt: accountClosureRequests.createdAt,
+      updatedAt: accountClosureRequests.updatedAt,
+      // Joined fields
+      numeroCompte: comptes.numeroCompte,
+      clientNom: sql<string>`coalesce(${clientUser.prenom} || ' ' || ${clientUser.nom}, ${clientUser.nom})`.as("client_nom"),
+      initiatorName: sql<string>`coalesce(${initiator.prenom} || ' ' || ${initiator.nom}, ${initiator.nom})`.as("initiator_name"),
+    })
+    .from(accountClosureRequests)
+    .innerJoin(comptes, eq(accountClosureRequests.compteId, comptes.id))
+    .leftJoin(clients, eq(comptes.clientId, clients.id))
+    .leftJoin(clientUser, eq(clients.userId, clientUser.id))
+    .leftJoin(initiator, eq(accountClosureRequests.initiatedBy, initiator.id));
+
+  const conditions = [eq(accountClosureRequests.status, "PENDING")];
   if (agenceId) {
-    return await db
-      .select({
-        id: accountClosureRequests.id,
-        compteId: accountClosureRequests.compteId,
-        initiatedBy: accountClosureRequests.initiatedBy,
-        initiatedAt: accountClosureRequests.initiatedAt,
-        approvedBy: accountClosureRequests.approvedBy,
-        approvedAt: accountClosureRequests.approvedAt,
-        status: accountClosureRequests.status,
-        reason: accountClosureRequests.reason,
-        closingFeeAmount: accountClosureRequests.closingFeeAmount,
-        payoutMethod: accountClosureRequests.payoutMethod,
-        payoutAmount: accountClosureRequests.payoutAmount,
-        payoutPhoneNumber: accountClosureRequests.payoutPhoneNumber,
-        payoutStatus: accountClosureRequests.payoutStatus,
-        payoutMouvementId: accountClosureRequests.payoutMouvementId,
-        payoutPaymentIntentId: accountClosureRequests.payoutPaymentIntentId,
-        balanceAtInitiation: accountClosureRequests.balanceAtInitiation,
-        cancelledBy: accountClosureRequests.cancelledBy,
-        cancelledAt: accountClosureRequests.cancelledAt,
-        cancelReason: accountClosureRequests.cancelReason,
-        createdAt: accountClosureRequests.createdAt,
-        updatedAt: accountClosureRequests.updatedAt,
-      })
-      .from(accountClosureRequests)
-      .innerJoin(comptes, eq(accountClosureRequests.compteId, comptes.id))
-      .where(
-        and(
-          eq(accountClosureRequests.status, "PENDING"),
-          eq(comptes.agenceId, agenceId)
-        )
-      )
-      .orderBy(accountClosureRequests.initiatedAt);
+    conditions.push(eq(comptes.agenceId, agenceId));
   }
 
-  return await db
-    .select()
-    .from(accountClosureRequests)
-    .where(eq(accountClosureRequests.status, "PENDING"))
+  return await baseQuery
+    .where(and(...conditions))
     .orderBy(accountClosureRequests.initiatedAt);
 }
 

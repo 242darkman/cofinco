@@ -29,7 +29,7 @@ const RessourcesHumaines = lazy(() => import('./components/hr/RessourcesHumaines
 // Agent modules
 const AgentTerrain = lazy(() => import('./components/agent/AgentTerrain'));
 const AgentTerrainPortail = lazy(() => import('./components/agent/AgentTerrainPortail'));
-const AgentValidations = lazy(() => import('./components/agent/AgentValidations'));
+const ValidationsCenter = lazy(() => import('./components/validations/ValidationsCenter'));
 
 // Admin modules
 const AdminModuleComplet = lazy(() => import('./components/admin/AdminModuleComplet'));
@@ -390,10 +390,10 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             <MessagesModule initialChatUserId={moduleData?.chatUserId} initialChatUserName={moduleData?.chatUserName} initialChatUserPhoto={moduleData?.chatUserPhoto} />
           </Suspense>
         );
-      case 'agentValidations':
+      case 'validations':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Validations" />}>
-            <AgentValidations />
+            <ValidationsCenter activeView={currentSubModule} />
           </Suspense>
         );
       case 'tresorerie':

@@ -3289,8 +3289,10 @@ export function registerComptesRoutes(app: Express) {
     async (req, res) => {
       try {
         const user = req.session.user;
-        const agenceId = req.query.agenceId as string | undefined;
-        const requests = await getPendingClosureRequests(agenceId || user?.agence);
+        const isAdmin = req.ability?.can(Actions.MANAGE, Subjects.ALL);
+        // Admin → toujours toutes agences ; sinon filtre par agence
+        const effectiveAgenceId = isAdmin ? undefined : (req.query.agenceId as string | undefined) || user?.agenceId;
+        const requests = await getPendingClosureRequests(effectiveAgenceId);
         res.json(requests);
       } catch (error: any) {
         logger.error({ err: error }, 'Error listing pending closures');

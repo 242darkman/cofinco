@@ -8,7 +8,7 @@ import IconButton from '../ui/IconButton';
 import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 import { usePermissionsContextOptional } from '../../contexts/PermissionsContext';
 import { isAdminRole } from '@shared/types/roles';
-import { useOperationsBadge } from '../../hooks/useOperationsBadge';
+import { useValidationsBadge } from '../../hooks/useValidationsBadge';
 import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 import { useProspectionBadge } from '../../hooks/useProspectionBadge';
 import { useEnqueteBadge } from '../../hooks/useEnqueteBadge';
@@ -41,8 +41,8 @@ export default function PlatformSidebarContent({
   const [lockedModules, setLockedModules] = useState<Set<string>>(new Set());
   const [pendingRefundsCount, setPendingRefundsCount] = useState<number>(0);
 
-  // Use real-time operations badge hook
-  const { pendingCount: pendingValidationsCount } = useOperationsBadge();
+  // Use combined validations badge (operations + closures)
+  const { totalCount: pendingValidationsCount } = useValidationsBadge();
 
   // Unread messages count for badge
   const { totalUnread: unreadMessagesCount } = useUnreadMessagesCount();
@@ -312,7 +312,7 @@ export default function PlatformSidebarContent({
         )}
 
         {/* Real-time Badge for Collapsed Sidebar - Validations */}
-        {!sidebarOpen && route.key === 'agentValidations' && pendingValidationsCount > 0 && (
+        {!sidebarOpen && route.key === 'validations' && pendingValidationsCount > 0 && (
           <div className="absolute top-1 right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {pendingValidationsCount}
           </div>
@@ -347,7 +347,7 @@ export default function PlatformSidebarContent({
             <span className={`flex-1 text-left truncate transition-all duration-300 ${isActive ? 'translate-x-1' : ''}`}>
               {t(route.labelKey || route.key)}
             </span>
-            {route.key === 'agentValidations' && pendingValidationsCount > 0 && (
+            {route.key === 'validations' && pendingValidationsCount > 0 && (
               <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingValidationsCount}
               </span>

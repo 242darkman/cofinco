@@ -14,7 +14,7 @@ const Comptabilite = lazy(() => import('@/components/finance/accounting/Comptabi
 const RessourcesHumaines = lazy(() => import('@/components/hr/RessourcesHumaines'));
 const AgentTerrain = lazy(() => import('@/components/agent/AgentTerrain'));
 const AgentTerrainPortail = lazy(() => import('@/components/agent/AgentTerrainPortail'));
-const AgentValidations = lazy(() => import('@/components/agent/AgentValidations'));
+const ValidationsCenter = lazy(() => import('@/components/validations/ValidationsCenter'));
 const CaisseDashboard = lazy(() => import('@/components/finance/caisse/CaisseDashboard'));
 const CoffreFortDashboard = lazy(() => import('@/components/finance/caisse/CoffreFortDashboard').then(module => ({ default: module.CoffreFortDashboard })));
 const TransfertArgent = lazy(() => import('@/components/finance/transfert/TransfertArgent'));
@@ -177,13 +177,17 @@ export const ROUTES: RouteConfig[] = [
     group: 'Opérations',
   },
   {
-    key: 'agentValidations',
-    path: '/agent-terrain/validations',
-    component: AgentValidations,
+    key: 'validations',
+    path: '/validations',
+    component: ValidationsCenter,
     requiredRoles: [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR],
     label: 'Validations',
     labelKey: 'menuValidations',
     group: 'Opérations',
+    subRoutes: [
+      { path: '/validations/collectes', subModule: 'collectes', label: 'Collectes Agents' },
+      { path: '/validations/clotures', subModule: 'clotures', label: 'Clôtures Comptes' },
+    ],
   },
   {
     key: 'transfert',

@@ -12,7 +12,6 @@ import {
   AlertCircle,
   Building2,
   Hash,
-  ShieldCheck,
   ChevronDown,
   ChevronUp,
   Users,
@@ -32,7 +31,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
-import SecureValidationModal from './SecureValidationModal';
+import SecureValidationModal from '../agent/SecureValidationModal';
 import { StatutOperationTerrain } from '@shared/enum/status-constants';
 import type { OperationTerrainWithRelations, OperationTerrainMetadata } from '@shared/schema';
 import { resolveStorageUrl } from '@/lib/format';
@@ -275,7 +274,7 @@ function AgentGroupCard({
   );
 }
 
-export default function AgentValidations() {
+export default function AgentCollecteValidations() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useUserProfile();
@@ -539,30 +538,7 @@ export default function AgentValidations() {
   };
 
   return (
-    <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-slate-800 dark:text-white flex items-center gap-2 sm:gap-3">
-            <ShieldCheck className="text-emerald-500 w-6 h-6 sm:w-8 sm:h-8" />
-            Réception Collectes
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Validez la réception physique de l'argent collecté.
-          </p>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => loadData(false)}
-          disabled={loading || processing}
-        >
-          <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Actualiser</span>
-        </Button>
-      </div>
-
+    <div className="space-y-4 sm:space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="p-3 sm:p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border-cyan-200 dark:border-cyan-800">

@@ -150,6 +150,7 @@ export default function ClosureWizard({
       toast.success('Demande de clôture annulée.');
       setExistingRequest(null);
       setCancelReason('');
+      window.dispatchEvent(new CustomEvent('closure-update'));
       onSuccess();
     } catch (error) {
       toast.error(handleApiError(error, "Erreur lors de l'annulation de la demande"));
@@ -185,6 +186,7 @@ export default function ClosureWizard({
       }
 
       toast.success('Demande de clôture soumise. En attente d\'approbation.');
+      window.dispatchEvent(new CustomEvent('closure-update'));
       onSuccess();
       onClose();
     } catch (error) {

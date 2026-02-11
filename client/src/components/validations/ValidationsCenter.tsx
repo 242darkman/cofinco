@@ -1,0 +1,103 @@
+import React, { useEffect } from 'react';
+import { ShieldCheck, RefreshCw } from 'lucide-react';
+import TabGroup from '@/components/ui/TabGroup';
+import { useValidationsBadge } from '@/hooks/useValidationsBadge';
+import { useAppNavigation } from '@/hooks/useAppNavigation';
+import AgentCollecteValidations from './AgentCollecteValidations';
+import ClosureApprovals from './ClosureApprovals';
+
+type TabKey = 'collectes' | 'clotures';
+
+const VALID_TABS: TabKey[] = ['collectes', 'clotures'];
+
+interface ValidationsCenterProps {
+  activeView?: string;
+}
+
+export default function ValidationsCenter({ activeView }: ValidationsCenterProps) {
+  const { navigateToModule } = useAppNavigation();
+  const { operationsCount, closuresCount, totalCount, refresh } = useValidationsBadge();
+
+  // Derive active tab from URL, default to 'collectes'
+  const activeTab: TabKey = VALID_TABS.includes(activeView as TabKey)
+    ? (activeView as TabKey)
+    : 'collectes';
+
+  // Redirect bare /validations to /validations/collectes
+  useEffect(() => {
+    if (!activeView || !VALID_TABS.includes(activeView as TabKey)) {
+      navigateToModule('validations', 'collectes');
+    }
+  }, [activeView, navigateToModule]);
+
+  const handleTabChange = (key: string) => {
+    navigateToModule('validations', key);
+  };
+
+  const tabs = [
+    {
+      key: 'collectes' as const,
+      label: 'Collectes Agents',
+      badge: operationsCount,
+      badgeClassName: activeTab === 'collectes'
+        ? 'bg-slate-900 text-white ring-1 ring-white/30'
+        : 'bg-red-500 text-white',
+    },
+    {
+      key: 'clotures' as const,
+      label: 'Clôtures Comptes',
+      badge: closuresCount,
+      badgeClassName: activeTab === 'clotures'
+        ? 'bg-slate-900 text-white ring-1 ring-white/30'
+        : 'bg-red-500 text-white',
+    },
+  ];
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 space-y-4 sm:space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-slate-800 dark:text-white flex items-center gap-2 sm:gap-3">
+            <ShieldCheck className="text-emerald-500 w-6 h-6 sm:w-8 sm:h-8" />
+            Centre de Validations
+            {totalCount > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {totalCount}
+              </span>
+            )}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+            Gérez toutes les validations en attente depuis un seul endroit.
+          </p>
+        </div>
+
+        <button
+          onClick={refresh}
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors self-end sm:self-auto"
+          title="Rafraîchir"
+        >
+          <RefreshCw size={18} />
+        </button>
+      </div>
+
+      {/* Tab Bar */}
+      <div className="shrink-0">
+        <TabGroup
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          tabs={tabs}
+          variant="pills"
+          size="md"
+          scrollable
+        />
+      </div>
+
+      {/* Tab Content — fills remaining space */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {activeTab === 'collectes' && <AgentCollecteValidations />}
+        {activeTab === 'clotures' && <ClosureApprovals />}
+      </div>
+    </div>
+  );
+}

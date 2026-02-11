@@ -37,7 +37,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   { labelKey: 'menuCaisse', icon: Wallet, key: 'caisse', section: 'operations' },
   { labelKey: 'menuAgentTerrain', icon: MapPinned, key: 'agentTerrain', section: 'operations' },
   { labelKey: 'menuAgentModules', icon: Briefcase, key: 'agentModules', section: 'operations' },
-  { labelKey: 'menuValidations', icon: CheckCircle, key: 'agentValidations', section: 'operations' },
+  { labelKey: 'menuValidations', icon: CheckCircle, key: 'validations', section: 'operations' },
   { labelKey: 'menuTransfert', icon: ArrowLeftRight, key: 'transfert', section: 'operations' },
   { labelKey: 'menuCoffre', icon: Shield, key: 'coffre', section: 'operations' },
   { labelKey: 'menuVirementsProgrammes', icon: CalendarClock, key: 'virements_programmes', section: 'operations' },
