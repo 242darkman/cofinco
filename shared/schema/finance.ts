@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum, suspensionReasonEnum, closureRequestStatusEnum, closurePayoutStatusEnum, closurePayoutMethodEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -573,6 +573,15 @@ export const comptes = pgTable(
     blocageDebut: timestamp("blocage_debut"),
     blocageFin: timestamp("blocage_fin"),
 
+    // Suspension (lifecycle - distinct du blocage financier)
+    suspendedAt: timestamp("suspended_at"),
+    suspendedBy: uuid("suspended_by").references(() => users.id, { onDelete: "set null" }),
+    suspendedReasonCode: suspensionReasonEnum("suspended_reason_code"),
+    suspendedReasonText: text("suspended_reason_text"),
+    autoLift: boolean("auto_lift").notNull().default(false),
+    suspendedEndDate: timestamp("suspended_end_date"),
+    suspendedReviewRequired: boolean("suspended_review_required").notNull().default(false),
+
     // Cache solde (la vérité reste le ledger / mouvements)
     soldeCourant: numeric("solde_courant").notNull().default("0"),
 
@@ -625,6 +634,62 @@ export const comptes = pgTable(
 export const insertCompteSchema = createInsertSchema(comptes).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertCompte = z.infer<typeof insertCompteSchema>;
 export type Compte = typeof comptes.$inferSelect;
+
+// ============================================================================
+// DEMANDES DE CLÔTURE (Maker-Checker workflow)
+// ============================================================================
+
+export const accountClosureRequests = pgTable(
+  "account_closure_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    compteId: uuid("compte_id").notNull().references(() => comptes.id, { onDelete: "restrict" }),
+
+    // Maker-Checker
+    initiatedBy: uuid("initiated_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    initiatedAt: timestamp("initiated_at").notNull().defaultNow(),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+
+    // Statut
+    status: closureRequestStatusEnum("status").notNull().default("PENDING"),
+    reason: text("reason").notNull(),
+
+    // Frais
+    closingFeeAmount: numeric("closing_fee_amount").notNull().default("0"),
+
+    // Payout
+    payoutMethod: closurePayoutMethodEnum("payout_method").notNull(),
+    payoutAmount: numeric("payout_amount").notNull(),
+    payoutPhoneNumber: text("payout_phone_number"),
+    payoutStatus: closurePayoutStatusEnum("payout_status").notNull().default("PENDING"),
+    payoutMouvementId: uuid("payout_mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+    payoutPaymentIntentId: uuid("payout_payment_intent_id"),
+
+    // Snapshot
+    balanceAtInitiation: numeric("balance_at_initiation").notNull(),
+
+    // Annulation
+    cancelledBy: uuid("cancelled_by").references(() => users.id, { onDelete: "set null" }),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxCompteId: index("idx_closure_requests_compte_id").on(t.compteId),
+    idxStatus: index("idx_closure_requests_status").on(t.status),
+    idxInitiatedBy: index("idx_closure_requests_initiated_by").on(t.initiatedBy),
+    chkPayoutPos: sql`CONSTRAINT chk_closure_payout_pos CHECK (${t.payoutAmount} >= 0)`,
+  }),
+);
+
+export const insertAccountClosureRequestSchema = createInsertSchema(accountClosureRequests).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertAccountClosureRequest = z.infer<typeof insertAccountClosureRequestSchema>;
+export type AccountClosureRequest = typeof accountClosureRequests.$inferSelect;
 
 
 export const produitsCompte = pgTable(

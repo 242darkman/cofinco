@@ -58,7 +58,7 @@ export class SmtpEmailProvider implements EmailProvider {
     const username = process.env.SMTP_USERNAME;
     const password = process.env.SMTP_PASSWORD;
 
-    if (host && username && password) {
+    if (host) {
       return {
         host,
         port,

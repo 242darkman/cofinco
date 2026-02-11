@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
-import { useLocation } from 'wouter';
 import { DollarSign, Award, MapPin, Phone, Mail, User, Building2, ChevronRight, TrendingUp, Wallet, AlertTriangle } from 'lucide-react';
 import { Card, Modal, Button, Skeleton } from '../ui';
 import ClientTags from './ClientTags';
+import ClientCreditsPanel from './ClientCreditsPanel';
 import { useQuery } from '@tanstack/react-query';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
@@ -31,8 +31,8 @@ interface AnalyticsData {
   }
 
 export default function ClientDetails({ client }: ClientDetailsProps) {
-    const [, setLocation] = useLocation();
     const [showSavingsModal, setShowSavingsModal] = useState(false);
+    const [showCreditsPanel, setShowCreditsPanel] = useState(false);
 
     // Fetch Real-Time Analytics (Cached from Analytics Tab)
     const { data: analytics, isLoading } = useQuery<AnalyticsData>({
@@ -128,7 +128,7 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
             {/* Credits - Clickable Drill-down */}
             <div 
                 className="group bg-slate-800/30 hover:bg-slate-800/60 rounded-lg p-3 flex items-center justify-between border border-slate-700/30 transition-colors cursor-pointer"
-                onClick={() => setLocation(`/credits?client=${client.id}`)}
+                onClick={() => setShowCreditsPanel(true)}
             >
                 <div>
                     <p className="text-[10px] uppercase text-slate-500 mb-0.5 flex items-center gap-2">
@@ -220,6 +220,13 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
           </div>
       </Card>
       
+      {/* Credits Panel Modal */}
+      <ClientCreditsPanel
+        clientId={client.id}
+        isOpen={showCreditsPanel}
+        onClose={() => setShowCreditsPanel(false)}
+      />
+
       {/* Quick View Modal for Savings */}
       <Modal 
          isOpen={showSavingsModal} 

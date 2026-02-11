@@ -41,6 +41,7 @@ import { scheduleGlReconciliationMonitoring } from "./cron/gl-reconciliation-mon
 import { scheduleAutoFix } from "./cron/gl-auto-fix";
 import { startAccessCodeCleanupCron } from "./cron/access-code-cleanup";
 import { startDailyIntegrityAuditCron } from "./cron/daily-integrity-audit";
+import { startAutoLiftSuspensionCron } from "./cron/auto-lift-suspension";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -202,6 +203,17 @@ app.get("/api/health", async (_req, res) => {
     logger.info('GL_POSTING_MODE=STRICT — toute opération sans règle comptable sera bloquée avec rollback');
   }
 
+  // Sync RBAC permissions from config to DB (idempotent upsert)
+  // Ensures permission codes like comptes.suspend, comptes.close_initiate exist
+  // and role_permissions are in sync with shared/config/rbac.ts
+  try {
+    const { seedRBAC } = await import('./seed-rbac-logic');
+    await seedRBAC();
+    logger.info('RBAC permissions synced from config');
+  } catch (error) {
+    logger.warn({ err: error }, 'RBAC sync failed — permissions may be stale');
+  }
+
   // Setup auth first (creates session table and middleware)
   await setupAuth(app);
 
@@ -332,7 +344,11 @@ app.get("/api/health", async (_req, res) => {
     startDailyIntegrityAuditCron();
     logger.info('Daily integrity audit cron started (04:00)');
 
-    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit');
+    // Start Auto-Lift Suspension Cron (every 5 min — lifts expired suspensions with autoLift=true)
+    startAutoLiftSuspensionCron();
+    logger.info('Auto-lift suspension cron started (every 5 min)');
+
+    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit, auto-lift-suspension');
 
     // Start Account Cleanup Cron
     const { accountCleanup } = await import("./services/account-cleanup");

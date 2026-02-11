@@ -673,7 +673,7 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     const userRole = req.user?.role;
 
     // RBAC Check
-    const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
+    const allowedRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
     if (!roleIn(userRole, allowedRoles)) {
         return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à approuver'));
     }
@@ -784,7 +784,7 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
     }
 
     // RBAC Check
-    const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
+    const allowedRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
     if (!roleIn(userRole, allowedRoles)) {
         return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à refuser'));
     }

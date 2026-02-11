@@ -106,6 +106,7 @@ export const ACCOUNT_STATUS_LABELS: Record<StatutCompteType, string> = {
   SUSPENDED: "Suspendu",
   CLOSED: "Clôturé",
   CANCELLED: "Annulé",
+  CLOSURE_PENDING: "Clôture en cours",
 };
 
 export const ACCOUNT_STATUS_COLORS: Record<StatutCompteType, string> = {
@@ -114,6 +115,7 @@ export const ACCOUNT_STATUS_COLORS: Record<StatutCompteType, string> = {
   SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   CLOSED: "bg-slate-700 text-slate-400 border-transparent",
   CANCELLED: "bg-red-500/20 text-red-400 border-red-500/30",
+  CLOSURE_PENDING: "bg-purple-500/20 text-purple-400 border-purple-500/30",
 };
 
 // --- Statut Client ---

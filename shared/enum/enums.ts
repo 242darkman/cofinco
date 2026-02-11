@@ -337,6 +337,8 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "CREDIT_PROVISION",
   "CREDIT_PROVISION_REVERSAL",
   "CREDIT_WRITEOFF",
+  // Clôture de compte
+  "CLOSURE_PAYOUT",
 ]);
 
 // ============================================
@@ -361,6 +363,39 @@ export const statutCompteEnum = pgEnum("statut_compte_enum", [
   "CLOSED",
   "PENDING_ACTIVATION",
   "CANCELLED",
+  "CLOSURE_PENDING",
+]);
+
+// Motifs de suspension (lifecycle)
+export const suspensionReasonEnum = pgEnum("suspension_reason_enum", [
+  "KYC",
+  "FRAUD",
+  "INTERNAL",
+  "CLIENT_REQUEST",
+  "DISPUTE",
+  "OTHER",
+]);
+
+// Statuts demande de clôture (maker-checker)
+export const closureRequestStatusEnum = pgEnum("closure_request_status_enum", [
+  "PENDING",
+  "APPROVED",
+  "CANCELLED",
+  "COMPLETED",
+]);
+
+// Statuts du payout de clôture
+export const closurePayoutStatusEnum = pgEnum("closure_payout_status_enum", [
+  "PENDING",
+  "PROCESSING",
+  "SUCCESS",
+  "FAILED",
+]);
+
+// Méthode de payout de clôture
+export const closurePayoutMethodEnum = pgEnum("closure_payout_method_enum", [
+  "CASH",
+  "MOBILE_MONEY",
 ]);
 
 export const motifBlocageEnum = pgEnum("motif_blocage_enum", [

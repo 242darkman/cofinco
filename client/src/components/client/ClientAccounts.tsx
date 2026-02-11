@@ -2,11 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Check, AlertCircle, AlertTriangle, X } from 'lucide-react';
 import { Card, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { useCan } from '../../contexts/AbilityContext';
 import { useCompteSubscription } from '../../hooks/useRealTimeSubscription';
 import { toast, handleApiError } from '../../lib/toast';
 import AccountCard from './AccountCard';
 import AccountHistory from './AccountHistory';
+import SuspendAccountModal from './SuspendAccountModal';
+import ClosureWizard from './ClosureWizard';
 import { StatutCompte, type StatutCompteType, TypeCompte, MethodePaiement } from '@shared/enum/status-constants';
+import { Actions } from '@shared/ability/actions';
+import { Subjects } from '@shared/ability/subjects';
 
 // Mapping FR → EN pour envoi backend
 const TYPE_COMPTE_TO_EN: Record<string, string> = {
@@ -82,17 +87,29 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
   const { hasPermission } = usePermissions();
   const canCreateAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'create');
   const canEditAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'edit');
-  
+
+  // Granular CASL permissions for account lifecycle
+  const canSuspend = useCan(Actions.SUSPEND, Subjects.COMPTE);
+  const canUnsuspend = useCan(Actions.UNSUSPEND, Subjects.COMPTE);
+  const canCloseInitiate = useCan(Actions.CLOSE_INITIATE, Subjects.COMPTE);
+  const canCloseCancel = useCan(Actions.CLOSE_CANCEL, Subjects.COMPTE);
+
   const [comptes, setComptes] = useState<CompteBancaire[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  
+
   // Action states
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showActionConfirm, setShowActionConfirm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<CompteBancaire | null>(null);
-  const [pendingAction, setPendingAction] = useState<'suspend' | 'close' | 'reactivate' | null>(null);
-  const [actionReason, setActionReason] = useState('');
+
+  // Suspend modal
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+
+  // Unsuspend confirm
+  const [showUnsuspendConfirm, setShowUnsuspendConfirm] = useState(false);
+
+  // Closure wizard
+  const [showClosureWizard, setShowClosureWizard] = useState(false);
 
   // History state
   const [showHistory, setShowHistory] = useState(false);
@@ -207,66 +224,42 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       }
   };
 
-  const handleAccountAction = (action: 'suspend' | 'close' | 'details' | 'history', compte: CompteBancaire) => {
+  const handleAccountAction = (action: 'suspend' | 'unsuspend' | 'close' | 'cancel_closure' | 'history', compte: CompteBancaire) => {
       setSelectedAccount(compte);
-      
+
       if (action === 'suspend') {
-          setPendingAction(compte.statut === StatutCompte.SUSPENDED ? 'reactivate' : 'suspend');
-          setShowActionConfirm(true);
-      } else if (action === 'close') {
-          setPendingAction('close');
-          setShowActionConfirm(true);
-      } else if (action === 'details') {
-          toast.info(`Détails du compte ${compte.numeroCompte}`);
+          setShowSuspendModal(true);
+      } else if (action === 'unsuspend') {
+          setShowUnsuspendConfirm(true);
+      } else if (action === 'close' || action === 'cancel_closure') {
+          // ClosureWizard handles both: new requests and viewing/cancelling existing ones
+          setShowClosureWizard(true);
       } else if (action === 'history') {
           setHistoryCompte(compte);
           setShowHistory(true);
       }
   };
 
-  const executeAccountAction = async () => {
-      if (!selectedAccount || !pendingAction) return;
-      
-      try {
-          if (pendingAction === 'close') {
-            toast.warning("La clôture de compte n'est pas encore automatisée.");
-            toast.info("Veuillez contacter l'administrateur système.");
-            setShowActionConfirm(false);
-            return;
-          }
-
-          const endpoint = pendingAction === 'suspend' 
-            ? `/api/comptes/${selectedAccount.id}/bloquer`
-            : `/api/comptes/${selectedAccount.id}/debloquer`;
-
-          // Map 'Autre' as default motif if not specified strictly in UI
-          const motif = actionReason || 'Autre';
-
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ motif })
-          });
-
-          if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'Erreur lors de l\'opération');
-          }
-          
-          const actionLabel = pendingAction === 'suspend' ? 'suspendu' : 'réactivé';
-          toast.success(`Le compte a été ${actionLabel} avec succès.`);
-          
-          await fetchComptes(); // Refresh list to get updated status
-          
-          setShowActionConfirm(false);
-          setSelectedAccount(null);
-          setPendingAction(null);
-          setActionReason('');
-      } catch (error) {
-          console.error("Status change error:", error);
-          toast.error(handleApiError(error, "Erreur lors du changement de statut"));
+  const handleUnsuspend = async () => {
+    if (!selectedAccount) return;
+    try {
+      const res = await fetch(`/api/comptes/${selectedAccount.id}/unsuspend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ motif: 'Levée manuelle de suspension' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Erreur lors de la levée de suspension');
       }
+      toast.success('Suspension levée avec succès. Le compte est de nouveau actif.');
+      await fetchComptes();
+      setShowUnsuspendConfirm(false);
+      setSelectedAccount(null);
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors de la levée de suspension'));
+    }
   };
 
   const resetForm = () => {
@@ -312,40 +305,45 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
         isLoading={loading}
       />
 
-        {/* Change Status Dialog */}
-       <ConfirmDialog
-        isOpen={showActionConfirm}
-        onClose={() => setShowActionConfirm(false)}
-        onConfirm={executeAccountAction}
-        title={pendingAction === 'suspend' ? "Suspendre le compte" : pendingAction === 'close' ? "Clôturer le compte" : "Réactiver le compte"}
+      {/* Suspend Account Modal */}
+      {selectedAccount && (
+        <SuspendAccountModal
+          isOpen={showSuspendModal}
+          onClose={() => { setShowSuspendModal(false); setSelectedAccount(null); }}
+          compteId={selectedAccount.id}
+          numeroCompte={selectedAccount.numeroCompte}
+          onSuccess={fetchComptes}
+        />
+      )}
+
+      {/* Unsuspend Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={showUnsuspendConfirm}
+        onClose={() => { setShowUnsuspendConfirm(false); setSelectedAccount(null); }}
+        onConfirm={handleUnsuspend}
+        title="Lever la suspension"
         message={
-            <div className="space-y-3">
-                <p>
-                    {pendingAction === 'suspend' 
-                        ? "Le compte sera bloqué pour toutes les opérations de débit. Les crédits resteront possibles."
-                        : pendingAction === 'close'
-                        ? "Attention : La clôture est définitive. Le solde doit être à zéro avant de procéder."
-                        : "Le compte sera de nouveau pleinement opérationnel."}
-                </p>
-                {(pendingAction === 'suspend' || pendingAction === 'close') && (
-                    <div>
-                        <label className="block text-xs text-slate-400 mb-1">Motif de l'action *</label>
-                        <input 
-                            type="text" 
-                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white"
-                            placeholder="Ex: Fraude suspicion, Demande client..."
-                            value={actionReason}
-                            onChange={(e) => setActionReason(e.target.value)}
-                        />
-                    </div>
-                )}
-            </div>
+          <div className="space-y-2">
+            <p>Le compte <span className="font-mono text-white">{selectedAccount?.numeroCompte}</span> sera de nouveau pleinement opérationnel.</p>
+            <p className="text-sm text-slate-400">Toutes les opérations (dépôts et retraits) seront réactivées.</p>
+          </div>
         }
-        confirmText={pendingAction === 'suspend' ? "Suspendre" : pendingAction === 'close' ? "Clôturer" : "Réactiver"}
-        variant={pendingAction === 'close' ? "danger" : "warning"}
+        confirmText="Lever la suspension"
+        variant="success"
         isLoading={loading}
-        disabled={(pendingAction === 'suspend' || pendingAction === 'close') && !actionReason.trim()}
       />
+
+      {/* Closure Wizard */}
+      {selectedAccount && (
+        <ClosureWizard
+          isOpen={showClosureWizard}
+          onClose={() => { setShowClosureWizard(false); setSelectedAccount(null); }}
+          compteId={selectedAccount.id}
+          numeroCompte={selectedAccount.numeroCompte}
+          soldeCourant={selectedAccount.soldeCourant}
+          onSuccess={fetchComptes}
+        />
+      )}
 
       {/* Account History Modal */}
       {showHistory && historyCompte && (
@@ -381,11 +379,15 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
           {comptes.map((compte) => (
-             <AccountCard 
+             <AccountCard
                 key={compte.id}
                 compte={compte}
                 onAction={handleAccountAction}
                 onEdit={(c) => { setEditingCompte(c); setShowForm(true); }}
+                canSuspend={canSuspend}
+                canUnsuspend={canUnsuspend}
+                canCloseInitiate={canCloseInitiate}
+                canCloseCancel={canCloseCancel}
              />
           ))}
         </div>
@@ -439,7 +441,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                     <button
                         key={type}
                         type="button"
-                        disabled={!!editingCompte} 
+                        disabled={!!editingCompte}
                         onClick={() => setFormData(prev => ({ ...prev, typeCompte: type as any }))}
                         className={`p-3 rounded-lg border transition flex flex-col items-center gap-2 ${
                         formData.typeCompte === type

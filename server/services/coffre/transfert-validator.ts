@@ -44,9 +44,9 @@ export class TransfertCoffreValidator {
 
     // Config par défaut si non configuré
     const effectiveConfig = config || {
-      rolesInitiateurs: ["caissier", "chef_caisse", "Chef d'Agence"],
-      rolesValideurs: ["Chef d'Agence", "superviseur", "admin"],
-      rolesExecuteurs: ["caissier", "chef_caisse", "Chef d'Agence"],
+      rolesInitiateurs: ["CAISSIER", "COMPTABLE", "CHEF_AGENCE"],
+      rolesValideurs: ["CHEF_AGENCE", "SUPERVISEUR", "ADMIN"],
+      rolesExecuteurs: ["CAISSIER", "COMPTABLE", "CHEF_AGENCE"],
       separationInitiateurValideur: true,
       separationValideurExecuteur: false,
     };

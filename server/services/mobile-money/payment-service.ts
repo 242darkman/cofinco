@@ -348,6 +348,16 @@ class PaymentService {
           logger.warn({ err: error }, 'Could not notify agent MM service');
         }
       }
+
+      // Notify closure service if this was a closure payout
+      if (metadata?.useCase === "CLOSURE_PAYOUT" && metadata?.closureRequestId) {
+        try {
+          const { handleClosurePayoutFailure } = await import("../compte-closure");
+          await handleClosurePayoutFailure(metadata.closureRequestId as string);
+        } catch (error) {
+          logger.warn({ err: error }, 'Could not notify closure service of payout failure');
+        }
+      }
     } else if (normalizedStatus === "EXPIRED") {
       await storage.updatePaymentIntent(intent.id, {
         status: "EXPIRED",
@@ -619,6 +629,20 @@ class PaymentService {
     );
 
     logger.info({ intentId: intent.id, mouvementId: mouvement.id }, 'Payout processed');
+
+    // Post-payout hook: finalize closure if this was a closure payout
+    if (metadata?.useCase === "CLOSURE_PAYOUT" && metadata?.closureRequestId) {
+      try {
+        const { handleClosurePayoutSuccess } = await import("../compte-closure");
+        await handleClosurePayoutSuccess(
+          metadata.closureRequestId as string,
+          mouvement.id
+        );
+        logger.info({ intentId: intent.id, closureRequestId: metadata.closureRequestId }, 'Closure payout finalized');
+      } catch (error) {
+        logger.error({ intentId: intent.id, err: error }, 'Failed to finalize closure after payout');
+      }
+    }
   }
 
   /**

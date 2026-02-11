@@ -26,7 +26,15 @@ import { requireAgenceAccess, requireAgenceIdAccess, validateAgenceIdAction } fr
 import { logAudit } from "../audit";
 import { normalizeKeysDeep } from "./utils";
 import { z } from "zod";
-import comptesService, { CompteError } from "../services/comptes";
+import comptesService, { CompteError, suspendCompte, unsuspendCompte } from "../services/comptes";
+import {
+  initiateClosureCompte,
+  approveClosureCompte,
+  cancelClosureCompte,
+  getClosureRequest,
+  getPendingClosureRequests,
+  createClosureMoMoPayout,
+} from "../services/compte-closure";
 import { createVirementProgramme, executeCompteTransfer } from "../services/compte-transfers";
 import { reverseOperation, canReverseOperation, ReversalError } from "../services/caisse/transaction-reversal-service";
 import { duplicateDetection } from "../middleware/duplicate-detection";
@@ -37,7 +45,7 @@ import { aliasedTable, and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
-import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage } from "@shared/enum/status-constants";
+import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage, SuspensionReason } from "@shared/enum/status-constants";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 // Validation schemas
@@ -99,6 +107,37 @@ const virementCompteSchema = z.object({
   scheduled: z.boolean().optional().default(false),
   frequence: z.enum(["ONCE", "DAILY", "WEEKLY", "MONTHLY"]).optional().default("ONCE"),
   prochaineExecution: z.string().datetime({ offset: true }).optional(), // ISO datetime for Cron start
+});
+
+// Account lifecycle schemas
+const suspendSchema = z.object({
+  reasonCode: z.enum([
+    SuspensionReason.KYC,
+    SuspensionReason.FRAUD,
+    SuspensionReason.INTERNAL,
+    SuspensionReason.CLIENT_REQUEST,
+    SuspensionReason.DISPUTE,
+    SuspensionReason.OTHER,
+  ]),
+  reasonText: z.string().optional(),
+  autoLift: z.boolean().optional().default(false),
+  endDate: z.string().datetime().optional(),
+  reviewRequired: z.boolean().optional().default(false),
+});
+
+const unsuspendSchema = z.object({
+  motif: z.string().optional(),
+});
+
+const initiateClosureSchema = z.object({
+  reason: z.string().min(3, "Motif requis (min 3 caractères)"),
+  payoutMethod: z.enum(["CASH", "MOBILE_MONEY"]),
+  payoutPhoneNumber: z.string().optional(),
+  closingFeeAmount: z.number().min(0).optional().default(0),
+});
+
+const cancelClosureSchema = z.object({
+  cancelReason: z.string().min(3, "Motif d'annulation requis (min 3 caractères)"),
 });
 
 const updateVirementProgrammeSchema = z.object({
@@ -2937,6 +2976,342 @@ export function registerComptesRoutes(app: Express) {
         const message = error instanceof Error ? error.message : "Erreur interne";
         logger.error({ err: error }, 'Error in reconciliation');
         res.status(500).json({ success: false, message });
+      }
+    }
+  );
+
+  // ============================================================================
+  // ACCOUNT LIFECYCLE: SUSPENSION / UNSUSPENSION
+  // ============================================================================
+
+  /**
+   * POST /api/comptes/:id/suspend - Suspendre un compte
+   */
+  app.post(
+    "/api/comptes/:id/suspend",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.SUSPEND, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = suspendSchema.parse(data);
+        const user = req.session.user;
+
+        const compte = await suspendCompte(
+          {
+            compteId: req.params.id,
+            reasonCode: parsed.reasonCode as any,
+            reasonText: parsed.reasonText,
+            autoLift: parsed.autoLift,
+            endDate: parsed.endDate ? new Date(parsed.endDate) : undefined,
+            reviewRequired: parsed.reviewRequired,
+          },
+          user!.id
+        );
+
+        await logAudit(
+          req,
+          "SUSPEND_COMPTE",
+          "compte",
+          req.params.id,
+          { reasonCode: parsed.reasonCode, autoLift: parsed.autoLift },
+          "success",
+          "high"
+        );
+
+        dispatchDomainEvent({
+          type: "ACCOUNT_SUSPENDED",
+          data: {
+            compteId: compte.id,
+            numeroCompte: compte.numeroCompte,
+            typeCompte: compte.typeCompte,
+            clientId: compte.clientId,
+            reasonCode: parsed.reasonCode,
+            agenceId: compte.agenceId || undefined,
+          },
+          timestamp: new Date(),
+          agenceId: compte.agenceId || undefined,
+        });
+
+        res.json({ ...compte, message: "Compte suspendu avec succès" });
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({ message: error.message, code: error.code });
+        }
+        logger.error({ err: error }, 'Error suspending compte');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/comptes/:id/unsuspend - Lever la suspension d'un compte
+   */
+  app.post(
+    "/api/comptes/:id/unsuspend",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.UNSUSPEND, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = unsuspendSchema.parse(data);
+        const user = req.session.user;
+
+        const compte = await unsuspendCompte(
+          req.params.id,
+          parsed.motif,
+          user!.id
+        );
+
+        await logAudit(
+          req,
+          "UNSUSPEND_COMPTE",
+          "compte",
+          req.params.id,
+          { motif: parsed.motif },
+          "success",
+          "high"
+        );
+
+        dispatchDomainEvent({
+          type: "ACCOUNT_UNSUSPENDED",
+          data: {
+            compteId: compte.id,
+            numeroCompte: compte.numeroCompte,
+            typeCompte: compte.typeCompte,
+            clientId: compte.clientId,
+            agenceId: compte.agenceId || undefined,
+          },
+          timestamp: new Date(),
+          agenceId: compte.agenceId || undefined,
+        });
+
+        const wsInstance = getWsInstance();
+        if (wsInstance && user?.agence) {
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "NOTIFICATION",
+            payload: {
+              message: `Compte ${compte.numeroCompte} réactivé`,
+              type: "success",
+            },
+          });
+        }
+
+        res.json({ ...compte, message: "Suspension levée avec succès" });
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({ message: error.message, code: error.code });
+        }
+        logger.error({ err: error }, 'Error unsuspending compte');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  // ============================================================================
+  // ACCOUNT LIFECYCLE: CLOSURE (Maker-Checker)
+  // ============================================================================
+
+  /**
+   * POST /api/comptes/:id/closure/initiate - Initier une demande de clôture (maker)
+   */
+  app.post(
+    "/api/comptes/:id/closure/initiate",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.CLOSE_INITIATE, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = initiateClosureSchema.parse(data);
+        const user = req.session.user;
+
+        const request = await initiateClosureCompte(
+          {
+            compteId: req.params.id,
+            reason: parsed.reason,
+            payoutMethod: parsed.payoutMethod as any,
+            payoutPhoneNumber: parsed.payoutPhoneNumber,
+            closingFeeAmount: parsed.closingFeeAmount,
+          },
+          user!.id
+        );
+
+        await logAudit(
+          req,
+          "INITIATE_CLOSURE",
+          "compte",
+          req.params.id,
+          { requestId: request.id, payoutMethod: parsed.payoutMethod },
+          "success",
+          "critical"
+        );
+
+        dispatchDomainEvent({
+          type: "CLOSURE_INITIATED",
+          data: {
+            compteId: req.params.id,
+            requestId: request.id,
+            payoutMethod: parsed.payoutMethod,
+            payoutAmount: request.payoutAmount,
+          },
+          timestamp: new Date(),
+        });
+
+        res.json({
+          ...request,
+          message: "Demande de clôture soumise. En attente d'approbation.",
+        });
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({ message: error.message, code: error.code });
+        }
+        logger.error({ err: error }, 'Error initiating closure');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/closure-requests/:id/approve - Approuver une demande de clôture (checker)
+   */
+  app.post(
+    "/api/closure-requests/:id/approve",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.CLOSE_APPROVE, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const user = req.session.user;
+
+        const request = await approveClosureCompte(
+          req.params.id,
+          user!.id
+        );
+
+        await logAudit(
+          req,
+          "APPROVE_CLOSURE",
+          "compte",
+          request.compteId,
+          { requestId: request.id, payoutMethod: request.payoutMethod },
+          "success",
+          "critical"
+        );
+
+        dispatchDomainEvent({
+          type: "CLOSURE_APPROVED",
+          data: {
+            compteId: request.compteId,
+            requestId: request.id,
+            approvedBy: user!.id,
+          },
+          timestamp: new Date(),
+        });
+
+        // For MOBILE_MONEY payouts, initiate the payout after TX commit
+        if (request.payoutMethod === "MOBILE_MONEY" && request.payoutStatus === "PROCESSING") {
+          createClosureMoMoPayout(request).catch((err) => {
+            logger.error({ err, requestId: request.id }, "Failed to initiate MoMo closure payout");
+          });
+        }
+
+        const message = request.payoutMethod === "MOBILE_MONEY"
+          ? "Clôture approuvée. Paiement Mobile Money en cours."
+          : "Clôture approuvée et paiement effectué.";
+
+        res.json({ ...request, message });
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          const statusCode = error.code === "SAME_USER_APPROVAL" ? 403 : 400;
+          return res.status(statusCode).json({ message: error.message, code: error.code });
+        }
+        logger.error({ err: error }, 'Error approving closure');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/closure-requests/:id/cancel - Annuler une demande de clôture
+   */
+  app.post(
+    "/api/closure-requests/:id/cancel",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.CLOSE_CANCEL, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = cancelClosureSchema.parse(data);
+        const user = req.session.user;
+
+        const request = await cancelClosureCompte(
+          req.params.id,
+          parsed.cancelReason,
+          user!.id
+        );
+
+        await logAudit(
+          req,
+          "CANCEL_CLOSURE",
+          "compte",
+          request.compteId,
+          { requestId: request.id, cancelReason: parsed.cancelReason },
+          "success",
+          "high"
+        );
+
+        res.json({
+          ...request,
+          message: "Demande de clôture annulée.",
+        });
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({ message: error.message, code: error.code });
+        }
+        logger.error({ err: error }, 'Error cancelling closure');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/closure-requests/pending - Lister les demandes en attente
+   */
+  app.get(
+    "/api/closure-requests/pending",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.CLOSE_APPROVE, Subjects.COMPTE),
+    async (req, res) => {
+      try {
+        const user = req.session.user;
+        const agenceId = req.query.agenceId as string | undefined;
+        const requests = await getPendingClosureRequests(agenceId || user?.agence);
+        res.json(requests);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error listing pending closures');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/:id/closure-request - Demande de clôture active d'un compte
+   */
+  app.get(
+    "/api/comptes/:id/closure-request",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const request = await getClosureRequest(req.params.id);
+        res.json(request);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error getting closure request');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
   );

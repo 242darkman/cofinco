@@ -67,8 +67,8 @@ export const configEcartCaisse = pgTable("config_ecart_caisse", {
   seuilN2Approval: numeric("seuil_n2_approval", { precision: 15, scale: 2 }).notNull().default("50000"),
 
   // Rôles autorisés à approuver
-  rolesApprobateursN1: jsonb("roles_approbateurs_n1").notNull().default(['SUPERVISEUR', 'CHEF_CAISSE']),
-  rolesApprobateursN2: jsonb("roles_approbateurs_n2").notNull().default(['CHEF_AGENCE', 'DIRECTEUR']),
+  rolesApprobateursN1: jsonb("roles_approbateurs_n1").notNull().default(['SUPERVISEUR', 'CAISSIER']),
+  rolesApprobateursN2: jsonb("roles_approbateurs_n2").notNull().default(['CHEF_AGENCE', 'ADMIN']),
 
   // Comportement
   blockCloseUntilApproved: boolean("block_close_until_approved").notNull().default(true),

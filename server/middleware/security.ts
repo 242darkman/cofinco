@@ -249,7 +249,7 @@ export const additionalSecurityHeaders = (_req: Request, res: Response, next: Ne
   // Désactive les fonctionnalités sensibles non utilisées
   res.setHeader(
     "Permissions-Policy",
-    "accelerometer=(), camera=(), geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+    "accelerometer=(), camera=(self), geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
   );
 
   // Cache-Control pour les réponses API

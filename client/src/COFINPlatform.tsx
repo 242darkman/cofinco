@@ -484,12 +484,15 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             isOpen={showGlobalSearch}
             onClose={() => setShowGlobalSearch(false)}
             onNavigate={(module, itemId, itemType) => {
-              // For other types, pass subModule
-              const subModule = itemId && (itemType === 'credit' || itemType === 'tontine' || itemType === 'agent')
-                ? `detail-${itemId}`
-                : undefined;
-
-              handleModuleChange(module, subModule);
+              if (module === 'clients' && itemId) {
+                // Navigate directly to client detail via URL routing
+                navigateToModule('clients', 'details', undefined, { id: itemId });
+              } else {
+                const subModule = itemId && (itemType === 'credit' || itemType === 'tontine' || itemType === 'agent')
+                  ? `detail-${itemId}`
+                  : undefined;
+                handleModuleChange(module, subModule);
+              }
               setShowGlobalSearch(false);
             }}
           />

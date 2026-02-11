@@ -58,9 +58,11 @@ import {
   StatutCredit as StatutCreditConst,
   TypeCompte as TypeCompteEnum,
   MotifBlocage as MotifBlocageEnum,
+  SuspensionReason as SuspensionReasonEnum,
   type StatutCompteType,
   type TypeCompteType,
   type MotifBlocageType,
+  type SuspensionReasonType,
   getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
 
@@ -70,15 +72,15 @@ export type StatutCompte = StatutCompteType;
 export type MotifBlocage = MotifBlocageType;
 
 // State Machine Transitions (using EN constants)
-// ACTIVE <-> SUSPENDED
-// ACTIVE -> CLOSED (Final)
-// SUSPENDED -> CLOSED (Final)
-// PENDING_ACTIVATION -> ACTIVE (via premier versement)
-// PENDING_ACTIVATION -> CLOSED (via rejet/timeout)
+// ACTIVE -> SUSPENDED (suspension) | CLOSURE_PENDING (clôture)
+// SUSPENDED -> ACTIVE (levée) | CLOSURE_PENDING (clôture)
+// CLOSURE_PENDING -> ACTIVE (annulation) | CLOSED (finalisation)
+// PENDING_ACTIVATION -> ACTIVE (premier versement) | CLOSED (rejet)
 
 export const VALID_TRANSITIONS: Record<StatutCompte, StatutCompte[]> = {
-  [StatutCompteConst.ACTIVE]: [StatutCompteConst.SUSPENDED, StatutCompteConst.CLOSED],
-  [StatutCompteConst.SUSPENDED]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSED],
+  [StatutCompteConst.ACTIVE]: [StatutCompteConst.SUSPENDED, StatutCompteConst.CLOSURE_PENDING],
+  [StatutCompteConst.SUSPENDED]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSURE_PENDING],
+  [StatutCompteConst.CLOSURE_PENDING]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSED],
   [StatutCompteConst.CLOSED]: [], // Terminal state
   [StatutCompteConst.PENDING_ACTIVATION]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSED],
   [StatutCompteConst.CANCELLED]: [], // Terminal state
@@ -178,6 +180,9 @@ export function canWithdraw(compte: typeof comptes.$inferSelect): {
   if (compte.statut === StatutCompteConst.CLOSED) {
     return { allowed: false, reason: "Compte clôturé" };
   }
+  if (compte.statut === StatutCompteConst.CLOSURE_PENDING) {
+    return { allowed: false, reason: "Compte en cours de clôture" };
+  }
 
   // Blocage check for Bloqué accounts
   // Admin role check should be done at the call site (retirerDuCompte),
@@ -212,6 +217,9 @@ export function canDeposit(compte: typeof comptes.$inferSelect): {
 } {
   if (compte.statut === StatutCompteConst.CLOSED) {
     return { allowed: false, reason: "Compte clôturé" };
+  }
+  if (compte.statut === StatutCompteConst.CLOSURE_PENDING) {
+    return { allowed: false, reason: "Compte en cours de clôture" };
   }
   // Les dépôts sont toujours autorisés sur les comptes bloqués
   return { allowed: true };
@@ -849,6 +857,178 @@ export async function debloquerCompte(
       payload: {
         type: "COMPTE_DEBLOQUE",
         compteId: data.compteId,
+        typeCompte: compte.typeCompte,
+        nouveauSolde: compte.soldeCourant,
+      },
+    });
+
+    return updated;
+  });
+}
+
+// ============================================================================
+// SUSPENSION / UNSUSPENSION (Account Lifecycle)
+// ============================================================================
+
+export interface SuspendCompteData {
+  compteId: string;
+  reasonCode: SuspensionReasonType;
+  reasonText?: string;
+  autoLift?: boolean;
+  endDate?: Date;
+  reviewRequired?: boolean;
+}
+
+/**
+ * Suspend un compte (change statut à SUSPENDED + métadonnées enrichies)
+ * Distinct du blocage (blocageActif) qui est un hold financier
+ */
+export async function suspendCompte(
+  data: SuspendCompteData,
+  userId: string
+): Promise<typeof comptes.$inferSelect> {
+  return await db.transaction(async (tx) => {
+    const [compte] = await tx.select().from(comptes).where(eq(comptes.id, data.compteId));
+    if (!compte) {
+      throw new CompteError("Compte non trouvé", "COMPTE_NOT_FOUND");
+    }
+
+    // Validate state transition
+    const allowed = VALID_TRANSITIONS[compte.statut as StatutCompte];
+    if (!allowed?.includes(StatutCompteConst.SUSPENDED)) {
+      throw new CompteError(
+        `Impossible de suspendre un compte en statut ${compte.statut}`,
+        "INVALID_STATE_TRANSITION"
+      );
+    }
+
+    // Idempotency: if already suspended, update reason
+    if (compte.statut === StatutCompteConst.SUSPENDED) {
+      const [updated] = await tx
+        .update(comptes)
+        .set({
+          suspendedReasonCode: data.reasonCode,
+          suspendedReasonText: data.reasonText || null,
+          autoLift: data.autoLift || false,
+          suspendedEndDate: data.endDate || null,
+          suspendedReviewRequired: data.reviewRequired || false,
+          updatedAt: new Date(),
+        })
+        .where(eq(comptes.id, data.compteId))
+        .returning();
+      return updated;
+    }
+
+    const [updated] = await tx
+      .update(comptes)
+      .set({
+        statut: StatutCompteConst.SUSPENDED,
+        suspendedAt: new Date(),
+        suspendedBy: userId,
+        suspendedReasonCode: data.reasonCode,
+        suspendedReasonText: data.reasonText || null,
+        autoLift: data.autoLift || false,
+        suspendedEndDate: data.endDate || null,
+        suspendedReviewRequired: data.reviewRequired || false,
+        updatedAt: new Date(),
+      })
+      .where(eq(comptes.id, data.compteId))
+      .returning();
+
+    // Outbox event
+    await tx.insert(evenementsOutbox).values({
+      type: "MOUVEMENT_STATUT_CHANGE",
+      aggregateType: "compte",
+      aggregateId: data.compteId,
+      payload: {
+        compteId: data.compteId,
+        action: "SUSPENSION",
+        reasonCode: data.reasonCode,
+        reasonText: data.reasonText,
+        autoLift: data.autoLift,
+        endDate: data.endDate?.toISOString(),
+        suspendedBy: userId,
+      },
+    });
+
+    // Notify client
+    await tx.insert(evenementsOutbox).values({
+      type: "SOLDE_COMPTE_CHANGE",
+      aggregateType: "client",
+      aggregateId: compte.clientId,
+      payload: {
+        type: "COMPTE_SUSPENDU",
+        compteId: data.compteId,
+        typeCompte: compte.typeCompte,
+        reasonCode: data.reasonCode,
+      },
+    });
+
+    return updated;
+  });
+}
+
+/**
+ * Lève la suspension d'un compte (SUSPENDED -> ACTIVE)
+ * Peut être appelé manuellement ou par le cron auto-lift
+ */
+export async function unsuspendCompte(
+  compteId: string,
+  motif?: string,
+  userId?: string,
+  isAutoLift: boolean = false
+): Promise<typeof comptes.$inferSelect> {
+  return await db.transaction(async (tx) => {
+    const [compte] = await tx.select().from(comptes).where(eq(comptes.id, compteId));
+    if (!compte) {
+      throw new CompteError("Compte non trouvé", "COMPTE_NOT_FOUND");
+    }
+
+    if (compte.statut !== StatutCompteConst.SUSPENDED) {
+      throw new CompteError("Le compte n'est pas suspendu", "NOT_SUSPENDED");
+    }
+
+    const ancienReasonCode = compte.suspendedReasonCode;
+
+    const [updated] = await tx
+      .update(comptes)
+      .set({
+        statut: StatutCompteConst.ACTIVE,
+        suspendedAt: null,
+        suspendedBy: null,
+        suspendedReasonCode: null,
+        suspendedReasonText: null,
+        autoLift: false,
+        suspendedEndDate: null,
+        suspendedReviewRequired: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(comptes.id, compteId))
+      .returning();
+
+    // Outbox event
+    await tx.insert(evenementsOutbox).values({
+      type: "MOUVEMENT_STATUT_CHANGE",
+      aggregateType: "compte",
+      aggregateId: compteId,
+      payload: {
+        compteId,
+        action: "UNSUSPENSION",
+        ancienReasonCode,
+        motif: motif || (isAutoLift ? "Levée automatique (date de fin atteinte)" : undefined),
+        unsuspendedBy: userId,
+        isAutoLift,
+      },
+    });
+
+    // Notify client
+    await tx.insert(evenementsOutbox).values({
+      type: "SOLDE_COMPTE_CHANGE",
+      aggregateType: "client",
+      aggregateId: compte.clientId,
+      payload: {
+        type: "COMPTE_REACTIVE",
+        compteId,
         typeCompte: compte.typeCompte,
         nouveauSolde: compte.soldeCourant,
       },
@@ -1685,6 +1865,9 @@ export async function crediterInterets(
 
   if (compte.statut === StatutCompteConst.CLOSED) {
     throw new CompteError("Impossible de créditer des intérêts sur un compte clôturé", "COMPTE_CLOSED");
+  }
+  if (compte.statut === StatutCompteConst.CLOSURE_PENDING) {
+    throw new CompteError("Impossible de créditer des intérêts sur un compte en cours de clôture", "CLOSURE_PENDING");
   }
 
   if (data.montant <= 0) {

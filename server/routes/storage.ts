@@ -11,7 +11,8 @@ import {
   StorageFileType,
   StorageEntityType,
   STORAGE_CONFIG,
-  isPublicFileType
+  isPublicFileType,
+  parseStoragePath
 } from '@shared/config/storage-paths';
 
 const logger = createLogger('Routes:Storage');
@@ -65,8 +66,13 @@ router.get('/files/:key(*)', async (req, res) => {
   }
 
   // Déterminer si le fichier est dans le bucket privé ou public
-  // Les fichiers misc (conversations) sont privés
-  const isPrivateFile = key.startsWith('misc/');
+  // Utiliser parseStoragePath pour détecter le bucket à partir du fileType (kyc, credit, etc.)
+  // Note: la sécurité est assurée en amont — l'URL n'est révélée que par les endpoints authentifiés
+  // (/api/storage/documents/:id/view) et la clé est non-devinable (UUID + timestamp)
+  const parsed = parseStoragePath(key);
+  const isPrivateFile = parsed
+    ? !isPublicFileType(parsed.fileType)
+    : key.startsWith('misc/');
 
   try {
     let result;
@@ -190,8 +196,9 @@ router.get('/documents/:id/view', requireAuth, async (req, res) => {
       return res.json({ url: objectKey });
     }
 
-    // Générer une URL presignée pour le document privé
-    const url = await StorageService.getPresignedDownloadUrl(objectKey, 900);
+    // Retourner une URL proxy plutôt qu'une URL présignée MinIO
+    // (les URL présignées pointent vers le hostname Docker interne, inaccessible depuis le navigateur)
+    const url = `/api/storage/files/${objectKey}`;
 
     res.json({ url });
   } catch (error: any) {

@@ -11,6 +11,7 @@ export interface NavigationState {
   currentModule: string;
   currentSubModule?: string;
   currentPath: string;
+  params?: Record<string, string>;
 }
 
 export function useAppNavigation() {
@@ -34,18 +35,21 @@ export function useAppNavigation() {
       currentModule: moduleConfig.moduleKey,
       currentSubModule: moduleConfig.subModule,
       currentPath: location,
+      params: moduleConfig.params,
     };
   }, [location]);
 
   /**
    * Naviguer vers un module avec sous-module optionnel
+   * params permet de remplir les segments dynamiques (ex: { id: 'abc123' })
    */
   const navigateToModule = useCallback((
     moduleKey: string,
     subModule?: string,
-    data?: any
+    data?: any,
+    params?: Record<string, string>
   ) => {
-    const path = getPathForModule(moduleKey, subModule);
+    const path = getPathForModule(moduleKey, subModule, params);
 
     // Si on a des données à passer, on utilise l'événement custom pour la compatibilité
     if (data) {
@@ -94,6 +98,7 @@ export function useAppNavigation() {
     currentModule: currentState.currentModule,
     currentSubModule: currentState.currentSubModule,
     currentPath: currentState.currentPath,
+    params: currentState.params,
 
     // Méthodes de navigation
     navigateToModule,

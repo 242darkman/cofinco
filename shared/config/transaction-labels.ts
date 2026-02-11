@@ -46,6 +46,7 @@ export const DEBIT_TYPES = new Set([
   'LIQUIDATION',
   'CASH_TRANSFER',
   'ADJUSTMENT', // Généralement débit (correction)
+  'CLOSURE_PAYOUT', // Retrait de clôture
 ]);
 
 /**
@@ -215,6 +216,8 @@ const TRANSACTION_LABEL_GENERATORS: Record<string, (metadata?: TransactionMetada
     m?.motif
       ? `DÉCAISSEMENT: ${m.motif}`
       : 'DÉCAISSEMENT DIVERS',
+
+  CLOSURE_PAYOUT: () => 'RETRAIT CLÔTURE COMPTE',
 };
 
 /**

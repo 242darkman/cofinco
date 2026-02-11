@@ -27,6 +27,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { Pagination } from '../ui/Pagination';
 import { formatClientName, resolveStorageUrl, formatPhoneNumber } from '../../lib/format';
 import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import {
   getStatusLabel,
   getStatusColor,
@@ -40,6 +41,8 @@ interface ClientModuleProps {
   activeSubModule?: string;
 }
 
+const CLIENT_TAB_IDS = ['details', 'comptes', 'kyc', 'notes', 'analytics', 'historique', 'transactions', 'alertes', 'actions'] as const;
+
 export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -49,21 +52,25 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   const canImportClients = hasPermission('clients', 'import') || hasPermission('clients', 'manage');
   const canExportClients = hasPermission('clients', 'export') || hasPermission('clients', 'view');
 
+  // URL-driven navigation
+  const { currentSubModule, params, navigateToPath } = useAppNavigation();
+  const activeTab = CLIENT_TAB_IDS.includes(currentSubModule as any) ? currentSubModule! : 'details';
+  const clientIdFromUrl = params?.id;
+
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
-  // Handle initial view
+  // Handle initial view from URL
   useEffect(() => {
-    if (activeSubModule === 'new') {
+    if (currentSubModule === 'new') {
       setShowForm(true);
     }
-  }, [activeSubModule]);
+  }, [currentSubModule]);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [viewingClient, setViewingClient] = useState<any>(null);
-  const [selectedTab, setSelectedTab] = useState('details');
   const [searchFilters, setSearchFilters] = useState<any>({});
   const [activeView, setActiveView] = useState<'list' | 'map' | 'stats'>('list');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -85,6 +92,26 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   useEffect(() => {
     loadClients();
   }, [searchFilters, currentPage]);
+
+  // Deep linking: load client from URL params
+  useEffect(() => {
+    if (clientIdFromUrl && CLIENT_TAB_IDS.includes(currentSubModule as any)) {
+      // Load client if not already loaded or different client
+      if (!viewingClient || viewingClient.id !== clientIdFromUrl) {
+        clientService.getById(clientIdFromUrl).then(client => {
+          if (client) {
+            setViewingClient(client);
+          } else {
+            toast.error('Client introuvable');
+            navigateToPath('/clients');
+          }
+        });
+      }
+    } else if (!currentSubModule || currentSubModule === 'new') {
+      // Back to list or new client form — clear viewing state
+      if (viewingClient) setViewingClient(null);
+    }
+  }, [clientIdFromUrl, currentSubModule]);
 
   const loadClients = async () => {
     setLoading(true);
@@ -143,7 +170,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   const handleViewClient = (client: any) => {
     setViewingClient(client);
-    setSelectedTab('details');
+    navigateToPath(`/clients/${client.id}/details`);
   };
 
   const handleDeleteClick = (clientId: string, e?: React.MouseEvent) => {
@@ -158,7 +185,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
       await clientService.delete(clientToDelete);
       toast.success('Client supprimé avec succès');
       if (viewingClient?.id === clientToDelete) {
-        setViewingClient(null);
+        navigateToPath('/clients');
       }
       loadClients();
     } catch (error) {
@@ -182,8 +209,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
     return (
       <div className="space-y-6">
         {/* Back button */}
-        <button 
-          onClick={() => setViewingClient(null)} 
+        <button
+          onClick={() => navigateToPath('/clients')}
           className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors"
         >
           <ChevronRight size={20} className="rotate-180" />
@@ -272,9 +299,9 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setSelectedTab(tab.id)}
+              onClick={() => navigateToPath(`/clients/${viewingClient.id}/${tab.id}`)}
               className={`px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm whitespace-nowrap transition rounded-t-lg flex items-center gap-1 ${
-                selectedTab === tab.id ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'
+                activeTab === tab.id ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <tab.icon size={14} />
@@ -285,15 +312,15 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
         {/* Tab Content */}
         <div className="min-h-[400px]">
-          {selectedTab === 'details' && <ClientDetails client={viewingClient} />}
-          {selectedTab === 'comptes' && <ClientAccounts clientId={viewingClient.id} />}
-          {selectedTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
-          {selectedTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
-          {selectedTab === 'analytics' && <ClientAnalytics client={viewingClient} />}
-          {selectedTab === 'historique' && <ClientHistory clientId={viewingClient.id} />}
-          {selectedTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
-          {selectedTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} />}
-          {selectedTab === 'actions' && <ClientActions client={viewingClient} onActionComplete={loadClients} />}
+          {activeTab === 'details' && <ClientDetails client={viewingClient} />}
+          {activeTab === 'comptes' && <ClientAccounts clientId={viewingClient.id} />}
+          {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
+          {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
+          {activeTab === 'analytics' && <ClientAnalytics client={viewingClient} />}
+          {activeTab === 'historique' && <ClientHistory clientId={viewingClient.id} />}
+          {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
+          {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} />}
+          {activeTab === 'actions' && <ClientActions client={viewingClient} onActionComplete={loadClients} />}
         </div>
 
         {/* Delete Confirmation */}

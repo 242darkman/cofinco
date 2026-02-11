@@ -234,11 +234,11 @@ export const configEvacuationCoffre = pgTable(
     separationApprobateurPreparateur: boolean("separation_approbateur_preparateur").notNull().default(true),
     separationPreparateurDispatcher: boolean("separation_preparateur_dispatcher").notNull().default(false),
 
-    // Rôles autorisés
-    rolesCreateurs: json("roles_createurs").$type<string[]>().default(["agent_caisse", "Comptable", "Chef d'Agence"]),
-    rolesApprobateurs: json("roles_approbateurs").$type<string[]>().default(["Chef d'Agence", "Directeur", "Trésorier"]),
-    rolesPreparateurs: json("roles_preparateurs").$type<string[]>().default(["agent_caisse", "Comptable", "Trésorier"]),
-    rolesDispatchers: json("roles_dispatchers").$type<string[]>().default(["Chef d'Agence", "Trésorier"]),
+    // Rôles autorisés (valeurs SystemRole canoniques)
+    rolesCreateurs: json("roles_createurs").$type<string[]>().default(["CAISSIER", "COMPTABLE", "CHEF_AGENCE"]),
+    rolesApprobateurs: json("roles_approbateurs").$type<string[]>().default(["CHEF_AGENCE", "ADMIN", "SUPERVISEUR"]),
+    rolesPreparateurs: json("roles_preparateurs").$type<string[]>().default(["CAISSIER", "COMPTABLE", "CHEF_AGENCE"]),
+    rolesDispatchers: json("roles_dispatchers").$type<string[]>().default(["CHEF_AGENCE", "ADMIN"]),
 
     // Transport
     nombreAgentsTransportMin: numeric("nombre_agents_transport_min").notNull().default("1"),

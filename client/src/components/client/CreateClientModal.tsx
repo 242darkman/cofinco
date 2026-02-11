@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   User, MapPin, Briefcase, FileText, Camera, ChevronRight,
   ChevronLeft, Save, X, UploadCloud, Check, File as FileIcon
@@ -8,6 +8,28 @@ import { agenceApi, employeApi, villeApi } from '../../lib/api-client';
 import { isAdminRole, SystemRole } from '@shared/types/roles';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { StatutAgence, CLIENT_ORIGIN_OPTIONS } from '@shared/enum/status-constants';
+import { toast } from '../../lib/toast';
+
+async function uploadEntityFile(
+  file: File,
+  fileType: 'profile' | 'kyc',
+  entityId: string,
+): Promise<string | null> {
+  const body = new FormData();
+  body.append('file', file);
+  body.append('fileType', fileType);
+  body.append('entityType', 'client');
+  body.append('entityId', entityId);
+
+  const res = await fetch('/api/storage/entity/upload', {
+    method: 'POST',
+    body,
+    credentials: 'include',
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.key as string;
+}
 
 interface CreateClientModalProps {
   isOpen: boolean;
@@ -18,6 +40,7 @@ interface CreateClientModalProps {
 export default function CreateClientModal({ isOpen, onClose, onSave }: CreateClientModalProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const tempEntityId = useMemo(() => crypto.randomUUID(), []);
   
   // Data State
   const [formData, setFormData] = useState({
@@ -111,40 +134,79 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
   const handleSave = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    
-    // Map fit to legacy structure expected by ClientModule/Service
-    const payload = {
-      nom: formData.nom,
-      prenom: formData.prenom,
-      dateNaissance: formData.dateNaissance,
-      sexe: formData.sexe,
-      
-      telephone: formData.telephone,
-      email: formData.email,
-      ville: formData.ville,
-      villeId: formData.villeId || undefined,
-      adresseDomicile: formData.adresse, // mapping to correct field
-      
-      profession: formData.profession,
-      typeMarcheId: formData.secteurId,
-      typeRevenu: formData.typeRevenu,
-      revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenu : undefined,
-      revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenu : undefined,
-      segment: formData.segment,
-      
-      agenceId: formData.agenceId || user?.agenceId, // Fallback to user agency if not admin
-      agentReferentId: formData.agentReferentId,
-      clientOrigin: formData.clientOrigin,
-      
-      // TODO: Handle File Uploads securely in real flow
-      // For now passing as placeholder or separate upload logic would be needed
-    };
 
     try {
+      // Upload files before creating client
+      let photoProfileKey: string | null = null;
+      const documents: any[] = [];
+
+      if (formData.files.photo) {
+        photoProfileKey = await uploadEntityFile(formData.files.photo, 'profile', tempEntityId);
+      }
+
+      if (formData.files.cniRecto) {
+        const key = await uploadEntityFile(formData.files.cniRecto, 'kyc', tempEntityId);
+        if (key) {
+          documents.push({
+            id: crypto.randomUUID(),
+            documentType: 'ID_CARD_FRONT',
+            documentName: formData.files.cniRecto.name,
+            documentUrl: key,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            isPrivate: true,
+          });
+        }
+      }
+
+      if (formData.files.cniVerso) {
+        const key = await uploadEntityFile(formData.files.cniVerso, 'kyc', tempEntityId);
+        if (key) {
+          documents.push({
+            id: crypto.randomUUID(),
+            documentType: 'ID_CARD_BACK',
+            documentName: formData.files.cniVerso.name,
+            documentUrl: key,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            isPrivate: true,
+          });
+        }
+      }
+
+      const payload = {
+        nom: formData.nom,
+        prenom: formData.prenom,
+        dateNaissance: formData.dateNaissance,
+        sexe: formData.sexe,
+
+        telephone: formData.telephone,
+        email: formData.email,
+        ville: formData.ville,
+        villeId: formData.villeId || undefined,
+        adresseDomicile: formData.adresse,
+
+        profession: formData.profession,
+        typeMarcheId: formData.secteurId,
+        typeRevenu: formData.typeRevenu,
+        revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenu : undefined,
+        revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenu : undefined,
+        segment: formData.segment,
+
+        agenceId: formData.agenceId || user?.agenceId,
+        agentReferentId: formData.agentReferentId,
+        clientOrigin: formData.clientOrigin,
+
+        tempEntityId,
+        photoProfile: photoProfileKey || undefined,
+        documents: documents.length > 0 ? documents : undefined,
+      };
+
       await onSave(payload);
       onClose();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      toast.error(e?.message || 'Erreur lors de la création du client');
     } finally {
       setIsSubmitting(false);
     }

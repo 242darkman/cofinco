@@ -154,6 +154,11 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Effectuer un dépôt', code: 'epargnes.deposit', description: 'Créditer un compte épargne' },
     { name: 'Effectuer un retrait', code: 'epargnes.withdraw', description: 'Débiter un compte épargne' },
     { name: 'Modifier un compte', code: 'epargnes.edit', description: 'Modifier un compte épargne' },
+    { name: 'Suspendre un compte', code: 'comptes.suspend', description: 'Suspendre un compte client' },
+    { name: 'Lever la suspension', code: 'comptes.unsuspend', description: 'Lever la suspension d\'un compte' },
+    { name: 'Initier une clôture', code: 'comptes.close_initiate', description: 'Initier la clôture d\'un compte' },
+    { name: 'Approuver une clôture', code: 'comptes.close_approve', description: 'Approuver la clôture d\'un compte (maker-checker)' },
+    { name: 'Annuler une clôture', code: 'comptes.close_cancel', description: 'Annuler une demande de clôture en cours' },
   ],
   'Tontines': [
     { name: 'Voir les tontines', code: 'tontines.view', description: 'Accès au module Tontines' },
@@ -378,8 +383,10 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     // Crédits
     'credits.view', 'credits.create', 'credits.edit', 'credits.approve', 'credits.delete',
     'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
-    // Épargnes
+    // Épargnes / Comptes
     'epargnes.view', 'epargnes.create', 'epargnes.edit',
+    'comptes.suspend', 'comptes.unsuspend',
+    'comptes.close_initiate', 'comptes.close_approve', 'comptes.close_cancel',
     // Tontines
     'tontines.view', 'tontines.create', 'tontines.edit', 'tontines.manage',
     // Comptabilité
@@ -454,6 +461,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'agent.view', 'agent.manage',
     'tontines.view', 'tontines.manage',
     'caisseagent.view', 'caisseagent.approve', 'caisseagent.reject',
+    'comptes.close_approve',
     'prospection.view', 'prospection.edit',
     'prospection.primes.view', 'prospection.primes.approve', 'prospection.primes.reject',
     'prospection.supervision.view',

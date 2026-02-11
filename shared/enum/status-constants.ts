@@ -161,9 +161,90 @@ export const StatutCompte = {
   SUSPENDED: "SUSPENDED",
   CLOSED: "CLOSED",
   CANCELLED: "CANCELLED",
+  CLOSURE_PENDING: "CLOSURE_PENDING",
 } as const;
 
 export type StatutCompteType = (typeof StatutCompte)[keyof typeof StatutCompte];
+
+// ============================================
+// MOTIFS DE SUSPENSION (Account Lifecycle)
+// ============================================
+
+export const SuspensionReason = {
+  KYC: "KYC",
+  FRAUD: "FRAUD",
+  INTERNAL: "INTERNAL",
+  CLIENT_REQUEST: "CLIENT_REQUEST",
+  DISPUTE: "DISPUTE",
+  OTHER: "OTHER",
+} as const;
+
+export type SuspensionReasonType = (typeof SuspensionReason)[keyof typeof SuspensionReason];
+
+export const SUSPENSION_REASON_LABELS: Record<SuspensionReasonType, string> = {
+  [SuspensionReason.KYC]: "Conformité KYC",
+  [SuspensionReason.FRAUD]: "Suspicion de fraude",
+  [SuspensionReason.INTERNAL]: "Décision interne",
+  [SuspensionReason.CLIENT_REQUEST]: "Demande du client",
+  [SuspensionReason.DISPUTE]: "Litige",
+  [SuspensionReason.OTHER]: "Autre",
+};
+
+// ============================================
+// STATUTS DEMANDE CLÔTURE (Maker-Checker)
+// ============================================
+
+export const ClosureRequestStatus = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  CANCELLED: "CANCELLED",
+  COMPLETED: "COMPLETED",
+} as const;
+
+export type ClosureRequestStatusType = (typeof ClosureRequestStatus)[keyof typeof ClosureRequestStatus];
+
+export const CLOSURE_REQUEST_STATUS_LABELS: Record<ClosureRequestStatusType, string> = {
+  [ClosureRequestStatus.PENDING]: "En attente d'approbation",
+  [ClosureRequestStatus.APPROVED]: "Approuvée",
+  [ClosureRequestStatus.CANCELLED]: "Annulée",
+  [ClosureRequestStatus.COMPLETED]: "Terminée",
+};
+
+// ============================================
+// STATUTS PAYOUT CLÔTURE
+// ============================================
+
+export const ClosurePayoutStatus = {
+  PENDING: "PENDING",
+  PROCESSING: "PROCESSING",
+  SUCCESS: "SUCCESS",
+  FAILED: "FAILED",
+} as const;
+
+export type ClosurePayoutStatusType = (typeof ClosurePayoutStatus)[keyof typeof ClosurePayoutStatus];
+
+export const CLOSURE_PAYOUT_STATUS_LABELS: Record<ClosurePayoutStatusType, string> = {
+  [ClosurePayoutStatus.PENDING]: "En attente",
+  [ClosurePayoutStatus.PROCESSING]: "En cours",
+  [ClosurePayoutStatus.SUCCESS]: "Effectué",
+  [ClosurePayoutStatus.FAILED]: "Échoué",
+};
+
+// ============================================
+// MÉTHODE PAYOUT CLÔTURE
+// ============================================
+
+export const ClosurePayoutMethod = {
+  CASH: "CASH",
+  MOBILE_MONEY: "MOBILE_MONEY",
+} as const;
+
+export type ClosurePayoutMethodType = (typeof ClosurePayoutMethod)[keyof typeof ClosurePayoutMethod];
+
+export const CLOSURE_PAYOUT_METHOD_LABELS: Record<ClosurePayoutMethodType, string> = {
+  [ClosurePayoutMethod.CASH]: "Espèces",
+  [ClosurePayoutMethod.MOBILE_MONEY]: "Mobile Money",
+};
 
 
 

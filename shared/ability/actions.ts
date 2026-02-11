@@ -43,6 +43,12 @@ export const Actions = {
   MANAGE_ROLES: 'manage_roles',
   SUSPEND: 'suspend',
   ACTIVATE: 'activate',
+  UNSUSPEND: 'unsuspend',
+
+  // Account lifecycle (closure workflow)
+  CLOSE_INITIATE: 'close_initiate',
+  CLOSE_APPROVE: 'close_approve',
+  CLOSE_CANCEL: 'close_cancel',
 
   // Caisse-specific
   OPEN_SESSION: 'open_session',
@@ -148,6 +154,10 @@ export const ACTION_LABELS: Record<Action, string> = {
   [Actions.MANAGE_ROLES]: 'Gérer les rôles',
   [Actions.SUSPEND]: 'Suspendre',
   [Actions.ACTIVATE]: 'Activer',
+  [Actions.UNSUSPEND]: 'Lever la suspension',
+  [Actions.CLOSE_INITIATE]: 'Initier la clôture',
+  [Actions.CLOSE_APPROVE]: 'Approuver la clôture',
+  [Actions.CLOSE_CANCEL]: 'Annuler la clôture',
   [Actions.OPEN_SESSION]: 'Ouvrir session',
   [Actions.CLOSE_SESSION]: 'Fermer session',
   [Actions.DEPOSIT]: 'Déposer',

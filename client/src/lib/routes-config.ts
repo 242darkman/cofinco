@@ -85,6 +85,15 @@ export const ROUTES: RouteConfig[] = [
     group: 'Services Clients',
     subRoutes: [
       { path: '/clients/nouveau', subModule: 'new', label: 'Nouveau client' },
+      { path: '/clients/:id/details', subModule: 'details', label: 'Détails' },
+      { path: '/clients/:id/comptes', subModule: 'comptes', label: 'Comptes' },
+      { path: '/clients/:id/kyc', subModule: 'kyc', label: 'KYC' },
+      { path: '/clients/:id/notes', subModule: 'notes', label: 'Notes' },
+      { path: '/clients/:id/analytics', subModule: 'analytics', label: 'Analytics' },
+      { path: '/clients/:id/historique', subModule: 'historique', label: 'Activité' },
+      { path: '/clients/:id/transactions', subModule: 'transactions', label: 'Transactions' },
+      { path: '/clients/:id/alertes', subModule: 'alertes', label: 'Alertes' },
+      { path: '/clients/:id/actions', subModule: 'actions', label: 'Actions' },
     ],
   },
   {
@@ -484,25 +493,64 @@ const _urlMap: UrlRouteEntry[] = ROUTES.flatMap(route => {
 }).sort((a, b) => b.path.length - a.path.length);
 
 /**
- * Obtenir la configuration module à partir d'un chemin URL.
- * Match exact uniquement (pas de prefix matching pour l'instant).
+ * Match un pattern de chemin avec paramètres (ex: /clients/:id/details) contre un chemin réel.
+ * Retourne les paramètres extraits ou null si pas de match.
  */
-export function getModuleFromPath(path: string): { moduleKey: string; subModule?: string } | null {
+function matchPathPattern(pattern: string, path: string): Record<string, string> | null {
+  const patternParts = pattern.split('/');
+  const pathParts = path.split('/');
+  if (patternParts.length !== pathParts.length) return null;
+  const params: Record<string, string> = {};
+  for (let i = 0; i < patternParts.length; i++) {
+    if (patternParts[i].startsWith(':')) {
+      params[patternParts[i].slice(1)] = pathParts[i];
+    } else if (patternParts[i] !== pathParts[i]) {
+      return null;
+    }
+  }
+  return params;
+}
+
+/**
+ * Obtenir la configuration module à partir d'un chemin URL.
+ * Tente d'abord un match exact, puis un match paramétrique (routes avec :param).
+ */
+export function getModuleFromPath(path: string): { moduleKey: string; subModule?: string; params?: Record<string, string> } | null {
+  // 1. Match exact
   const match = _urlMap.find(r => r.path === path);
   if (match) {
     return { moduleKey: match.moduleKey, subModule: match.subModule };
   }
+
+  // 2. Match paramétrique (routes avec :param)
+  for (const entry of _urlMap) {
+    if (!entry.path.includes(':')) continue;
+    const params = matchPathPattern(entry.path, path);
+    if (params) {
+      return { moduleKey: entry.moduleKey, subModule: entry.subModule, params };
+    }
+  }
+
   return null;
 }
 
 /**
  * Obtenir le chemin URL pour un module donné, avec sous-module optionnel.
+ * Si params est fourni, remplace les segments :param dans le chemin.
  */
-export function getPathForModule(moduleKey: string, subModule?: string): string {
+export function getPathForModule(moduleKey: string, subModule?: string, params?: Record<string, string>): string {
   if (subModule) {
     const route = ROUTES.find(r => r.key === moduleKey);
     const sub = route?.subRoutes?.find(sr => sr.subModule === subModule);
-    if (sub) return sub.path;
+    if (sub) {
+      let path = sub.path;
+      if (params) {
+        for (const [key, value] of Object.entries(params)) {
+          path = path.replace(`:${key}`, value);
+        }
+      }
+      return path;
+    }
   }
   const route = ROUTES.find(r => r.key === moduleKey);
   return route?.path || '/';
@@ -510,17 +558,17 @@ export function getPathForModule(moduleKey: string, subModule?: string): string 
 
 /**
  * Vérifier si un chemin correspond à un module/sous-module.
+ * Supporte les routes paramétrées (ex: /clients/:id/details match /clients/abc/details).
  */
 export function isActiveRoute(
   currentPath: string,
   moduleKey: string,
   subModule?: string
 ): boolean {
+  const resolved = getModuleFromPath(currentPath);
+  if (!resolved) return false;
   if (subModule) {
-    const route = ROUTES.find(r => r.key === moduleKey);
-    const sub = route?.subRoutes?.find(sr => sr.subModule === subModule);
-    return sub?.path === currentPath;
+    return resolved.moduleKey === moduleKey && resolved.subModule === subModule;
   }
-  const route = ROUTES.find(r => r.key === moduleKey);
-  return route?.path === currentPath;
+  return resolved.moduleKey === moduleKey;
 }

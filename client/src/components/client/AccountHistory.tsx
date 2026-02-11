@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
-import { Badge, ConfirmDialog, Modal, Button } from '../ui';
+import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Loader2 } from 'lucide-react';
+import { Badge } from '../ui';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
 import AccountStatsChart from './AccountStatsChart';
 
 // P3.3: Lazy-loaded export utilities (jsPDF ~500KB, xlsx ~500KB)
@@ -46,7 +45,6 @@ interface AccountHistoryProps {
 }
 
 export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose }: AccountHistoryProps) {
-  const queryClient = useQueryClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
@@ -54,10 +52,6 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
   const [exportingCSV, setExportingCSV] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
 
-  // Closure state
-  const [showClosureConfirm, setShowClosureConfirm] = useState(false);
-  const [closureLoading, setClosureLoading] = useState(false);
-  const [closureError, setClosureError] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
     if (isOpen && compteId) {
@@ -80,38 +74,6 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
     }
   };
 
-  const handleClosure = async () => {
-    setClosureLoading(true);
-    try {
-      const res = await fetch(`/api/comptes/${compteId}/cloturer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const json = await res.json();
-
-      if (!res.ok) {
-        setShowClosureConfirm(false); // Close confirmation to show error
-        setClosureError({
-          title: 'Impossible de clôturer le compte',
-          message: json.message || 'Une erreur est survenue lors de la clôture.'
-        });
-      } else {
-        // Success
-        setShowClosureConfirm(false);
-        onClose(); // Close modal
-        // P3.4: Invalidate cache instead of hard reload
-        await queryClient.invalidateQueries({ queryKey: ['comptes'] });
-        await queryClient.invalidateQueries({ queryKey: ['client-accounts'] });
-        toast.success('Compte clôturé avec succès');
-      }
-    } catch (err) {
-      console.error(err);
-      setShowClosureConfirm(false);
-      setClosureError({ title: 'Erreur technique', message: 'Impossible de contacter le serveur.' });
-    } finally {
-      setClosureLoading(false);
-    }
-  };
 
   const safeFormatDate = (dateStr: string) => {
     try {
@@ -240,23 +202,12 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
             </h2>
             <p className="text-sm text-slate-400 font-mono mt-1">N° {numeroCompte}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowClosureConfirm(true)}
-              className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-red-500/20"
-              title="Clôturer le compte"
-            >
-              <Trash2 size={16} />
-              <span className="hidden sm:inline">Clôturer</span>
-            </button>
-            <div className="w-px h-6 bg-slate-700 mx-1"></div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Toolbar */}
@@ -381,49 +332,6 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
              Affichage des {filteredTransactions.length} dernières opérations
         </div>
       </div>
-
-      {/* Closure Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showClosureConfirm}
-        onClose={() => setShowClosureConfirm(false)}
-        onConfirm={handleClosure}
-        title="Clôturer le compte"
-        message={
-          <div className="space-y-2">
-            <p>Êtes-vous sûr de vouloir clôturer définitivement ce compte ?</p>
-            <ul className="list-disc pl-4 text-slate-400 text-xs space-y-1">
-              <li>Le solde doit être à zéro.</li>
-              <li>Aucune transaction ne doit être en attente.</li>
-              <li>Cette action est irréversible.</li>
-            </ul>
-          </div>
-        }
-        variant="danger"
-        confirmText="Clôturer définitivement"
-        cancelText="Annuler"
-        isLoading={closureLoading}
-      />
-
-      {/* Error Modal */}
-      {closureError && (
-        <Modal
-          isOpen={!!closureError}
-          onClose={() => setClosureError(null)}
-          title={closureError.title}
-          variant="danger"
-          size="sm"
-        >
-          <div className="flex flex-col gap-4">
-             <div className="flex items-start gap-3 bg-red-500/10 p-4 rounded-lg border border-red-500/20">
-                <AlertTriangle className="text-red-400 shrink-0" size={20} />
-                <p className="text-sm text-red-200">{closureError.message}</p>
-             </div>
-             <div className="flex justify-end">
-                <Button onClick={() => setClosureError(null)} variant="secondary">Fermer</Button>
-             </div>
-          </div>
-        </Modal>
-      )}
 
     </div>
   );

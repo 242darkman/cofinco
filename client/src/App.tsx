@@ -13,6 +13,7 @@ import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { AgenceProvider } from './contexts/AgenceContext';
 import { PermissionsProvider } from './contexts/PermissionsContext';
+import { AbilityProvider } from './contexts/AbilityContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { SessionProvider } from './contexts/SessionContext';
 import { UpdatePrompt } from './components/shared/UpdatePrompt';
@@ -293,41 +294,43 @@ function App() {
         <AgenceProvider>
           <WebSocketProvider>
             <PermissionsProvider>
-              <SessionProvider
-                onSessionInvalid={(reason) => {
-                  handleSessionExpired(reason);
-                }}
-              >
-                <ErrorBoundary>
-                  <Toaster position="top-right" richColors closeButton />
-                  {/* Network status banner - shows for unstable/offline/api_down */}
-                  <NetworkBanner />
-                  <UpdatePrompt />
-                  <LocationTracker />
-                  <SessionExpirationWarning />
-                  <Suspense fallback={null}>
-                    {isAuthenticated && showSeasonalWelcome && (
-                      <SeasonalWelcome
-                        userName={currentUser?.prenom || currentUser?.username}
-                        onComplete={() => setShowSeasonalWelcome(false)}
-                      />
-                    )}
-                  </Suspense>
-                  {/* Add top padding when network banner is visible */}
-                  <div className={networkStatus !== 'online' ? 'pt-14' : ''}>
-                    <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
-                      {authService.isAgentCaisse() ? (
-                        <AgentCaisseInterface
-                          agentId={currentUser.id}
-                          onLogout={handleLogout}
+              <AbilityProvider>
+                <SessionProvider
+                  onSessionInvalid={(reason) => {
+                    handleSessionExpired(reason);
+                  }}
+                >
+                  <ErrorBoundary>
+                    <Toaster position="top-right" richColors closeButton />
+                    {/* Network status banner - shows for unstable/offline/api_down */}
+                    <NetworkBanner />
+                    <UpdatePrompt />
+                    <LocationTracker />
+                    <SessionExpirationWarning />
+                    <Suspense fallback={null}>
+                      {isAuthenticated && showSeasonalWelcome && (
+                        <SeasonalWelcome
+                          userName={currentUser?.prenom || currentUser?.username}
+                          onComplete={() => setShowSeasonalWelcome(false)}
                         />
-                      ) : (
-                        <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
                       )}
                     </Suspense>
-                  </div>
-                </ErrorBoundary>
-              </SessionProvider>
+                    {/* Add top padding when network banner is visible */}
+                    <div className={networkStatus !== 'online' ? 'pt-14' : ''}>
+                      <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
+                        {authService.isAgentCaisse() ? (
+                          <AgentCaisseInterface
+                            agentId={currentUser.id}
+                            onLogout={handleLogout}
+                          />
+                        ) : (
+                          <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
+                        )}
+                      </Suspense>
+                    </div>
+                  </ErrorBoundary>
+                </SessionProvider>
+              </AbilityProvider>
             </PermissionsProvider>
           </WebSocketProvider>
         </AgenceProvider>

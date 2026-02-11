@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { CreditCard, Wallet, Lock, MoreVertical, Copy, Check, TrendingUp, Unlock, AlertTriangle, Ban, XCircle, FileText } from 'lucide-react';
+import { CreditCard, Wallet, Lock, MoreVertical, Copy, Check, TrendingUp, Unlock, AlertTriangle, Ban, XCircle, Clock } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { toast } from 'sonner';
 import { StatutCompte, type StatutCompteType } from '@shared/enum/status-constants';
-import { getStatusLabel, ACCOUNT_STATUS_LABELS } from '@/lib/status-labels';
+import { getStatusLabel, getStatusColor, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_COLORS } from '@/lib/status-labels';
 
 interface CompteBancaire {
   id: string;
@@ -23,10 +23,14 @@ interface CompteBancaire {
 interface AccountCardProps {
   compte: CompteBancaire;
   onEdit?: (compte: CompteBancaire) => void;
-  onAction?: (action: 'suspend' | 'close' | 'details' | 'history', compte: CompteBancaire) => void;
+  onAction?: (action: 'suspend' | 'unsuspend' | 'close' | 'cancel_closure' | 'history', compte: CompteBancaire) => void;
+  canSuspend?: boolean;
+  canUnsuspend?: boolean;
+  canCloseInitiate?: boolean;
+  canCloseCancel?: boolean;
 }
 
-export default function AccountCard({ compte, onEdit, onAction }: AccountCardProps) {
+export default function AccountCard({ compte, onEdit, onAction, canSuspend = true, canUnsuspend = true, canCloseInitiate = true, canCloseCancel = true }: AccountCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   
   const getCompteIcon = (type: string) => {
@@ -57,7 +61,13 @@ export default function AccountCard({ compte, onEdit, onAction }: AccountCardPro
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleMenuAction = (action: 'suspend' | 'close' | 'details' | 'history', e: React.MouseEvent) => {
+  const isSuspended = compte.statut === StatutCompte.SUSPENDED;
+  const isClosurePending = compte.statut === StatutCompte.CLOSURE_PENDING;
+  const isClosed = compte.statut === StatutCompte.CLOSED;
+  const isCancelled = compte.statut === StatutCompte.CANCELLED;
+  const isTerminal = isClosed || isCancelled;
+
+  const handleMenuAction = (action: 'suspend' | 'unsuspend' | 'close' | 'cancel_closure' | 'history', e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
     onAction?.(action, compte);
@@ -79,7 +89,7 @@ export default function AccountCard({ compte, onEdit, onAction }: AccountCardPro
             <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
         )}
 
-      <div className="flex items-start justify-between mb-3 relative z-10">
+      <div className={`flex items-start justify-between mb-3 relative ${showMenu ? 'z-50' : 'z-10'}`}>
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${isBloque ? 'bg-amber-500/10 text-amber-400' : isEpargne ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
             <Icon size={20} />
@@ -109,31 +119,51 @@ export default function AccountCard({ compte, onEdit, onAction }: AccountCardPro
             
             {showMenu && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in duration-150">
-                    <button onClick={(e) => handleMenuAction('details', e)} className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2">
-                        <FileText size={14} /> Détails & RIB
-                    </button>
                     <button onClick={(e) => handleMenuAction('history', e)} className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2">
                         <TrendingUp size={14} /> Historique
                     </button>
-                    <div className="h-px bg-slate-800 my-1"></div>
-                    {compte.statut === StatutCompte.ACTIVE ? (
-                        <button onClick={(e) => handleMenuAction('suspend', e)} className="w-full text-left px-4 py-2 text-sm text-amber-400 hover:bg-amber-950/30 flex items-center gap-2">
-                            <Ban size={14} /> Suspendre
-                        </button>
-                    ) : (
-                        <button onClick={(e) => handleMenuAction('suspend', e)} className="w-full text-left px-4 py-2 text-sm text-emerald-400 hover:bg-emerald-950/30 flex items-center gap-2">
-                            <Check size={14} /> Réactiver
-                        </button>
+                    {!isTerminal && !isClosurePending && (
+                      <>
+                        <div className="h-px bg-slate-800 my-1"></div>
+                        {isSuspended ? (
+                          canUnsuspend && (
+                            <button onClick={(e) => handleMenuAction('unsuspend', e)} className="w-full text-left px-4 py-2 text-sm text-emerald-400 hover:bg-emerald-950/30 flex items-center gap-2">
+                              <Check size={14} /> Lever la suspension
+                            </button>
+                          )
+                        ) : (
+                          canSuspend && (
+                            <button onClick={(e) => handleMenuAction('suspend', e)} className="w-full text-left px-4 py-2 text-sm text-amber-400 hover:bg-amber-950/30 flex items-center gap-2">
+                              <Ban size={14} /> Suspendre
+                            </button>
+                          )
+                        )}
+                        {canCloseInitiate && (
+                          <button onClick={(e) => handleMenuAction('close', e)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-950/30 flex items-center gap-2">
+                            <XCircle size={14} /> Clôturer
+                          </button>
+                        )}
+                      </>
                     )}
-                     <button onClick={(e) => handleMenuAction('close', e)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-950/30 flex items-center gap-2">
-                        <XCircle size={14} /> Clôturer
-                    </button>
+                    {isClosurePending && (
+                      <>
+                        <div className="h-px bg-slate-800 my-1"></div>
+                        <div className="px-4 py-2 text-xs text-purple-400 flex items-center gap-2">
+                          <Clock size={12} /> Clôture en attente d'approbation
+                        </div>
+                        {canCloseCancel && (
+                          <button onClick={(e) => handleMenuAction('cancel_closure', e)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-950/30 flex items-center gap-2">
+                            <XCircle size={14} /> Annuler la clôture
+                          </button>
+                        )}
+                      </>
+                    )}
                 </div>
             )}
         </div>
       </div>
 
-      <div className="relative z-10">
+      <div className="relative">
           <div className="flex justify-between items-end mb-1">
              <p className="text-[10px] text-slate-500 uppercase tracking-tight">
                {isBloque ? 'Solde (Bloqué)' : 'Solde Disponible'}
@@ -141,6 +171,7 @@ export default function AccountCard({ compte, onEdit, onAction }: AccountCardPro
              <Badge
                 value={getStatusLabel(compte.statut, ACCOUNT_STATUS_LABELS)}
                 size="sm"
+                className={getStatusColor(compte.statut, ACCOUNT_STATUS_COLORS)}
              />
           </div>
           
