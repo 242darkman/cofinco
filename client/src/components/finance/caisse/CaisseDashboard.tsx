@@ -88,7 +88,26 @@ export default function CaisseDashboard({
   const canCreatePayments = hasPermission('caisse', 'deposit') || hasPermission('paiements', 'create');
 
   const { mobileMoneyEnabled } = useFeatureFlags();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(activeView || 'dashboard');
+
+  // Sync tab changes to URL
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    if (tab === 'dashboard') {
+      onModuleChange?.('caisse');
+    } else {
+      onModuleChange?.('caisse', tab);
+    }
+  }, [onModuleChange]);
+
+  // Sync URL changes to tab
+  useEffect(() => {
+    if (activeView && activeView !== activeTab) {
+      setActiveTab(activeView);
+    } else if (!activeView && activeTab !== 'dashboard') {
+      setActiveTab('dashboard');
+    }
+  }, [activeView]);
 
   const [showOuverture, setShowOuverture] = useState(false);
   const [showPaiement, setShowPaiement] = useState(false);
@@ -245,13 +264,16 @@ export default function CaisseDashboard({
     return () => socket.removeEventListener('message', handleMessage);
   }, [socket, currentSession, refetchPendingDisbursements]);
 
+  // Legacy subModule aliases (for cross-module navigation from dashboard quick actions)
   useEffect(() => {
     if (activeView) {
-      switch (activeView) {
-        case 'caisse-session': setActiveTab('dashboard'); break;
-        case 'caisse-operations': setActiveTab('operations'); break;
-        case 'caisse-cloture': setActiveTab('rapprochement'); break;
-        default: setActiveTab('dashboard');
+      const legacyMap: Record<string, string> = {
+        'caisse-session': 'dashboard',
+        'caisse-operations': 'dashboard',
+        'caisse-cloture': 'rapprochement',
+      };
+      if (legacyMap[activeView]) {
+        setActiveTab(legacyMap[activeView]);
       }
     }
   }, [activeView]);
@@ -464,7 +486,7 @@ export default function CaisseDashboard({
   const handleSupervisionStart = useCallback((session: SessionCaisse, info: SupervisionSession) => {
     setSupervisedSession(session);
     setSupervisionInfo(info);
-    setActiveTab('dashboard');
+    handleTabChange('dashboard');
     toast.success(`Supervision activée`, {
       description: `Vous supervisez maintenant ${info.targetCaisseName} (${info.targetCaissierName})`,
     });
@@ -497,7 +519,7 @@ export default function CaisseDashboard({
     : 0;
 
   const handleFermetureCaisse = () => {
-    setActiveTab('rapprochement');
+    handleTabChange('rapprochement');
   };
 
   // Session inactivity timeout
@@ -507,7 +529,7 @@ export default function CaisseDashboard({
       toast.warning('Session fermée pour inactivité', {
         description: 'Votre session a été redirigée vers la clôture après 15 minutes d\'inactivité.',
       });
-      setActiveTab('rapprochement');
+      handleTabChange('rapprochement');
     },
   });
 
@@ -541,7 +563,7 @@ export default function CaisseDashboard({
   // Redirection automatique si on tente d'accéder à un onglet verrouillé
   useEffect(() => {
     if (!isSessionOpen && activeTab !== 'dashboard' && activeTab !== 'supervision') {
-      setActiveTab('dashboard');
+      handleTabChange('dashboard');
       toast.error("Session fermée", {
         description: "Veuillez ouvrir une session pour accéder à ce module."
       });
@@ -592,7 +614,7 @@ export default function CaisseDashboard({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setActiveTab('dashboard')}
+                onClick={() => handleTabChange('dashboard')}
                 icon={ArrowRightLeft}
                 className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180"
               />
@@ -609,14 +631,14 @@ export default function CaisseDashboard({
         ) : null;
       case 'historique':
         return (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full flex flex-col">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col">
             {/* Toggle between Today and Global History */}
             <div className="flex items-center justify-between mb-2 px-2 shrink-0">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setActiveTab('dashboard')}
+                  onClick={() => handleTabChange('dashboard')}
                   icon={ArrowRightLeft}
                   className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180 text-slate-400 hover:text-white"
                 />
@@ -649,15 +671,15 @@ export default function CaisseDashboard({
             </div>
 
             {historiqueMode === 'global' && currentSession?.caisseId ? (
-              <div className="flex-1 min-h-0">
+              <div>
                   <CaisseHistoriqueGlobal
                     caisseId={currentSession.caisseId}
                     caisseName={currentSession.caisseNom}
-                    onBack={() => setActiveTab('dashboard')}
+                    onBack={() => handleTabChange('dashboard')}
                   />
               </div>
             ) : (
-              <div className="flex-1 min-h-0 overflow-y-auto px-2">
+              <div className="px-2">
                 <TransactionHistoryPage
                   transactions={transactions.map(tx => ({
                     id: tx.id,
@@ -678,7 +700,7 @@ export default function CaisseDashboard({
                   }))}
                   isLoading={loadingTransactions}
                   onRefresh={() => refetchTransactions()}
-                  onBack={() => setActiveTab('dashboard')}
+                  onBack={() => handleTabChange('dashboard')}
                 />
               </div>
             )}
@@ -687,13 +709,13 @@ export default function CaisseDashboard({
 
       case 'especes':
         return currentSession ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                  <CaisseEspeces sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); }} />
             </div>
         ) : null;
       case 'mobilemoney':
         return currentSession ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                  <CaisseMobileMoney sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); loadCaissesSeparees(); }} />
             </div>
         ) : null;
@@ -704,20 +726,20 @@ export default function CaisseDashboard({
       case 'rapprochement':
         return currentSession ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
-              <CaisseRapprochement session={currentSession} onClose={() => { setActiveTab('dashboard'); loadSessionActive(); loadTransactionsJour(); }} soldeTheoriqueCalcule={soldeActuel} />
+              <CaisseRapprochement session={currentSession} onClose={() => { handleTabChange('dashboard'); loadSessionActive(); loadTransactionsJour(); }} soldeTheoriqueCalcule={soldeActuel} />
               <WeightVerificationPanel compact />
             </div>
         ) : null;
       case 'transferts':
-        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => setActiveTab('dashboard')} /></div>;
+        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => handleTabChange('dashboard')} /></div>;
       case 'etats':
-        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full"><CaisseEtats onBack={() => setActiveTab('dashboard')} /></div>;
+        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseEtats onBack={() => handleTabChange('dashboard')} /></div>;
 
       case 'supervision':
         return (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
+                    <Button variant="ghost" size="sm" onClick={() => handleTabChange('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
                     <h2 className="text-lg font-bold text-white">Supervision</h2>
                  </div>
                  <CaisseSupervision
@@ -730,7 +752,7 @@ export default function CaisseDashboard({
         return (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
+                    <Button variant="ghost" size="sm" onClick={() => handleTabChange('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
                     <h2 className="text-lg font-bold text-white">Journal d'Audit</h2>
                  </div>
                  <CaisseAuditLog />
@@ -740,7 +762,7 @@ export default function CaisseDashboard({
         // Handle pending opening workflow states
         if (hasPendingOpening && pendingSession) {
           return (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div className="flex flex-col items-center justify-center min-h-[40vh] sm:min-h-[50vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
               {pendingSession.statut === 'REQUESTING_FUNDS' ? (
                 <>
                   <div className="p-8 rounded-[2rem] bg-amber-500/5 ring-1 ring-amber-500/10 shadow-2xl relative overflow-hidden group">
@@ -800,7 +822,7 @@ export default function CaisseDashboard({
 
               {isAdminRole(userRole) && (
                 <button
-                  onClick={() => setActiveTab('supervision')}
+                  onClick={() => handleTabChange('supervision')}
                   className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
                 >
                   Accéder aux outils de supervision
@@ -817,7 +839,7 @@ export default function CaisseDashboard({
           const isPendingCoffreValidation = isValidationPhase && currentSession.coffreValidationStatus === 'PENDING';
 
           return (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div className="flex flex-col items-center justify-center min-h-[40vh] sm:min-h-[50vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
               {isCountPhase ? (
                 // Phase 1: Counting in progress
                 <>
@@ -839,7 +861,7 @@ export default function CaisseDashboard({
                   <div className="flex flex-col gap-3 items-center w-full max-w-sm">
                     <Button
                       size="lg"
-                      onClick={() => setActiveTab('rapprochement')}
+                      onClick={() => handleTabChange('rapprochement')}
                       className="w-full bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)] font-bold py-6 text-lg"
                     >
                       <RefreshCw className="w-5 h-5 mr-2" />
@@ -874,7 +896,7 @@ export default function CaisseDashboard({
                     <Button
                       size="lg"
                       variant="outline"
-                      onClick={() => setActiveTab('rapprochement')}
+                      onClick={() => handleTabChange('rapprochement')}
                       className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
                     >
                       <Clock className="w-5 h-5 mr-2" />
@@ -902,7 +924,7 @@ export default function CaisseDashboard({
                   <div className="flex flex-col gap-3 items-center w-full max-w-xs">
                     <Button
                       size="lg"
-                      onClick={() => setActiveTab('rapprochement')}
+                      onClick={() => handleTabChange('rapprochement')}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 rounded-2xl font-black py-6 text-lg"
                     >
                       <Check className="w-5 h-5 mr-2" />
@@ -914,7 +936,7 @@ export default function CaisseDashboard({
 
               {isAdminRole(userRole) && (
                 <button
-                  onClick={() => setActiveTab('supervision')}
+                  onClick={() => handleTabChange('supervision')}
                   className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
                 >
                   Accéder aux outils de supervision
@@ -926,7 +948,7 @@ export default function CaisseDashboard({
 
         if (!isSessionOpen) {
            return (
-             <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
+             <div className="flex flex-col items-center justify-center min-h-[40vh] sm:min-h-[50vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 <div className="p-6 rounded-full bg-slate-900 ring-1 ring-slate-800 shadow-2xl relative overflow-hidden group">
                   <div className="absolute inset-0 bg-gradient-to-tr from-slate-800/0 to-slate-700/0 group-hover:from-slate-800/20 group-hover:to-slate-700/20 transition-all duration-500" />
                   <LockKeyhole className="w-16 h-16 text-slate-500 relative z-10" />
@@ -951,7 +973,7 @@ export default function CaisseDashboard({
 
                   {isAdminRole(userRole) && (
                     <button
-                      onClick={() => setActiveTab('supervision')}
+                      onClick={() => handleTabChange('supervision')}
                       className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
                     >
                       Accéder aux outils de supervision sans ouvrir
@@ -1104,7 +1126,7 @@ export default function CaisseDashboard({
         isLoading={loadingTransactions}
         emptyMessage="Aucune opération aujourd'hui"
         headerTitle="Opérations du Jour"
-        onViewAll={() => setActiveTab('historique')}
+        onViewAll={() => handleTabChange('historique')}
         maxItems={5}
       />
 
@@ -1149,7 +1171,7 @@ export default function CaisseDashboard({
   };
 
   return (
-    <div className="h-full bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
+    <div className="min-h-full bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
         <UniversalPaymentSuccessModal
             isOpen={showHistoryReceipt}
             onClose={() => {
@@ -1160,7 +1182,7 @@ export default function CaisseDashboard({
             data={historyReceiptData}
         />
 
-      <div className="w-full h-full flex flex-col p-3 md:p-4 overflow-y-auto overflow-x-hidden">
+      <div className="w-full min-h-full flex flex-col p-3 md:p-4">
         {/* App Header with contextual help */}
         <FeatureHeader
           featureKey="finance.caisse"
@@ -1234,7 +1256,7 @@ export default function CaisseDashboard({
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => setActiveTab('rapprochement')}
+                  onClick={() => handleTabChange('rapprochement')}
                   className="rounded-full shadow-lg shadow-blue-500/20"
                 >
                   <RefreshCw size={14} className="mr-1.5" />
@@ -1328,7 +1350,7 @@ export default function CaisseDashboard({
         <div className="bg-[#020617]/90 backdrop-blur-xl -mx-4 px-4 py-2 mb-2 border-b border-[#1e293b]/50 sticky top-0 z-20">
           <TabGroup
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
             tabs={tabs}
             variant="pills"
             size="sm"
@@ -1338,7 +1360,7 @@ export default function CaisseDashboard({
         </div>
 
         {/* Main Content - P2.1: Wrapped in Suspense for lazy loaded components */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="flex-1">
           <Suspense fallback={<TabLoadingFallback />}>
             {renderContent()}
           </Suspense>
@@ -1413,7 +1435,7 @@ export default function CaisseDashboard({
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  setActiveTab('rapprochement');
+                  handleTabChange('rapprochement');
                   resetSessionTimeout();
                 }}
                 className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition"

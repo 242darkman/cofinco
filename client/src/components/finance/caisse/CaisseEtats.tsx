@@ -144,7 +144,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-500 font-sans selection:bg-cyan-500/30 overflow-hidden">
+    <div className="flex flex-col space-y-4 animate-in fade-in duration-500 font-sans selection:bg-cyan-500/30">
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between gap-4 py-1">
         <div className="flex items-center gap-3">
@@ -178,7 +178,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
         />
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex flex-col">
           {typeRapport === 'journal' ? (
             <CashJournal
               sessions={sessions}
@@ -189,7 +189,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
               onPageChange={setCurrentPage}
             />
           ) : (
-            <div className="flex-1 overflow-y-auto pr-2 pb-4 scrollbar-thin">
+            <div className="pb-4">
                 {typeRapport === 'synthese' && (
                     <DailySummary sessions={sessions} transactions={transactions} loading={loading} />
                 )}
@@ -208,7 +208,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
 
           {/* Empty state */}
           {!loading && sessions.length === 0 && (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center py-16">
                 <Card className="bg-slate-900/80 border-slate-800 py-16 text-center max-w-md w-full">
                 <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <FileText size={32} className="text-slate-600" />
