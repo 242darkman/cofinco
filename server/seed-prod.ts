@@ -2195,9 +2195,9 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
 
   // Produits Compte - upsert by code
   const produits = [
-    { code: 'COURANT_STD', nom: 'Compte Courant Standard', typeCompte: 'CURRENT' as const, tauxInteret: '0', frais: { ouverture: 5000, tenue: 1500 }, actif: true },
-    { code: 'EPARGNE_STD', nom: 'Compte Épargne Classique', typeCompte: 'SAVINGS' as const, tauxInteret: '3.5', frais: { ouverture: 2500 }, actif: true },
-    { code: 'TONTINE_STD', nom: 'Compte Tontine', typeCompte: 'BLOCKED' as const, tauxInteret: '0', actif: true },
+    { code: 'COURANT_STD', nom: 'Compte Courant Standard', typeCompte: 'CURRENT' as const, tauxInteret: '0', frais: { ouverture: 5000, tenue: 1500, cloture: 2500 }, actif: true },
+    { code: 'EPARGNE_STD', nom: 'Compte Épargne Classique', typeCompte: 'SAVINGS' as const, tauxInteret: '3.5', frais: { ouverture: 2500, cloture: 1500 }, actif: true },
+    { code: 'TONTINE_STD', nom: 'Compte Tontine', typeCompte: 'BLOCKED' as const, tauxInteret: '0', frais: { cloture: 1000 }, actif: true },
   ];
 
   for (const p of produits) {

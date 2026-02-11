@@ -21,6 +21,7 @@ import {
   credits,
   clients,
   users,
+  produitsCompte,
   type AccountClosureRequest,
 } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -49,7 +50,6 @@ export interface InitiateClosureData {
   reason: string;
   payoutMethod: "CASH" | "MOBILE_MONEY";
   payoutPhoneNumber?: string;
-  closingFeeAmount?: number;
 }
 
 // ============================================================================
@@ -118,9 +118,21 @@ export async function initiateClosureCompte(
       );
     }
 
-    // 5. Calculate payout
+    // 5. Auto-fetch closing fee from product config (admin-controlled)
+    let fee = 0;
+    if (compte.produitId) {
+      const [produit] = await tx
+        .select({ frais: produitsCompte.frais })
+        .from(produitsCompte)
+        .where(eq(produitsCompte.id, compte.produitId));
+      if (produit?.frais && typeof produit.frais === "object") {
+        const fraisObj = produit.frais as Record<string, unknown>;
+        fee = Number(fraisObj.cloture) || 0;
+      }
+    }
+
+    // Calculate payout
     const balance = parseFloat(compte.soldeCourant || "0");
-    const fee = data.closingFeeAmount || 0;
     const payoutAmount = Math.max(0, balance - fee);
 
     // 6. Validate phone for MOBILE_MONEY
@@ -562,6 +574,32 @@ export async function getPendingClosureRequests(
   return await baseQuery
     .where(and(...conditions))
     .orderBy(accountClosureRequests.initiatedAt);
+}
+
+/**
+ * Retourne les frais de clôture configurés pour un compte (via son produit).
+ */
+export async function getClosureFeeForCompte(
+  compteId: string
+): Promise<{ closingFee: number; productName: string | null }> {
+  const [row] = await db
+    .select({
+      frais: produitsCompte.frais,
+      nom: produitsCompte.nom,
+    })
+    .from(comptes)
+    .leftJoin(produitsCompte, eq(comptes.produitId, produitsCompte.id))
+    .where(eq(comptes.id, compteId));
+
+  if (!row?.frais || typeof row.frais !== "object") {
+    return { closingFee: 0, productName: row?.nom || null };
+  }
+
+  const fraisObj = row.frais as Record<string, unknown>;
+  return {
+    closingFee: Number(fraisObj.cloture) || 0,
+    productName: row.nom || null,
+  };
 }
 
 // ============================================================================

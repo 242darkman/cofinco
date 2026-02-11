@@ -33,6 +33,7 @@ import {
   cancelClosureCompte,
   getClosureRequest,
   getPendingClosureRequests,
+  getClosureFeeForCompte,
   createClosureMoMoPayout,
 } from "../services/compte-closure";
 import { createVirementProgramme, executeCompteTransfer } from "../services/compte-transfers";
@@ -133,7 +134,6 @@ const initiateClosureSchema = z.object({
   reason: z.string().min(3, "Motif requis (min 3 caractères)"),
   payoutMethod: z.enum(["CASH", "MOBILE_MONEY"]),
   payoutPhoneNumber: z.string().optional(),
-  closingFeeAmount: z.number().min(0).optional().default(0),
 });
 
 const cancelClosureSchema = z.object({
@@ -3134,7 +3134,6 @@ export function registerComptesRoutes(app: Express) {
             reason: parsed.reason,
             payoutMethod: parsed.payoutMethod as any,
             payoutPhoneNumber: parsed.payoutPhoneNumber,
-            closingFeeAmount: parsed.closingFeeAmount,
           },
           user!.id
         );
@@ -3296,6 +3295,23 @@ export function registerComptesRoutes(app: Express) {
         res.json(requests);
       } catch (error: any) {
         logger.error({ err: error }, 'Error listing pending closures');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/:id/closure-fee - Frais de clôture configurés pour ce compte (via produit)
+   */
+  app.get(
+    "/api/comptes/:id/closure-fee",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const result = await getClosureFeeForCompte(req.params.id);
+        res.json(result);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error getting closure fee');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }

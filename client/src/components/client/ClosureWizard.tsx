@@ -59,6 +59,9 @@ export default function ClosureWizard({
   ]);
   const [preconditionsOk, setPreconditionsOk] = useState(false);
 
+  // Closure fee from product config (read-only, admin-controlled)
+  const [closingFee, setClosingFee] = useState(0);
+
   // Payout state
   const [payoutMethod, setPayoutMethod] = useState<ClosurePayoutMethodType>(ClosurePayoutMethod.CASH);
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -84,6 +87,7 @@ export default function ClosureWizard({
     setPhoneNumber('');
     setReason('');
     setConfirmed(false);
+    setClosingFee(0);
     setExistingRequest(null);
     setCancelReason('');
     setCancelling(false);
@@ -111,6 +115,19 @@ export default function ClosureWizard({
       }
     } catch {
       setExistingRequest(null);
+    }
+
+    // Fetch closure fee from product config
+    try {
+      const feeRes = await fetch(`/api/comptes/${compteId}/closure-fee`, {
+        credentials: 'include',
+      });
+      if (feeRes.ok) {
+        const feeData = await feeRes.json();
+        setClosingFee(Number(feeData.closingFee) || 0);
+      }
+    } catch {
+      // Fee defaults to 0 if fetch fails
     }
 
     // For pending transactions and active credits, we check them on submission
@@ -515,11 +532,13 @@ export default function ClosureWizard({
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-400">Frais de clôture</span>
-              <span className="text-white font-medium">0 FCFA</span>
+              <span className={`font-medium ${closingFee > 0 ? 'text-red-400' : 'text-white'}`}>
+                {closingFee > 0 ? `- ${closingFee.toLocaleString()}` : '0'} FCFA
+              </span>
             </div>
             <div className="border-t border-slate-700 pt-2 flex justify-between text-sm">
               <span className="text-slate-300 font-semibold">Montant à restituer</span>
-              <span className="text-emerald-400 font-bold">{Math.max(0, balance).toLocaleString()} FCFA</span>
+              <span className="text-emerald-400 font-bold">{Math.max(0, balance - closingFee).toLocaleString()} FCFA</span>
             </div>
           </div>
 
@@ -574,9 +593,15 @@ export default function ClosureWizard({
                   <span className="text-white">{phoneNumber}</span>
                 </div>
               )}
+              {closingFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Frais de clôture</span>
+                  <span className="text-red-400 font-medium">- {closingFee.toLocaleString()} FCFA</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-400">Montant à restituer</span>
-                <span className="text-emerald-400 font-bold">{Math.max(0, balance).toLocaleString()} FCFA</span>
+                <span className="text-emerald-400 font-bold">{Math.max(0, balance - closingFee).toLocaleString()} FCFA</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Motif</span>
