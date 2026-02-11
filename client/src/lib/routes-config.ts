@@ -190,6 +190,7 @@ export const ROUTES: RouteConfig[] = [
     subRoutes: [
       { path: '/validations/collectes', subModule: 'collectes', label: 'Collectes Agents' },
       { path: '/validations/clotures', subModule: 'clotures', label: 'Clôtures Comptes' },
+      { path: '/validations/ouvertures', subModule: 'ouvertures', label: 'Créations Comptes' },
     ],
   },
   {
