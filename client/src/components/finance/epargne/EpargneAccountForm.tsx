@@ -51,6 +51,17 @@ interface ProduitCompte {
   typeCompte?: string;
   taux_interet?: number | string | null;
   tauxInteret?: number | string | null;
+  frais?: {
+    ouverture?: number;
+    cloture?: number;
+    tenue?: number;
+    retrait?: number;
+  } | null;
+  regles?: {
+    depotInitialObligatoire?: boolean;
+    depotInitialMinimum?: number;
+    validationOuvertureRequise?: boolean;
+  } | null;
 }
 
 interface EpargneAccountFormProps {
@@ -192,7 +203,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
      );
    }, [clients, searchQuery]);
    
-   const existingAccountsTypes = useMemo(() => 
+   const selectedProduct = useMemo(() => produits.find(p => p.id === formData.produit_id), [produits, formData.produit_id]);
+   const openingFee = selectedProduct?.frais?.ouverture ?? 0;
+   const depotMinimum = selectedProduct?.regles?.depotInitialMinimum ?? 0;
+   const validationRequise = selectedProduct?.regles?.validationOuvertureRequise ?? false;
+
+   const existingAccountsTypes = useMemo(() =>
      comptesExistants.map(c => normalizeTypeCompte(c.typeCompte || '')),
    [comptesExistants]);
 
@@ -234,7 +250,13 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       const amount = parseFloat(formData.solde_initial);
       if (formData.solde_initial && isNaN(amount)) newErrors.solde_initial = "Montant invalide";
       if (amount < 0) newErrors.solde_initial = "Ne peut être négatif";
-      
+
+      // Check against fee + minimum deposit
+      const minRequired = openingFee + depotMinimum;
+      if (minRequired > 0 && amount < minRequired) {
+        newErrors.solde_initial = `Montant minimum requis: ${formatMoney(minRequired)} FCFA (frais ${formatMoney(openingFee)} + dépôt min ${formatMoney(depotMinimum)})`;
+      }
+
       // Transfer validation
       if (formData.mode_ouverture === 'TRANSFER' && !formData.compte_source_id) {
          newErrors.compte_source_id = "Compte source requis";
@@ -314,11 +336,14 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
       await compteEpargneApi.create(payload);
 
-      if (formData.mode_ouverture === 'CASH' && soldeInitial > 0) {
-        toast.success(`Compte créé avec succès !`);
+      if (validationRequise && (formData.type_compte === 'SAVINGS' || formData.type_compte === 'BLOCKED')) {
+        toast.success('Compte créé — en attente de validation du chef d\'agence.');
+        toast.info('Le compte apparaîtra dans le Centre de Validations.');
+      } else if (formData.mode_ouverture === 'CASH' && soldeInitial > 0) {
+        toast.success('Compte créé avec succès !');
         toast.info(`Statut: En attente de paiement. Veuillez encaisser ${formatMoney(soldeInitial)} en caisse.`);
       } else {
-        toast.success(`Compte créé et activé avec succès !`);
+        toast.success('Compte créé et activé avec succès !');
       }
       onSuccess();
     } catch (error: any) {
@@ -633,8 +658,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                    <label className="text-xs font-bold text-slate-500 uppercase ml-1">Montant Initial (FCFA)</label>
                    <div className="relative group">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xl">$</span>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         value={formData.solde_initial}
                         onChange={(e) => handleInputChange('solde_initial', e.target.value)}
                         className="w-full h-20 bg-slate-900 border-2 border-slate-700 rounded-xl pl-10 pr-4 text-4xl font-bold text-white placeholder-slate-800 outline-none focus:border-indigo-500 transition-all"
@@ -643,6 +668,50 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       />
                    </div>
                    {errors.solde_initial && <p className="text-xs text-red-400 ml-1">{errors.solde_initial}</p>}
+
+                   {/* Fee breakdown */}
+                   {(openingFee > 0 || depotMinimum > 0) && (
+                     <div className="bg-slate-900/80 border border-slate-700/50 rounded-xl p-3 space-y-2">
+                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ventilation du montant</p>
+                       <div className="space-y-1.5">
+                         {openingFee > 0 ? (
+                           <div className="flex justify-between text-xs">
+                             <span className="text-slate-400">Frais d'ouverture</span>
+                             <span className="text-red-400 font-medium">{formatMoney(openingFee)} F</span>
+                           </div>
+                         ) : (
+                           <div className="flex justify-between text-xs">
+                             <span className="text-slate-400">Frais d'ouverture</span>
+                             <span className="text-emerald-400 font-medium">Offerts</span>
+                           </div>
+                         )}
+                         <div className="flex justify-between text-xs">
+                           <span className="text-slate-400">Dépôt initial minimum</span>
+                           <span className="text-slate-300 font-medium">{formatMoney(depotMinimum)} F</span>
+                         </div>
+                         <div className="border-t border-slate-700/50 pt-1.5 flex justify-between text-xs">
+                           <span className="text-white font-semibold">Minimum à verser</span>
+                           <span className="text-white font-bold">{formatMoney(openingFee + depotMinimum)} F</span>
+                         </div>
+                         {parseFloat(formData.solde_initial) > openingFee + depotMinimum && (
+                           <div className="flex justify-between text-xs text-emerald-400">
+                             <span>Solde effectif du compte</span>
+                             <span className="font-medium">{formatMoney(parseFloat(formData.solde_initial) - openingFee)} F</span>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Validation notice */}
+                   {validationRequise && (
+                     <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/5 border border-amber-500/15 rounded-lg">
+                       <ShieldCheck size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                       <p className="text-xs text-amber-400/90">
+                         Ce produit nécessite une validation du chef d'agence avant activation. Le compte sera en attente de validation après création.
+                       </p>
+                     </div>
+                   )}
                 </div>
              </div>
            )}
@@ -744,24 +813,23 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                    />
                 </div>
 
-                {/* Validation Manager */}
+                {/* Validation Info (driven by product config) */}
                 <div className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl">
                    <div>
                       <div className="text-sm font-bold text-white">Validation Chef d'Agence</div>
-                      <div className="text-xs text-slate-500">Requis pour les comptes VIP ou {'>'} 1M FCFA</div>
+                      <div className="text-xs text-slate-500">
+                        {validationRequise
+                          ? 'Requise par la politique du produit sélectionné'
+                          : 'Non requise pour ce produit'}
+                      </div>
                    </div>
-                   <div className="relative inline-block w-12 h-6 transition duration-200 ease-in-out">
-                      <input 
-                        type="checkbox" 
-                        checked={formData.validation_requise}
-                        onChange={(e) => handleInputChange('validation_requise', e.target.checked)}
-                        className="sr-only peer" 
-                        id="validation-mgr"
-                      />
-                      <label htmlFor="validation-mgr" className={`block h-6 overflow-hidden rounded-full cursor-pointer transition-colors ${formData.validation_requise ? 'bg-indigo-600' : 'bg-slate-700'}`}>
-                      </label>
-                      <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow transition-transform ${formData.validation_requise ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                   </div>
+                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                     validationRequise
+                       ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                       : 'bg-slate-700/50 text-slate-500'
+                   }`}>
+                     {validationRequise ? 'Requise' : 'Non'}
+                   </span>
                 </div>
              </div>
            )}
@@ -823,9 +891,23 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                <p className="text-slate-400 mb-6">Confirmez le comptage physique des espèces pour le dépôt initial.</p>
 
                {/* Summary */}
-               <div className="bg-slate-800 p-4 rounded-xl mb-6 flex justify-between items-center">
-                  <span className="text-slate-400">Montant Attendu</span>
-                  <span className="text-2xl font-bold text-white">{formatMoney(parseFloat(formData.solde_initial))}</span>
+               <div className="bg-slate-800 p-4 rounded-xl mb-6 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Montant Total Attendu</span>
+                    <span className="text-2xl font-bold text-white">{formatMoney(parseFloat(formData.solde_initial))}</span>
+                  </div>
+                  {openingFee > 0 && (
+                    <div className="border-t border-slate-700 pt-2 space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Dont frais d'ouverture</span>
+                        <span className="text-red-400">{formatMoney(openingFee)} F</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Dont dépôt sur compte</span>
+                        <span className="text-emerald-400">{formatMoney(parseFloat(formData.solde_initial) - openingFee)} F</span>
+                      </div>
+                    </div>
+                  )}
                </div>
 
                {/* Billetage Forms */}

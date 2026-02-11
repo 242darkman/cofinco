@@ -1,32 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckCircle, XCircle, Clock, User, Loader2, RefreshCw,
-  Banknote, Smartphone, CreditCard, AlertTriangle, FileText,
-  Search, ChevronLeft, ChevronRight,
+  Banknote, CreditCard, AlertTriangle,
+  Search, ChevronLeft, ChevronRight, PiggyBank, Lock, Wallet,
 } from 'lucide-react';
 import { Card, Badge, ConfirmDialog } from '../ui';
 import { toast, handleApiError } from '../../lib/toast';
-import { type ClosurePayoutMethodType } from '@shared/enum/status-constants';
 
-interface ClosureRequest {
+interface OpeningRequest {
   id: string;
   compteId: string;
   initiatedBy: string;
   initiatedAt: string;
   status: string;
-  reason: string;
-  payoutMethod: ClosurePayoutMethodType;
-  payoutAmount: string;
-  payoutPhoneNumber?: string;
-  balanceAtInitiation: string;
-  closingFeeAmount: string;
+  openingFeeAmount: string;
+  initialDepositAmount: string;
+  produitId: string | null;
+  createdAt: string;
   // Joined fields
   numeroCompte?: string;
+  typeCompte?: string;
+  produitNom?: string;
   clientNom?: string;
   initiatorName?: string;
 }
 
-interface ClosureApprovalsProps {
+interface OpeningApprovalsProps {
   agenceId?: string;
 }
 
@@ -36,62 +35,62 @@ function formatMoney(value: string | number): string {
   return Number(value).toLocaleString('fr-FR');
 }
 
-function PayoutMethodBadge({ method, phoneNumber }: { method: ClosurePayoutMethodType; phoneNumber?: string }) {
-  if (method === 'CASH') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
-        <Banknote size={14} />
-        Espèces — via Caisse
-      </span>
-    );
-  }
+const TYPE_LABEL: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+  SAVINGS: { label: 'Épargne', icon: PiggyBank, className: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' },
+  CURRENT: { label: 'Courant', icon: Wallet, className: 'bg-blue-500/10 border-blue-500/20 text-blue-400' },
+  BLOCKED: { label: 'Bloqué', icon: Lock, className: 'bg-amber-500/10 border-amber-500/20 text-amber-400' },
+};
+
+function AccountTypeBadge({ typeCompte }: { typeCompte?: string }) {
+  const config = TYPE_LABEL[typeCompte || ''] || { label: typeCompte || '—', icon: CreditCard, className: 'bg-slate-500/10 border-slate-500/20 text-slate-400' };
+  const Icon = config.icon;
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium">
-      <Smartphone size={14} />
-      Mobile Money{phoneNumber ? ` — ${phoneNumber}` : ''}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium ${config.className}`}>
+      <Icon size={14} />
+      {config.label}
     </span>
   );
 }
 
-export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
-  const [requests, setRequests] = useState<ClosureRequest[]>([]);
+export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
+  const [requests, setRequests] = useState<OpeningRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Approve dialog
-  const [approveTarget, setApproveTarget] = useState<ClosureRequest | null>(null);
+  const [approveTarget, setApproveTarget] = useState<OpeningRequest | null>(null);
 
-  // Cancel dialog
-  const [cancelTarget, setCancelTarget] = useState<ClosureRequest | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
+  // Reject dialog
+  const [rejectTarget, setRejectTarget] = useState<OpeningRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     fetchPending();
   }, [agenceId]);
 
-  // Real-time: listen for closure-update DOM events (from WS bridge or same-tab)
+  // Real-time: listen for opening-update DOM events (from WS bridge or same-tab)
   useEffect(() => {
-    const handleClosureUpdate = () => {
+    const handleOpeningUpdate = () => {
       fetchPending();
     };
-    window.addEventListener('closure-update', handleClosureUpdate);
-    return () => window.removeEventListener('closure-update', handleClosureUpdate);
+    window.addEventListener('opening-update', handleOpeningUpdate);
+    return () => window.removeEventListener('opening-update', handleOpeningUpdate);
   }, []);
 
   const fetchPending = async () => {
     setLoading(true);
     try {
       const url = agenceId
-        ? `/api/closure-requests/pending?agenceId=${agenceId}`
-        : '/api/closure-requests/pending';
+        ? `/api/opening-requests/pending?agenceId=${agenceId}`
+        : '/api/opening-requests/pending';
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur chargement demandes');
       const data = await res.json();
       setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading closure requests:', error);
+      console.error('Error loading opening requests:', error);
     } finally {
       setLoading(false);
     }
@@ -104,7 +103,8 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
     return requests.filter(r =>
       (r.numeroCompte || '').toLowerCase().includes(q) ||
       (r.clientNom || '').toLowerCase().includes(q) ||
-      (r.initiatorName || '').toLowerCase().includes(q)
+      (r.initiatorName || '').toLowerCase().includes(q) ||
+      (r.produitNom || '').toLowerCase().includes(q)
     );
   }, [requests, searchQuery]);
 
@@ -121,46 +121,46 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
     if (!approveTarget) return;
     setActionLoading(approveTarget.id);
     try {
-      const res = await fetch(`/api/closure-requests/${approveTarget.id}/approve`, {
+      const res = await fetch(`/api/opening-requests/${approveTarget.id}/approve`, {
         method: 'POST',
         credentials: 'include',
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || 'Erreur lors de l\'approbation');
+        throw new Error(err.message || "Erreur lors de l'approbation");
       }
-      toast.success('Clôture approuvée et exécutée avec succès.');
+      toast.success('Ouverture de compte approuvée. Le caissier peut maintenant encaisser le dépôt initial.');
       setApproveTarget(null);
       fetchPending();
-      window.dispatchEvent(new CustomEvent('closure-update'));
+      window.dispatchEvent(new CustomEvent('opening-update'));
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de l\'approbation'));
+      toast.error(handleApiError(error, "Erreur lors de l'approbation"));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleCancel = async () => {
-    if (!cancelTarget || cancelReason.trim().length < 3) return;
-    setActionLoading(cancelTarget.id);
+  const handleReject = async () => {
+    if (!rejectTarget || rejectReason.trim().length < 3) return;
+    setActionLoading(rejectTarget.id);
     try {
-      const res = await fetch(`/api/closure-requests/${cancelTarget.id}/cancel`, {
+      const res = await fetch(`/api/opening-requests/${rejectTarget.id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ cancelReason }),
+        body: JSON.stringify({ reason: rejectReason }),
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || 'Erreur lors de l\'annulation');
+        throw new Error(err.message || 'Erreur lors du rejet');
       }
-      toast.success('Demande de clôture annulée. Le compte est réactivé.');
-      setCancelTarget(null);
-      setCancelReason('');
+      toast.success("Demande d'ouverture rejetée. Le compte a été annulé.");
+      setRejectTarget(null);
+      setRejectReason('');
       fetchPending();
-      window.dispatchEvent(new CustomEvent('closure-update'));
+      window.dispatchEvent(new CustomEvent('opening-update'));
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de l\'annulation'));
+      toast.error(handleApiError(error, 'Erreur lors du rejet'));
     } finally {
       setActionLoading(null);
     }
@@ -179,7 +179,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
       <Card variant="default" padding="lg" className="border-dashed border-slate-700 bg-transparent">
         <div className="text-center py-8">
           <CheckCircle className="text-emerald-500 mx-auto mb-2" size={32} />
-          <p className="text-slate-400 text-sm">Aucune demande de clôture en attente</p>
+          <p className="text-slate-400 text-sm">Aucune demande d'ouverture en attente</p>
         </div>
       </Card>
     );
@@ -191,7 +191,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-slate-400 uppercase flex items-center gap-2">
           <Clock size={14} />
-          Clôtures en attente
+          Ouvertures en attente
           <Badge value={String(requests.length)} size="sm" />
         </h4>
         <div className="flex items-center gap-2">
@@ -201,7 +201,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="N° compte, client..."
+              placeholder="N° compte, client, produit..."
               className="pl-8 pr-3 py-1.5 w-48 sm:w-56 bg-slate-800/60 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition"
             />
           </div>
@@ -231,10 +231,9 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         </Card>
       ) : (
         paginated.map((req) => {
-          const balance = Number(req.balanceAtInitiation);
-          const fee = Number(req.closingFeeAmount);
-          const payout = Number(req.payoutAmount);
-          const isCash = req.payoutMethod === 'CASH';
+          const fee = Number(req.openingFeeAmount);
+          const deposit = Number(req.initialDepositAmount);
+          const total = fee + deposit;
 
           return (
             <Card key={req.id} variant="default" padding="md" className="border-purple-500/20">
@@ -252,41 +251,44 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
                       <p className="text-sm text-slate-300 pl-6">{req.clientNom}</p>
                     )}
                   </div>
-                  <PayoutMethodBadge method={req.payoutMethod} phoneNumber={req.payoutPhoneNumber} />
+                  <div className="flex items-center gap-2">
+                    <AccountTypeBadge typeCompte={req.typeCompte} />
+                    {req.produitNom && (
+                      <span className="text-xs text-slate-400 bg-slate-800/60 px-2 py-1 rounded-md border border-slate-700/50">
+                        {req.produitNom}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Financial details grid */}
                 <div className="grid grid-cols-3 gap-3 bg-slate-800/40 rounded-lg p-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Solde au moment</p>
-                    <p className="text-sm font-semibold text-slate-200">{formatMoney(balance)} <span className="text-[10px] text-slate-500">FCFA</span></p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Frais de clôture</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Frais d'ouverture</p>
                     <p className="text-sm font-semibold text-red-400">
-                      {fee > 0 ? `- ${formatMoney(fee)}` : '0'} <span className="text-[10px] text-slate-500">FCFA</span>
+                      {fee > 0 ? `${formatMoney(fee)}` : 'Offerts'} <span className="text-[10px] text-slate-500">FCFA</span>
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Net à restituer</p>
-                    <p className="text-sm font-bold text-emerald-400">{formatMoney(payout)} <span className="text-[10px] text-slate-500">FCFA</span></p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Dépôt initial</p>
+                    <p className="text-sm font-semibold text-slate-200">
+                      {formatMoney(deposit)} <span className="text-[10px] text-slate-500">FCFA</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Total à verser</p>
+                    <p className="text-sm font-bold text-emerald-400">
+                      {formatMoney(total)} <span className="text-[10px] text-slate-500">FCFA</span>
+                    </p>
                   </div>
                 </div>
 
-                {/* Cash caisse notice */}
-                {isCash && payout > 0 && (
-                  <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/5 border border-amber-500/15 rounded-lg">
-                    <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-amber-400/90">
-                      La restitution en espèces sera traitée en caisse. Le caissier devra confirmer la remise physique des fonds.
-                    </p>
-                  </div>
-                )}
-
-                {/* Reason */}
-                <div className="flex items-start gap-2 text-xs text-slate-400">
-                  <FileText size={12} className="mt-0.5 shrink-0 text-slate-500" />
-                  <span><span className="text-slate-500">Motif :</span> {req.reason}</span>
+                {/* Info notice */}
+                <div className="flex items-start gap-2 px-3 py-2 bg-blue-500/5 border border-blue-500/15 rounded-lg">
+                  <Banknote size={14} className="text-blue-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-400/90">
+                    Après approbation, le caissier pourra encaisser le dépôt initial de {formatMoney(total)} FCFA.
+                  </p>
                 </div>
 
                 {/* Footer: Initiator + Actions */}
@@ -316,7 +318,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
                       Approuver
                     </button>
                     <button
-                      onClick={() => setCancelTarget(req)}
+                      onClick={() => setRejectTarget(req)}
                       disabled={actionLoading === req.id}
                       className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
                     >
@@ -374,12 +376,12 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         isOpen={!!approveTarget}
         onClose={() => setApproveTarget(null)}
         onConfirm={handleApprove}
-        title="Approuver la clôture"
+        title="Approuver l'ouverture de compte"
         message={
           approveTarget ? (
             <div className="space-y-3">
               <p>
-                Vous allez approuver la clôture du compte{' '}
+                Vous allez approuver l'ouverture du compte{' '}
                 <span className="font-mono text-white font-semibold">{approveTarget.numeroCompte || approveTarget.compteId.slice(0, 8)}</span>
                 {approveTarget.clientNom && (
                   <> du client <span className="text-white">{approveTarget.clientNom}</span></>
@@ -389,66 +391,67 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
               {/* Financial summary in dialog */}
               <div className="grid grid-cols-3 gap-2 bg-slate-800/60 rounded-lg p-3 text-center">
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Solde</p>
-                  <p className="text-sm font-semibold text-slate-200">{formatMoney(approveTarget.balanceAtInitiation)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Frais</p>
-                  <p className="text-sm font-semibold text-red-400">- {formatMoney(approveTarget.closingFeeAmount)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Net</p>
-                  <p className="text-sm font-bold text-emerald-400">{formatMoney(approveTarget.payoutAmount)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-400">Restitution par :</span>
-                <PayoutMethodBadge method={approveTarget.payoutMethod} phoneNumber={approveTarget.payoutPhoneNumber} />
-              </div>
-
-              {approveTarget.payoutMethod === 'CASH' && Number(approveTarget.payoutAmount) > 0 && (
-                <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                  <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-400">
-                    La restitution en espèces devra être confirmée en caisse par le caissier.
+                  <p className="text-[10px] text-slate-500 uppercase">Frais ouverture</p>
+                  <p className="text-sm font-semibold text-red-400">
+                    {Number(approveTarget.openingFeeAmount) > 0
+                      ? formatMoney(approveTarget.openingFeeAmount)
+                      : 'Offerts'}
                   </p>
                 </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase">Dépôt initial</p>
+                  <p className="text-sm font-semibold text-slate-200">{formatMoney(approveTarget.initialDepositAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase">Total</p>
+                  <p className="text-sm font-bold text-emerald-400">
+                    {formatMoney(Number(approveTarget.openingFeeAmount) + Number(approveTarget.initialDepositAmount))}
+                  </p>
+                </div>
+              </div>
+
+              {approveTarget.produitNom && (
+                <p className="text-sm text-slate-400">
+                  Produit : <span className="text-white">{approveTarget.produitNom}</span>
+                </p>
               )}
 
-              <p className="text-amber-400 text-sm flex items-center gap-1.5">
-                <AlertTriangle size={14} />
-                Cette action est irréversible.
+              <p className="text-sm text-slate-400">
+                Le compte passera en statut <span className="text-cyan-400 font-medium">En attente d'activation</span>.
+                Le caissier pourra ensuite encaisser le dépôt initial.
               </p>
             </div>
           ) : ''
         }
-        confirmText={approveTarget?.payoutMethod === 'CASH' && Number(approveTarget?.payoutAmount) > 0
-          ? "Approuver et envoyer en caisse"
-          : "Approuver et exécuter"
-        }
+        confirmText="Approuver l'ouverture"
         variant="success"
         isLoading={!!actionLoading}
       />
 
-      {/* Cancel dialog */}
+      {/* Reject dialog */}
       <ConfirmDialog
-        isOpen={!!cancelTarget}
-        onClose={() => { setCancelTarget(null); setCancelReason(''); }}
-        onConfirm={handleCancel}
-        title="Rejeter la clôture"
+        isOpen={!!rejectTarget}
+        onClose={() => { setRejectTarget(null); setRejectReason(''); }}
+        onConfirm={handleReject}
+        title="Rejeter l'ouverture de compte"
         message={
           <div className="space-y-3">
             <p>
               Le compte{' '}
-              <span className="font-mono text-white">{cancelTarget?.numeroCompte || cancelTarget?.compteId.slice(0, 8)}</span>
-              {' '}sera réactivé et la demande annulée.
+              <span className="font-mono text-white">{rejectTarget?.numeroCompte || rejectTarget?.compteId.slice(0, 8)}</span>
+              {' '}sera annulé et la demande rejetée.
             </p>
+            <div className="flex items-start gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <AlertTriangle size={14} className="text-red-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-red-400">
+                Cette action est irréversible. Le client devra recommencer la procédure d'ouverture.
+              </p>
+            </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Motif du rejet *</label>
               <textarea
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Raison du rejet..."
                 rows={2}
                 className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white resize-none"
@@ -459,7 +462,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         confirmText="Rejeter"
         variant="danger"
         isLoading={!!actionLoading}
-        disabled={cancelReason.trim().length < 3}
+        disabled={rejectReason.trim().length < 3}
       />
     </div>
   );

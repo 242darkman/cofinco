@@ -496,19 +496,40 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
       }
 
-      case "CREDIT_UPDATE":
-         // NOTE: Les mises à jour de solde crédit sont gérées par BALANCE_UPDATED
-         // Ce handler reste pour les notifications non-financières (création, suppression, etc.)
-         debounceInvalidate(creditKeys.all);
-         // dashboard-stats est invalidé par BALANCE_UPDATED, pas besoin de le faire ici
+      case "CREDIT_UPDATE": {
+         // Dispatch DOM event FIRST for any component listening directly
          window.dispatchEvent(new CustomEvent('credit-update', { detail: message.payload }));
 
+         const creditAction = message.payload?.type as string | undefined;
+
+         // Enquête/demande events: invalidate ALL credit keys immediately (0ms)
+         const isEnqueteEvent = creditAction && [
+           'investigation_assigned', 'investigation_reassigned', 'investigation_started',
+           'investigation_submitted', 'investigation_validated',
+           'enquete_new', 'demande_updated', 'demande_deleted', 'demande_cancelled',
+         ].includes(creditAction);
+
+         if (isEnqueteEvent) {
+           // Immediate invalidation — keys are disjoint, must invalidate each
+           queryClient.invalidateQueries({ queryKey: creditKeys.all });
+           queryClient.invalidateQueries({ queryKey: creditKeys.demandes() });
+           queryClient.invalidateQueries({ queryKey: creditKeys.demandesCounts() });
+           queryClient.invalidateQueries({ queryKey: creditKeys.enquetes() });
+         } else {
+           // Non-enquête credit events: debounced for bulk scenarios
+           debounceInvalidate(creditKeys.all);
+           debounceInvalidate(creditKeys.demandes());
+           debounceInvalidate(creditKeys.demandesCounts());
+           debounceInvalidate(creditKeys.enquetes());
+         }
+
          // Handle refund-related credit updates for sidebar badge
-         if (message.payload?.type === 'refund_created' || message.payload?.type === 'refund_approved') {
+         if (creditAction === 'refund_created' || creditAction === 'refund_approved') {
            window.dispatchEvent(new CustomEvent('refund-update', { detail: message.payload }));
-           debounceInvalidate(["/api/credit-refunds"]);
+           queryClient.invalidateQueries({ queryKey: ["/api/credit-refunds"] });
          }
          break;
+      }
 
       case "CLIENT_UPDATE":
          debounceInvalidate(["clients"]);
@@ -689,6 +710,15 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          if (aggregateType === 'compte') {
            debounceInvalidate(['compte', aggregateId]);
            debounceInvalidate(['transactions', aggregateId]);
+           // Bridge closure/opening events to dedicated DOM events for Validations Center
+           const action = data?.action as string | undefined;
+           if (action?.startsWith('CLOSURE_')) {
+             window.dispatchEvent(new CustomEvent('closure-update', { detail: data }));
+             debounceInvalidate(['/api/closure-requests/pending']);
+           } else if (action?.startsWith('OPENING_')) {
+             window.dispatchEvent(new CustomEvent('opening-update', { detail: data }));
+             debounceInvalidate(['/api/opening-requests/pending']);
+           }
          } else if (aggregateType === 'credit') {
            debounceInvalidate(['credit', aggregateId]);
            debounceInvalidate(['remboursements', aggregateId]);
@@ -1023,10 +1053,22 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Safe fallback when context is not yet available (lazy loading, HMR)
+const WS_FALLBACK: WebSocketContextType = {
+  isConnected: false,
+  socket: null,
+  onlineUsers: new Set(),
+  typingUsers: new Map(),
+  sendMessage: () => {},
+  sendTyping: () => {},
+  pendingMessagesCount: 0,
+};
+
 export function useWebSocketContext() {
   const context = useContext(WebSocketContext);
   if (context === undefined) {
-    throw new Error('useWebSocketContext must be used within a WebSocketProvider');
+    // Graceful degradation instead of crash — provider will mount shortly
+    return WS_FALLBACK;
   }
   return context;
 }

@@ -365,6 +365,8 @@ const PLAN_COMPTABLE_DATA = [
   { num: '708200', label: 'Frais de tenue de compte', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708300', label: 'Commissions de gestion', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708400', label: 'Pénalités de retard', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '708500', label: "Frais d'ouverture de compte", classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '708600', label: 'Frais de clôture de compte', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '758', label: 'Produits divers de gestion courante', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: false },
   { num: '772', label: 'Produits sur transit', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '76', label: 'Produits financiers', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
@@ -1308,6 +1310,256 @@ const ACCOUNTING_RULES_DATA = [
     priority: 10,
   },
 
+  // ============================================================================
+  // FRAIS D'OUVERTURE DE COMPTE
+  // ============================================================================
+
+  // Frais d'ouverture - Espèces
+  {
+    code: 'OPENING_FEE_CASH',
+    name: "Frais d'ouverture compte (espèces)",
+    description: "Frais d'ouverture perçu en espèces",
+    sourceType: 'MOUVEMENT',
+    eventType: 'OPENING_FEE',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '521',     // Caisse centrale
+    creditAccount: '708500', // Frais d'ouverture de compte (Produit)
+    descriptionTemplate: "Frais ouverture compte - {clientName}",
+    priority: 10,
+  },
+  // Frais d'ouverture - MTN
+  {
+    code: 'OPENING_FEE_MTN',
+    name: "Frais d'ouverture compte (MTN)",
+    description: "Frais d'ouverture perçu via MTN Mobile Money",
+    sourceType: 'MOUVEMENT',
+    eventType: 'OPENING_FEE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',    // Mobile Money MTN
+    creditAccount: '708500', // Frais d'ouverture de compte
+    descriptionTemplate: "Frais ouverture compte MTN - {clientName}",
+    priority: 10,
+  },
+  // Frais d'ouverture - Airtel
+  {
+    code: 'OPENING_FEE_AIRTEL',
+    name: "Frais d'ouverture compte (Airtel)",
+    description: "Frais d'ouverture perçu via Airtel Money",
+    sourceType: 'MOUVEMENT',
+    eventType: 'OPENING_FEE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',    // Mobile Money Airtel
+    creditAccount: '708500', // Frais d'ouverture de compte
+    descriptionTemplate: "Frais ouverture compte Airtel - {clientName}",
+    priority: 10,
+  },
+
+  // Frais d'ouverture - Virement interne (prélevé sur compte courant source)
+  {
+    code: 'OPENING_FEE_TRANSFER',
+    name: "Frais d'ouverture compte (virement)",
+    description: "Frais d'ouverture prélevé par virement interne depuis un compte existant",
+    sourceType: 'MOUVEMENT',
+    eventType: 'OPENING_FEE',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'OPD',
+    debitAccount: '4111',    // Dépôts courant (compte source)
+    creditAccount: '708500', // Frais d'ouverture de compte
+    descriptionTemplate: "Frais ouverture compte (virement) - {clientName}",
+    priority: 10,
+  },
+
+  // ============================================================================
+  // FRAIS DE CLÔTURE DE COMPTE (prélevés sur dépôts client)
+  // ============================================================================
+
+  // Frais de clôture - Compte épargne
+  {
+    code: 'CLOSING_FEE_SAVINGS',
+    name: 'Frais clôture compte épargne',
+    description: 'Frais de clôture prélevé sur dépôt client épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSING_FEE_SAVINGS',
+    journalCode: 'OD',
+    debitAccount: '4112',    // Dépôts clients - Comptes épargne
+    creditAccount: '708600', // Frais de clôture de compte (Produit)
+    descriptionTemplate: 'Frais clôture compte épargne - {clientName}',
+    priority: 10,
+  },
+  // Frais de clôture - Compte courant
+  {
+    code: 'CLOSING_FEE_CURRENT',
+    name: 'Frais clôture compte courant',
+    description: 'Frais de clôture prélevé sur dépôt client courant',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSING_FEE_CURRENT',
+    journalCode: 'OD',
+    debitAccount: '4111',    // Dépôts clients - Comptes courants
+    creditAccount: '708600', // Frais de clôture de compte
+    descriptionTemplate: 'Frais clôture compte courant - {clientName}',
+    priority: 10,
+  },
+  // Frais de clôture - Compte bloqué
+  {
+    code: 'CLOSING_FEE_BLOCKED',
+    name: 'Frais clôture compte bloqué',
+    description: 'Frais de clôture prélevé sur dépôt client bloqué',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSING_FEE_BLOCKED',
+    journalCode: 'OD',
+    debitAccount: '4113',    // Dépôts clients - Comptes bloqués
+    creditAccount: '708600', // Frais de clôture de compte
+    descriptionTemplate: 'Frais clôture compte bloqué - {clientName}',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // RESTITUTION CLÔTURE (payout client)
+  // ============================================================================
+
+  // Restitution clôture espèces - Épargne
+  {
+    code: 'CLOSURE_PAYOUT_CASH_SAVINGS',
+    name: 'Restitution clôture épargne (espèces)',
+    description: 'Restitution solde clôture compte épargne en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_SAVINGS',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4112',    // Dépôts clients - Comptes épargne
+    creditAccount: '521',    // Caisse centrale
+    descriptionTemplate: 'Restitution clôture épargne - {clientName}',
+    priority: 10,
+  },
+  // Restitution clôture espèces - Courant
+  {
+    code: 'CLOSURE_PAYOUT_CASH_CURRENT',
+    name: 'Restitution clôture courant (espèces)',
+    description: 'Restitution solde clôture compte courant en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_CURRENT',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4111',    // Dépôts clients - Comptes courants
+    creditAccount: '521',    // Caisse centrale
+    descriptionTemplate: 'Restitution clôture courant - {clientName}',
+    priority: 10,
+  },
+  // Restitution clôture espèces - Bloqué
+  {
+    code: 'CLOSURE_PAYOUT_CASH_BLOCKED',
+    name: 'Restitution clôture bloqué (espèces)',
+    description: 'Restitution solde clôture compte bloqué en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_BLOCKED',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4113',    // Dépôts clients - Comptes bloqués
+    creditAccount: '521',    // Caisse centrale
+    descriptionTemplate: 'Restitution clôture bloqué - {clientName}',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // RESTITUTION CLÔTURE Mobile Money (MTN + Airtel × 3 types de compte)
+  // ============================================================================
+
+  // Restitution clôture MoMo MTN - Épargne
+  {
+    code: 'CLOSURE_PAYOUT_MTN_SAVINGS',
+    name: 'Restitution clôture épargne (MTN)',
+    description: 'Restitution solde clôture compte épargne via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_SAVINGS',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMO',
+    debitAccount: '4112',    // Dépôts clients - Comptes épargne
+    creditAccount: '5781',   // Mobile Money MTN
+    descriptionTemplate: 'Restitution clôture épargne MTN - {clientName}',
+    priority: 10,
+  },
+  // Restitution clôture MoMo Airtel - Épargne
+  {
+    code: 'CLOSURE_PAYOUT_AIRTEL_SAVINGS',
+    name: 'Restitution clôture épargne (Airtel)',
+    description: 'Restitution solde clôture compte épargne via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_SAVINGS',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MMO',
+    debitAccount: '4112',    // Dépôts clients - Comptes épargne
+    creditAccount: '5782',   // Mobile Money Airtel
+    descriptionTemplate: 'Restitution clôture épargne Airtel - {clientName}',
+    priority: 10,
+  },
+  // Restitution clôture MoMo MTN - Courant
+  {
+    code: 'CLOSURE_PAYOUT_MTN_CURRENT',
+    name: 'Restitution clôture courant (MTN)',
+    description: 'Restitution solde clôture compte courant via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_CURRENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMO',
+    debitAccount: '4111',    // Dépôts clients - Comptes courants
+    creditAccount: '5781',   // Mobile Money MTN
+    descriptionTemplate: 'Restitution clôture courant MTN - {clientName}',
+    priority: 10,
+  },
+  // Restitution clôture MoMo Airtel - Courant
+  {
+    code: 'CLOSURE_PAYOUT_AIRTEL_CURRENT',
+    name: 'Restitution clôture courant (Airtel)',
+    description: 'Restitution solde clôture compte courant via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_CURRENT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MMO',
+    debitAccount: '4111',    // Dépôts clients - Comptes courants
+    creditAccount: '5782',   // Mobile Money Airtel
+    descriptionTemplate: 'Restitution clôture courant Airtel - {clientName}',
+    priority: 10,
+  },
+  // Restitution clôture MoMo MTN - Bloqué
+  {
+    code: 'CLOSURE_PAYOUT_MTN_BLOCKED',
+    name: 'Restitution clôture bloqué (MTN)',
+    description: 'Restitution solde clôture compte bloqué via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_BLOCKED',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMO',
+    debitAccount: '4113',    // Dépôts clients - Comptes bloqués
+    creditAccount: '5781',   // Mobile Money MTN
+    descriptionTemplate: 'Restitution clôture bloqué MTN - {clientName}',
+    priority: 10,
+  },
+  // Restitution clôture MoMo Airtel - Bloqué
+  {
+    code: 'CLOSURE_PAYOUT_AIRTEL_BLOCKED',
+    name: 'Restitution clôture bloqué (Airtel)',
+    description: 'Restitution solde clôture compte bloqué via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CLOSURE_PAYOUT_BLOCKED',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MMO',
+    debitAccount: '4113',    // Dépôts clients - Comptes bloqués
+    creditAccount: '5782',   // Mobile Money Airtel
+    descriptionTemplate: 'Restitution clôture bloqué Airtel - {clientName}',
+    priority: 10,
+  },
+
   // Virement interne entre comptes client
   {
     code: 'INTERNAL_TRANSFER',
@@ -2195,15 +2447,35 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
 
   // Produits Compte - upsert by code
   const produits = [
-    { code: 'COURANT_STD', nom: 'Compte Courant Standard', typeCompte: 'CURRENT' as const, tauxInteret: '0', frais: { ouverture: 5000, tenue: 1500, cloture: 2500 }, actif: true },
-    { code: 'EPARGNE_STD', nom: 'Compte Épargne Classique', typeCompte: 'SAVINGS' as const, tauxInteret: '3.5', frais: { ouverture: 2500, cloture: 1500 }, actif: true },
-    { code: 'TONTINE_STD', nom: 'Compte Tontine', typeCompte: 'BLOCKED' as const, tauxInteret: '0', frais: { cloture: 1000 }, actif: true },
+    {
+      code: 'COURANT_STD', nom: 'Compte Courant Standard', typeCompte: 'CURRENT' as const, tauxInteret: '0',
+      frais: { ouverture: 5000, tenue: 1500, cloture: 2500 },
+      regles: { soldeMinimum: 0, depotInitialObligatoire: true, depotInitialMinimum: 5000, validationOuvertureRequise: false, autoriserSoldeNegatifCloture: false },
+      actif: true,
+    },
+    {
+      code: 'EPARGNE_STD', nom: 'Compte Épargne Classique', typeCompte: 'SAVINGS' as const, tauxInteret: '3.5',
+      frais: { ouverture: 2500, cloture: 1500 },
+      regles: { depotInitialObligatoire: true, depotInitialMinimum: 2500, validationOuvertureRequise: true, autoriserSoldeNegatifCloture: false },
+      actif: true,
+    },
+    {
+      code: 'TONTINE_STD', nom: 'Compte Tontine', typeCompte: 'BLOCKED' as const, tauxInteret: '0',
+      frais: { cloture: 1000 },
+      regles: { validationOuvertureRequise: true, autoriserSoldeNegatifCloture: true },
+      actif: true,
+    },
   ];
 
   for (const p of produits) {
     const [existing] = await db.select().from(produitsCompte).where(eq(produitsCompte.code, p.code));
     if (!existing) {
       await db.insert(produitsCompte).values(p);
+    } else {
+      // Always sync frais & regles from seed (admin can override via UI later)
+      await db.update(produitsCompte)
+        .set({ frais: p.frais, regles: p.regles })
+        .where(eq(produitsCompte.code, p.code));
     }
   }
   results.push({ table: 'produitsCompte', action: 'created', count: produits.length });

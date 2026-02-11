@@ -118,22 +118,37 @@ export async function initiateClosureCompte(
       );
     }
 
-    // 5. Auto-fetch closing fee from product config (admin-controlled)
+    // 5. Auto-fetch closing fee + policy from product config (admin-controlled)
     let fee = 0;
+    let autoriserSoldeNegatif = false;
     if (compte.produitId) {
       const [produit] = await tx
-        .select({ frais: produitsCompte.frais })
+        .select({ frais: produitsCompte.frais, regles: produitsCompte.regles })
         .from(produitsCompte)
         .where(eq(produitsCompte.id, compte.produitId));
       if (produit?.frais && typeof produit.frais === "object") {
         const fraisObj = produit.frais as Record<string, unknown>;
         fee = Number(fraisObj.cloture) || 0;
       }
+      if (produit?.regles && typeof produit.regles === "object") {
+        const reglesObj = produit.regles as Record<string, unknown>;
+        autoriserSoldeNegatif = Boolean(reglesObj.autoriserSoldeNegatifCloture);
+      }
     }
 
     // Calculate payout
     const balance = parseFloat(compte.soldeCourant || "0");
+
+    // If balance < fee: check policy
+    if (balance < fee && !autoriserSoldeNegatif) {
+      throw new CompteError(
+        `Solde insuffisant pour couvrir les frais de clôture (solde: ${balance}, frais: ${fee})`,
+        "INSUFFICIENT_BALANCE_FOR_CLOSURE"
+      );
+    }
+
     const payoutAmount = Math.max(0, balance - fee);
+    const creanceAmount = fee > balance ? fee - balance : 0;
 
     // 6. Validate phone for MOBILE_MONEY
     if (data.payoutMethod === "MOBILE_MONEY" && !data.payoutPhoneNumber) {
@@ -162,7 +177,7 @@ export async function initiateClosureCompte(
       );
     }
 
-    // 8. Create closure request
+    // 8. Create closure request (with creance metadata if applicable)
     const [request] = await tx
       .insert(accountClosureRequests)
       .values({
@@ -174,7 +189,10 @@ export async function initiateClosureCompte(
         payoutPhoneNumber: data.payoutPhoneNumber || null,
         closingFeeAmount: fee.toString(),
         balanceAtInitiation: compte.soldeCourant,
-      })
+        ...(creanceAmount > 0 ? {
+          metadata: { creanceClient: creanceAmount, note: "Frais partiellement couverts — créance client" },
+        } : {}),
+      } as any)
       .returning();
 
     // 9. Transition account to CLOSURE_PENDING
@@ -268,36 +286,125 @@ export async function approveClosureCompte(
 // EXECUTE PAYOUT (internal)
 // ============================================================================
 
+/**
+ * Map account type to the closing fee eventType for GL rule routing
+ */
+function getClosingFeeEventType(typeCompte: string): string {
+  switch (typeCompte) {
+    case "SAVINGS": return "CLOSING_FEE_SAVINGS";
+    case "CURRENT": return "CLOSING_FEE_CURRENT";
+    case "BLOCKED": return "CLOSING_FEE_BLOCKED";
+    default: return "CLOSING_FEE_SAVINGS"; // fallback
+  }
+}
+
+/**
+ * Map account type to the closure payout eventType for GL rule routing
+ */
+function getClosurePayoutEventType(typeCompte: string): string {
+  switch (typeCompte) {
+    case "SAVINGS": return "CLOSURE_PAYOUT_SAVINGS";
+    case "CURRENT": return "CLOSURE_PAYOUT_CURRENT";
+    case "BLOCKED": return "CLOSURE_PAYOUT_BLOCKED";
+    default: return "CLOSURE_PAYOUT_SAVINGS"; // fallback
+  }
+}
+
 async function executeClosurePayout(
   tx: PgTransaction<any, any, any>,
   request: AccountClosureRequest
 ): Promise<void> {
   const payoutAmount = parseFloat(request.payoutAmount);
+  const closingFee = parseFloat(request.closingFeeAmount);
 
-  // No payout needed if balance is already 0
+  const [compte] = await tx
+    .select()
+    .from(comptes)
+    .where(eq(comptes.id, request.compteId));
+
+  if (!compte) {
+    throw new CompteError("Compte introuvable", "COMPTE_NOT_FOUND");
+  }
+
+  const balance = parseFloat(compte.soldeCourant || "0");
+  const feeToDebit = Math.min(closingFee, balance); // Only debit what's available
+
+  // --- Step 1: Post closing fee GL entry (if fee > 0 and balance > 0) ---
+  if (feeToDebit > 0) {
+    const feeReference = generateReference("FRAIS");
+    const feeEventType = getClosingFeeEventType(compte.typeCompte);
+
+    const [feeMouvement] = await tx
+      .insert(mouvementsFinanciers)
+      .values({
+        reference: feeReference,
+        sourceModule: "COMPTE",
+        sens: "DEBIT",
+        montant: feeToDebit.toString(),
+        dateOperation: new Date(),
+        clientId: compte.clientId,
+        compteId: request.compteId,
+        agenceId: compte.agenceId,
+        methodePaiement: "CASH",
+        typePaiement: "CLOSING_FEE",
+        createdBy: request.approvedBy,
+        statut: "POSTED",
+        requiresGlPosting: true,
+        glPostingStatus: "PENDING",
+        metadata: {
+          description: "Frais de clôture de compte",
+          closureRequestId: request.id,
+          feeConfigured: closingFee,
+          feeDebited: feeToDebit,
+        },
+      } as any)
+      .returning();
+
+    // Debit fee from account balance
+    await updateCompteSolde(tx, request.compteId, -feeToDebit);
+
+    // Fee transaction record
+    await tx.insert(transactionsCompte).values({
+      compteId: request.compteId,
+      mouvementId: feeMouvement.id,
+      typePaiement: "CLOSING_FEE",
+      sens: "DEBIT",
+      montant: feeToDebit.toString(),
+      soldeApres: (balance - feeToDebit).toString(),
+      statut: "POSTED",
+      methodePaiement: "CASH",
+      observations: `Frais de clôture — ${feeToDebit.toLocaleString()} F`,
+      createdBy: request.approvedBy,
+    } as any);
+
+    // GL posting for fee with eventType override for account-type routing
+    try {
+      await postGlForMouvement(tx, feeMouvement, compte.agenceId!, request.approvedBy || undefined, {
+        eventType: feeEventType,
+      });
+      await tx.update(mouvementsFinanciers)
+        .set({ glPostingStatus: "POSTED" })
+        .where(eq(mouvementsFinanciers.id, feeMouvement.id));
+    } catch (err) {
+      logger.error({ mouvementId: feeMouvement.id, err }, "GL posting failed for closing fee");
+    }
+  }
+
+  // --- Step 2: No payout needed if balance after fee is 0 ---
   if (payoutAmount <= 0) {
     await finalizeClosureCompte(tx, request);
     return;
   }
 
+  // --- Step 3: Execute payout ---
   if (request.payoutMethod === "CASH") {
-    // Cash payout: create withdrawal mouvement immediately
-    const [compte] = await tx
-      .select()
-      .from(comptes)
-      .where(eq(comptes.id, request.compteId));
+    const payoutReference = generateReference("EPARGNE");
+    const payoutEventType = getClosurePayoutEventType(compte.typeCompte);
 
-    if (!compte) {
-      throw new CompteError("Compte introuvable", "COMPTE_NOT_FOUND");
-    }
-
-    const reference = generateReference("EPARGNE");
-
-    // Create mouvement financier
-    const [mouvement] = await tx
+    const [payoutMouvement] = await tx
       .insert(mouvementsFinanciers)
       .values({
-        reference,
+        reference: payoutReference,
         sourceModule: "EPARGNE",
         sens: "DEBIT",
         montant: payoutAmount.toString(),
@@ -311,7 +418,7 @@ async function executeClosurePayout(
         statut: "POSTED",
         requiresGlPosting: true,
         glPostingStatus: "PENDING",
-        metadata: { description: "Retrait clôture de compte", closureRequestId: request.id },
+        metadata: { description: "Restitution solde clôture", closureRequestId: request.id },
       } as any)
       .returning();
 
@@ -321,7 +428,7 @@ async function executeClosurePayout(
     // Transaction record
     await tx.insert(transactionsCompte).values({
       compteId: request.compteId,
-      mouvementId: mouvement.id,
+      mouvementId: payoutMouvement.id,
       typePaiement: "CLOSURE_PAYOUT",
       sens: "DEBIT",
       montant: payoutAmount.toString(),
@@ -336,25 +443,28 @@ async function executeClosurePayout(
     await tx
       .update(accountClosureRequests)
       .set({
-        payoutMouvementId: mouvement.id,
+        payoutMouvementId: payoutMouvement.id,
         payoutStatus: "SUCCESS",
         updatedAt: new Date(),
       })
       .where(eq(accountClosureRequests.id, request.id));
 
-    // Post GL (async-safe, errors logged but don't block)
+    // GL posting for payout with eventType override for account-type routing
     try {
-      await postGlForMouvement(mouvement.id, tx);
+      await postGlForMouvement(tx, payoutMouvement, compte.agenceId!, request.approvedBy || undefined, {
+        eventType: payoutEventType,
+      });
+      await tx.update(mouvementsFinanciers)
+        .set({ glPostingStatus: "POSTED" })
+        .where(eq(mouvementsFinanciers.id, payoutMouvement.id));
     } catch (err) {
-      // GL posting failure is logged, auto-fix cron will retry
-      console.error("[CLOSURE] GL posting failed, will retry:", err);
+      logger.error({ mouvementId: payoutMouvement.id, err }, "GL posting failed for closure payout");
     }
 
     // Finalize (CLOSED)
     await finalizeClosureCompte(tx, request);
   } else if (request.payoutMethod === "MOBILE_MONEY") {
     // Mobile Money: mark as PROCESSING, actual payout handled asynchronously
-    // The payment intent will be created by the route handler after the TX commits
     await tx
       .update(accountClosureRequests)
       .set({
@@ -645,6 +755,7 @@ export async function createClosureMoMoPayout(
     .select({
       clientId: comptes.clientId,
       agenceId: comptes.agenceId,
+      typeCompte: comptes.typeCompte,
     })
     .from(comptes)
     .where(eq(comptes.id, request.compteId));
@@ -654,6 +765,7 @@ export async function createClosureMoMoPayout(
   }
 
   const provider = detectMomoProvider(request.payoutPhoneNumber);
+  const payoutEventType = getClosurePayoutEventType(compte.typeCompte);
 
   try {
     const intent = await paymentService.initiatePayout(
@@ -669,6 +781,7 @@ export async function createClosureMoMoPayout(
         metadata: {
           useCase: "CLOSURE_PAYOUT",
           closureRequestId: request.id,
+          glEventType: payoutEventType,
         },
       },
       request.approvedBy || undefined
@@ -727,6 +840,23 @@ export async function handleClosurePayoutSuccess(
     if (request.status === "COMPLETED") {
       logger.info({ closureRequestId }, "Closure already completed, skipping");
       return;
+    }
+
+    // Create transaction record for the MoMo payout (balance already deducted by payment service)
+    const payoutAmount = parseFloat(request.payoutAmount);
+    if (payoutAmount > 0) {
+      await tx.insert(transactionsCompte).values({
+        compteId: request.compteId,
+        mouvementId: mouvementId,
+        typePaiement: "CLOSURE_PAYOUT",
+        sens: "DEBIT",
+        montant: payoutAmount.toString(),
+        soldeApres: "0",
+        statut: "POSTED",
+        methodePaiement: "MOBILE_MONEY",
+        observations: "Restitution clôture via Mobile Money",
+        createdBy: request.approvedBy,
+      } as any);
     }
 
     // Link mouvement + mark payout success

@@ -5,10 +5,11 @@ import { useValidationsBadge } from '@/hooks/useValidationsBadge';
 import { useAppNavigation } from '@/hooks/useAppNavigation';
 import AgentCollecteValidations from './AgentCollecteValidations';
 import ClosureApprovals from './ClosureApprovals';
+import OpeningApprovals from './OpeningApprovals';
 
-type TabKey = 'collectes' | 'clotures';
+type TabKey = 'collectes' | 'clotures' | 'ouvertures';
 
-const VALID_TABS: TabKey[] = ['collectes', 'clotures'];
+const VALID_TABS: TabKey[] = ['collectes', 'clotures', 'ouvertures'];
 
 interface ValidationsCenterProps {
   activeView?: string;
@@ -16,7 +17,7 @@ interface ValidationsCenterProps {
 
 export default function ValidationsCenter({ activeView }: ValidationsCenterProps) {
   const { navigateToModule } = useAppNavigation();
-  const { operationsCount, closuresCount, totalCount, refresh } = useValidationsBadge();
+  const { operationsCount, closuresCount, openingsCount, totalCount, refresh } = useValidationsBadge();
 
   // Derive active tab from URL, default to 'collectes'
   const activeTab: TabKey = VALID_TABS.includes(activeView as TabKey)
@@ -45,9 +46,17 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
     },
     {
       key: 'clotures' as const,
-      label: 'Clôtures Comptes',
+      label: 'Clotures Comptes',
       badge: closuresCount,
       badgeClassName: activeTab === 'clotures'
+        ? 'bg-slate-900 text-white ring-1 ring-white/30'
+        : 'bg-red-500 text-white',
+    },
+    {
+      key: 'ouvertures' as const,
+      label: 'Creations Comptes',
+      badge: openingsCount,
+      badgeClassName: activeTab === 'ouvertures'
         ? 'bg-slate-900 text-white ring-1 ring-white/30'
         : 'bg-red-500 text-white',
     },
@@ -68,14 +77,14 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
             )}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Gérez toutes les validations en attente depuis un seul endroit.
+            Gerez toutes les validations en attente depuis un seul endroit.
           </p>
         </div>
 
         <button
           onClick={refresh}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors self-end sm:self-auto"
-          title="Rafraîchir"
+          title="Rafraichir"
         >
           <RefreshCw size={18} />
         </button>
@@ -97,6 +106,7 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'collectes' && <AgentCollecteValidations />}
         {activeTab === 'clotures' && <ClosureApprovals />}
+        {activeTab === 'ouvertures' && <OpeningApprovals />}
       </div>
     </div>
   );

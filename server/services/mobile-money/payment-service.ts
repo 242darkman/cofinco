@@ -529,7 +529,11 @@ class PaymentService {
     providerTxnId?: string
   ): Promise<void> {
     const metadata = intent.metadata as Record<string, unknown> | null;
-    const typePaiement = intent.creditId ? "CREDIT_DISBURSEMENT" : "WITHDRAWAL_SAVINGS";
+    const typePaiement = intent.creditId
+      ? "CREDIT_DISBURSEMENT"
+      : metadata?.useCase === "CLOSURE_PAYOUT"
+        ? "CLOSURE_PAYOUT"
+        : "WITHDRAWAL_SAVINGS";
 
     const { mouvement } = await executeWithLedger(
       "MOBILE_MONEY",

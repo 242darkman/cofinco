@@ -430,10 +430,17 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     }));
   };
 
+  const MAX_PHOTOS = 5;
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
+      let currentCount = formData.photos_activite.length;
       for (const file of Array.from(files)) {
+        if (currentCount >= MAX_PHOTOS) {
+          toast.warning(`Maximum ${MAX_PHOTOS} photos autorisées`);
+          break;
+        }
         try {
           const url = await uploadActivityPhoto(file);
           if (url) {
@@ -441,6 +448,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               ...prev,
               photos_activite: [...prev.photos_activite, url]
             }));
+            currentCount++;
           }
         } catch (error) {
           console.error("Error uploading photo", error);
@@ -451,6 +459,11 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   };
 
   const handleLiveCameraCapture = async (imageDataUrl: string) => {
+    if (formData.photos_activite.length >= MAX_PHOTOS) {
+      toast.warning(`Maximum ${MAX_PHOTOS} photos autorisées`);
+      setIsCameraOpen(false);
+      return;
+    }
     try {
       const res = await fetch(imageDataUrl);
       const blob = await res.blob();
@@ -1001,29 +1014,49 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             <label className="block text-xs font-semibold text-slate-300 mb-2">
               <Camera size={14} className="inline mr-1" />
               Photos de l'activité
+              {!readOnly && (
+                <span className="ml-1.5 text-slate-500 font-normal">
+                  ({formData.photos_activite.length}/{MAX_PHOTOS})
+                </span>
+              )}
+              {readOnly && formData.photos_activite.length > 0 && (
+                <span className="ml-1.5 text-slate-500 font-normal">
+                  ({formData.photos_activite.length})
+                </span>
+              )}
             </label>
 
             <div className="flex flex-wrap gap-2">
-              <label className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition">
-                <Upload size={18} className="text-slate-400 mb-1" />
-                <span className="text-[10px] text-slate-400">Upload</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                />
-              </label>
+              {!readOnly && formData.photos_activite.length < MAX_PHOTOS && (
+                <>
+                  <label className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition">
+                    <Upload size={18} className="text-slate-400 mb-1" />
+                    <span className="text-[10px] text-slate-400">Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
 
-              <button
-                type="button"
-                onClick={() => setIsCameraOpen(true)}
-                className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition"
-              >
-                <Camera size={18} className="text-slate-400 mb-1" />
-                <span className="text-[10px] text-slate-400">Camera</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCameraOpen(true)}
+                    className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition"
+                  >
+                    <Camera size={18} className="text-slate-400 mb-1" />
+                    <span className="text-[10px] text-slate-400">Camera</span>
+                  </button>
+                </>
+              )}
+
+              {!readOnly && formData.photos_activite.length >= MAX_PHOTOS && (
+                <div className="flex items-center justify-center w-20 h-20 bg-slate-700/30 border-2 border-dashed border-slate-700 rounded-lg">
+                  <span className="text-[10px] text-slate-500 text-center px-1">Max {MAX_PHOTOS} photos</span>
+                </div>
+              )}
 
               {formData.photos_activite.map((photo, index) => (
                 <div key={index} className="relative w-20 h-20">
@@ -1036,13 +1069,19 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect fill="%23374151" width="80" height="80"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239CA3AF" font-size="10">Erreur</text></svg>';
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(index)}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px]"
-                  >×</button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px]"
+                    >×</button>
+                  )}
                 </div>
               ))}
+
+              {readOnly && formData.photos_activite.length === 0 && (
+                <p className="text-xs text-slate-500 italic">Aucune photo d'activité</p>
+              )}
             </div>
           </div>
 

@@ -49,6 +49,10 @@ interface ProduitCompte {
     plafondDepot?: number;
     plafondRetrait?: number;
     dureeMinimumJours?: number;
+    depotInitialObligatoire?: boolean;
+    depotInitialMinimum?: number;
+    validationOuvertureRequise?: boolean;
+    autoriserSoldeNegatifCloture?: boolean;
   } | null;
   actif: boolean;
   createdAt: string;
@@ -92,6 +96,10 @@ export default function AdminProductRates() {
     fraisRetrait: '',
     soldeMinimum: '',
     plafondDepot: '',
+    depotInitialObligatoire: false,
+    depotInitialMinimum: '',
+    validationOuvertureRequise: false,
+    autoriserSoldeNegatifCloture: false,
   });
 
   // Fetch products
@@ -161,6 +169,10 @@ export default function AdminProductRates() {
       fraisRetrait: product.frais?.retrait?.toString() || '',
       soldeMinimum: product.regles?.soldeMinimum?.toString() || '',
       plafondDepot: product.regles?.plafondDepot?.toString() || '',
+      depotInitialObligatoire: product.regles?.depotInitialObligatoire ?? false,
+      depotInitialMinimum: product.regles?.depotInitialMinimum?.toString() || '',
+      validationOuvertureRequise: product.regles?.validationOuvertureRequise ?? false,
+      autoriserSoldeNegatifCloture: product.regles?.autoriserSoldeNegatifCloture ?? false,
     });
   }, []);
 
@@ -187,6 +199,10 @@ export default function AdminProductRates() {
             ...product.regles,
             soldeMinimum: editValues.soldeMinimum ? parseFloat(editValues.soldeMinimum) : undefined,
             plafondDepot: editValues.plafondDepot ? parseFloat(editValues.plafondDepot) : undefined,
+            depotInitialObligatoire: editValues.depotInitialObligatoire,
+            depotInitialMinimum: editValues.depotInitialMinimum ? parseFloat(editValues.depotInitialMinimum) : undefined,
+            validationOuvertureRequise: editValues.validationOuvertureRequise,
+            autoriserSoldeNegatifCloture: editValues.autoriserSoldeNegatifCloture,
           },
         };
         updateMutation.mutate({ id: product.id, data });
@@ -443,6 +459,47 @@ export default function AdminProductRates() {
                       )}
                     </div>
                   </div>
+
+                  {/* Policy toggles */}
+                  <div className="mt-2 pt-2 border-t border-slate-800/50 space-y-1.5">
+                    <p className="text-[9px] text-slate-500 uppercase tracking-wide">Politique</p>
+                    <PolicyToggle
+                      label="Dépôt initial obligatoire"
+                      checked={isEditing ? editValues.depotInitialObligatoire : (product.regles?.depotInitialObligatoire ?? false)}
+                      isEditing={isEditing}
+                      onChange={(v) => setEditValues({ ...editValues, depotInitialObligatoire: v })}
+                    />
+                    {(isEditing ? editValues.depotInitialObligatoire : product.regles?.depotInitialObligatoire) && (
+                      <div className="text-[10px] pl-5">
+                        <span className="text-slate-500">Dépôt min: </span>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editValues.depotInitialMinimum}
+                            onChange={(e) => setEditValues({ ...editValues, depotInitialMinimum: e.target.value })}
+                            className="w-16 px-1 py-0.5 bg-slate-700 border border-slate-600 rounded text-white text-[10px]"
+                            placeholder="0"
+                          />
+                        ) : (
+                          <span className="text-slate-300">
+                            {product.regles?.depotInitialMinimum?.toLocaleString() || '-'} F
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <PolicyToggle
+                      label="Validation ouverture requise"
+                      checked={isEditing ? editValues.validationOuvertureRequise : (product.regles?.validationOuvertureRequise ?? false)}
+                      isEditing={isEditing}
+                      onChange={(v) => setEditValues({ ...editValues, validationOuvertureRequise: v })}
+                    />
+                    <PolicyToggle
+                      label="Autoriser clôture solde < frais"
+                      checked={isEditing ? editValues.autoriserSoldeNegatifCloture : (product.regles?.autoriserSoldeNegatifCloture ?? false)}
+                      isEditing={isEditing}
+                      onChange={(v) => setEditValues({ ...editValues, autoriserSoldeNegatifCloture: v })}
+                    />
+                  </div>
                 </div>
 
                 {/* Actions Footer */}
@@ -497,6 +554,47 @@ export default function AdminProductRates() {
         variant={confirmState.variant}
         confirmText={confirmState.confirmText}
       />
+    </div>
+  );
+}
+
+// Policy Toggle Component
+function PolicyToggle({
+  label,
+  checked,
+  isEditing,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  isEditing: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {isEditing ? (
+        <button
+          type="button"
+          onClick={() => onChange(!checked)}
+          className={cn(
+            "relative w-7 h-4 rounded-full transition-colors shrink-0",
+            checked ? "bg-indigo-500" : "bg-slate-600"
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform",
+              checked ? "left-3.5" : "left-0.5"
+            )}
+          />
+        </button>
+      ) : (
+        <span className={cn(
+          "w-2 h-2 rounded-full shrink-0",
+          checked ? "bg-emerald-400" : "bg-slate-600"
+        )} />
+      )}
+      <span className="text-[10px] text-slate-400">{label}</span>
     </div>
   );
 }

@@ -25,6 +25,8 @@ import {
   users,
   userRoles,
   credits,
+  produitsCompte,
+  accountOpeningRequests,
   type Compte,
   type TransactionCompte,
 } from "@shared/schema";
@@ -76,6 +78,7 @@ export type MotifBlocage = MotifBlocageType;
 // SUSPENDED -> ACTIVE (levée) | CLOSURE_PENDING (clôture)
 // CLOSURE_PENDING -> ACTIVE (annulation) | CLOSED (finalisation)
 // PENDING_ACTIVATION -> ACTIVE (premier versement) | CLOSED (rejet)
+// PENDING_VALIDATION -> PENDING_ACTIVATION (chef approuve) | CANCELLED (chef rejette)
 
 export const VALID_TRANSITIONS: Record<StatutCompte, StatutCompte[]> = {
   [StatutCompteConst.ACTIVE]: [StatutCompteConst.SUSPENDED, StatutCompteConst.CLOSURE_PENDING],
@@ -83,6 +86,7 @@ export const VALID_TRANSITIONS: Record<StatutCompte, StatutCompte[]> = {
   [StatutCompteConst.CLOSURE_PENDING]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSED],
   [StatutCompteConst.CLOSED]: [], // Terminal state
   [StatutCompteConst.PENDING_ACTIVATION]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSED],
+  [StatutCompteConst.PENDING_VALIDATION]: [StatutCompteConst.PENDING_ACTIVATION, StatutCompteConst.CANCELLED], // Chef d'agence validation
   [StatutCompteConst.CANCELLED]: [], // Terminal state
 };
 
@@ -1572,19 +1576,63 @@ export async function createCompteWithInitialDeposit(
     agenceId: string;
     produitId?: string;
     montantInitial: number;
-    modePaiement: 'CASH' | 'TRANSFER';
+    modePaiement: 'CASH' | 'TRANSFER' | 'MOBILE_MONEY';
     compteSourceId?: string; // Required for Transfer
+    operateurMobile?: string; // MTN | AIRTEL
+    telephoneMobileMoney?: string;
+    referenceTransaction?: string;
     blocageActif?: boolean;
     blocageMotif?: MotifBlocage;
   },
   userId: string
-): Promise<{ compte: Compte; transaction?: TransactionCompte; facture?: Facture }> {
+): Promise<{ compte: Compte; transaction?: TransactionCompte; facture?: Facture; openingRequest?: any }> {
 
   return await db.transaction(async (tx) => {
+    // 0. Read product policy (fees & rules)
+    let openingFee = 0;
+    let depotInitialMinimum = 0;
+    let validationRequise = false;
+
+    if (data.produitId) {
+      const [produit] = await tx
+        .select({ frais: produitsCompte.frais, regles: produitsCompte.regles })
+        .from(produitsCompte)
+        .where(eq(produitsCompte.id, data.produitId));
+
+      if (produit?.frais && typeof produit.frais === "object") {
+        const fraisObj = produit.frais as Record<string, unknown>;
+        openingFee = Number(fraisObj.ouverture) || 0;
+      }
+      if (produit?.regles && typeof produit.regles === "object") {
+        const reglesObj = produit.regles as Record<string, unknown>;
+        depotInitialMinimum = Number(reglesObj.depotInitialMinimum) || 0;
+        // Validation only applies to SAVINGS and BLOCKED accounts
+        if (data.typeCompte === "SAVINGS" || data.typeCompte === "BLOCKED") {
+          validationRequise = Boolean(reglesObj.validationOuvertureRequise);
+        }
+      }
+    }
+
+    // Validate: total paid must cover fee + minimum deposit
+    const minimumRequired = openingFee + depotInitialMinimum;
+    if (data.montantInitial > 0 && data.montantInitial < minimumRequired) {
+      throw new CompteError(
+        `Montant insuffisant. Minimum requis: ${minimumRequired.toLocaleString()} F (frais: ${openingFee.toLocaleString()} F + dépôt min: ${depotInitialMinimum.toLocaleString()} F)`,
+        "INSUFFICIENT_OPENING_AMOUNT"
+      );
+    }
+
     // 1. Determine Status (using standardized EN values)
-    const statut = data.modePaiement === 'CASH' && data.montantInitial > 0
-      ? StatutCompteConst.PENDING_ACTIVATION
-      : StatutCompteConst.ACTIVE;
+    // CASH & MOBILE_MONEY: pending activation (caissier confirms receipt)
+    // TRANSFER: immediate activation (atomic debit/credit)
+    let statut: string;
+    if (validationRequise) {
+      statut = StatutCompteConst.PENDING_VALIDATION;
+    } else if ((data.modePaiement === 'CASH' || data.modePaiement === 'MOBILE_MONEY') && data.montantInitial > 0) {
+      statut = StatutCompteConst.PENDING_ACTIVATION;
+    } else {
+      statut = StatutCompteConst.ACTIVE;
+    }
     
     // 2. Generate Account Number
     const numeroCompte = await generateNumeroCompte(data.typeCompte);
@@ -1618,8 +1666,34 @@ export async function createCompteWithInitialDeposit(
       motif: "Création du compte",
       transferePar: userId,
     });
-    
-    // 5. Handle Transfer Payment (Immediate Activation)
+
+    // 4b. If validation required, create opening request and return early
+    if (validationRequise) {
+      const [openingRequest] = await tx.insert(accountOpeningRequests).values({
+        compteId: compte.id,
+        initiatedBy: userId,
+        openingFeeAmount: openingFee.toString(),
+        initialDepositAmount: data.montantInitial.toString(),
+        produitId: data.produitId || null,
+      }).returning();
+
+      // Outbox event for real-time updates (Validations Center)
+      await tx.insert(evenementsOutbox).values({
+        type: "MOUVEMENT_STATUT_CHANGE",
+        aggregateType: "compte",
+        aggregateId: compte.id,
+        payload: {
+          compteId: compte.id,
+          action: "OPENING_REQUESTED",
+          requestId: openingRequest.id,
+          initiatedBy: userId,
+        },
+      });
+
+      return { compte, openingRequest };
+    }
+
+    // 5. Handle Transfer Payment (Immediate Activation with fee ventilation)
     if (data.modePaiement === 'TRANSFER' && data.montantInitial > 0) {
       if (!data.compteSourceId) throw new Error('Compte source requis pour virement');
 
@@ -1635,80 +1709,132 @@ export async function createCompteWithInitialDeposit(
         throw new Error(`Solde insuffisant. Disponible: ${soldeSource}, Requis: ${data.montantInitial}`);
       }
 
-      // B. Create Financial Movement (Internal Transfer)
-      const reference = `VIR-OUVERTURE-${Date.now()}`;
-      const [mouvement] = await tx.insert(mouvementsFinanciers).values({
+      const depositAmount = data.montantInitial - openingFee;
+
+      // B. Debit source account by full amount
+      await tx.update(comptes)
+        .set({
+          soldeCourant: (soldeSource - data.montantInitial).toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(comptes.id, data.compteSourceId));
+
+      // C. Opening fee mouvement + GL (if fee > 0)
+      if (openingFee > 0) {
+        const feeRef = generateReference("FRAIS");
+        const [feeMouvement] = await tx.insert(mouvementsFinanciers).values({
+          reference: feeRef,
+          sourceModule: "COMPTE",
+          sens: "CREDIT",
+          montant: openingFee.toString(),
+          dateOperation: new Date(),
+          clientId: data.clientId,
+          compteId: compte.id,
+          agenceId: data.agenceId,
+          methodePaiement: "TRANSFER",
+          typePaiement: "OPENING_FEE",
+          createdBy: userId,
+          statut: "POSTED",
+          requiresGlPosting: true,
+          glPostingStatus: "PENDING",
+          metadata: { description: "Frais d'ouverture de compte (virement)", sourceCompte: compteSource.numeroCompte },
+        } as any).returning();
+
+        // Fee transaction on source account
+        await tx.insert(transactionsCompte).values({
+          compteId: data.compteSourceId,
+          mouvementId: feeMouvement.id,
+          typePaiement: "OPENING_FEE",
+          sens: "DEBIT",
+          montant: openingFee.toString(),
+          soldeApres: (soldeSource - openingFee).toString(),
+          methodePaiement: "TRANSFER",
+          observations: `Frais d'ouverture — ${openingFee.toLocaleString()} F (virement)`,
+          createdBy: userId,
+        } as any);
+
+        // GL: Dr 4111 (source deposit) / Cr 708500 (revenue)
+        try {
+          await postGlForMouvement(tx, feeMouvement, data.agenceId, userId);
+          await tx.update(mouvementsFinanciers)
+            .set({ glPostingStatus: "POSTED" })
+            .where(eq(mouvementsFinanciers.id, feeMouvement.id));
+        } catch (err) {
+          console.error("[OPENING] GL posting failed for transfer opening fee:", err);
+        }
+      }
+
+      // D. Deposit mouvement (deposit portion only)
+      const depositRef = generateReference("EPARGNE");
+      const [depositMouvement] = await tx.insert(mouvementsFinanciers).values({
+        reference: depositRef,
         dateOperation: new Date(),
-        montant: data.montantInitial.toString(),
+        montant: depositAmount.toString(),
         sens: 'CREDIT',
         statut: 'POSTED',
         methodePaiement: 'TRANSFER',
-        reference,
         sourceModule: 'COMPTE',
-        compteId: compte.id, // Linked to the new account
+        compteId: compte.id,
         clientId: data.clientId,
         agenceId: data.agenceId,
         typePaiement: "INITIAL_DEPOSIT",
         createdBy: userId,
-        metadata: { description: `Virement ouverture depuis ${compteSource.numeroCompte}` }
-      }).returning();
+        requiresGlPosting: true,
+        glPostingStatus: "PENDING",
+        metadata: { description: `Virement ouverture depuis ${compteSource.numeroCompte}` },
+      } as any).returning();
 
-      // B2. Post GL entry (blocking — rollback if GL fails)
-      if (data.agenceId) {
-        await postGlForMouvement(tx, mouvement, data.agenceId, userId, {
-          type: "INITIAL_DEPOSIT",
+      // GL for deposit
+      try {
+        await postGlForMouvement(tx, depositMouvement, data.agenceId, userId, {
           compteSourceNumero: compteSource.numeroCompte,
           compteDestNumero: compte.numeroCompte,
           description: `Virement ouverture depuis ${compteSource.numeroCompte}`,
         });
         await tx.update(mouvementsFinanciers)
           .set({ glPostingStatus: "POSTED" })
-          .where(eq(mouvementsFinanciers.id, mouvement.id));
+          .where(eq(mouvementsFinanciers.id, depositMouvement.id));
+      } catch (err) {
+        console.error("[OPENING] GL posting failed for transfer initial deposit:", err);
       }
 
-      // C. Transaction 1: DEBIT Source Account
+      // E. Transaction on source account (debit deposit portion)
       await tx.insert(transactionsCompte).values({
         compteId: data.compteSourceId,
-        mouvementId: mouvement.id,
+        mouvementId: depositMouvement.id,
         typePaiement: 'INTERNAL_TRANSFER',
-        sens: 'DEBIT', // Outgoing transfer
-        montant: data.montantInitial.toString(),
+        sens: 'DEBIT',
+        montant: depositAmount.toString(),
         soldeApres: (soldeSource - data.montantInitial).toString(),
         methodePaiement: 'TRANSFER',
         observations: `Virement vers nouveau compte ${compte.numeroCompte}`,
         createdBy: userId,
       } as any);
 
-      // Update Source Balance
-      await tx.update(comptes)
-        .set({
-          soldeCourant: (soldeSource - data.montantInitial).toString(),
-          updatedAt: new Date()
-        })
-        .where(eq(comptes.id, data.compteSourceId));
-
-      // D. Transaction 2: CREDIT New Account (Initial Deposit)
+      // F. Transaction on new account (credit deposit portion)
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId: compte.id,
-        mouvementId: mouvement.id,
+        mouvementId: depositMouvement.id,
         typePaiement: 'INITIAL_DEPOSIT',
-        sens: 'CREDIT', // Incoming deposit
-        montant: data.montantInitial.toString(),
-        soldeApres: data.montantInitial.toString(),
+        sens: 'CREDIT',
+        montant: depositAmount.toString(),
+        soldeApres: depositAmount.toString(),
         methodePaiement: 'TRANSFER',
-        observations: 'Dépôt initial - Ouverture de compte',
+        observations: openingFee > 0
+          ? `Dépôt initial (après frais ${openingFee.toLocaleString()} F)`
+          : 'Dépôt initial - Ouverture de compte',
         createdBy: userId,
-      }).returning();
+      } as any).returning();
 
-      // Update New Account Balance
+      // G. Update new account balance (deposit only, not fee)
       await tx.update(comptes)
         .set({
-          soldeCourant: data.montantInitial.toString(),
-          updatedAt: new Date()
+          soldeCourant: depositAmount.toString(),
+          updatedAt: new Date(),
         })
         .where(eq(comptes.id, compte.id));
 
-      // E. Generate Receipt (Facture)
+      // H. Generate Receipt
       const facture = await createFactureForDepotInitial({
         compteId: compte.id,
         numeroCompte: compte.numeroCompte,
@@ -1719,21 +1845,21 @@ export async function createCompteWithInitialDeposit(
         transactionId: transaction.id,
         agentId: userId,
       });
-      
-      // Re-fetch updated account
+
       const [updatedCompte] = await tx.select().from(comptes).where(eq(comptes.id, compte.id));
-      
+
       return { compte: updatedCompte!, transaction, facture };
     }
-    
-    // 6. Handle Cash (Pending Payment)
-    // No transaction created yet. Status is EN_ATTENTE_PAIEMENT.
+
+    // 6. Handle Cash / Mobile Money (Pending Payment — caissier will confirm receipt)
+    // No transaction created yet. Status is PENDING_ACTIVATION.
     return { compte };
   });
 }
 
 /**
  * Validates and processes the initial deposit for a pending account via Cashier.
+ * Handles fee ventilation: single cash payment split into OPENING_FEE + INITIAL_DEPOSIT.
  */
 export async function payerDepotInitialCompte(
   compteId: string,
@@ -1741,104 +1867,199 @@ export async function payerDepotInitialCompte(
     montant: number;
     sessionCaisseId: string;
     userId: string;
+    methodePaiement?: 'CASH' | 'MOBILE_MONEY';
+    operateurMobile?: string; // MTN | AIRTEL
   }
 ): Promise<{ compte: Compte; transaction: TransactionCompte; facture: Facture }> {
-  
-  return await executeWithLedger(
-    "COMPTE",
-    {
-      montant: data.montant.toString(),
-      sens: "CREDIT",
-      compteId,
-      sessionCaisseId: data.sessionCaisseId,
-      typePaiement: "INITIAL_DEPOSIT",
-      methodePaiement: "CASH",
-      metadata: { description: "Paiement dépôt initial - Activation compte" },
-      agenceId: undefined, // Will be inferred or can be passed if needed
-    },
-    async (tx, mouvement) => {
-      // 1. Verify Account
+
+  const result = await db.transaction(async (tx) => {
+    // 1. Verify Account
     const [compte] = await tx.select()
-        .from(comptes)
-        .where(eq(comptes.id, compteId));
+      .from(comptes)
+      .where(eq(comptes.id, compteId));
 
-      if (!compte) {
-        throw new Error("Compte introuvable");
+    if (!compte) {
+      throw new Error("Compte introuvable");
+    }
+
+    if (compte.statut !== StatutCompteConst.PENDING_ACTIVATION) {
+      throw new Error("Ce compte n'est pas en attente de paiement initial");
+    }
+
+    if (data.montant <= 0) {
+      throw new Error("Le montant du dépôt initial doit être supérieur à 0");
+    }
+
+    const paymentMethod = data.methodePaiement || "CASH";
+
+    // 2. Read product config for opening fee
+    let openingFee = 0;
+    if (compte.produitId) {
+      const [produit] = await tx
+        .select({ frais: produitsCompte.frais })
+        .from(produitsCompte)
+        .where(eq(produitsCompte.id, compte.produitId));
+      if (produit?.frais && typeof produit.frais === "object") {
+        const fraisObj = produit.frais as Record<string, unknown>;
+        openingFee = Number(fraisObj.ouverture) || 0;
       }
+    }
 
-      if (compte.statut !== StatutCompteConst.PENDING_ACTIVATION) {
-          throw new Error("Ce compte n'est pas en attente de paiement initial");
-      }
+    const depositAmount = data.montant - openingFee;
+    if (depositAmount < 0) {
+      throw new Error(`Montant insuffisant pour couvrir les frais d'ouverture (${openingFee.toLocaleString()} F)`);
+    }
 
-      // 2. Validate payment amount (flexible: client can deposit more or less than initially promised)
-      if (data.montant <= 0) {
-        throw new Error("Le montant du dépôt initial doit être supérieur à 0");
-      }
+    // 3. Create OPENING_FEE mouvement + GL posting (if fee > 0)
+    if (openingFee > 0) {
+      const feeReference = generateReference("FRAIS");
 
-      // 3. Create Transaction for account history
-      const [transaction] = await tx.insert(transactionsCompte).values({
-        compteId,
-        mouvementId: mouvement.id,
-        typePaiement: 'INITIAL_DEPOSIT',
-        sens: 'CREDIT', // Incoming deposit
-        montant: data.montant.toString(),
-        soldeApres: data.montant.toString(),
-        methodePaiement: 'CASH',
-        observations: 'Dépôt initial - Activation de compte',
+      const [feeMouvement] = await tx.insert(mouvementsFinanciers).values({
+        reference: feeReference,
+        sourceModule: "COMPTE",
+        sens: "CREDIT",
+        montant: openingFee.toString(),
+        dateOperation: new Date(),
+        clientId: compte.clientId,
+        compteId: compte.id,
+        agenceId: compte.agenceId,
+        sessionCaisseId: data.sessionCaisseId,
+        methodePaiement: paymentMethod,
+        typePaiement: "OPENING_FEE",
         createdBy: data.userId,
+        statut: "POSTED",
+        requiresGlPosting: true,
+        glPostingStatus: "PENDING",
+        metadata: {
+          description: "Frais d'ouverture de compte",
+          ...(data.operateurMobile ? { provider: data.operateurMobile } : {}),
+        },
       } as any).returning();
 
-      // 3. Activate Account & Update Balance with standardized EN status
-      const [updatedCompte] = await tx.update(comptes)
-        .set({
-          statut: StatutCompteConst.ACTIVE,
-          soldeCourant: data.montant.toString(),
-          updatedAt: new Date()
-        })
-        .where(eq(comptes.id, compteId))
-        .returning();
+      // Fee transaction record (not on account balance — goes to revenue)
+      await tx.insert(transactionsCompte).values({
+        compteId: compte.id,
+        mouvementId: feeMouvement.id,
+        typePaiement: "OPENING_FEE",
+        sens: "DEBIT",
+        montant: openingFee.toString(),
+        soldeApres: "0",
+        statut: "POSTED",
+        methodePaiement: paymentMethod,
+        observations: `Frais d'ouverture — ${openingFee.toLocaleString()} F`,
+        createdBy: data.userId,
+      } as any);
 
-      // 4. Update Session Balance
-      const nouveauSoldeSession = await updateSessionSolde(
-        tx,
-        data.sessionCaisseId,
-        data.montant
+      // GL posting for fee (rule matched by paymentMethod + provider)
+      try {
+        await postGlForMouvement(tx, feeMouvement, compte.agenceId!, data.userId,
+          data.operateurMobile ? { provider: data.operateurMobile } : undefined
+        );
+        await tx.update(mouvementsFinanciers)
+          .set({ glPostingStatus: "POSTED" })
+          .where(eq(mouvementsFinanciers.id, feeMouvement.id));
+      } catch (err) {
+        console.error("[OPENING] GL posting failed for opening fee:", err);
+      }
+    }
+
+    // 4. Create INITIAL_DEPOSIT mouvement for the deposit portion
+    const depositRef = generateReference("EPARGNE");
+    const [depositMouvement] = await tx.insert(mouvementsFinanciers).values({
+      reference: depositRef,
+      sourceModule: "COMPTE",
+      sens: "CREDIT",
+      montant: depositAmount.toString(),
+      dateOperation: new Date(),
+      clientId: compte.clientId,
+      compteId: compte.id,
+      agenceId: compte.agenceId,
+      sessionCaisseId: data.sessionCaisseId,
+      methodePaiement: paymentMethod,
+      typePaiement: "INITIAL_DEPOSIT",
+      createdBy: data.userId,
+      statut: "POSTED",
+      requiresGlPosting: true,
+      glPostingStatus: "PENDING",
+      metadata: {
+        description: "Dépôt initial - Activation compte",
+        ...(data.operateurMobile ? { provider: data.operateurMobile } : {}),
+      },
+    } as any).returning();
+
+    // Deposit transaction record
+    const [transaction] = await tx.insert(transactionsCompte).values({
+      compteId: compte.id,
+      mouvementId: depositMouvement.id,
+      typePaiement: "INITIAL_DEPOSIT",
+      sens: "CREDIT",
+      montant: depositAmount.toString(),
+      soldeApres: depositAmount.toString(),
+      methodePaiement: paymentMethod,
+      observations: "Dépôt initial - Activation de compte",
+      createdBy: data.userId,
+    } as any).returning();
+
+    // GL posting for deposit
+    try {
+      await postGlForMouvement(tx, depositMouvement, compte.agenceId!, data.userId,
+        data.operateurMobile ? { provider: data.operateurMobile } : undefined
       );
+      await tx.update(mouvementsFinanciers)
+        .set({ glPostingStatus: "POSTED" })
+        .where(eq(mouvementsFinanciers.id, depositMouvement.id));
+    } catch (err) {
+      console.error("[OPENING] GL posting failed for initial deposit:", err);
+    }
 
-      // 5. Create Operation Caisse
-      const [operation] = await tx.insert(operationsCaisse).values({
-        sessionId: data.sessionCaisseId,
-        mouvementId: mouvement.id,
-        typeOperation: "INITIAL_DEPOSIT",
-        montant: data.montant.toString(),
-        methodePaiement: "CASH",
-        reference: `DEP-INIT-${compte.numeroCompte}`,
-        description: `Dépôt initial - Activation compte ${compte.numeroCompte}`,
-        clientId: compte.clientId,
-        createdBy: data.userId
-      }).returning();
+    // 5. Activate Account & Update Balance (deposit portion only)
+    const [updatedCompte] = await tx.update(comptes)
+      .set({
+        statut: StatutCompteConst.ACTIVE,
+        soldeCourant: depositAmount.toString(),
+        updatedAt: new Date()
+      })
+      .where(eq(comptes.id, compteId))
+      .returning();
 
-      return {
-        result: { compte: updatedCompte, transaction, operation },
-        additionalEventData: { nouveauSoldeSession },
-      };
-    },
-    data.userId
-  ).then(async ({ result }) => {
-    // 6. Generate Receipt
-    const facture = await createFactureForDepotInitial({
-      compteId: result.compte.id,
-      numeroCompte: result.compte.numeroCompte,
-      clientId: result.compte.clientId,
+    // 6. Update Session Balance (full amount received — fee + deposit)
+    const nouveauSoldeSession = await updateSessionSolde(
+      tx,
+      data.sessionCaisseId,
+      data.montant
+    );
+
+    // 7. Create Operation Caisse (full amount)
+    await tx.insert(operationsCaisse).values({
+      sessionId: data.sessionCaisseId,
+      mouvementId: depositMouvement.id,
+      typeOperation: "INITIAL_DEPOSIT",
       montant: data.montant.toString(),
-      typeCompte: result.compte.typeCompte,
-      modePaiement: 'CASH',
-      transactionId: result.transaction.id,
-      agentId: data.userId,
+      methodePaiement: paymentMethod,
+      reference: `DEP-INIT-${compte.numeroCompte}`,
+      description: openingFee > 0
+        ? `Ouverture compte ${compte.numeroCompte} (frais: ${openingFee.toLocaleString()} F + dépôt: ${depositAmount.toLocaleString()} F)`
+        : `Dépôt initial - Activation compte ${compte.numeroCompte}`,
+      clientId: compte.clientId,
+      createdBy: data.userId
     });
 
-    return { ...result, facture };
+    return { compte: updatedCompte, transaction };
   });
+
+  // 8. Generate Receipt
+  const facture = await createFactureForDepotInitial({
+    compteId: result.compte.id,
+    numeroCompte: result.compte.numeroCompte,
+    clientId: result.compte.clientId,
+    montant: data.montant.toString(),
+    typeCompte: result.compte.typeCompte,
+    modePaiement: data.methodePaiement || 'CASH',
+    transactionId: result.transaction.id,
+    agentId: data.userId,
+  });
+
+  return { ...result, facture };
 }
 
 /**

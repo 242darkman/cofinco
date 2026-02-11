@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum, suspensionReasonEnum, closureRequestStatusEnum, closurePayoutStatusEnum, closurePayoutMethodEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum, suspensionReasonEnum, closureRequestStatusEnum, closurePayoutStatusEnum, closurePayoutMethodEnum, openingRequestStatusEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -690,6 +690,51 @@ export const insertAccountClosureRequestSchema = createInsertSchema(accountClosu
 });
 export type InsertAccountClosureRequest = z.infer<typeof insertAccountClosureRequestSchema>;
 export type AccountClosureRequest = typeof accountClosureRequests.$inferSelect;
+
+// ============================================================================
+// DEMANDES D'OUVERTURE (Maker-Checker workflow — validation chef d'agence)
+// ============================================================================
+
+export const accountOpeningRequests = pgTable(
+  "account_opening_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    compteId: uuid("compte_id").notNull().references(() => comptes.id, { onDelete: "restrict" }),
+
+    // Maker-Checker
+    initiatedBy: uuid("initiated_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    initiatedAt: timestamp("initiated_at").notNull().defaultNow(),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+
+    // Statut
+    status: openingRequestStatusEnum("status").notNull().default("PENDING"),
+
+    // Snapshot frais & dépôt au moment de la demande
+    openingFeeAmount: numeric("opening_fee_amount").notNull().default("0"),
+    initialDepositAmount: numeric("initial_deposit_amount").notNull(),
+    produitId: uuid("produit_id").references(() => produitsCompte.id, { onDelete: "set null" }),
+
+    // Rejet
+    rejectedBy: uuid("rejected_by").references(() => users.id, { onDelete: "set null" }),
+    rejectedAt: timestamp("rejected_at"),
+    rejectReason: text("reject_reason"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxCompteId: index("idx_opening_requests_compte_id").on(t.compteId),
+    idxStatus: index("idx_opening_requests_status").on(t.status),
+    idxInitiatedBy: index("idx_opening_requests_initiated_by").on(t.initiatedBy),
+  }),
+);
+
+export const insertAccountOpeningRequestSchema = createInsertSchema(accountOpeningRequests).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertAccountOpeningRequest = z.infer<typeof insertAccountOpeningRequestSchema>;
+export type AccountOpeningRequest = typeof accountOpeningRequests.$inferSelect;
 
 
 export const produitsCompte = pgTable(

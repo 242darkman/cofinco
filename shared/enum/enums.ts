@@ -194,7 +194,10 @@ export const typeOperationCaisseEnum = pgEnum("type_operation_caisse", [
   "LOAN_DISBURSEMENT",
   "WITHDRAWAL_SAVINGS",
   // Account activation
-  "INITIAL_DEPOSIT"
+  "INITIAL_DEPOSIT",
+  // Frais ouverture / clôture
+  "OPENING_FEE",
+  "CLOSING_FEE"
 ]);
 
 export const statutTransfertCaisseEnum = pgEnum("statut_transfert_caisse_enum", [
@@ -339,6 +342,17 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "CREDIT_WRITEOFF",
   // Clôture de compte
   "CLOSURE_PAYOUT",
+  // Frais ouverture / clôture (GL split)
+  "OPENING_FEE",
+  "CLOSING_FEE",
+  // Frais clôture par type de compte (pour routing GL)
+  "CLOSING_FEE_SAVINGS",
+  "CLOSING_FEE_CURRENT",
+  "CLOSING_FEE_BLOCKED",
+  // Restitution clôture par type de compte (pour routing GL)
+  "CLOSURE_PAYOUT_SAVINGS",
+  "CLOSURE_PAYOUT_CURRENT",
+  "CLOSURE_PAYOUT_BLOCKED",
 ]);
 
 // ============================================
@@ -362,6 +376,7 @@ export const statutCompteEnum = pgEnum("statut_compte_enum", [
   "SUSPENDED",
   "CLOSED",
   "PENDING_ACTIVATION",
+  "PENDING_VALIDATION",
   "CANCELLED",
   "CLOSURE_PENDING",
 ]);
@@ -382,6 +397,13 @@ export const closureRequestStatusEnum = pgEnum("closure_request_status_enum", [
   "APPROVED",
   "CANCELLED",
   "COMPLETED",
+]);
+
+// Statuts demande d'ouverture (maker-checker chef d'agence)
+export const openingRequestStatusEnum = pgEnum("opening_request_status_enum", [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
 ]);
 
 // Statuts du payout de clôture

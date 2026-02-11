@@ -158,6 +158,7 @@ export const ANCIENNETE_ACTIVITE_OPTIONS = Object.values(AncienneteActivite).map
 export const StatutCompte = {
   ACTIVE: "ACTIVE",
   PENDING_ACTIVATION: "PENDING_ACTIVATION",
+  PENDING_VALIDATION: "PENDING_VALIDATION",
   SUSPENDED: "SUSPENDED",
   CLOSED: "CLOSED",
   CANCELLED: "CANCELLED",
@@ -208,6 +209,24 @@ export const CLOSURE_REQUEST_STATUS_LABELS: Record<ClosureRequestStatusType, str
   [ClosureRequestStatus.APPROVED]: "Approuvée",
   [ClosureRequestStatus.CANCELLED]: "Annulée",
   [ClosureRequestStatus.COMPLETED]: "Terminée",
+};
+
+// ============================================
+// STATUTS DEMANDE OUVERTURE (Maker-Checker)
+// ============================================
+
+export const OpeningRequestStatus = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type OpeningRequestStatusType = (typeof OpeningRequestStatus)[keyof typeof OpeningRequestStatus];
+
+export const OPENING_REQUEST_STATUS_LABELS: Record<OpeningRequestStatusType, string> = {
+  [OpeningRequestStatus.PENDING]: "En attente de validation",
+  [OpeningRequestStatus.APPROVED]: "Approuvée",
+  [OpeningRequestStatus.REJECTED]: "Rejetée",
 };
 
 // ============================================

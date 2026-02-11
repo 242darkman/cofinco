@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, Play, UserCheck } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
@@ -114,6 +114,20 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const enquetes = useEnquetes();
   const stats = useCreditStats();
   const { counts: badgeCounts } = useCreditCounts();
+
+  // Real-time: refetch enquête data when the detail modal is open and a credit event arrives
+  const refreshOpenEnquete = useCallback(async () => {
+    if (showEnqueteForm && selectedDemande?.id) {
+      const fresh = await fetchEnqueteByDemandeId(selectedDemande.id);
+      if (fresh) setEnqueteData(fresh);
+    }
+  }, [showEnqueteForm, selectedDemande?.id]);
+
+  useEffect(() => {
+    const handler = () => { refreshOpenEnquete(); };
+    window.addEventListener('credit-update', handler);
+    return () => window.removeEventListener('credit-update', handler);
+  }, [refreshOpenEnquete]);
 
   // Dynamic Tabs Configuration
   const tabs = getTabConfig().map(tab => {

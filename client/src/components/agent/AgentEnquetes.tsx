@@ -165,7 +165,10 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
         payload.type === 'enquete_assigned' ||
         payload.type === 'enquete_updated' ||
         payload.type === 'investigation_assigned' ||
+        payload.type === 'investigation_reassigned' ||
+        payload.type === 'investigation_started' ||
         payload.type === 'investigation_submitted' ||
+        payload.type === 'investigation_validated' ||
         payload.type === 'demande_updated'
       ) {
         fetchInvestigations();

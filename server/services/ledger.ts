@@ -590,10 +590,14 @@ async function buildGlMetadata(
     }
   }
 
-  if (mouvement.methodePaiement === "MOBILE_MONEY" && mouvement.metadata) {
+  if (mouvement.metadata) {
     const mouvMeta = mouvement.metadata as Record<string, any>;
-    if (mouvMeta.provider) {
+    if (mouvement.methodePaiement === "MOBILE_MONEY" && mouvMeta.provider) {
       metadata.provider = mouvMeta.provider;
+    }
+    // Support eventType override from mouvement metadata (e.g. closure payout routing by account type)
+    if (mouvMeta.glEventType) {
+      metadata.eventType = mouvMeta.glEventType;
     }
   }
 

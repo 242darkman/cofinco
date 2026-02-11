@@ -36,6 +36,13 @@ import {
   getClosureFeeForCompte,
   createClosureMoMoPayout,
 } from "../services/compte-closure";
+import {
+  approveOpeningRequest,
+  rejectOpeningRequest,
+  getPendingOpeningRequests,
+  getOpeningRequest,
+  getOpeningFeeForCompte,
+} from "../services/account-opening-validation";
 import { createVirementProgramme, executeCompteTransfer } from "../services/compte-transfers";
 import { reverseOperation, canReverseOperation, ReversalError } from "../services/caisse/transaction-reversal-service";
 import { duplicateDetection } from "../middleware/duplicate-detection";
@@ -56,8 +63,11 @@ const createCompteSchema = z.object({
   agenceId: z.string().uuid(),
   produitId: z.string().uuid().optional(),
   soldeInitial: z.number().min(0).optional().default(0),
-  modePaiement: z.enum([MethodePaiement.CASH, MethodePaiement.TRANSFER]).default(MethodePaiement.CASH),
+  modePaiement: z.enum([MethodePaiement.CASH, MethodePaiement.TRANSFER, MethodePaiement.MOBILE_MONEY]).default(MethodePaiement.CASH),
   compteSourceId: z.string().uuid().optional(), // requis si Virement
+  operateurMobile: z.enum(["MTN", "AIRTEL"]).optional(),
+  telephoneMobileMoney: z.string().optional(),
+  referenceTransaction: z.string().optional(),
   blocageActif: z.boolean().optional(),
   blocageMotif: z.enum([
     MotifBlocage.LOAN_GUARANTEE,
@@ -264,6 +274,9 @@ export function registerComptesRoutes(app: Express) {
             montantInitial: parsed.soldeInitial,
             modePaiement: parsed.modePaiement,
             compteSourceId: parsed.compteSourceId,
+            operateurMobile: parsed.operateurMobile,
+            telephoneMobileMoney: parsed.telephoneMobileMoney,
+            referenceTransaction: parsed.referenceTransaction,
             blocageActif: parsed.blocageActif,
             blocageMotif: parsed.blocageMotif,
           },
@@ -3329,6 +3342,128 @@ export function registerComptesRoutes(app: Express) {
         res.json(request);
       } catch (error: any) {
         logger.error({ err: error }, 'Error getting closure request');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  // ============================================================================
+  // OPENING VALIDATION (Maker-Checker — Chef d'Agence)
+  // ============================================================================
+
+  /**
+   * GET /api/opening-requests/pending - Liste des demandes d'ouverture en attente
+   */
+  app.get(
+    "/api/opening-requests/pending",
+    requireAuth,
+    attachAbility,
+    async (req, res) => {
+      try {
+        const user = req.session.user;
+        const isAdmin = req.ability?.can(Actions.MANAGE, Subjects.ALL);
+        const effectiveAgenceId = isAdmin ? undefined : (req.query.agenceId as string | undefined) || user?.agenceId;
+        const requests = await getPendingOpeningRequests(effectiveAgenceId);
+        res.json(requests);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error listing pending opening requests');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/opening-requests/:id/approve - Approuver une ouverture (chef d'agence)
+   */
+  app.post(
+    "/api/opening-requests/:id/approve",
+    requireAuth,
+    attachAbility,
+    async (req, res) => {
+      try {
+        const userId = req.session.user?.id;
+        if (!userId) return res.status(401).json({ message: "Non authentifié" });
+
+        const result = await approveOpeningRequest(req.params.id, userId);
+
+        logAudit(req, "opening_request.approve", {
+          requestId: req.params.id,
+          compteId: result.compteId,
+          severity: "important",
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error approving opening request');
+        const status = error.code === "SAME_USER_APPROVAL" ? 403 : 400;
+        res.status(status).json({ message: error.message || "Erreur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/opening-requests/:id/reject - Rejeter une ouverture
+   */
+  app.post(
+    "/api/opening-requests/:id/reject",
+    requireAuth,
+    attachAbility,
+    async (req, res) => {
+      try {
+        const userId = req.session.user?.id;
+        if (!userId) return res.status(401).json({ message: "Non authentifié" });
+
+        const { reason } = req.body;
+        if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+          return res.status(400).json({ message: "Motif de rejet requis" });
+        }
+
+        const result = await rejectOpeningRequest(req.params.id, reason.trim(), userId);
+
+        logAudit(req, "opening_request.reject", {
+          requestId: req.params.id,
+          compteId: result.compteId,
+          reason: reason.trim(),
+          severity: "important",
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error rejecting opening request');
+        res.status(400).json({ message: error.message || "Erreur" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/:id/opening-fee - Frais d'ouverture + dépôt min depuis le produit
+   */
+  app.get(
+    "/api/comptes/:id/opening-fee",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const result = await getOpeningFeeForCompte(req.params.id);
+        res.json(result);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error getting opening fee');
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/:id/opening-request - Demande d'ouverture active d'un compte
+   */
+  app.get(
+    "/api/comptes/:id/opening-request",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const request = await getOpeningRequest(req.params.id);
+        res.json(request);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Error getting opening request');
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
