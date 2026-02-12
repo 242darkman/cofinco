@@ -1,20 +1,10 @@
-import React from 'react';
-import { LucideIcon, Lock } from 'lucide-react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { LucideIcon, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * TabGroup Component - COFIN Platform
  * Mobile-first tab navigation with pills or underline style
- *
- * @example
- * <TabGroup
- *   activeTab={activeTab}
- *   onTabChange={setActiveTab}
- *   tabs={[
- *     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
- *     { key: 'demandes', label: 'Demandes', icon: FileText, badge: 5 },
- *   ]}
- *   variant="pills"
- * />
+ * Hidden scrollbar with gradient fade + arrow indicators
  */
 
 export type TabVariant = 'pills' | 'underline' | 'buttons';
@@ -50,6 +40,55 @@ const TabGroup: React.FC<TabGroupProps> = ({
   fullWidth = false,
   scrollable = true,
 }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkOverflow = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    if (!scrollable) return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    checkOverflow();
+    el.addEventListener('scroll', checkOverflow, { passive: true });
+
+    const ro = new ResizeObserver(checkOverflow);
+    ro.observe(el);
+
+    return () => {
+      el.removeEventListener('scroll', checkOverflow);
+      ro.disconnect();
+    };
+  }, [scrollable, checkOverflow, tabs.length]);
+
+  // Scroll active tab into view on mount / tab change
+  useEffect(() => {
+    if (!scrollable || !scrollRef.current) return;
+    const el = scrollRef.current;
+    const activeBtn = el.querySelector('[aria-current="page"]') as HTMLElement | null;
+    if (activeBtn) {
+      const elRect = el.getBoundingClientRect();
+      const btnRect = activeBtn.getBoundingClientRect();
+      if (btnRect.left < elRect.left || btnRect.right > elRect.right) {
+        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [activeTab, scrollable]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.6;
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
+
   // Size classes (mobile-first)
   const sizeClasses = {
     xs: {
@@ -80,12 +119,12 @@ const TabGroup: React.FC<TabGroupProps> = ({
 
   const sizeConfig = sizeClasses[size];
 
-  // Variant styles
+  // Variant styles — scrollbar-hide hides native scrollbar, touch scroll still works
+  const scrollClass = scrollable ? 'flex flex-nowrap overflow-x-auto scrollbar-hide' : 'flex flex-wrap';
+
   const variantStyles = {
     pills: {
-      container: scrollable
-        ? 'flex flex-nowrap gap-2 overflow-x-auto scrollbar-thin'
-        : 'flex flex-wrap gap-2',
+      container: `${scrollClass} gap-1`,
       tab: `
         ${sizeConfig.padding} ${sizeConfig.text}
         font-medium rounded-lg transition-all duration-200
@@ -97,9 +136,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
       disabled: 'opacity-50 cursor-not-allowed',
     },
     underline: {
-      container: scrollable
-        ? 'flex flex-nowrap border-b border-slate-700 overflow-x-auto scrollbar-thin'
-        : 'flex flex-wrap border-b border-slate-700',
+      container: `${scrollClass} border-b border-slate-700`,
       tab: `
         ${sizeConfig.padding} ${sizeConfig.text}
         font-medium transition-all duration-200
@@ -112,9 +149,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
       disabled: 'opacity-50 cursor-not-allowed',
     },
     buttons: {
-      container: scrollable
-        ? 'flex flex-nowrap gap-2 overflow-x-auto scrollbar-thin'
-        : 'flex flex-wrap gap-2',
+      container: `${scrollClass} gap-1`,
       tab: `
         ${sizeConfig.padding} ${sizeConfig.text}
         font-semibold rounded-lg transition-all duration-200
@@ -129,48 +164,81 @@ const TabGroup: React.FC<TabGroupProps> = ({
   };
 
   const styles = variantStyles[variant];
+  const showArrows = scrollable && (canScrollLeft || canScrollRight);
 
   return (
-    <div className={`${styles.container} ${className}`}>
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.key;
-        const Icon = tab.icon;
-
-        // Custom default style if no class provided - high contrast for active state
-        const defaultBadgeStyle = isActive
-             ? 'bg-white text-emerald-600 font-bold'
-             : 'bg-slate-600 text-slate-300';
-
-        return (
+    <div className={`relative ${className}`}>
+      {/* Left fade + arrow */}
+      {showArrows && canScrollLeft && (
+        <>
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#020617] to-transparent z-10 pointer-events-none" />
           <button
-            key={tab.key}
             type="button"
-            onClick={() => !tab.disabled && onTabChange(tab.key)}
-            disabled={tab.disabled}
-            className={`
-              ${styles.tab}
-              ${isActive ? styles.active : styles.inactive}
-              ${tab.disabled ? styles.disabled : ''}
-            `}
-            aria-current={isActive ? 'page' : undefined}
-            aria-disabled={tab.disabled}
+            onClick={() => scroll('left')}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-slate-800/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-all shadow-lg"
+            aria-label="Défiler à gauche"
           >
-            {Icon && <Icon size={sizeConfig.icon} />}
-            <span>{tab.label}</span>
-            {tab.disabled && <Lock size={12} className="ml-1 opacity-50" />}
-            {tab.badge !== undefined && valOrZero(tab.badge) && (
-              <span
-                className={`
-                  px-1.5 py-0.5 rounded-full text-[10px] font-bold ml-1
-                  ${tab.badgeClassName || defaultBadgeStyle}
-                `}
-              >
-                {tab.badge}
-              </span>
-            )}
+            <ChevronLeft size={14} />
           </button>
-        );
-      })}
+        </>
+      )}
+
+      {/* Scrollable tabs container */}
+      <div ref={scrollRef} className={styles.container}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key;
+          const Icon = tab.icon;
+
+          const defaultBadgeStyle = isActive
+               ? 'bg-white text-emerald-600 font-bold'
+               : 'bg-slate-600 text-slate-300';
+
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => !tab.disabled && onTabChange(tab.key)}
+              disabled={tab.disabled}
+              className={`
+                ${styles.tab}
+                ${isActive ? styles.active : styles.inactive}
+                ${tab.disabled ? styles.disabled : ''}
+              `}
+              aria-current={isActive ? 'page' : undefined}
+              aria-disabled={tab.disabled}
+            >
+              {Icon && <Icon size={sizeConfig.icon} />}
+              <span>{tab.label}</span>
+              {tab.disabled && <Lock size={12} className="ml-1 opacity-50" />}
+              {tab.badge !== undefined && valOrZero(tab.badge) && (
+                <span
+                  className={`
+                    px-1.5 py-0.5 rounded-full text-[10px] font-bold ml-1
+                    ${tab.badgeClassName || defaultBadgeStyle}
+                  `}
+                >
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Right fade + arrow */}
+      {showArrows && canScrollRight && (
+        <>
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#020617] to-transparent z-10 pointer-events-none" />
+          <button
+            type="button"
+            onClick={() => scroll('right')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-slate-800/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-all shadow-lg"
+            aria-label="Défiler à droite"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </>
+      )}
     </div>
   );
 };
