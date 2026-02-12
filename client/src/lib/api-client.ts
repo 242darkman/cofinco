@@ -716,7 +716,7 @@ export const clientApi = {
  * Utilisé pour le workflow de réapprovisionnement intelligent
  */
 export interface InsufficientFundsErrorData {
-  code: "INSUFFICIENT_FUNDS";
+  code: "INSUFFICIENT_FUNDS" | "COFFRE_SOLDE_MINIMUM" | "COFFRE_INSUFFICIENT_FUNDS";
   message: string;
   required: number;
   current: number;
@@ -724,6 +724,7 @@ export interface InsufficientFundsErrorData {
   coffreId: string;
   coffreCode: string;
   coffreName?: string;
+  soldeMinimum?: number;
 }
 
 /**
@@ -742,34 +743,72 @@ export class ApiError extends Error {
   }
 }
 
+/** Codes d'erreur qui déclenchent le workflow de réapprovisionnement */
+const FUNDS_ERROR_CODES = ["INSUFFICIENT_FUNDS", "COFFRE_SOLDE_MINIMUM", "COFFRE_INSUFFICIENT_FUNDS"];
+
 /**
  * Type guard pour vérifier si une erreur est une ApiError avec données de solde insuffisant
  */
 export function isInsufficientFundsError(error: unknown): error is ApiError & { data: { error: InsufficientFundsErrorData } } {
-  if (error instanceof ApiError && error.data?.error?.code === "INSUFFICIENT_FUNDS") {
+  if (error instanceof ApiError && FUNDS_ERROR_CODES.includes(error.data?.error?.code)) {
     return true;
   }
-  // Fallback pour les objets simples
   if (typeof error === "object" && error !== null) {
     const e = error as any;
-    return e?.error?.code === "INSUFFICIENT_FUNDS" || e?.data?.error?.code === "INSUFFICIENT_FUNDS";
+    return FUNDS_ERROR_CODES.includes(e?.error?.code) || FUNDS_ERROR_CODES.includes(e?.data?.error?.code);
   }
   return false;
+}
+
+/**
+ * Normalise une erreur coffre guard en format InsufficientFundsErrorData
+ */
+function normalizeCoffreError(raw: any): InsufficientFundsErrorData | null {
+  if (raw?.code === "COFFRE_SOLDE_MINIMUM") {
+    return {
+      code: "COFFRE_SOLDE_MINIMUM",
+      message: `Le solde minimum du coffre (${Number(raw.soldeMinimum).toLocaleString('fr-FR')} FCFA) ne serait pas respecté après cette opération`,
+      coffreId: raw.coffreId,
+      coffreCode: raw.coffreCode || "—",
+      current: raw.soldeBefore ?? (raw.soldeApresOperation + (raw.amount ?? 0)),
+      required: (raw.amount ?? 0) + raw.soldeMinimum,
+      deficit: raw.deficit ?? (raw.soldeMinimum - raw.soldeApresOperation),
+      soldeMinimum: raw.soldeMinimum,
+    };
+  }
+  if (raw?.code === "COFFRE_INSUFFICIENT_FUNDS") {
+    return {
+      code: "COFFRE_INSUFFICIENT_FUNDS",
+      message: `Solde du coffre insuffisant`,
+      coffreId: raw.coffreId,
+      coffreCode: raw.coffreCode || "—",
+      current: raw.available,
+      required: raw.requested,
+      deficit: raw.deficit,
+    };
+  }
+  return null;
 }
 
 /**
  * Extraire les données d'erreur de solde insuffisant d'une erreur
  */
 export function extractInsufficientFundsData(error: unknown): InsufficientFundsErrorData | null {
-  if (error instanceof ApiError && error.data?.error?.code === "INSUFFICIENT_FUNDS") {
-    return error.data.error;
-  }
-  if (typeof error === "object" && error !== null) {
+  // Extract raw error object
+  let raw: any = null;
+  if (error instanceof ApiError) {
+    raw = error.data?.error;
+  } else if (typeof error === "object" && error !== null) {
     const e = error as any;
-    if (e?.error?.code === "INSUFFICIENT_FUNDS") return e.error;
-    if (e?.data?.error?.code === "INSUFFICIENT_FUNDS") return e.data.error;
+    raw = e?.error || e?.data?.error;
   }
-  return null;
+  if (!raw?.code) return null;
+
+  // Direct INSUFFICIENT_FUNDS format
+  if (raw.code === "INSUFFICIENT_FUNDS") return raw;
+
+  // Coffre guard errors → normalize to InsufficientFundsErrorData
+  return normalizeCoffreError(raw);
 }
 
 // Credit API

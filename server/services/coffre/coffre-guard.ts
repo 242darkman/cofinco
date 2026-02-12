@@ -146,7 +146,7 @@ export async function assertCoffreCanDebit(
   const soldeMinimum = parseFloat(coffre.soldeMinimum || "0");
   const soldeApres = solde - amount;
   if (soldeApres < soldeMinimum) {
-    throw new CoffreSoldeMinimumError(coffreId, soldeApres, soldeMinimum);
+    throw new CoffreSoldeMinimumError(coffreId, soldeApres, soldeMinimum, solde, amount);
   }
 
   // 5. Vérifier plafond journalier sortant (si configuré)

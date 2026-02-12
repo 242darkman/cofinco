@@ -309,10 +309,11 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 <Vault className="text-amber-400 flex-shrink-0 mt-0.5" size={20} />
                 <div className="space-y-1">
                   <p className="text-amber-200 font-medium">
-                    Le coffre {insufficientFundsError.coffreCode} ne contient que{' '}
-                    <span className="text-amber-400 font-bold">
-                      {formatMoney(insufficientFundsError.current)}
-                    </span>
+                    {insufficientFundsError.code === 'COFFRE_SOLDE_MINIMUM' ? (
+                      <>Le coffre ne contient que <span className="text-amber-400 font-bold">{formatMoney(insufficientFundsError.current)}</span> — le solde minimum requis est de <span className="text-amber-400 font-bold">{formatMoney(insufficientFundsError.soldeMinimum || 0)}</span></>
+                    ) : (
+                      <>Le coffre {insufficientFundsError.coffreCode} ne contient que <span className="text-amber-400 font-bold">{formatMoney(insufficientFundsError.current)}</span></>
+                    )}
                   </p>
                   <p className="text-slate-300 text-sm">
                     Il manque{' '}
@@ -321,8 +322,11 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                     </span>{' '}
                     pour valider ce décaissement de{' '}
                     <span className="text-white font-semibold">
-                      {formatMoney(insufficientFundsError.required)}
+                      {formatMoney(montantDecaissement)}
                     </span>
+                    {insufficientFundsError.code === 'COFFRE_SOLDE_MINIMUM' && (
+                      <span className="text-slate-400"> (le solde après l'opération doit rester au-dessus du minimum)</span>
+                    )}
                   </p>
                 </div>
               </div>

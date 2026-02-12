@@ -46,12 +46,25 @@ export class CoffreSoldeMinimumError extends Error {
     coffreId: string;
     soldeApresOperation: number;
     soldeMinimum: number;
+    soldeBefore: number;
+    amount: number;
+    deficit: number;
   };
 
-  constructor(coffreId: string, soldeApresOperation: number, soldeMinimum: number) {
+  constructor(coffreId: string, soldeApresOperation: number, soldeMinimum: number, soldeBefore?: number, amount?: number) {
     super(`L'opération ferait passer le solde (${soldeApresOperation}) en dessous du minimum requis (${soldeMinimum})`);
     this.name = "CoffreSoldeMinimumError";
-    this.data = { code: "COFFRE_SOLDE_MINIMUM", coffreId, soldeApresOperation, soldeMinimum };
+    const actualSoldeBefore = soldeBefore ?? (soldeApresOperation + (amount ?? 0));
+    const actualAmount = amount ?? (actualSoldeBefore - soldeApresOperation);
+    this.data = {
+      code: "COFFRE_SOLDE_MINIMUM",
+      coffreId,
+      soldeApresOperation,
+      soldeMinimum,
+      soldeBefore: actualSoldeBefore,
+      amount: actualAmount,
+      deficit: soldeMinimum + actualAmount - actualSoldeBefore,
+    };
   }
 }
 

@@ -183,10 +183,23 @@ export function AgenceProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Safe fallback when context is not yet available (lazy loading, HMR)
+const AGENCE_FALLBACK: AgenceContextType = {
+  agences: [],
+  selectedAgence: null,
+  loading: true,
+  error: null,
+  selectAgence: () => {},
+  refreshAgences: async () => {},
+  hasMultipleAgences: false,
+  isAdmin: false,
+};
+
 export function useAgence() {
   const context = useContext(AgenceContext);
   if (context === undefined) {
-    throw new Error('useAgence must be used within an AgenceProvider');
+    // Graceful degradation — provider will mount shortly
+    return AGENCE_FALLBACK;
   }
   return context;
 }

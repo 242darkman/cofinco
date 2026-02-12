@@ -374,6 +374,11 @@ export function registerFinanceRoutes(app: Express) {
 
             } catch (err: any) {
               logger.error({ err }, 'Erreur Ledger lors du décaissement');
+              // Re-throw business errors (coffre guards, insufficient funds) as-is
+              // so the outer catch can handle them with structured responses
+              if (isCoffreCaisseError(err) || err instanceof DecaissementInsufficientFundsError) {
+                throw err;
+              }
               throw new Error(`Erreur lors du décaissement effectif: ${err.message}`);
             }
           }
