@@ -1834,6 +1834,90 @@ export function registerFinanceRoutes(app: Express) {
       }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  // ENVOYER EN CAISSE — Frais d'engagement (CASH seulement)
+  // ═══════════════════════════════════════════════════════════════════
+  app.post("/api/demandes-credit/:id/envoyer-caisse", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION), async (req, res) => {
+    try {
+      const { id: demandeId } = req.params;
+      const user = req.session.user;
+      if (!user) return res.status(401).json({ message: "Non authentifié" });
+
+      // 1. Validate demande
+      const demande = await storage.getDemandeCredit(demandeId);
+      if (!demande) return res.status(404).json({ message: "Demande introuvable" });
+
+      if ((demande as any).fraisPaye) {
+        return res.status(400).json({ message: "Les frais sont déjà payés pour cette demande" });
+      }
+
+      // 2. Get client info
+      const client = await storage.getClient(demande.clientId);
+      if (!client) return res.status(404).json({ message: "Client introuvable" });
+
+      const agenceId = client.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "Agence du client introuvable" });
+
+      // 3. Compute fee amount
+      const montant = parseFloat(
+        (demande as any).montantFraisEngagement
+        || (demande as any).fraisDossier
+        || ((demande.montantDemande || 0) * 0.10).toString()
+      );
+
+      if (!montant || montant <= 0) {
+        return res.status(400).json({ message: "Montant des frais invalide" });
+      }
+
+      // 4. Check no duplicate pending request
+      const { caissePaymentRequests } = await import("@shared/schema");
+      const { eq: eqOp, and: andOp } = await import("drizzle-orm");
+      const [existing] = await db
+        .select({ id: caissePaymentRequests.id })
+        .from(caissePaymentRequests)
+        .where(andOp(
+          eqOp(caissePaymentRequests.sourceType, "demande_credit"),
+          eqOp(caissePaymentRequests.sourceId, demandeId),
+          eqOp(caissePaymentRequests.statut, "PENDING"),
+        ));
+
+      if (existing) {
+        return res.status(409).json({ message: "Une demande de paiement est déjà en attente pour cette demande de crédit" });
+      }
+
+      // 5. Create caisse payment request
+      const { createCaisseRequest } = await import("../services/caisse-queue-service");
+
+      const request = await createCaisseRequest({
+        category: "ENGAGEMENT_FEE",
+        direction: "IN",
+        agenceId,
+        sourceType: "demande_credit",
+        sourceId: demandeId,
+        clientId: client.id,
+        montant,
+        label: `Frais d'engagement - ${demande.numeroDemande}`,
+        description: `Frais de dossier crédit ${montant.toLocaleString('fr-FR')} FCFA pour ${client.nom} ${client.prenom || ''}`.trim(),
+        metadata: {
+          numeroDemande: demande.numeroDemande,
+          montantCredit: demande.montantDemande,
+          clientNom: client.nom,
+          clientPrenom: client.prenom,
+        },
+        createdBy: user.id,
+      });
+
+      res.json({
+        success: true,
+        requestId: request.id,
+        message: "Demande envoyée en caisse",
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur envoi en caisse frais engagement");
+      res.status(400).json({ message: error.message || "Erreur lors de l'envoi en caisse" });
+    }
+  });
+
   // Initiate refund for already rejected demande
   app.post("/api/demandes-credit/:id/initiate-refund", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REMBOURSEMENT), async (req, res) => {
     try {
@@ -3903,6 +3987,32 @@ export function registerFinanceRoutes(app: Express) {
              updatedAt: new Date()
           }).where(eq(creditRefundRequests.id, refundId));
 
+          // CASH: Create caisse payment request (queue)
+          if (method === 'CASH' && refundData.agenceId) {
+            const { createCaisseRequest } = await import("../services/caisse-queue-service");
+            const clientInfo = refundData.clientId ? await storage.getClient(refundData.clientId) : null;
+
+            await createCaisseRequest({
+              category: "FEE_REFUND",
+              direction: "OUT",
+              agenceId: refundData.agenceId,
+              sourceType: "credit_refund",
+              sourceId: refundId,
+              clientId: refundData.clientId || undefined,
+              montant: Number(refundData.montantRemboursable),
+              label: `Restitution frais dossier`,
+              description: clientInfo
+                ? `Remboursement ${Number(refundData.montantRemboursable).toLocaleString('fr-FR')} FCFA à ${clientInfo.nom} ${clientInfo.prenom || ''}`.trim()
+                : undefined,
+              metadata: {
+                demandeId: refundData.demandeId,
+                clientNom: clientInfo?.nom,
+                clientPrenom: clientInfo?.prenom,
+              },
+              createdBy: user.id,
+            });
+          }
+
           // Log Audit
           await logAudit(req, "REFUND_PENDING_CAISSE", "credit_refund", refundId, { method }, "success", "medium");
 
@@ -3925,7 +4035,7 @@ export function registerFinanceRoutes(app: Express) {
           return res.json({
              ...(updated as Record<string, unknown>),
              message: method === 'CASH'
-                ? 'Remboursement en attente de validation caisse. Le caissier doit confirmer le paiement.'
+                ? 'Remboursement envoyé en caisse. Le caissier traitera le paiement.'
                 : 'Remboursement Mobile Money en attente de validation caisse.'
           });
        }

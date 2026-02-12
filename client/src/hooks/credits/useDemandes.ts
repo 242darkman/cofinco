@@ -349,6 +349,23 @@ export function useDemandes() {
     }
   };
 
+  const envoyerEnCaisse = async (
+    demandeId: string,
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await fetch(`/api/demandes-credit/${demandeId}/envoyer-caisse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Erreur');
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
   // ── Derived data ─────────────────────────────────────────────────────
 
   const normalizeStatut = (statut?: string): string => {
@@ -393,5 +410,6 @@ export function useDemandes() {
     getDemandesEnAttente,
     getStatutColor,
     payerFrais,
+    envoyerEnCaisse,
   };
 }

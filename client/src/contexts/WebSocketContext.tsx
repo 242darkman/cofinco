@@ -1016,6 +1016,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(["/api/credit-refunds"]);
          debounceInvalidate(creditKeys.all);
          break;
+
+      case "CAISSE_REQUEST_CREATED":
+      case "CAISSE_REQUEST_COMPLETED":
+      case "CAISSE_REQUEST_CANCELLED":
+         // Dispatch caisse-request-update event for badge + list real-time updates
+         window.dispatchEvent(new CustomEvent('caisse-request-update', { detail: message.payload }));
+         debounceInvalidate(['caisse-payment-requests-count']);
+         break;
     }
   };
 

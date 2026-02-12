@@ -4,7 +4,7 @@ import {
   Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet,
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
   PiggyBank, ArrowUpRight, ArrowDownRight, Shield, Timer, AlertCircle,
-  LockKeyhole, KeyRound, Package, Check, UserCheck, History, ScrollText, Scale
+  LockKeyhole, KeyRound, Package, Check, UserCheck, History, ScrollText, Scale, ClipboardList
 } from 'lucide-react';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import { toast } from 'sonner';
@@ -39,7 +39,7 @@ const WeightVerificationPanel = lazy(() => import('./WeightVerificationPanel'));
 const CaisseAccessControl = lazy(() => import('./CaisseAccessControl'));
 const CaisseClientInfos = lazy(() => import('./CaisseClientInfos'));
 const CaisseHistoriqueGlobal = lazy(() => import('./CaisseHistoriqueGlobal'));
-const PendingDisbursements = lazy(() => import('./PendingDisbursements'));
+const CaisseDemandesTab = lazy(() => import('./CaisseDemandesTab'));
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
 import { PendingActivationDrawer } from './PendingActivationDrawer';
@@ -235,6 +235,28 @@ export default function CaisseDashboard({
   });
 
   const pendingDisbursementsCount = pendingDisbursementsData?.count || pendingDisbursementsData?.data?.length || 0;
+
+  // Pending caisse payment requests count - for badge on Demandes tab
+  const sessionAgenceId = currentSession?.agenceId;
+  const { data: caisseRequestsCountData, refetch: refetchCaisseRequestsCount } = useQuery({
+    queryKey: ['caisse-payment-requests-count', sessionAgenceId],
+    queryFn: async () => {
+      const params = sessionAgenceId ? `?agenceId=${sessionAgenceId}` : '';
+      const res = await fetch(`/api/caisses/payment-requests/count${params}`, { credentials: 'include' });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    enabled: !!currentSession,
+    staleTime: 30000,
+  });
+  const pendingCaisseRequestsCount = caisseRequestsCountData?.count || 0;
+
+  // Listen for caisse request updates (WebSocket → DOM event)
+  useEffect(() => {
+    const handler = () => refetchCaisseRequestsCount();
+    window.addEventListener('caisse-request-update', handler);
+    return () => window.removeEventListener('caisse-request-update', handler);
+  }, [refetchCaisseRequestsCount]);
 
   // WebSocket listener for real-time loan disbursement updates
   const { socket } = useWebSocket();
@@ -575,10 +597,10 @@ export default function CaisseDashboard({
 
   const tabs = [
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
+    { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: (pendingCaisseRequestsCount + pendingDisbursementsCount) > 0 ? (pendingCaisseRequestsCount + pendingDisbursementsCount) : undefined, badgeClassName: 'bg-cyan-500 text-white animate-pulse' },
     { key: 'infos-client', label: 'Info Client', icon: Users, disabled: !isSessionOpen },
     { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !isSessionOpen || isClosingWorkflow },
-    { key: 'prets-decaissement', label: 'Prêts', icon: CreditCard, disabled: !isSessionOpen || isClosingWorkflow, badge: pendingDisbursementsCount > 0 ? pendingDisbursementsCount : undefined, badgeClassName: 'bg-orange-500 text-white animate-pulse' },
     { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'etats', label: 'États', icon: FileText, disabled: !isSessionOpen },
@@ -605,30 +627,26 @@ export default function CaisseDashboard({
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'operations':
-        return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} /></div> : null;
-      case 'prets-decaissement':
+      case 'demandes':
         return currentSession ? (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
-            <div className="flex items-center gap-2 px-4 md:px-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleTabChange('dashboard')}
-                icon={ArrowRightLeft}
-                className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180"
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <Suspense fallback={<TabLoadingFallback />}>
+              <CaisseDemandesTab
+                sessionCaisseId={currentSession.id}
+                agenceId={currentSession.agenceId || undefined}
+                onRequestProcessed={() => {
+                  refetchSession();
+                  refetchTransactions();
+                  refetchCaisseRequestsCount();
+                  refetchPendingDisbursements();
+                }}
               />
-              <h2 className="text-lg font-bold text-white">Décaissements Prêts en Attente</h2>
-            </div>
-            <PendingDisbursements
-              sessionCaisseId={currentSession.id}
-              onDisbursementComplete={() => {
-                refetchSession();
-                refetchTransactions();
-              }}
-            />
+            </Suspense>
           </div>
         ) : null;
+      case 'operations':
+        return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} /></div> : null;
+      // prets-decaissement is now integrated in the 'demandes' tab
       case 'historique':
         return (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col">

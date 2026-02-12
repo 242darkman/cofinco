@@ -1678,4 +1678,139 @@ caisseAdminRouter.post(
   }
 );
 
+// ============================================================================
+// ROUTES - PAYMENT REQUESTS (Demandes de paiement centralisées)
+// ============================================================================
+
+const processRequestSchema = z.object({
+  sessionCaisseId: z.string().uuid(),
+});
+
+const cancelRequestSchema = z.object({
+  reason: z.string().min(3, "Le motif doit contenir au moins 3 caractères"),
+});
+
+/**
+ * GET /api/caisses/payment-requests
+ * Liste les demandes de paiement en attente pour une agence
+ */
+caisseAdminRouter.get(
+  "/payment-requests",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+      const category = req.query.category as string | undefined;
+
+      if (!agenceId) {
+        return res.status(400).json({ error: "Agence non spécifiée" });
+      }
+
+      const { getPendingRequests } = await import("../services/caisse-queue-service");
+      const requests = await getPendingRequests(agenceId, category);
+
+      res.json(requests);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur récupération payment requests");
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/payment-requests/count
+ * Nombre de demandes en attente (pour badge sidebar)
+ */
+caisseAdminRouter.get(
+  "/payment-requests/count",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ error: "Agence non spécifiée" });
+      }
+
+      const { getPendingCount } = await import("../services/caisse-queue-service");
+      const count = await getPendingCount(agenceId);
+
+      res.json({ count });
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur comptage payment requests");
+      res.status(500).json({ error: error.message || "Erreur interne" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/payment-requests/:id/process
+ * Traite une demande de paiement (caissier)
+ */
+caisseAdminRouter.post(
+  "/payment-requests/:id/process",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session.user!.id;
+
+      const validation = processRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const { processRequest } = await import("../services/caisse-queue-service");
+      const result = await processRequest(id, validation.data.sessionCaisseId, userId);
+
+      res.json({
+        success: true,
+        request: result,
+        message: "Demande traitée avec succès",
+      });
+    } catch (error: any) {
+      logger.error({ err: error, requestId: req.params.id }, "Erreur traitement payment request");
+      res.status(400).json({ error: error.message || "Erreur lors du traitement" });
+    }
+  }
+);
+
+/**
+ * POST /api/caisses/payment-requests/:id/cancel
+ * Annule une demande de paiement
+ */
+caisseAdminRouter.post(
+  "/payment-requests/:id/cancel",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session.user!.id;
+
+      const validation = cancelRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: validation.error.format(),
+        });
+      }
+
+      const { cancelRequest } = await import("../services/caisse-queue-service");
+      const result = await cancelRequest(id, validation.data.reason, userId);
+
+      res.json({
+        success: true,
+        request: result,
+        message: "Demande annulée",
+      });
+    } catch (error: any) {
+      logger.error({ err: error, requestId: req.params.id }, "Erreur annulation payment request");
+      res.status(400).json({ error: error.message || "Erreur lors de l'annulation" });
+    }
+  }
+);
+
 export default caisseAdminRouter;

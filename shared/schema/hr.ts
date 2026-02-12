@@ -634,6 +634,7 @@ export type LeaveStatusType = typeof LeaveStatus[keyof typeof LeaveStatus];
 export const BulletinStatus = {
   DRAFT: 'DRAFT',
   VALIDATED: 'VALIDATED',
+  PENDING_CAISSE: 'PENDING_CAISSE',
   PAID: 'PAID',
   CANCELLED: 'CANCELLED',
 } as const;

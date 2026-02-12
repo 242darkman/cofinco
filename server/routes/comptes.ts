@@ -335,6 +335,44 @@ export function registerComptesRoutes(app: Express) {
           agenceId: parsed.agenceId,
         });
 
+        // Create caisse payment request for CASH PENDING_ACTIVATION accounts
+        if (
+          result.compte.statut === 'PENDING_ACTIVATION' &&
+          parsed.modePaiement === 'CASH' &&
+          parsed.soldeInitial > 0
+        ) {
+          try {
+            const { createCaisseRequest } = await import("../services/caisse-queue-service");
+            const client = await storage.getClient(parsed.clientId);
+
+            await createCaisseRequest({
+              category: "ACCOUNT_ACTIVATION",
+              direction: "IN",
+              agenceId: parsed.agenceId,
+              sourceType: "compte",
+              sourceId: result.compte.id,
+              clientId: parsed.clientId,
+              montant: parsed.soldeInitial,
+              label: `Activation compte ${result.compte.numeroCompte}`,
+              description: client
+                ? `Frais ouverture + dépôt initial — ${client.nom} ${client.prenom || ''}`.trim()
+                : undefined,
+              metadata: {
+                compteId: result.compte.id,
+                numeroCompte: result.compte.numeroCompte,
+                typeCompte: result.compte.typeCompte,
+                montantTotal: parsed.soldeInitial,
+                clientNom: client?.nom,
+                clientPrenom: client?.prenom,
+              },
+              createdBy: user?.id,
+            });
+          } catch (err) {
+            // Non-blocking: account is still created
+            logger.error({ err }, "Failed to create caisse request for account activation");
+          }
+        }
+
         // Broadcast pour mise à jour UI
         const wsInstance = getWsInstance();
         if (wsInstance) {

@@ -429,6 +429,21 @@ export const motifBlocageEnum = pgEnum("motif_blocage_enum", [
   "OTHER",
 ]);
 
+// ========== CAISSE PAYMENT REQUESTS ENUMS ==========
+
+export const caisseRequestCategoryEnum = pgEnum("caisse_request_category_enum", [
+  "ENGAGEMENT_FEE",
+  "FEE_REFUND",
+  "SALARY_PAYMENT",
+  "ACCOUNT_ACTIVATION",
+]);
+
+export const caisseRequestStatusEnum = pgEnum("caisse_request_status_enum", [
+  "PENDING",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
 // ========== CAISSE AGENT ENUMS ==========
 
 export const statutCaisseAgentEnum = pgEnum("statut_caisse_agent_enum", [

@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum, suspensionReasonEnum, closureRequestStatusEnum, closurePayoutStatusEnum, closurePayoutMethodEnum, openingRequestStatusEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum, suspensionReasonEnum, closureRequestStatusEnum, closurePayoutStatusEnum, closurePayoutMethodEnum, openingRequestStatusEnum, caisseRequestCategoryEnum, caisseRequestStatusEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -1980,3 +1980,50 @@ export const caisseHandoverAuditLogs = pgTable("caisse_handover_audit_logs", {
 });
 
 export type CaisseHandoverAuditLog = typeof caisseHandoverAuditLogs.$inferSelect;
+
+// ============================================================================
+// CAISSE PAYMENT REQUESTS (queue centralisée des demandes de paiement en caisse)
+// ============================================================================
+
+export const caissePaymentRequests = pgTable("caisse_payment_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  category: caisseRequestCategoryEnum("category").notNull(),
+  direction: text("direction").notNull(), // "IN" (argent entre en caisse) | "OUT" (argent sort)
+  agenceId: uuid("agence_id").notNull().references(() => agences.id),
+
+  // Liens polymorphiques vers la source
+  sourceType: text("source_type").notNull(),  // "demande_credit" | "credit_refund" | "bulletin_paie" | "compte"
+  sourceId: text("source_id").notNull(),
+
+  // Cible
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  employeeId: uuid("employee_id"),
+
+  // Montant
+  montant: numeric("montant").notNull(),
+
+  // Affichage
+  label: text("label").notNull(),
+  description: text("description"),
+  metadata: jsonb("metadata"),
+
+  // Statut
+  statut: caisseRequestStatusEnum("statut").notNull().default("PENDING"),
+
+  // Traitement
+  processedBy: uuid("processed_by").references(() => users.id, { onDelete: "set null" }),
+  processedAt: timestamp("processed_at"),
+  sessionCaisseId: uuid("session_caisse_id").references(() => sessionsCaisse.id, { onDelete: "set null" }),
+  mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+  // Audit
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  idxAgenceStatut: index("idx_caisse_requests_agence_statut").on(t.agenceId, t.statut),
+  idxSource: index("idx_caisse_requests_source").on(t.sourceType, t.sourceId),
+}));
+
+export type CaissePaymentRequest = typeof caissePaymentRequests.$inferSelect;
+export type InsertCaissePaymentRequest = typeof caissePaymentRequests.$inferInsert;

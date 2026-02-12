@@ -2865,34 +2865,105 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
       return res.status(400).json(errorResponse('INVALID_STATUS', `Le run est en statut ${run.status}, seul VALIDATED peut être payé`));
     }
 
-    // Update run status
-    await db.update(payrollRuns).set({
-      status: PayrollRunStatus.PAID,
-      paidBy: userId,
-      paidAt: new Date(),
-    }).where(eq(payrollRuns.id, runId));
-
-    // Update all bulletins to PAID
-    const updated = await db
-      .update(bulletinsPaie)
-      .set({
-        statut: BulletinStatus.PAID,
-        datePaiement: paymentDate.toISOString().split('T')[0],
+    // Get all validated bulletins with employee payment method
+    const allBulletins = await db
+      .select({
+        bulletin: bulletinsPaie,
+        paymentMethod: employes.paymentMethod,
+        employeNom: employes.nom,
+        employePrenom: employes.prenom,
       })
+      .from(bulletinsPaie)
+      .innerJoin(employes, eq(bulletinsPaie.employeId, employes.id))
       .where(
         and(
           eq(bulletinsPaie.payrollRunId, runId),
           eq(bulletinsPaie.statut, BulletinStatus.VALIDATED),
           eq(bulletinsPaie.cancelled, false)
         )
-      )
-      .returning();
+      );
 
-    const totalPaid = updated.reduce((sum, b) => sum + Number(b.salaireNet), 0);
+    // Split: CASH employees → caisse queue, others → immediate PAID
+    const cashBulletins = allBulletins.filter(b => b.paymentMethod === 'CASH');
+    const nonCashBulletins = allBulletins.filter(b => b.paymentMethod !== 'CASH');
 
-    // Post GL payment
+    // ── Non-CASH: Mark as PAID immediately ──
+    const paidIds: string[] = [];
+    if (nonCashBulletins.length > 0) {
+      const nonCashIds = nonCashBulletins.map(b => b.bulletin.id);
+      await db
+        .update(bulletinsPaie)
+        .set({
+          statut: BulletinStatus.PAID,
+          datePaiement: paymentDate.toISOString().split('T')[0],
+        })
+        .where(
+          and(
+            sql`${bulletinsPaie.id} = ANY(${nonCashIds}::int[])`,
+            eq(bulletinsPaie.payrollRunId, runId)
+          )
+        );
+      paidIds.push(...nonCashIds.map(String));
+    }
+
+    // ── CASH: Mark as PENDING_CAISSE + create caisse requests ──
+    const pendingCaisseIds: string[] = [];
+    if (cashBulletins.length > 0) {
+      const cashIds = cashBulletins.map(b => b.bulletin.id);
+      await db
+        .update(bulletinsPaie)
+        .set({ statut: BulletinStatus.PENDING_CAISSE })
+        .where(
+          and(
+            sql`${bulletinsPaie.id} = ANY(${cashIds}::int[])`,
+            eq(bulletinsPaie.payrollRunId, runId)
+          )
+        );
+      pendingCaisseIds.push(...cashIds.map(String));
+
+      // Create caisse payment requests for each CASH bulletin
+      if (agenceId) {
+        const { createCaisseRequest } = await import("../services/caisse-queue-service");
+        for (const item of cashBulletins) {
+          const b = item.bulletin;
+          const net = Number(b.salaireNet);
+          if (net <= 0) continue;
+
+          await createCaisseRequest({
+            category: "SALARY_PAYMENT",
+            direction: "OUT",
+            agenceId,
+            sourceType: "bulletin_paie",
+            sourceId: String(b.id),
+            employeeId: b.employeId,
+            montant: net,
+            label: `Salaire ${item.employeNom || ''} ${item.employePrenom || ''}`.trim(),
+            description: `Paiement salaire ${run.period} — ${net.toLocaleString('fr-FR')} FCFA`,
+            metadata: {
+              payrollRunId: runId,
+              period: run.period,
+              employeNom: item.employeNom,
+              employePrenom: item.employePrenom,
+            },
+            createdBy: userId,
+          });
+        }
+      }
+    }
+
+    const totalPaid = nonCashBulletins.reduce((sum, b) => sum + Number(b.bulletin.salaireNet), 0);
+    const totalPendingCaisse = cashBulletins.reduce((sum, b) => sum + Number(b.bulletin.salaireNet), 0);
+
+    // Update run status: PAID only if no CASH bulletins are pending
+    const runStatus = cashBulletins.length === 0 ? PayrollRunStatus.PAID : PayrollRunStatus.VALIDATED;
+    await db.update(payrollRuns).set({
+      status: runStatus,
+      ...(runStatus === PayrollRunStatus.PAID ? { paidBy: userId, paidAt: new Date() } : {}),
+    }).where(eq(payrollRuns.id, runId));
+
+    // Post GL payment for non-CASH only
     let glError: string | null = null;
-    if (agenceId) {
+    if (agenceId && nonCashBulletins.length > 0) {
       const freshRun = (await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)))[0];
       const payResult = await postRunPayment(freshRun, agenceId, userId);
       glError = payResult.error;
@@ -2909,7 +2980,14 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
         agenceId: req.user?.agenceId ?? undefined,
       },
       { statut: PayrollRunStatus.VALIDATED },
-      { statut: PayrollRunStatus.PAID, count: updated.length, totalPaid, datePaiement: paymentDate },
+      {
+        statut: runStatus,
+        paidCount: nonCashBulletins.length,
+        pendingCaisseCount: cashBulletins.length,
+        totalPaid,
+        totalPendingCaisse,
+        datePaiement: paymentDate,
+      },
       undefined,
       'critical'
     );
@@ -2919,12 +2997,23 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
         entity: 'payroll_run',
         action: 'paid',
         id: String(runId),
-        extra: { count: updated.length, total: totalPaid },
+        extra: {
+          count: allBulletins.length,
+          total: totalPaid + totalPendingCaisse,
+          pendingCaisse: cashBulletins.length,
+        },
       },
       req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
     );
 
-    res.json(successResponse({ paid: updated.length, totalPaid, bulletins: updated, glError }));
+    res.json(successResponse({
+      paid: nonCashBulletins.length,
+      pendingCaisse: cashBulletins.length,
+      totalPaid,
+      totalPendingCaisse,
+      runStatus,
+      glError,
+    }));
   } catch (error) {
     logger.error({ err: error }, 'Erreur paiement paie');
     res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));

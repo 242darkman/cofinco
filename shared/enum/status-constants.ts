@@ -1006,6 +1006,10 @@ export const TypeOperationCaisse = {
   // Autres
   INITIAL_DEPOSIT: "INITIAL_DEPOSIT",
   ADJUSTMENT: "ADJUSTMENT",
+  // Demandes centralisées caisse
+  SALARY_PAYMENT: "SALARY_PAYMENT",
+  FEE_REFUND: "FEE_REFUND",
+  ACCOUNT_ACTIVATION: "ACCOUNT_ACTIVATION",
 } as const;
 
 export type TypeOperationCaisseType = (typeof TypeOperationCaisse)[keyof typeof TypeOperationCaisse];

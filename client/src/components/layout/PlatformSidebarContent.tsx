@@ -9,6 +9,7 @@ import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 import { usePermissionsContextOptional } from '../../contexts/PermissionsContext';
 import { isAdminRole } from '@shared/types/roles';
 import { useValidationsBadge } from '../../hooks/useValidationsBadge';
+import { useCaisseBadge } from '../../hooks/useCaisseBadge';
 import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 import { useProspectionBadge } from '../../hooks/useProspectionBadge';
 import { useEnqueteBadge } from '../../hooks/useEnqueteBadge';
@@ -43,6 +44,9 @@ export default function PlatformSidebarContent({
 
   // Use combined validations badge (operations + closures)
   const { totalCount: pendingValidationsCount } = useValidationsBadge();
+
+  // Caisse payment requests badge
+  const { pendingCount: pendingCaisseRequestsCount } = useCaisseBadge();
 
   // Unread messages count for badge
   const { totalUnread: unreadMessagesCount } = useUnreadMessagesCount();
@@ -341,6 +345,12 @@ export default function PlatformSidebarContent({
             {pendingCoffreCount > 99 ? '99+' : pendingCoffreCount}
           </div>
         )}
+        {/* Real-time Badge for Collapsed Sidebar - Caisse Payment Requests */}
+        {!sidebarOpen && route.key === 'caisse' && pendingCaisseRequestsCount > 0 && (
+          <div className="absolute top-1 right-2 bg-emerald-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+            {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
+          </div>
+        )}
 
         {sidebarOpen && (
           <>
@@ -370,6 +380,11 @@ export default function PlatformSidebarContent({
             {route.key === 'coffre' && pendingCoffreCount > 0 && (
               <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingCoffreCount > 99 ? '99+' : pendingCoffreCount}
+              </span>
+            )}
+            {route.key === 'caisse' && pendingCaisseRequestsCount > 0 && (
+              <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+                {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
               </span>
             )}
             {isDisabled && (

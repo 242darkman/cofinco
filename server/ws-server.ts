@@ -113,6 +113,11 @@ export type GlobalMessage = {
     | "REFUND_PENDING_CAISSE" | "REFUND_PAID"
 
     // =============================================
+    // CAISSE PAYMENT REQUESTS (Queue centralisée)
+    // =============================================
+    | "CAISSE_REQUEST_CREATED" | "CAISSE_REQUEST_COMPLETED" | "CAISSE_REQUEST_CANCELLED"
+
+    // =============================================
     // BALANCE & RÉCONCILIATION
     // =============================================
     | "BALANCE_UPDATED"

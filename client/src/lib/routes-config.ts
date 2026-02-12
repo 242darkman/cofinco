@@ -150,10 +150,10 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuCaisse',
     group: 'Opérations',
     subRoutes: [
+      { path: '/caisse/demandes', subModule: 'demandes', label: 'Demandes' },
       { path: '/caisse/infos-client', subModule: 'infos-client', label: 'Info Client' },
       { path: '/caisse/especes', subModule: 'especes', label: 'Espèces' },
       { path: '/caisse/mobilemoney', subModule: 'mobilemoney', label: 'Mobile Money' },
-      { path: '/caisse/prets', subModule: 'prets-decaissement', label: 'Prêts' },
       { path: '/caisse/historique', subModule: 'historique', label: 'Historique' },
       { path: '/caisse/transferts', subModule: 'transferts', label: 'Transferts' },
       { path: '/caisse/etats', subModule: 'etats', label: 'États de caisse' },

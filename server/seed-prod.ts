@@ -1842,6 +1842,36 @@ const ACCOUNTING_RULES_DATA = [
     priority: 100,
   },
 
+  // --- Paiement salaire en caisse ---
+  {
+    code: 'SALARY_PAYMENT_CASH',
+    name: 'Paiement salaire — espèces',
+    description: 'Paiement de salaire employé en espèces via caisse',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SALARY_PAYMENT',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4211',   // Personnel — rémunérations dues
+    creditAccount: '521',   // Caisse (argent sort)
+    descriptionTemplate: 'Paiement salaire espèces — {employeeName}',
+    priority: 100,
+  },
+
+  // --- Restitution frais de dossier en caisse ---
+  {
+    code: 'FEE_REFUND_CASH',
+    name: 'Restitution frais de dossier — espèces',
+    description: 'Remboursement de frais de dossier crédit en espèces via caisse',
+    sourceType: 'MOUVEMENT',
+    eventType: 'FEE_REFUND',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '7072',   // Produits — frais de dossier (contre-passation)
+    creditAccount: '521',   // Caisse (argent sort)
+    descriptionTemplate: 'Restitution frais dossier espèces — {clientName}',
+    priority: 100,
+  },
+
   // --- Reversals Mobile Money ---
   {
     code: 'REVERSAL_COLLECTION_MTN',
