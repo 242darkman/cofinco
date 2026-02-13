@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   RefreshCw, Wallet, Building2, Smartphone, Banknote,
   Loader2, ChevronDown, ChevronUp, CreditCard, Landmark, Signal,
-  CheckCircle2, AlertCircle, Link2
+  CheckCircle2, AlertCircle, Link2, Vault
 } from 'lucide-react';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
@@ -138,6 +138,7 @@ export default function TresoreriePage() {
   const [filterAgence] = useState<string>('');
   const [mtnExpanded, setMtnExpanded] = useState(true);
   const [airtelExpanded, setAirtelExpanded] = useState(true);
+  const [physicalFilter, setPhysicalFilter] = useState<'ALL' | 'CAISSE' | 'COFFRE'>('ALL');
 
   const { data: stats, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery<TresorerieStats>({
     queryKey: ['tresorerie-stats', filterAgence],
@@ -171,6 +172,13 @@ export default function TresoreriePage() {
   const totalGlobal = totalPhysique + pawapayTotal;
   const mtnData = stats?.digitalCaisses?.mtn || { total: 0, byAgence: [] };
   const airtelData = stats?.digitalCaisses?.airtel || { total: 0, byAgence: [] };
+
+  const filteredPhysicalCaisses = (stats?.physicalCaisses || []).filter((c: CaisseSummary) => {
+    if (physicalFilter === 'ALL') return true;
+    const isCoffre = /coffre/i.test(c.nom);
+    return physicalFilter === 'COFFRE' ? isCoffre : !isCoffre;
+  });
+  const filteredTotal = filteredPhysicalCaisses.reduce((sum: number, c: CaisseSummary) => sum + Number(c.solde || 0), 0);
 
   return (
     <div className="flex flex-col h-full space-y-3 relative p-3" data-testid="page-tresorerie">
@@ -314,13 +322,34 @@ export default function TresoreriePage() {
                 <Landmark size={15} className="text-emerald-400" />
                 <h2 className="text-sm font-bold text-white">Caisses & Coffres Physiques</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge value={`${totalPhysique.toLocaleString('fr-FR')} FCFA`} variant="success" className="text-[10px]" />
-                <Badge value={`${stats?.physicalCaisses?.length || 0}`} variant="neutral" className="text-[10px]" />
+              <div className="flex items-center gap-3">
+                {/* Segmented filter */}
+                <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-700/50">
+                  {([
+                    { key: 'ALL', label: 'Tout', icon: null },
+                    { key: 'CAISSE', label: 'Caisses', icon: Banknote },
+                    { key: 'COFFRE', label: 'Coffres', icon: Vault },
+                  ] as const).map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setPhysicalFilter(key)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
+                        physicalFilter === key
+                          ? 'bg-slate-700 text-white shadow-sm'
+                          : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {Icon && <Icon size={10} />}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <Badge value={`${filteredTotal.toLocaleString('fr-FR')} FCFA`} variant="success" className="text-[10px]" />
+                <Badge value={`${filteredPhysicalCaisses.length}`} variant="neutral" className="text-[10px]" />
               </div>
             </div>
 
-            {stats?.physicalCaisses && stats.physicalCaisses.length > 0 ? (
+            {filteredPhysicalCaisses.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-slate-900/80 sticky top-0 z-10 backdrop-blur-sm">
@@ -332,10 +361,17 @@ export default function TresoreriePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
-                    {stats.physicalCaisses.map((caisse) => (
+                    {filteredPhysicalCaisses.map((caisse: CaisseSummary) => (
                       <tr key={caisse.id} className="hover:bg-slate-800/30 transition-colors group">
                         <td className="px-4 py-2.5">
-                          <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors">{caisse.nom}</span>
+                          <div className="flex items-center gap-1.5">
+                            {/coffre/i.test(caisse.nom) ? (
+                              <Vault size={12} className="text-amber-400/60 shrink-0" />
+                            ) : (
+                              <Banknote size={12} className="text-emerald-400/60 shrink-0" />
+                            )}
+                            <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors">{caisse.nom}</span>
+                          </div>
                         </td>
                         <td className="px-4 py-2.5">
                           <span className="text-xs text-slate-500">{caisse.agenceNom || '-'}</span>
@@ -361,7 +397,9 @@ export default function TresoreriePage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-slate-600">
                 <Banknote size={28} className="mb-2 opacity-20" />
-                <p className="text-xs">Aucune caisse physique</p>
+                <p className="text-xs">
+                  {physicalFilter === 'COFFRE' ? 'Aucun coffre-fort' : physicalFilter === 'CAISSE' ? 'Aucune caisse' : 'Aucune caisse physique'}
+                </p>
               </div>
             )}
           </div>
