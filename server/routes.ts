@@ -44,6 +44,7 @@ import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
 import { registerMonitoringRoutes } from "./routes/monitoring";
 import syncRouter from "./routes/sync";
+import { syncJournalRouter } from "./routes/sync-journal";
 import { registerZoneManagementRoutes } from "./routes/zone-management";
 import { registerProspectionPrimesRoutes } from "./routes/prospection-primes";
 import { registerVilleRoutes } from "./routes/villes";
@@ -136,6 +137,9 @@ export function registerRoutes(app: Express): Server {
 
   // Sync Heartbeat Module (real-time connection status)
   app.use("/api/sync", syncRouter);
+
+  // Offline-Native Sync Journal (ECDSA-signed journal entries, device keys, COBAC audit)
+  app.use("/api/sync", syncJournalRouter);
 
   // External Services
   registerMobileMoneyRoutes(app);

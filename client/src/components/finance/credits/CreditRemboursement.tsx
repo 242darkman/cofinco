@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2, Printer } from 'lucide-react';
+import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2, Printer, WifiOff } from 'lucide-react';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -15,6 +15,9 @@ import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
 import { StatutCredit, StatutEcheanceCredit, STATUT_ECHEANCE_CREDIT_LABELS } from '@shared/enum/status-constants';
+import { useNetworkStatus } from '../../../contexts/NetworkContext';
+import { useUserProfile } from '../../../hooks/useUserProfile';
+import { executeOfflineOperation } from '../../../lib/offline-treasury';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
@@ -82,6 +85,11 @@ export default function CreditRemboursement() {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreatePayments = hasPermission('remboursements', 'create') || hasPermission('credits', 'edit');
+
+  // Offline support
+  const networkStatus = useNetworkStatus();
+  const { user } = useUserProfile();
+  const isOffline = networkStatus === 'offline';
 
   const [credits, setCredits] = useState<Credit[]>([]);
   const [selectedCredit, setSelectedCredit] = useState<Credit | null>(null);
@@ -300,6 +308,36 @@ export default function CreditRemboursement() {
 
       const finalRef = sanitizeInput(paymentRef || paymentData.reference_paiement || `REF-${Date.now()}`);
 
+      // Offline path: route through journal for Cash payments when offline
+      if (isOffline && paymentData.mode_paiement === 'Cash' && user?.id) {
+        const result = await executeOfflineOperation({
+          type: 'LOAN_REPAYMENT',
+          amount: montant,
+          agentId: parseInt(user.id, 10),
+          agenceId: user.agenceId || '',
+          payload: {
+            creditId: selectedCredit.id,
+            clientId: selectedCredit.clientId,
+            montant,
+            distribution,
+            referencePaiement: finalRef,
+            notes: sanitizeInput(paymentData.notes),
+          },
+        });
+
+        setLastPaymentRef(result.operationRef || finalRef);
+        setLastPaymentAmount(montant);
+        setPaymentData({ montant: '', mode_paiement: 'Cash', reference_paiement: '', notes: '' });
+        setSelectedOperator('');
+        setShowPaymentForm(false);
+        setShowPaymentModal(false);
+        setShowConfirmPayment(false);
+        setErrors({});
+        toast.success(`Remboursement de ${formatMoney(montant)} enregistré hors ligne (réf: ${result.operationRef})`);
+        setShowSuccessModal(true);
+        return;
+      }
+
       const remboursementData = {
         credit_id: selectedCredit.id,
         date_remboursement: new Date().toISOString().split('T')[0],
@@ -354,7 +392,9 @@ export default function CreditRemboursement() {
     calculatePaymentDistribution,
     loadCredits,
     loadEcheances,
-    nextEcheance
+    nextEcheance,
+    isOffline,
+    user,
   ]);
 
   const handlePaymentValidation = useCallback((paymentRef: string, operator?: string) => {
@@ -452,7 +492,15 @@ export default function CreditRemboursement() {
 
   return (
     <div className="space-y-6 relative">
-      
+
+      {/* Offline Indicator */}
+      {isOffline && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm">
+          <WifiOff size={16} />
+          <span>Mode hors ligne — Seuls les paiements en espèces sont disponibles. Les données seront synchronisées au retour du réseau.</span>
+        </div>
+      )}
+
       {/* Hidden Receipt Template for Printing (offscreen, not display:none) */}
       {printData && (
         <div
@@ -678,7 +726,7 @@ export default function CreditRemboursement() {
                   </legend>
                   <div className="grid grid-cols-3 gap-2" role="radiogroup">
                     {PAYMENT_MODES.map(({ id, icon: Icon, label, disabled }) => {
-                      const isDisabled = id === 'Mobile Money' ? !mobileMoneyEnabled : disabled;
+                      const isDisabled = isOffline ? id !== 'Cash' : (id === 'Mobile Money' ? !mobileMoneyEnabled : disabled);
                       const isSelected = paymentData.mode_paiement === id;
 
                       return (

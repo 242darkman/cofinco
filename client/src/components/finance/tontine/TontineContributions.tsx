@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search, Info, Zap, Download } from 'lucide-react';
+import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search, Info, Zap, Download, WifiOff } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import { Pagination } from '../../ui/Pagination';
 import { SkeletonContributionCard } from '../../ui/Skeleton';
@@ -13,6 +13,9 @@ import { formatMoney, formatDate } from '../../../lib/format';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { exportToCSV, exportToPDF } from '../../../lib/exportUtils';
 import { usePagination } from '../../../hooks/usePagination';
+import { useNetworkStatus } from '../../../contexts/NetworkContext';
+import { useUserProfile } from '../../../hooks/useUserProfile';
+import { executeOfflineOperation } from '../../../lib/offline-treasury';
 import {
   StatutClient,
   StatutContributionTontine,
@@ -301,6 +304,11 @@ export default function TontineContributions({ tontineId }: TontineContributions
   const { hasPermission } = usePermissions();
   const canCreateContributions = hasPermission('tontines', 'create') || hasPermission('tontines', 'edit');
 
+  // Offline support
+  const networkStatus = useNetworkStatus();
+  const { user } = useUserProfile();
+  const isOffline = networkStatus === 'offline';
+
   const [contributions, setContributions] = useState<TontineContribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -429,6 +437,32 @@ export default function TontineContributions({ tontineId }: TontineContributions
 
       setSubmitting(true);
       try {
+        // Offline path: route through journal for Cash payments when offline
+        if (isOffline && formData.mode_paiement === MethodePaiement.CASH && user?.id) {
+          const result = await executeOfflineOperation({
+            type: 'TONTINE_CONTRIBUTION',
+            amount: formData.montant,
+            agentId: parseInt(user.id, 10),
+            agenceId: user.agenceId || '',
+            payload: {
+              tontineId,
+              clientId: membre.clientId,
+              montant: formData.montant,
+              tourNumero: formData.tour_numero,
+              methodePaiement: MethodePaiement.CASH,
+              observations: sanitizeInput(formData.notes) || undefined,
+            },
+          });
+
+          setShowAddForm(false);
+          setShowPaymentModal(false);
+          resetForm();
+
+          const membreNom = membre.client?.nom || 'Membre';
+          toast.success(`Cotisation de ${formData.montant.toLocaleString()} FCFA pour ${membreNom} enregistrée hors ligne (réf: ${result.operationRef})`);
+          return;
+        }
+
         const providerName = operator ? operator.toUpperCase() : undefined;
         await contributionTontineApi.create({
           tontineId: tontineId,
@@ -460,7 +494,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
         setSubmitting(false);
       }
     },
-    [formData, membres, tontineId, selectedOperator, fetchContributions, fetchMembres]
+    [formData, membres, tontineId, selectedOperator, fetchContributions, fetchMembres, isOffline, user, resetForm]
   );
 
   const resetForm = useCallback(() => {
@@ -580,6 +614,14 @@ export default function TontineContributions({ tontineId }: TontineContributions
 
   return (
     <div className="space-y-4">
+      {/* Offline Indicator */}
+      {isOffline && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm">
+          <WifiOff size={16} />
+          <span>Mode hors ligne — Seules les cotisations en espèces sont disponibles.</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
         <div>
@@ -903,27 +945,32 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   Mode de paiement *
                 </label>
                 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode de paiement">
-                  {PAYMENT_MODE_OPTIONS.map((option) => (
+                  {PAYMENT_MODE_OPTIONS.map((option) => {
+                    const modeDisabled = isOffline
+                      ? option.value !== MethodePaiement.CASH
+                      : (option.value !== MethodePaiement.CASH && option.value !== MethodePaiement.MOBILE_MONEY);
+                    return (
                     <button
                       key={option.value}
                       type="button"
                       role="radio"
                       aria-checked={formData.mode_paiement === option.value}
-                      onClick={() => setFormData((prev) => ({ ...prev, mode_paiement: option.value }))}
+                      onClick={() => !modeDisabled && setFormData((prev) => ({ ...prev, mode_paiement: option.value }))}
                       className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition ${
                         formData.mode_paiement === option.value
                           ? 'bg-emerald-600 border-emerald-500 text-white'
-                          : (option.value !== MethodePaiement.CASH && option.value !== MethodePaiement.MOBILE_MONEY)
+                          : modeDisabled
                             ? 'bg-slate-800/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
                             : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                       }`}
-                      disabled={option.value !== MethodePaiement.CASH && option.value !== MethodePaiement.MOBILE_MONEY}
+                      disabled={modeDisabled}
                     >
                       {getModeIcon(option.value)} {option.label}
                     </button>
-                  ))}
+                    );
+                  })}
                   <div className="col-span-2 text-[10px] text-slate-500 italic text-center mt-1">
-                    * Virement et Chèque bientôt disponibles
+                    {isOffline ? '* Mode hors ligne — espèces uniquement' : '* Virement et Chèque bientôt disponibles'}
                   </div>
 
                 </div>

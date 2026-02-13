@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, Loader2, AlertTriangle, CheckCircle, WifiOff } from 'lucide-react';
 import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -7,6 +7,9 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { StatutCompte } from '@shared/enum/status-constants';
+import { useNetworkStatus } from '../../../contexts/NetworkContext';
+import { executeOfflineOperation } from '../../../lib/offline-treasury';
+import { useUserProfile } from '../../../hooks/useUserProfile';
 
 // Mapping EN -> FR pour les types de compte
 const TYPE_COMPTE_LABELS: Record<string, string> = {
@@ -57,6 +60,9 @@ const PAYMENT_MODES: { id: ModePaiement; icon: typeof Banknote; label: string }[
 export default function EpargneTransactionForm({ compte, type, onClose, onSuccess }: EpargneTransactionFormProps) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const networkStatus = useNetworkStatus();
+  const { user } = useUserProfile();
+  const isOffline = networkStatus === 'offline' || networkStatus === 'api_down';
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentModalType, setPaymentModalType] = useState<'mobile_money' | 'especes'>('especes');
 
@@ -160,7 +166,31 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
       const operatorInfo = (operator || selectedOperator) ? `Opérateur: ${operator || selectedOperator}` : '';
       const observations = [sanitizedDescription, sanitizedReference, operatorInfo].filter(Boolean).join(' - ');
 
-      // Single atomic call via ledger-backed endpoint
+      // === OFFLINE FALLBACK (cash operations only, non-activation) ===
+      if (isOffline && formData.mode_paiement === 'CASH' && !isPendingActivation && user?.id) {
+        const journalType = type === 'Dépôt' ? 'DEPOSIT' : 'WITHDRAWAL';
+        const result = await executeOfflineOperation({
+          type: journalType as any,
+          amount: montantNum,
+          agentId: parseInt(user.id, 10),
+          agenceId: user.agenceId || '',
+          payload: {
+            compteId: compte.id,
+            clientId: compte.clients.id,
+            montant: montantNum,
+            methodePaiement: 'CASH',
+            observations,
+          },
+        });
+
+        toast.success(
+          `${type} de ${formatMoney(montantNum)} enregistré hors ligne (réf: ${result.operationRef})`
+        );
+        onSuccess();
+        return;
+      }
+
+      // === ONLINE PATH (standard behavior) ===
       if (isPendingActivation && type === 'Dépôt') {
         await compteEpargneApi.depotInitial(compte.id, {
           montant: montantNum,
@@ -192,7 +222,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
       setLoading(false);
       setShowPaymentModal(false);
     }
-  }, [compte, type, montantNum, isPendingActivation, formData, selectedOperator, onSuccess]);
+  }, [compte, type, montantNum, isPendingActivation, formData, selectedOperator, onSuccess, isOffline, user]);
 
   const handlePaymentValidation = useCallback((paymentRef: string, operator?: string) => {
     processTransaction(paymentRef, operator);
@@ -255,6 +285,18 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {/* Offline Indicator */}
+            {isOffline && (
+              <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3 flex items-center gap-3" role="status">
+                <WifiOff className="text-amber-400 flex-shrink-0" size={18} aria-hidden="true" />
+                <span className="text-amber-300 text-sm">
+                  Mode hors ligne — {formData.mode_paiement === 'CASH'
+                    ? 'Les opérations en espèces seront synchronisées automatiquement.'
+                    : 'Seules les opérations en espèces sont disponibles hors ligne.'}
+                </span>
+              </div>
+            )}
+
             {/* General Error */}
             {errors.general && (
               <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 flex items-center gap-3" role="alert">
@@ -318,7 +360,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                     role="radio"
                     aria-checked={formData.mode_paiement === id}
                     onClick={() => handleModeChange(id)}
-                    disabled={loading}
+                    disabled={loading || (isOffline && id !== 'CASH')}
                     className={`flex flex-col items-center justify-center p-3 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       formData.mode_paiement === id
                         ? 'bg-blue-600 border-blue-500 text-white'
@@ -474,7 +516,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               </button>
               <button
                 type="submit"
-                disabled={loading || montantNum <= 0}
+                disabled={loading || montantNum <= 0 || (isOffline && formData.mode_paiement !== 'CASH')}
                 className={`flex-1 px-6 py-3 ${buttonColorClass} text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center gap-2`}
               >
                 {loading ? (

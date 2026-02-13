@@ -22,6 +22,18 @@ import {
   clearCompletedOperations
 } from './offline-db';
 import { networkManager, isNetworkUsable } from './networkManager';
+import {
+  getUnsyncedEntries,
+  markEntriesSyncing,
+  markEntriesConfirmed,
+  markEntriesRejected,
+  getChainHead,
+  getJournalStats,
+  updateNtpOffset,
+} from './journal-service';
+import { getActiveKeyId } from './offline-crypto';
+import { getOrCreateFingerprint } from './device-fingerprint';
+import { updateOfflineLimits, markSessionSynced } from './offline-treasury';
 
 // ========== TYPES ==========
 
@@ -135,6 +147,8 @@ class SyncService {
         console.log('[Sync Service] Connexion rétablie, démarrage de la synchronisation');
         this.currentRetryDelay = RETRY_DELAY_MS; // Reset retry delay
         this.scheduleSync(1000);
+        // Also trigger journal sync when connectivity returns
+        setTimeout(() => this.syncJournal().catch(() => {}), 2000);
       } else {
         console.log('[Sync Service] Connexion perdue, synchronisation en pause');
         this.cancelScheduledSync();
@@ -729,7 +743,390 @@ class SyncService {
       // Non-critical
     }
   }
+
+  // ========== JOURNAL-BASED 3-PHASE SYNC (Offline Native) ==========
+
+  private isJournalSyncing = false;
+  private journalSyncCallbacks: Set<(stats: JournalSyncStats) => void> = new Set();
+
+  /**
+   * Execute the full 3-phase journal sync protocol.
+   * Phase 1: Handshake (exchange state, get limits/revoked keys/server time)
+   * Phase 2: Upload journal entries in batches of 10
+   * Phase 3: Pull confirmed entry statuses
+   */
+  public async syncJournal(): Promise<JournalSyncStats> {
+    if (this.isJournalSyncing) {
+      console.log('[Sync Service] Journal sync already in progress');
+      return { phase: 'idle', uploaded: 0, confirmed: 0, rejected: 0, conflicts: 0, error: null };
+    }
+
+    if (!isNetworkUsable()) {
+      console.log('[Sync Service] Offline, journal sync skipped');
+      return { phase: 'idle', uploaded: 0, confirmed: 0, rejected: 0, conflicts: 0, error: null };
+    }
+
+    this.isJournalSyncing = true;
+    const stats: JournalSyncStats = {
+      phase: 'handshake',
+      uploaded: 0,
+      confirmed: 0,
+      rejected: 0,
+      conflicts: 0,
+      error: null,
+    };
+
+    this.notifyJournalCallbacks(stats);
+
+    try {
+      // ===== PHASE 1: HANDSHAKE =====
+      const handshakeResult = await this.journalHandshake();
+      if (!handshakeResult.ok) {
+        stats.error = handshakeResult.error || 'Handshake failed';
+        return stats;
+      }
+
+      // Update NTP offset from server time
+      if (handshakeResult.serverTime) {
+        updateNtpOffset(handshakeResult.serverTime);
+      }
+
+      // Update offline limits
+      if (handshakeResult.offlineLimits) {
+        await updateOfflineLimits(handshakeResult.offlineLimits).catch(() => {});
+      }
+
+      // ===== PHASE 2: UPLOAD =====
+      stats.phase = 'upload';
+      this.notifyJournalCallbacks(stats);
+
+      const unsyncedEntries = await getUnsyncedEntries();
+      if (unsyncedEntries.length > 0) {
+        console.log(`[Sync Service] Journal: ${unsyncedEntries.length} entries to upload`);
+
+        // Process in batches of 10
+        for (let i = 0; i < unsyncedEntries.length; i += JOURNAL_BATCH_SIZE) {
+          if (!isNetworkUsable()) break;
+
+          const batch = unsyncedEntries.slice(i, i + JOURNAL_BATCH_SIZE);
+          const batchUuids = batch.map(e => e.uuid);
+
+          // Mark as syncing
+          await markEntriesSyncing(batchUuids);
+
+          // Upload batch
+          const result = await this.uploadJournalBatch(batch);
+
+          if (result.error) {
+            // Revert syncing status on network failure
+            await markEntriesRejected(batchUuids.map(uuid => ({ uuid, reason: 'upload_failed' })));
+            stats.error = result.error;
+            break;
+          }
+
+          // Process results
+          if (result.accepted.length > 0) {
+            const serverTime = result.serverTime || Date.now();
+            await markEntriesConfirmed(
+              result.accepted.map((uuid: string, idx: number) => ({
+                uuid,
+                serverTimestamp: serverTime,
+                serverSequence: i + idx + 1, // Approximate server sequence
+              }))
+            );
+            stats.confirmed += result.accepted.length;
+          }
+
+          if (result.rejected.length > 0) {
+            await markEntriesRejected(result.rejected);
+            stats.rejected += result.rejected.length;
+          }
+
+          stats.conflicts += result.conflicts?.length || 0;
+          stats.uploaded += batch.length;
+
+          this.notifyJournalCallbacks(stats);
+        }
+      }
+
+      // Mark sessions as synced (for any closed sessions with all entries confirmed)
+      await this.markSyncedSessions();
+
+      // ===== PHASE 3: PULL =====
+      stats.phase = 'pull';
+      this.notifyJournalCallbacks(stats);
+
+      // Pull is lightweight — just check for status updates on entries
+      // The main pull mechanism for entities remains in pullChanges()
+      await this.pullJournalUpdates();
+
+      stats.phase = 'done';
+      this.notifyJournalCallbacks(stats);
+
+      console.log('[Sync Service] Journal sync complete:', {
+        uploaded: stats.uploaded,
+        confirmed: stats.confirmed,
+        rejected: stats.rejected,
+        conflicts: stats.conflicts,
+      });
+
+      return stats;
+    } catch (error: any) {
+      console.error('[Sync Service] Journal sync error:', error);
+      stats.error = error.message;
+      return stats;
+    } finally {
+      this.isJournalSyncing = false;
+      this.notifyJournalCallbacks(stats);
+    }
+  }
+
+  /**
+   * Phase 1: Handshake with server.
+   */
+  private async journalHandshake(): Promise<{
+    ok: boolean;
+    error?: string;
+    serverTime?: number;
+    offlineLimits?: any;
+  }> {
+    try {
+      const chainHead = await getChainHead();
+      const journalStats = await getJournalStats();
+      const deviceKeyId = getActiveKeyId();
+      const { full: deviceId } = getOrCreateFingerprint();
+
+      if (!deviceKeyId) {
+        return { ok: false, error: 'No active device key' };
+      }
+
+      const response = await fetch('/api/sync/handshake', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId,
+          deviceKeyId,
+          lastConfirmedSequence: chainHead?.sequence || 0,
+          chainHeadHash: chainHead?.hash || 'GENESIS',
+          pendingCount: journalStats.local + journalStats.syncing,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return { ok: false, error: data.error || `Handshake HTTP ${response.status}` };
+      }
+
+      const data = await response.json();
+      return {
+        ok: true,
+        serverTime: data.serverTime,
+        offlineLimits: data.offlineLimits,
+      };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  /**
+   * Phase 2: Upload a batch of journal entries.
+   */
+  private async uploadJournalBatch(entries: Array<{
+    uuid: string;
+    sequence: number;
+    type: string;
+    agentId: number;
+    deviceId: string;
+    agenceId: string;
+    payloadHash: string;
+    previousHash: string;
+    entryHash: string;
+    signature: string;
+    deviceKeyId: string;
+    localTimestamp: number;
+    monotonicClock: number;
+    ntpOffset?: number;
+    sessionId: string;
+    operationRef: string;
+    idempotencyKey: string;
+    metadata?: string;
+    payload: string;
+  }>): Promise<{
+    accepted: string[];
+    rejected: Array<{ uuid: string; reason: string }>;
+    conflicts: Array<{ uuid: string; conflictWith: string; reason: string }>;
+    serverTime?: number;
+    error?: string;
+  }> {
+    try {
+      // Parse payload for server (server expects objects, not encrypted strings)
+      const serverEntries = entries.map(e => {
+        let parsedPayload: Record<string, unknown> = {};
+        try {
+          // If payload is encrypted, we still send the hash (server validates hash)
+          // For non-encrypted payloads, parse them
+          if (!e.payload.startsWith('enc:')) {
+            parsedPayload = JSON.parse(e.payload);
+          }
+        } catch {
+          parsedPayload = {};
+        }
+
+        return {
+          uuid: e.uuid,
+          sequence: e.sequence,
+          type: e.type,
+          agentId: String(e.agentId),
+          deviceId: e.deviceId,
+          agenceId: e.agenceId,
+          payload: parsedPayload,
+          payloadHash: e.payloadHash,
+          previousHash: e.previousHash,
+          entryHash: e.entryHash,
+          signature: e.signature,
+          deviceKeyId: e.deviceKeyId,
+          localTimestamp: e.localTimestamp,
+          monotonicClock: e.monotonicClock,
+          ntpOffset: e.ntpOffset,
+          sessionId: e.sessionId,
+          operationRef: e.operationRef,
+          idempotencyKey: e.idempotencyKey,
+          metadata: e.metadata ? JSON.parse(e.metadata) : undefined,
+        };
+      });
+
+      const response = await fetch('/api/sync/journal', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: serverEntries }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return {
+          accepted: [],
+          rejected: [],
+          conflicts: [],
+          error: data.error || `Upload HTTP ${response.status}`,
+        };
+      }
+
+      return await response.json();
+    } catch (err: any) {
+      return {
+        accepted: [],
+        rejected: [],
+        conflicts: [],
+        error: err.message,
+      };
+    }
+  }
+
+  /**
+   * Phase 3: Pull journal entry status updates from server.
+   */
+  private async pullJournalUpdates(): Promise<void> {
+    try {
+      const response = await fetch('/api/sync/pull?limit=100', {
+        credentials: 'include',
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      // Update NTP offset
+      if (data.serverTime) {
+        updateNtpOffset(data.serverTime);
+      }
+    } catch {
+      // Non-critical
+    }
+  }
+
+  /**
+   * Mark day sessions as synced when all their entries are confirmed.
+   */
+  private async markSyncedSessions(): Promise<void> {
+    try {
+      const { db } = await import('./offline-db');
+      const sessions = await db.agentDaySessions
+        .where('syncStatus')
+        .anyOf(['open', 'closed'])
+        .toArray();
+
+      for (const session of sessions) {
+        if (!session.agentId || !session.date) continue;
+
+        // Check if all entries for this session are confirmed
+        const unconfirmed = await db.journalEntries
+          .where('sessionId')
+          .equals(session.date)
+          .filter(e => e.syncStatus !== 'confirmed' && e.syncStatus !== 'rejected')
+          .count();
+
+        if (unconfirmed === 0) {
+          await markSessionSynced(session.agentId, session.date);
+        }
+      }
+    } catch {
+      // Non-critical
+    }
+  }
+
+  // ========== JOURNAL SYNC SUBSCRIPTIONS ==========
+
+  public subscribeToJournalSync(callback: (stats: JournalSyncStats) => void): () => void {
+    this.journalSyncCallbacks.add(callback);
+    return () => {
+      this.journalSyncCallbacks.delete(callback);
+    };
+  }
+
+  private notifyJournalCallbacks(stats: JournalSyncStats): void {
+    this.journalSyncCallbacks.forEach(cb => {
+      try { cb({ ...stats }); } catch {}
+    });
+  }
+
+  /**
+   * Get current journal sync statistics.
+   */
+  public async getJournalSyncStats(): Promise<{
+    pending: number;
+    syncing: number;
+    confirmed: number;
+    rejected: number;
+  }> {
+    return getJournalStats();
+  }
+
+  /**
+   * Full sync: run legacy queue sync + journal sync.
+   */
+  public async fullSync(): Promise<void> {
+    // Run both in parallel
+    await Promise.allSettled([
+      this.sync(),
+      this.syncJournal(),
+    ]);
+  }
 }
+
+// ========== JOURNAL SYNC TYPES ==========
+
+export interface JournalSyncStats {
+  phase: 'idle' | 'handshake' | 'upload' | 'pull' | 'done';
+  uploaded: number;
+  confirmed: number;
+  rejected: number;
+  conflicts: number;
+  error: string | null;
+}
+
+const JOURNAL_BATCH_SIZE = 10;
 
 export const syncService = new SyncService();
 

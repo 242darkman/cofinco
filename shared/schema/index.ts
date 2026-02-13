@@ -27,6 +27,7 @@ export * from "./notifications";
 export * from "./agent-modules";
 export * from "./caisse-closing";
 export * from "./idempotency";
+export * from "./device-keys";
 
 // Relations - Need to be defined here or in a separate file to avoid circular dependencies
 // if they were in individual files. OR we can put relations in `relations.ts`.

@@ -9,11 +9,8 @@ import {
 import { Button, Card, Badge, TabGroup, StatCard, Modal, ResponsiveTable, FormField, SelectField } from '../../ui';
 import TransactionFlow from './TransactionFlow';
 
-import airtelMoneyLogo from '../../../assets/logos/airtel-money.png';
-import mtnMomoLogo from '../../../assets/logos/mtn-momo.png';
-import orangeMoneyLogo from '../../../assets/logos/orange-money.png';
-import mpesaLogo from '../../../assets/logos/mpesa.png';
-import waveLogo from '../../../assets/logos/wave.png';
+import airtelMoneyLogo from '../../../assets/logos/airtel-logo.png';
+import mtnMomoLogo from '../../../assets/logos/mtn-logo.png';
 
 interface TransferFormData {
   type: 'local' | 'international';
@@ -485,9 +482,6 @@ export default function TransfertArgent() {
   const partners = [
     { name: 'Airtel Money', logo: airtelMoneyLogo, coverage: 'Afrique Centrale', speed: 'Instantané' },
     { name: 'MTN MoMo', logo: mtnMomoLogo, coverage: 'Afrique de l\'Ouest', speed: 'Instantané' },
-    { name: 'Orange Money', logo: orangeMoneyLogo, coverage: 'Multi-pays', speed: 'Instantané' },
-    { name: 'M-Pesa', logo: mpesaLogo, coverage: 'Afrique de l\'Est', speed: '< 1 minute' },
-    { name: 'Wave', logo: waveLogo, coverage: 'Sénégal, Côte d\'Ivoire', speed: 'Instantané' }
   ];
 
   return (

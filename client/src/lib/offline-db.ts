@@ -237,6 +237,136 @@ export interface CachedMapTile {
   timestamp: number;
 }
 
+// ========== JOURNAL ENTRIES (Immutable Offline Ledger) ==========
+
+export type JournalEventType =
+  | 'DEPOSIT'
+  | 'WITHDRAWAL'
+  | 'LOAN_DISBURSEMENT'
+  | 'LOAN_REPAYMENT'
+  | 'TONTINE_CONTRIBUTION'
+  | 'TONTINE_DISTRIBUTION'
+  | 'CLIENT_CREATE'
+  | 'CLIENT_UPDATE'
+  | 'CAISSE_OPEN'
+  | 'CAISSE_CLOSE'
+  | 'CAISSE_RECONCILE'
+  | 'REMISE_CREATE'
+  | 'SETTLEMENT';
+
+export type JournalSyncStatus = 'local' | 'syncing' | 'confirmed' | 'rejected';
+
+export interface JournalEntry {
+  id?: number;
+  sequence: number;               // Monotonically increasing, gap-free
+  uuid: string;                   // UUIDv7 (timestamp-ordered)
+  type: JournalEventType;
+  agentId: number;
+  deviceId: string;               // Device fingerprint
+  agenceId: string;
+
+  // Payload
+  payload: string;                // AES-GCM encrypted JSON of business data
+  payloadHash: string;            // SHA-256 of plaintext payload
+
+  // Chain linking (tamper detection)
+  previousHash: string;           // Hash of previous entry ("GENESIS" for first)
+  entryHash: string;              // SHA-256(sequence|uuid|type|payloadHash|previousHash|timestamp)
+
+  // Signature
+  signature: string;              // ECDSA P-256 signature of entryHash
+  deviceKeyId: string;            // ID of signing key (for rotation tracking)
+
+  // Timestamps
+  localTimestamp: number;         // Date.now() at creation
+  monotonicClock: number;         // performance.now() relative to session boot
+  ntpOffset?: number;             // Last known NTP offset (serverTime - localTime)
+
+  // Sync state
+  syncStatus: JournalSyncStatus;
+  serverTimestamp?: number;       // Server-assigned timestamp after sync
+  serverSequence?: number;        // Global server sequence after sync
+  syncAttempts: number;
+  syncError?: string;
+
+  // Context
+  sessionId: string;              // Offline day session ID
+  operationRef: string;           // Business reference (e.g., EPG-20260213-XXXXXX)
+  idempotencyKey: string;
+  metadata?: string;              // JSON (GPS coords, billetage, etc.)
+}
+
+// ========== DEVICE KEYS (ECDSA P-256 Key Store) ==========
+
+export type DeviceKeyStatus = 'active' | 'rotated' | 'revoked';
+
+export interface DeviceKey {
+  id: string;                     // SHA-256 fingerprint of public key JWK
+  publicKey: string;              // Exported JWK (JSON string)
+  privateKey: CryptoKey;          // Non-extractable CryptoKey (stored by Dexie as structured clone)
+  createdAt: number;
+  expiresAt: number;              // 90-day rotation
+  status: DeviceKeyStatus;
+  agentId: number;
+  deviceFingerprint: string;
+  serverRegistered: boolean;      // Public key sent to server
+}
+
+// ========== AGENT DAY SESSION (Offline Treasury Tracking) ==========
+
+export type DaySessionSyncStatus = 'open' | 'closed' | 'synced' | 'reconciled';
+
+export interface AgentDaySession {
+  id?: number;
+  date: string;                   // YYYY-MM-DD
+  agentId: number;
+  deviceId: string;
+
+  // Opening
+  openedAt: number;
+  openingBalance: number;         // Cash at start of day
+  openingBilletage: string;       // JSON denomination breakdown
+
+  // Real-time tracking
+  currentCashBalance: number;     // Computed = opening + sum(cash impacts)
+  operationCount: number;
+  dailyVolume: number;            // Sum of absolute amounts
+
+  // Collections
+  totalCollected: number;         // Deposits + repayments received
+  totalDisbursed: number;         // Withdrawals + disbursements made
+
+  // Closing
+  closedAt?: number;
+  closingBalance?: number;        // Physically counted cash
+  closingBilletage?: string;
+  discrepancy?: number;           // closingBalance - currentCashBalance
+  discrepancyJustification?: string;
+
+  // Sync
+  syncStatus: DaySessionSyncStatus;
+  lastSyncTimestamp: number;
+
+  // Chain reference
+  firstJournalSequence?: number;
+  lastJournalSequence?: number;
+}
+
+// ========== OFFLINE LIMITS (Server-Signed Parameters) ==========
+
+export interface OfflineLimits {
+  id: string;                     // 'current'
+  maxCaisseBalance: number;       // Max agent cash balance (e.g., 5,000,000 XAF)
+  maxSingleOperation: number;     // Max single operation (e.g., 1,000,000 XAF)
+  maxDailyOperations: number;     // Max ops per day (e.g., 50)
+  maxDailyVolume: number;         // Max daily volume (e.g., 10,000,000 XAF)
+  maxOfflineDays: number;         // Max days offline (e.g., 7)
+  maxPendingSync: number;         // Max unsynced operations (e.g., 200)
+  allowedOperationTypes: string[];// Types allowed offline
+  lastUpdated: number;
+  serverSignature: string;        // HMAC-SHA256 by server (anti-tampering)
+}
+
 // ========== GPS TRACKING ==========
 
 export interface GpsTrackPoint {
@@ -282,8 +412,48 @@ class OfflineDatabase extends Dexie {
   mapTiles!: Table<CachedMapTile>;
   gpsTrackPoints!: Table<GpsTrackPoint>;
 
+  // Offline-native ledger tables
+  journalEntries!: Table<JournalEntry>;
+  deviceKeys!: Table<DeviceKey>;
+  agentDaySessions!: Table<AgentDaySession>;
+  offlineLimits!: Table<OfflineLimits>;
+
   constructor() {
     super('COFINOfflineDB');
+
+    // Version 3: Offline-native ledger with cryptographic integrity
+    this.version(3).stores({
+      // Sync queue tables
+      operations: '++id, uuid, type, priority, status, createdAt, idempotencyKey, userId, agenceId, backgroundSyncTag',
+      conflicts: '++id, operationId, entityType, entityId, createdAt, resolvedAt',
+      metadata: '++id, key',
+
+      // Entity tables
+      clients: '++id, uuid, serverId, isDirty, lastSyncedAt, agenceId, isDeleted',
+      transfers: '++id, uuid, serverId, status, lastSyncedAt, agenceId',
+      caisseTransactions: '++id, uuid, serverId, isDirty, lastSyncedAt, caisseId, sessionId',
+      epargneAccounts: '++id, uuid, serverId, clientId, isDirty, lastSyncedAt',
+      credits: '++id, uuid, serverId, clientId, isDirty, lastSyncedAt, status',
+      tontines: '++id, uuid, serverId, isDirty, lastSyncedAt',
+      remises: '++id, uuid, serverId, agentId, status, createdAt',
+      enquetes: '++id, uuid, serverId, clientId, demandeId, synced, timestamp, agentId',
+
+      // Cache tables
+      cachedQueries: '++id, key, timestamp',
+      cachedConfigs: '++id, key, version',
+      preferences: '++id, key, userId',
+
+      // Session & Maps
+      offlineSessions: '++id, userId, expiresAt',
+      mapTiles: '++id, tileUrl, zoom, [zoom+x+y], timestamp',
+      gpsTrackPoints: '++id, agentId, timestamp, synced',
+
+      // Offline-native ledger tables
+      journalEntries: '++id, sequence, uuid, type, syncStatus, sessionId, [agentId+syncStatus], idempotencyKey, localTimestamp',
+      deviceKeys: 'id, status, agentId, deviceFingerprint',
+      agentDaySessions: '++id, date, agentId, syncStatus, [agentId+date]',
+      offlineLimits: 'id'
+    });
 
     // Version 2: Enhanced schema with full offline support
     this.version(2).stores({

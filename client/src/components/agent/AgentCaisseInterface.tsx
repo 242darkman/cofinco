@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { DollarSign, CheckCircle, AlertCircle, Search, CreditCard, Banknote, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { DollarSign, CheckCircle, AlertCircle, Search, CreditCard, Banknote, ArrowDownCircle, ArrowUpCircle, WifiOff } from 'lucide-react';
 import AppShell from '../layout/AppShell';
 import AgentSidebarContent from '../layout/AgentSidebarContent';
 import AgentHeader from '../layout/AgentHeader';
+import OfflineDaySession from './offline/OfflineDaySession';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useNetworkStatus } from '@/contexts/NetworkContext';
+import { useOfflinePendingCount } from '@/hooks/useJournalSync';
+import { executeOfflineOperation } from '@/lib/offline-treasury';
 
 interface AgentCaisseInterfaceProps {
   agentId: string;
@@ -12,7 +17,13 @@ interface AgentCaisseInterfaceProps {
 
 export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseInterfaceProps) {
   const [agent, setAgent] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'versement' | 'retrait' | 'remboursement' | 'epargne'>('versement');
+  const [activeTab, setActiveTab] = useState<'versement' | 'retrait' | 'remboursement' | 'epargne' | 'offline'>('versement');
+
+  // Offline support
+  const { user } = useUserProfile();
+  const networkStatus = useNetworkStatus();
+  const isOffline = networkStatus === 'offline';
+  const pendingOffline = useOfflinePendingCount();
   const [searchClient, setSearchClient] = useState('');
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [montant, setMontant] = useState('');
@@ -165,6 +176,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
       case 'retrait': return 'Retrait';
       case 'remboursement': return 'Remboursement crédit';
       case 'epargne': return 'Collecte épargne';
+      case 'offline': return 'Session Offline';
       default: return tab;
     }
   };
@@ -175,10 +187,12 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
       case 'retrait': return <ArrowUpCircle size={size} />;
       case 'remboursement': return <CreditCard size={size} />;
       case 'epargne': return <Banknote size={size} />;
+      case 'offline': return <WifiOff size={size} />;
     }
   };
 
   const canPerformTab = (tab: typeof activeTab) => {
+    if (tab === 'offline') return true; // Offline session always accessible
     if (!agent) return false;
     switch (tab) {
       case 'versement': return agent.peut_faire_versements;
@@ -230,32 +244,49 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
       }
     >
       <div className="max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-4 gap-4 mb-6">
-          {(['versement', 'retrait', 'remboursement', 'epargne'] as const).map((tab) => (
+        <div className="grid md:grid-cols-5 gap-4 mb-6">
+          {(['versement', 'retrait', 'remboursement', 'epargne', 'offline'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               disabled={!canPerformTab(tab)}
-              className={`p-4 rounded-xl border transition-all duration-300 ${
+              className={`p-4 rounded-xl border transition-all duration-300 relative ${
                 activeTab === tab
-                  ? 'bg-gradient-to-br from-blue-600 to-cyan-600 border-blue-500 shadow-lg shadow-blue-500/30 text-white scale-105'
+                  ? tab === 'offline'
+                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 border-amber-500 shadow-lg shadow-amber-500/30 text-white scale-105'
+                    : 'bg-gradient-to-br from-blue-600 to-cyan-600 border-blue-500 shadow-lg shadow-blue-500/30 text-white scale-105'
                   : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800 hover:scale-105'
               } ${!canPerformTab(tab) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="flex items-center justify-between mb-2">
                 {getTabIcon(tab)}
-                <span className="text-2xl">
-                  {tab === 'versement' && '💵'}
-                  {tab === 'retrait' && '💸'}
-                  {tab === 'remboursement' && '💳'}
-                  {tab === 'epargne' && '💰'}
-                </span>
+                {tab === 'offline' && pendingOffline > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {pendingOffline > 99 ? '99+' : pendingOffline}
+                  </span>
+                )}
               </div>
-              <p className="font-semibold">{getTabLabel(tab)}</p>
+              <p className="font-semibold text-sm">{getTabLabel(tab)}</p>
             </button>
           ))}
         </div>
 
+        {/* Offline Session Tab */}
+        {activeTab === 'offline' && (
+          <div className="animate-slide-up">
+            {user?.id ? (
+              <OfflineDaySession
+                agentId={parseInt(user.id, 10)}
+                agenceId={user.agenceId || ''}
+              />
+            ) : (
+              <div className="text-center py-12 text-slate-400">Chargement du profil...</div>
+            )}
+          </div>
+        )}
+
+        {/* Transaction Tabs */}
+        {activeTab !== 'offline' && (
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="card-gradient p-6 animate-slide-up">
@@ -416,6 +447,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {notification && (

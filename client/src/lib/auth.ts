@@ -1,5 +1,6 @@
 import { authApi, AuthUser, setOnUnauthorized, PermissionsData, ApiError } from './api-client';
-import { initEncryptionKey, clearEncryptionKey } from './offline-crypto';
+import { initEncryptionKey, clearEncryptionKey, clearSigningKey, clearHmacKey } from './offline-crypto';
+import { initializeDeviceKey, teardownDeviceKey } from './device-key-manager';
 import type { AppModule } from '@shared/config/rbac';
 import { SystemRole, hasRole as hasSystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
@@ -102,6 +103,12 @@ class AuthService {
         // Fallback: charger les permissions depuis l'API si non incluses
         await this.loadPermissionsFromApi();
       }
+
+      // Initialize offline encryption key and ECDSA device signing key
+      initEncryptionKey(user.id).catch(() => {});
+      initializeDeviceKey(user.id).catch((err) => {
+        console.warn('[Auth] Device key initialization failed (non-blocking):', err);
+      });
 
       // Démarrer la vérification périodique de session
       this.startSessionCheck();
@@ -270,6 +277,9 @@ class AuthService {
     this.permissionsLoaded = false;
     this.stopSessionCheck();
     clearEncryptionKey();
+    clearSigningKey();
+    clearHmacKey();
+    teardownDeviceKey();
 
     // Nettoyer l'ancien localStorage (migration)
     localStorage.removeItem('cofin_user');
@@ -363,8 +373,11 @@ class AuthService {
       const user = this.mapAuthUser(authUser);
       this.currentUser = user;
       await this.loadPermissionsFromApi();
-      // Initialize offline encryption key from user ID
+      // Initialize offline encryption key and ECDSA device signing key
       initEncryptionKey(user.id).catch(() => {});
+      initializeDeviceKey(user.id).catch((err) => {
+        console.warn('[Auth] Device key initialization failed (non-blocking):', err);
+      });
       this.startSessionCheck();
       return this.currentUser;
     } catch (error) {

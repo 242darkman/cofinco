@@ -161,3 +161,203 @@ export const SENSITIVE_FIELDS: Record<string, string[]> = {
   operations: ['payload'], // Operation payloads contain financial data
   sessions: ['data'], // Session data may contain auth info
 };
+
+// ========== ECDSA P-256 DEVICE KEY MANAGEMENT ==========
+
+/**
+ * ECDSA P-256 key pair management for offline journal signing.
+ *
+ * Each device/agent pair generates a non-extractable private key stored
+ * in the browser's CryptoKey store (via IndexedDB). The public key is
+ * exported as JWK and registered with the server.
+ *
+ * This provides:
+ * - Non-repudiation: only this device could have signed the entry
+ * - Tamper detection: modified entries fail signature verification
+ * - Key rotation: 90-day rotation with graceful fallback
+ */
+
+const ECDSA_PARAMS: EcKeyGenParams = {
+  name: 'ECDSA',
+  namedCurve: 'P-256',
+};
+
+const ECDSA_SIGN_PARAMS: EcdsaParams = {
+  name: 'ECDSA',
+  hash: 'SHA-256',
+};
+
+let activeSigningKey: CryptoKey | null = null;
+let activeKeyId: string | null = null;
+
+/**
+ * Generate a new ECDSA P-256 key pair.
+ * The private key is non-extractable (cannot be read from JS).
+ * Returns the public key as JWK and a CryptoKeyPair for signing.
+ */
+export async function generateDeviceKeyPair(): Promise<{
+  keyId: string;
+  publicKeyJwk: JsonWebKey;
+  keyPair: CryptoKeyPair;
+}> {
+  const keyPair = await crypto.subtle.generateKey(
+    ECDSA_PARAMS,
+    false, // Private key NOT extractable
+    ['sign', 'verify']
+  );
+
+  const publicKeyJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+
+  // Key ID = SHA-256 fingerprint of the public key JWK
+  const keyId = await computeSha256(JSON.stringify(publicKeyJwk));
+
+  return { keyId, publicKeyJwk, keyPair };
+}
+
+/**
+ * Set the active signing key (loaded from IndexedDB on app start).
+ */
+export function setActiveSigningKey(privateKey: CryptoKey, keyId: string): void {
+  activeSigningKey = privateKey;
+  activeKeyId = keyId;
+}
+
+/**
+ * Get the current active key ID.
+ */
+export function getActiveKeyId(): string | null {
+  return activeKeyId;
+}
+
+/**
+ * Clear the active signing key (on logout or key rotation).
+ */
+export function clearSigningKey(): void {
+  activeSigningKey = null;
+  activeKeyId = null;
+}
+
+/**
+ * Check if a signing key is available.
+ */
+export function hasSigningKey(): boolean {
+  return activeSigningKey !== null;
+}
+
+/**
+ * Sign a message (hash string) using the active ECDSA private key.
+ * Returns a base64-encoded signature.
+ */
+export async function signData(data: string): Promise<string> {
+  if (!activeSigningKey) {
+    throw new Error('No active signing key. Device key not initialized.');
+  }
+
+  const encoded = new TextEncoder().encode(data);
+  const signature = await crypto.subtle.sign(
+    ECDSA_SIGN_PARAMS,
+    activeSigningKey,
+    encoded
+  );
+
+  return arrayBufferToBase64(signature);
+}
+
+/**
+ * Verify an ECDSA signature against a public key (JWK).
+ * Used for local chain verification and server-side validation.
+ */
+export async function verifySignature(
+  data: string,
+  signatureBase64: string,
+  publicKeyJwk: JsonWebKey
+): Promise<boolean> {
+  try {
+    const publicKey = await crypto.subtle.importKey(
+      'jwk',
+      publicKeyJwk,
+      ECDSA_PARAMS,
+      false,
+      ['verify']
+    );
+
+    const encoded = new TextEncoder().encode(data);
+    const signature = base64ToArrayBuffer(signatureBase64);
+
+    return await crypto.subtle.verify(
+      ECDSA_SIGN_PARAMS,
+      publicKey,
+      signature,
+      encoded
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ========== HMAC VERIFICATION (Server-signed limits) ==========
+
+/**
+ * Verify HMAC-SHA256 signature on server-provided data (e.g., offline limits).
+ * The HMAC key is derived from a server-provided secret during sync handshake.
+ */
+let hmacVerifyKey: CryptoKey | null = null;
+
+export async function initHmacKey(serverSecret: string): Promise<void> {
+  const keyMaterial = new TextEncoder().encode(serverSecret);
+  hmacVerifyKey = await crypto.subtle.importKey(
+    'raw',
+    keyMaterial,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['verify']
+  );
+}
+
+export async function verifyHmac(data: string, signatureBase64: string): Promise<boolean> {
+  if (!hmacVerifyKey) return false;
+
+  try {
+    const encoded = new TextEncoder().encode(data);
+    const signature = base64ToArrayBuffer(signatureBase64);
+    return await crypto.subtle.verify('HMAC', hmacVerifyKey, signature, encoded);
+  } catch {
+    return false;
+  }
+}
+
+export function clearHmacKey(): void {
+  hmacVerifyKey = null;
+}
+
+// ========== HASHING UTILITIES ==========
+
+/**
+ * Compute SHA-256 hash of a string. Returns hex-encoded hash.
+ */
+export async function computeSha256(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ========== BINARY CONVERSION UTILITIES ==========
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
