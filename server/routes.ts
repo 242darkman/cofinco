@@ -68,7 +68,7 @@ export function registerRoutes(app: Express): Server {
 
   // Mobile Money Payments & Webhooks
   app.use("/api/payments", paymentsRouter);
-  app.use("/api/webhooks", webhooksRouter); // Webhooks MTN/Airtel (router dédié, sans auth)
+  app.use("/api/webhooks", webhooksRouter); // Webhooks pawaPay (router dédié, sans auth)
   app.use("/api/payments-test", paymentsTestRouter); // Test endpoints (dev only)
 
   // Storage routes (unified)

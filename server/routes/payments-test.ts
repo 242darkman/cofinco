@@ -1,6 +1,6 @@
 /**
  * Payment Test Routes (Development Only)
- * Endpoints pour tester le flux Mobile Money sans vrais providers
+ * Endpoints pour tester le flux Mobile Money pawaPay en sandbox
  */
 
 import { Router } from "express";
@@ -9,6 +9,7 @@ import { createLogger } from "../lib/logger";
 const logger = createLogger('Routes:PaymentsTest');
 import * as storage from "../storage/mobile-money";
 import { paymentService } from "../services/mobile-money/payment-service";
+import { operatorToCorrespondent, resolveOperatorFromPhone } from "../services/mobile-money/providers/pawapay/pawapay-config";
 
 export const paymentsTestRouter = Router();
 
@@ -22,7 +23,7 @@ paymentsTestRouter.use((req, res, next) => {
 
 /**
  * POST /api/payments-test/simulate-webhook
- * Simule un webhook de confirmation (SUCCESS ou FAILED)
+ * Simule un webhook pawaPay (SUCCESS, FAILED, EXPIRED)
  */
 paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
   try {
@@ -45,31 +46,48 @@ paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
       return res.status(404).json({ error: "Payment intent non trouvé" });
     }
 
-    // Simuler le payload webhook selon le provider
-    const webhookPayload = intent.provider === "MTN"
+    // Résoudre le correspondent pawaPay
+    const operator = (intent as any).operator || intent.provider || "MTN";
+    const correspondent = (intent as any).correspondent || operatorToCorrespondent(operator as "MTN" | "AIRTEL");
+
+    // Simuler le payload webhook au format pawaPay
+    const isDeposit = intent.type === "COLLECTION";
+    const webhookPayload = isDeposit
       ? {
-          // Format MTN MoMo
-          referenceId: intent.providerRef,
-          externalId: intent.externalRef,
-          status: status === "SUCCESS" ? "SUCCESSFUL" : status === "FAILED" ? "FAILED" : "EXPIRED",
+          // Format pawaPay deposit callback
+          depositId: intent.externalRef,
+          status: status === "SUCCESS" ? "COMPLETED" : status === "FAILED" ? "FAILED" : "EXPIRED",
+          amount: intent.amount,
+          currency: intent.currency || "XAF",
+          correspondent,
+          country: "COG",
+          payer: { type: "MSISDN", address: { value: intent.phone } },
           financialTransactionId: providerTxnId || `SIM-${Date.now()}`,
+          depositFee: status === "SUCCESS" ? Math.round(parseFloat(intent.amount) * 0.01) : undefined,
+          correspondentFee: status === "SUCCESS" ? Math.round(parseFloat(intent.amount) * 0.005) : undefined,
+          created: new Date().toISOString(),
+          respondedByPayer: new Date().toISOString(),
           reason: status !== "SUCCESS" ? `Simulated ${status}` : undefined,
         }
       : {
-          // Format Airtel
-          transaction: {
-            id: intent.providerRef || intent.externalRef,
-            partner_id: intent.externalRef,
-            status_code: status === "SUCCESS" ? "TS" : status === "FAILED" ? "TF" : "TE",
-            airtel_money_id: providerTxnId || `SIM-${Date.now()}`,
-            message: `Simulated ${status} webhook`,
-          },
+          // Format pawaPay payout callback
+          payoutId: intent.externalRef,
+          status: status === "SUCCESS" ? "COMPLETED" : status === "FAILED" ? "FAILED" : "EXPIRED",
+          amount: intent.amount,
+          currency: intent.currency || "XAF",
+          correspondent,
+          country: "COG",
+          recipient: { type: "MSISDN", address: { value: intent.phone } },
+          financialTransactionId: providerTxnId || `SIM-${Date.now()}`,
+          payoutFee: status === "SUCCESS" ? Math.round(parseFloat(intent.amount) * 0.01) : undefined,
+          created: new Date().toISOString(),
+          reason: status !== "SUCCESS" ? `Simulated ${status}` : undefined,
         };
 
-    // Traiter comme un vrai webhook
+    // Traiter comme un vrai webhook pawaPay (sans vérification de signature en sandbox)
     await paymentService.handleWebhook(
-      intent.provider as "MTN" | "AIRTEL",
       webhookPayload,
+      JSON.stringify(webhookPayload),
       "simulated-signature",
       {}
     );
@@ -78,7 +96,7 @@ paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
     const updatedIntent = await storage.getPaymentIntent(paymentIntentId);
 
     res.json({
-      message: `Webhook ${status} simulé avec succès`,
+      message: `Webhook pawaPay ${status} simulé avec succès`,
       intent: updatedIntent,
     });
   } catch (error) {
@@ -92,7 +110,7 @@ paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
 
 /**
  * POST /api/payments-test/create-mock-intent
- * Crée un payment intent de test sans appeler le provider
+ * Crée un payment intent de test sans appeler pawaPay
  */
 paymentsTestRouter.post("/create-mock-intent", async (req, res) => {
   try {
@@ -110,8 +128,15 @@ paymentsTestRouter.post("/create-mock-intent", async (req, res) => {
       return res.status(400).json({ error: "clientId requis" });
     }
 
+    // Résoudre l'opérateur et le correspondent
+    const operator = provider as "MTN" | "AIRTEL";
+    const correspondent = operatorToCorrespondent(operator);
+
     const intent = await storage.createPaymentIntent({
-      provider,
+      provider: operator,
+      gateway: "PAWAPAY",
+      operator,
+      correspondent,
       type,
       amount: amount.toString(),
       currency: "XAF",
@@ -127,7 +152,7 @@ paymentsTestRouter.post("/create-mock-intent", async (req, res) => {
     });
 
     res.status(201).json({
-      message: "Mock payment intent créé",
+      message: "Mock payment intent créé (pawaPay sandbox)",
       intent,
       nextStep: `POST /api/payments-test/simulate-webhook avec paymentIntentId: ${intent.id}`,
     });
@@ -156,11 +181,14 @@ paymentsTestRouter.get("/pending", async (req, res) => {
       intents: intents.data.map((i) => ({
         id: i.id,
         provider: i.provider,
+        gateway: (i as any).gateway,
+        operator: (i as any).operator,
+        correspondent: (i as any).correspondent,
         type: i.type,
         amount: i.amount,
         phone: i.phone,
         status: i.status,
-        providerRef: i.providerRef,
+        externalRef: i.externalRef,
         createdAt: i.createdAt,
       })),
     });
@@ -171,7 +199,7 @@ paymentsTestRouter.get("/pending", async (req, res) => {
 
 /**
  * GET /api/payments-test/health
- * Vérifie que les providers sont initialisés
+ * Vérifie que pawaPay est initialisé
  */
 paymentsTestRouter.get("/health", async (req, res) => {
   try {
@@ -180,6 +208,7 @@ paymentsTestRouter.get("/health", async (req, res) => {
     const providers = providerRegistry.getCodes();
     const status = {
       initialized: providers.length > 0,
+      gateway: "PAWAPAY",
       providers: providers.map((code) => ({
         code,
         name: providerRegistry.get(code)?.name,

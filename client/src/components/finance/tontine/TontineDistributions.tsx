@@ -5,6 +5,13 @@ import {
   StatutMembreTontine
 } from '@shared/enum/status-constants';
 import { Check, DollarSign, User, X, AlertTriangle, Wallet, TrendingDown, Banknote, Smartphone, Clock, Play } from 'lucide-react';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
+
+const MOBILE_OPERATORS = [
+  { id: 'MTN', name: 'MTN Mobile Money', color: 'bg-yellow-500', logo: mtnLogo },
+  { id: 'AIRTEL', name: 'Airtel Money', color: 'bg-red-500', logo: airtelLogo },
+] as const;
 import { Card, Button, Badge, IconButton } from '../../ui';
 import { tontineMembreApi, tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -447,15 +454,23 @@ export default function TontineDistributions({ tontineId, montantContribution, t
               {payoutMethod === 'MOBILE_MONEY' && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Opérateur</label>
-                  <select
-                    value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:border-emerald-500 focus:outline-none text-sm"
-                  >
-                    <option value="">Sélectionner...</option>
-                    <option value="MTN">MTN</option>
-                    <option value="AIRTEL">Airtel</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MOBILE_OPERATORS.map(op => (
+                      <button
+                        key={op.id}
+                        type="button"
+                        onClick={() => setProvider(op.id)}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border text-sm font-medium transition ${
+                          provider === op.id
+                            ? 'bg-emerald-600 border-emerald-500 text-white'
+                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <img src={op.logo} alt={op.name} className="w-6 h-6 rounded-full object-contain bg-white/10" />
+                        {op.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

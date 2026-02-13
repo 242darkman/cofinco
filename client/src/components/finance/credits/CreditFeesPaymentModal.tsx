@@ -9,8 +9,8 @@ import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentS
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { MethodePaiement, METHODE_PAIEMENT_LABELS, type MethodePaiementType } from '@shared/enum/status-constants';
-import mtnMomoLogo from '../../../assets/logos/momo_mtna.png';
-import airtelMoneyLogo from '../../../assets/logos/airtel-money.png';
+import mtnMomoLogo from '@/assets/logos/mtn-logo.png';
+import airtelMoneyLogo from '@/assets/logos/airtel-logo.png';
 
 interface CreditFeesPaymentModalProps {
   demande: any;

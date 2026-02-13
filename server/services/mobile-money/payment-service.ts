@@ -1,18 +1,19 @@
 /**
  * Payment Service
- * Service orchestrateur pour les paiements Mobile Money
+ * Service orchestrateur pour les paiements Mobile Money via pawaPay
  *
  * Fonctionnalités:
- * - Collection (dépôts, remboursements, cotisations tontine)
- * - Payout (retraits, décaissements)
- * - Webhooks et réconciliation
+ * - Collection (dépôts, remboursements, cotisations tontine) via pawaPay
+ * - Payout (retraits, décaissements) via pawaPay
+ * - Webhook pawaPay avec signature RFC 9421
  * - Traçabilité operationsCaisse et caisses digitales
  * - Allocation crédit (pénalités → intérêts → principal)
  * - Reversals et réconciliation manuelle
+ * - Fee tracking (pawaPay aggregator fees)
  */
 
 import { db } from "../../db";
-import { paymentIntents, operationsCaisse, sessionsCaisse, type PaymentIntent } from "@shared/schema";
+import { paymentIntents, operationsCaisse, sessionsCaisse, transactionsCompte, type PaymentIntent } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
@@ -27,13 +28,16 @@ import type {
   InitiateCollectionParams,
   InitiatePayoutParams,
   PaymentIntentFilter,
-  WebhookPayload
+  WebhookPayload,
+  MobileOperator,
+  RefundRequest,
 } from "./types";
-import { MobileMoneyError, WebhookVerificationError } from "./types";
+import { MobileMoneyError } from "./types";
 import { getOrCreateDigitalCaisse, updateDigitalCaisseSolde } from "./mm-caisse-service";
-import { allocateCreditRepayment, type AllocationResult } from "../credit-allocation-service";
+import { allocateCreditRepayment } from "../credit-allocation-service";
 import { canMemberWithdraw } from "../tontine-logic";
 import { TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
+import { operatorToCorrespondent, correspondentToOperator, resolveOperatorFromPhone } from "./providers/pawapay/pawapay-config";
 import { createLogger } from "../../lib/logger";
 
 const logger = createLogger('PaymentService');
@@ -51,12 +55,30 @@ async function getAgentMmPaymentService() {
 // Timeout par défaut en minutes
 const PAYMENT_TIMEOUT_MINUTES = parseInt(process.env.PAYMENT_TIMEOUT_MINUTES || "30", 10);
 
-// URL de callback
-const CALLBACK_BASE_URL = process.env.APP_URL || "http://localhost:5000";
+/**
+ * Résout l'opérateur (MTN/AIRTEL) à partir du numéro de téléphone ou du paramètre provider
+ */
+function resolveOperator(provider: MobileOperator, phone: string): MobileOperator {
+  // Le paramètre provider a la priorité (sélection UI explicite)
+  if (provider === "MTN" || provider === "AIRTEL") {
+    return provider;
+  }
+  // Sinon, résoudre depuis le numéro de téléphone
+  const resolved = resolveOperatorFromPhone(phone);
+  if (!resolved) {
+    throw new MobileMoneyError(
+      `Impossible de déterminer l'opérateur pour le numéro ${phone}`,
+      "OPERATOR_RESOLUTION_FAILED",
+      "PAWAPAY",
+      false
+    );
+  }
+  return resolved;
+}
 
 class PaymentService {
   /**
-   * Initie une collection (argent entrant)
+   * Initie une collection (argent entrant) via pawaPay
    * Utilisé pour: dépôts, remboursements crédit, cotisations tontine
    */
   async initiateCollection(
@@ -86,20 +108,23 @@ class PaymentService {
       }
     }
 
-    // Récupérer le provider
-    const providerInstance = providerRegistry.getOrThrow(provider);
+    // Résoudre l'opérateur et le correspondant pawaPay
+    const operator = resolveOperator(provider, phone);
+    const correspondent = operatorToCorrespondent(operator);
 
-    // Récupérer la currency du provider (adapté selon sandbox/production)
-    const providerConfig = (providerInstance as any).config || (providerInstance as any).getConfig?.() || {};
-    const currency = providerConfig.currency || "XAF";
+    // Récupérer le provider pawaPay
+    const pawaPayProvider = providerRegistry.getPawaPay();
 
     // Créer l'intent avec status CREATED
     const intent = await storage.createPaymentIntent({
-      provider,
+      provider: operator,
       type: "COLLECTION",
       status: "CREATED",
+      gateway: "PAWAPAY",
+      operator,
+      correspondent,
       amount: amount.toString(),
-      currency,
+      currency: "XAF",
       phone,
       clientId,
       compteId,
@@ -116,15 +141,13 @@ class PaymentService {
     });
 
     try {
-      // Appeler le provider
-      // Use provider's configured callback URL (from MTN_MOMO_CALLBACK_URL)
-      // If not configured, fallback to constructing from APP_URL
-      const providerCallbackUrl = providerConfig.callbackUrl || `${CALLBACK_BASE_URL}/api/webhooks/${provider.toLowerCase()}`;
-      const response = await providerInstance.collect({
+      // Appeler pawaPay collect avec le correspondant
+      const response = await pawaPayProvider.collect({
         amount,
         phone,
         externalRef: intent.externalRef,
-        callbackUrl: providerCallbackUrl,
+        callbackUrl: "", // pawaPay v2 ne supporte pas callbackUrl dans le body — configurer dans le dashboard pawaPay
+        correspondent,
         description,
       });
 
@@ -134,14 +157,12 @@ class PaymentService {
         status: "PENDING",
         initiatedAt: new Date(),
         expireAt: new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000),
-        callbackUrl: providerCallbackUrl,
       });
 
-      logger.info({ intentId: intent.id, providerRef: response.providerRef }, 'Collection initiated');
+      logger.info({ intentId: intent.id, providerRef: response.providerRef, operator, correspondent }, 'Collection initiated via pawaPay');
       return updatedIntent!;
     } catch (error) {
-      // En cas d'erreur, marquer l'intent comme FAILED
-      logger.error({ err: error }, 'Collection failed');
+      logger.error({ err: error, operator, correspondent }, 'Collection failed');
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const errorCode = error instanceof MobileMoneyError ? error.code : "PROVIDER_ERROR";
@@ -158,7 +179,7 @@ class PaymentService {
   }
 
   /**
-   * Initie un payout (argent sortant)
+   * Initie un payout (argent sortant) via pawaPay
    * Utilisé pour: décaissements crédit, retraits, remboursements frais
    */
   async initiatePayout(
@@ -172,6 +193,7 @@ class PaymentService {
       clientId,
       compteId,
       creditId,
+      tontineId,
       description,
       idempotencyKey,
       agenceId,
@@ -187,40 +209,52 @@ class PaymentService {
       }
     }
 
-    // Récupérer le provider
-    const providerInstance = providerRegistry.getOrThrow(provider);
+    // Résoudre l'opérateur et le correspondant pawaPay
+    const operator = resolveOperator(provider, phone);
+    const correspondent = operatorToCorrespondent(operator);
 
-    // Récupérer la currency du provider (adapté selon sandbox/production)
-    const providerConfig = (providerInstance as any).config || (providerInstance as any).getConfig?.() || {};
-    const currency = providerConfig.currency || "XAF";
+    // Récupérer le provider pawaPay
+    const pawaPayProvider = providerRegistry.getPawaPay();
+
+    // Déterminer le useCase
+    const useCase = creditId
+      ? "CREDIT_DISBURSEMENT"
+      : tontineId
+        ? "TONTINE_DISTRIBUTION"
+        : "WITHDRAWAL_SAVINGS";
 
     // Créer l'intent avec status CREATED
     const intent = await storage.createPaymentIntent({
-      provider,
+      provider: operator,
       type: "PAYOUT",
       status: "CREATED",
+      gateway: "PAWAPAY",
+      operator,
+      correspondent,
       amount: amount.toString(),
-      currency,
+      currency: "XAF",
       phone,
       clientId,
       compteId,
       creditId,
+      tontineId,
       agenceId,
       idempotencyKey,
       metadata: {
         ...metadata,
         description,
-        useCase: creditId ? "CREDIT_DISBURSEMENT" : "WITHDRAWAL",
+        useCase,
       },
       createdBy: userId,
     });
 
     try {
-      // Appeler le provider
-      const response = await providerInstance.payout({
+      // Appeler pawaPay payout
+      const response = await pawaPayProvider.payout({
         amount,
         phone,
         externalRef: intent.externalRef,
+        correspondent,
         description,
       });
 
@@ -232,10 +266,10 @@ class PaymentService {
         expireAt: new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000),
       });
 
-      logger.info({ intentId: intent.id, providerRef: response.providerRef }, 'Payout initiated');
+      logger.info({ intentId: intent.id, providerRef: response.providerRef, operator, correspondent }, 'Payout initiated via pawaPay');
       return updatedIntent!;
     } catch (error) {
-      logger.error({ err: error }, 'Payout failed');
+      logger.error({ err: error, operator, correspondent }, 'Payout failed');
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const errorCode = error instanceof MobileMoneyError ? error.code : "PROVIDER_ERROR";
@@ -252,22 +286,27 @@ class PaymentService {
   }
 
   /**
-   * Gère un webhook entrant d'un provider
+   * Gère un webhook entrant de pawaPay
    */
   async handleWebhook(
-    provider: "MTN" | "AIRTEL",
     payload: unknown,
+    rawBodyStr: string,
     signature: string,
     headers: Record<string, string>
   ): Promise<void> {
-    const providerInstance = providerRegistry.getOrThrow(provider);
+    const pawaPayProvider = providerRegistry.getPawaPay();
 
-    // 1. Logger l'événement brut
-    const parsedPayload = providerInstance.parseWebhookPayload(payload);
-    console.log(">>> [DEBUG] Parsed Payload:", JSON.stringify(parsedPayload, null, 2));
+    // 1. Parser le payload
+    const parsedPayload = pawaPayProvider.parseWebhookPayload(payload);
 
+    // Extraire l'opérateur depuis le correspondent dans le payload
+    const rawPayload = payload as Record<string, unknown>;
+    const payloadCorrespondent = (rawPayload.correspondent as string) || "";
+    const operator = payloadCorrespondent ? correspondentToOperator(payloadCorrespondent) : undefined;
+
+    // 2. Logger l'événement brut
     const event = await storage.createProviderEvent({
-      provider,
+      provider: operator || "MTN", // Fallback, sera corrigé lors du traitement
       eventType: parsedPayload.status || "UNKNOWN",
       providerRef: parsedPayload.providerRef,
       externalRef: parsedPayload.externalRef,
@@ -276,59 +315,76 @@ class PaymentService {
       processed: false,
     });
 
-    logger.info({ provider, eventId: event.id }, 'Webhook received');
+    logger.info({ eventId: event.id, operator, correspondent: payloadCorrespondent }, 'pawaPay webhook received');
 
-    // 2. Vérifier la signature
-    const isValid = providerInstance.verifyWebhook(payload, signature, headers);
-    console.log(`>>> [DEBUG] Webhook Signature Valid: ${isValid}`);
-    console.log(`>>> [DEBUG] Signature headers present:`, JSON.stringify(headers));
+    // 3. Vérifier la signature RFC 9421 (utilise le rawBody pour Content-Digest)
+    const isValid = pawaPayProvider.verifyWebhook(rawBodyStr, signature, headers);
 
     if (!isValid) {
-      logger.warn({ provider }, 'Invalid webhook signature');
+      logger.warn('Invalid pawaPay webhook signature');
       await storage.markEventProcessed(event.id, undefined, "INVALID_SIGNATURE");
-      return; // Ne pas lever d'erreur, retourner 200 quand même
+      return;
     }
 
-    // 3. Trouver le payment intent
+    // 4. Trouver le payment intent par externalRef (= depositId/payoutId)
     let intent: PaymentIntent | undefined;
 
-    if (parsedPayload.providerRef) {
-      intent = await storage.getPaymentIntentByProviderRef(provider, parsedPayload.providerRef);
-    }
-
-    if (!intent && parsedPayload.externalRef) {
+    if (parsedPayload.externalRef) {
       intent = await storage.getPaymentIntentByExternalRef(parsedPayload.externalRef);
     }
 
+    if (!intent && parsedPayload.providerRef) {
+      // Fallback par providerRef
+      const searchOperator = operator || "MTN";
+      intent = await storage.getPaymentIntentByProviderRef(searchOperator, parsedPayload.providerRef);
+    }
+
     if (!intent) {
-      console.log(">>> [DEBUG] NO INTENT FOUND for ref:", parsedPayload.providerRef || parsedPayload.externalRef);
-      logger.warn({ provider, providerRef: parsedPayload.providerRef }, 'Orphan webhook: no intent found');
+      logger.warn({ providerRef: parsedPayload.providerRef, externalRef: parsedPayload.externalRef }, 'Orphan webhook: no intent found');
       await storage.markEventProcessed(event.id, undefined, "INTENT_NOT_FOUND");
       return;
     }
-    
-    console.log(`>>> [DEBUG] Intent Found: ${intent.id} | Status: ${intent.status}`);
 
-    // 4. Vérifier l'idempotence
+    // 5. Stocker le callback brut et la validité de la signature
+    await storage.updatePaymentIntent(intent.id, {
+      rawCallbackPayload: payload as Record<string, unknown>,
+      callbackSignatureValid: isValid,
+      providerTxnId: (rawPayload.financialTransactionId as string) || undefined,
+    });
+
+    // 6. Vérifier l'idempotence
     if (["SUCCESS", "FAILED", "EXPIRED", "CANCELLED", "REVERSED"].includes(intent.status)) {
-      console.log(">>> [DEBUG] Intent already terminal, skipping.");
       logger.info({ intentId: intent.id, status: intent.status }, 'Intent already in terminal state');
       await storage.markEventProcessed(event.id, intent.id, "ALREADY_PROCESSED");
       return;
     }
 
-    // 5. Normaliser le statut
-    const normalizedStatus = providerInstance.normalizeStatus(parsedPayload.status);
-    console.log(`>>> [DEBUG] Local Intent Status: ${intent.status} -> New Provider Status: ${parsedPayload.status} (Normalized: ${normalizedStatus})`);
+    // 7. Normaliser le statut pawaPay
+    const normalizedStatus = pawaPayProvider.normalizeStatus(parsedPayload.status);
 
-
-    // 6. Traiter selon le statut
+    // 8. Traiter selon le statut
     if (normalizedStatus === "SUCCESS") {
-      await this.processSuccessfulPayment(intent, parsedPayload.financialTransactionId);
+      // Extraire les frais du payload
+      const feeAmount = this.extractFeeAmount(rawPayload);
+      const feeBreakdown = this.extractFeeBreakdown(rawPayload);
+      const settlementTimestamp = rawPayload.settlementTimestamp
+        ? new Date(rawPayload.settlementTimestamp as string)
+        : undefined;
+
+      // Stocker les fees et le settlement
+      if (feeAmount || feeBreakdown || settlementTimestamp) {
+        await storage.updatePaymentIntent(intent.id, {
+          feeAmount: feeAmount?.toString(),
+          feeBreakdown: feeBreakdown as any,
+          settlementTimestamp,
+        });
+      }
+
+      await this.processSuccessfulPayment(intent, parsedPayload.financialTransactionId, feeAmount);
       await storage.markEventProcessed(event.id, intent.id);
     } else if (normalizedStatus === "FAILED") {
-      const errorCode = parsedPayload.reason as string || "UNKNOWN";
-      const errorMessage = `Payment failed: ${parsedPayload.reason}`;
+      const errorCode = (parsedPayload.reason as string) || "UNKNOWN";
+      const errorMessage = `Payment failed: ${parsedPayload.reason || "unknown reason"}`;
 
       await storage.updatePaymentIntent(intent.id, {
         status: "FAILED",
@@ -367,23 +423,103 @@ class PaymentService {
     }
     // Si PENDING, on ne fait rien (on attend le prochain webhook)
 
-    logger.info({ intentId: intent.id, status: normalizedStatus }, 'Webhook processed');
+    logger.info({ intentId: intent.id, status: normalizedStatus }, 'pawaPay webhook processed');
   }
 
   /**
-   * Traite un paiement réussi - crée les écritures comptables
+   * Extraire le montant des frais du payload pawaPay
+   */
+  private extractFeeAmount(payload: Record<string, unknown>): number | undefined {
+    // pawaPay deposit callbacks include depositFee or correspondentFee
+    const depositFee = payload.depositFee as number | undefined;
+    const correspondentFee = payload.correspondentFee as number | undefined;
+    const payoutFee = payload.payoutFee as number | undefined;
+
+    if (depositFee != null) return depositFee;
+    if (correspondentFee != null) return correspondentFee;
+    if (payoutFee != null) return payoutFee;
+    return undefined;
+  }
+
+  /**
+   * Extraire le breakdown des frais du payload pawaPay
+   */
+  private extractFeeBreakdown(payload: Record<string, unknown>): Record<string, unknown> | undefined {
+    const breakdown: Record<string, unknown> = {};
+    let hasFees = false;
+
+    if (payload.depositFee != null) { breakdown.depositFee = payload.depositFee; hasFees = true; }
+    if (payload.correspondentFee != null) { breakdown.correspondentFee = payload.correspondentFee; hasFees = true; }
+    if (payload.payoutFee != null) { breakdown.payoutFee = payload.payoutFee; hasFees = true; }
+    if (payload.suspenseAmount != null) { breakdown.suspenseAmount = payload.suspenseAmount; hasFees = true; }
+    if (payload.currency != null) { breakdown.currency = payload.currency; }
+
+    return hasFees ? breakdown : undefined;
+  }
+
+  /**
+   * Traite un paiement réussi - crée les écritures comptables + fees GL
    */
   private async processSuccessfulPayment(
     intent: PaymentIntent,
-    providerTxnId?: string
+    providerTxnId?: string,
+    feeAmount?: number
   ): Promise<void> {
     const amount = parseFloat(intent.amount);
-    const metadata = intent.metadata as Record<string, unknown> | null;
 
     if (intent.type === "COLLECTION") {
       await this.processSuccessfulCollection(intent, amount, providerTxnId);
     } else if (intent.type === "PAYOUT") {
       await this.processSuccessfulPayout(intent, amount, providerTxnId);
+    }
+
+    // Post GL entry for pawaPay operator fees (DR 6272 / CR 578x)
+    const effectiveFee = feeAmount ?? (intent.feeAmount ? parseFloat(intent.feeAmount) : 0);
+    if (effectiveFee > 0) {
+      await this.postFeeGlEntry(intent, effectiveFee);
+    }
+  }
+
+  /**
+   * Poste l'écriture GL pour les frais opérateur pawaPay
+   * Utilise les règles COMM_MTN / COMM_AIRTEL (eventType: OPERATOR_FEE)
+   * DR 6272 (Commissions Mobile Money) / CR 5781 ou 5782 (Compte Mobile Money)
+   */
+  private async postFeeGlEntry(intent: PaymentIntent, feeAmount: number): Promise<void> {
+    const operator = (intent as any).operator || intent.provider;
+
+    try {
+      await executeWithLedger(
+        "MOBILE_MONEY",
+        {
+          montant: feeAmount.toString(),
+          sens: "DEBIT",
+          clientId: intent.clientId || undefined,
+          compteId: intent.compteId || undefined,
+          methodePaiement: "MOBILE_MONEY",
+          typePaiement: "OPERATOR_FEE",
+          referenceExterne: intent.providerTxnId || undefined,
+          idempotencyKey: `momo-fee-${intent.id}`,
+          agenceId: intent.agenceId || undefined,
+          requiresGlPosting: false, // Non-bloquant: si la règle GL n'existe pas, ne pas bloquer le paiement
+          metadata: {
+            provider: operator,
+            gateway: "PAWAPAY",
+            correspondent: (intent as any).correspondent,
+            originalIntentId: intent.id,
+            feeBreakdown: intent.feeBreakdown,
+          },
+        },
+        async (_tx, mouvement) => {
+          return { result: mouvement };
+        },
+        intent.createdBy || undefined
+      );
+
+      logger.info({ intentId: intent.id, feeAmount, operator }, 'Fee GL entry posted');
+    } catch (error) {
+      // Fee posting is non-critical — log but don't fail the payment
+      logger.warn({ intentId: intent.id, feeAmount, err: error }, 'Could not post fee GL entry');
     }
   }
 
@@ -398,6 +534,8 @@ class PaymentService {
   ): Promise<void> {
     const metadata = intent.metadata as Record<string, unknown> | null;
     const typePaiement = this.determineTypePaiement(intent);
+    // GL routing utilise le champ provider (= operator MTN/AIRTEL)
+    const operator = (intent as any).operator || intent.provider;
 
     const { mouvement } = await executeWithLedger(
       "MOBILE_MONEY",
@@ -414,7 +552,9 @@ class PaymentService {
         idempotencyKey: `momo-col-${intent.id}`,
         agenceId: intent.agenceId || undefined,
         metadata: {
-          provider: intent.provider,
+          provider: operator, // GL rules match on operator (MTN/AIRTEL)
+          gateway: "PAWAPAY",
+          correspondent: (intent as any).correspondent,
           phone: intent.phone,
           externalRef: intent.externalRef,
           ...(metadata || {}),
@@ -428,6 +568,20 @@ class PaymentService {
         if (intent.compteId) {
           const nouveauSolde = await updateCompteSolde(tx, intent.compteId, amount);
           additionalEventData.nouveauSoldeCompte = nouveauSolde;
+
+          // Create transaction record for account history
+          await tx.insert(transactionsCompte).values({
+            compteId: intent.compteId,
+            mouvementId: mouvement.id,
+            typePaiement: typePaiement as any,
+            sens: "CREDIT",
+            montant: amount.toString(),
+            soldeApres: nouveauSolde,
+            methodePaiement: MethodePaiement.MOBILE_MONEY,
+            observations: `Dépôt Mobile Money ${operator} via pawaPay`,
+            idempotencyKey: `tx-momo-col-${intent.id}`,
+            createdBy: intent.createdBy,
+          });
         }
 
         // 2. Allocation crédit si applicable (remboursement)
@@ -447,7 +601,7 @@ class PaymentService {
         // 3. Mettre à jour la caisse digitale si agence définie
         if (intent.agenceId) {
           try {
-            const digitalCaisse = await getOrCreateDigitalCaisse(tx, intent.provider, intent.agenceId);
+            const digitalCaisse = await getOrCreateDigitalCaisse(tx, operator as "MTN" | "AIRTEL", intent.agenceId);
             await updateDigitalCaisseSolde(tx, digitalCaisse.id, amount, mouvement.id);
             additionalEventData.digitalCaisseId = digitalCaisse.id;
           } catch (error) {
@@ -469,10 +623,12 @@ class PaymentService {
                   typeOperation: this.mapToOperationType(intent) as any,
                   montant: amount.toString(),
                   methodePaiement: MethodePaiement.MOBILE_MONEY,
-                  reference: `MM-${intent.provider}-${intent.externalRef}`,
-                  description: `Paiement Mobile Money ${intent.provider}`,
+                  reference: `MM-${operator}-${intent.externalRef}`,
+                  description: `Paiement Mobile Money ${operator} via pawaPay`,
                   metadata: {
-                    provider: intent.provider,
+                    gateway: "PAWAPAY",
+                    operator,
+                    correspondent: (intent as any).correspondent,
                     providerTxnId,
                     phone: intent.phone,
                   },
@@ -529,6 +685,7 @@ class PaymentService {
     providerTxnId?: string
   ): Promise<void> {
     const metadata = intent.metadata as Record<string, unknown> | null;
+    const operator = (intent as any).operator || intent.provider;
     const typePaiement = intent.creditId
       ? "CREDIT_DISBURSEMENT"
       : metadata?.useCase === "CLOSURE_PAYOUT"
@@ -550,7 +707,9 @@ class PaymentService {
         idempotencyKey: `momo-pay-${intent.id}`,
         agenceId: intent.agenceId || undefined,
         metadata: {
-          provider: intent.provider,
+          provider: operator, // GL rules match on operator (MTN/AIRTEL)
+          gateway: "PAWAPAY",
+          correspondent: (intent as any).correspondent,
           phone: intent.phone,
           externalRef: intent.externalRef,
           ...(metadata || {}),
@@ -564,12 +723,26 @@ class PaymentService {
         if (intent.compteId) {
           const nouveauSolde = await updateCompteSolde(tx, intent.compteId, -amount);
           additionalEventData.nouveauSoldeCompte = nouveauSolde;
+
+          // Create transaction record for account history
+          await tx.insert(transactionsCompte).values({
+            compteId: intent.compteId,
+            mouvementId: mouvement.id,
+            typePaiement: typePaiement as any,
+            sens: "DEBIT",
+            montant: amount.toString(),
+            soldeApres: nouveauSolde,
+            methodePaiement: MethodePaiement.MOBILE_MONEY,
+            observations: `Retrait Mobile Money ${operator} via pawaPay`,
+            idempotencyKey: `tx-momo-pay-${intent.id}`,
+            createdBy: intent.createdBy,
+          });
         }
 
         // 2. Mettre à jour la caisse digitale si agence définie (débit)
         if (intent.agenceId) {
           try {
-            const digitalCaisse = await getOrCreateDigitalCaisse(tx, intent.provider, intent.agenceId);
+            const digitalCaisse = await getOrCreateDigitalCaisse(tx, operator as "MTN" | "AIRTEL", intent.agenceId);
             await updateDigitalCaisseSolde(tx, digitalCaisse.id, -amount, mouvement.id);
             additionalEventData.digitalCaisseId = digitalCaisse.id;
           } catch (error) {
@@ -595,10 +768,12 @@ class PaymentService {
                   typeOperation: opType as any,
                   montant: amount.toString(),
                   methodePaiement: MethodePaiement.MOBILE_MONEY,
-                  reference: `MM-${intent.provider}-${intent.externalRef}`,
-                  description: `Payout Mobile Money ${intent.provider}`,
+                  reference: `MM-${operator}-${intent.externalRef}`,
+                  description: `Payout Mobile Money ${operator} via pawaPay`,
                   metadata: {
-                    provider: intent.provider,
+                    gateway: "PAWAPAY",
+                    operator,
+                    correspondent: (intent as any).correspondent,
                     providerTxnId,
                     phone: intent.phone,
                   },
@@ -661,10 +836,188 @@ class PaymentService {
   }
 
   /**
-   * Récupère un payment intent par ID
+   * Initie un remboursement (refund) via pawaPay
+   * Seul un COLLECTION en status SUCCESS peut être remboursé
+   */
+  async initiateRefund(
+    intentId: string,
+    amount?: number,
+    userId?: string
+  ): Promise<PaymentIntent> {
+    const originalIntent = await storage.getPaymentIntent(intentId);
+
+    if (!originalIntent) {
+      throw new Error("Payment intent not found");
+    }
+
+    if (originalIntent.type !== "COLLECTION") {
+      throw new Error("Seules les collections (dépôts) peuvent être remboursées");
+    }
+
+    if (originalIntent.status !== "SUCCESS") {
+      throw new Error(`Cannot refund payment in status: ${originalIntent.status}`);
+    }
+
+    if (!originalIntent.externalRef) {
+      throw new Error("Original intent has no externalRef (depositId) for pawaPay refund");
+    }
+
+    const operator = (originalIntent as any).operator || originalIntent.provider;
+    const correspondent = (originalIntent as any).correspondent;
+    const refundAmount = amount ?? parseFloat(originalIntent.amount);
+
+    if (refundAmount > parseFloat(originalIntent.amount)) {
+      throw new Error(`Refund amount (${refundAmount}) exceeds original amount (${originalIntent.amount})`);
+    }
+
+    const pawaPayProvider = providerRegistry.getPawaPay();
+
+    // Create a new payment intent for the refund
+    const refundIntent = await storage.createPaymentIntent({
+      provider: operator,
+      type: "PAYOUT", // pawaPay treats refunds as payouts to the customer
+      status: "CREATED",
+      gateway: "PAWAPAY",
+      operator,
+      correspondent,
+      amount: refundAmount.toString(),
+      currency: "XAF",
+      phone: originalIntent.phone,
+      clientId: originalIntent.clientId,
+      compteId: originalIntent.compteId,
+      creditId: originalIntent.creditId,
+      tontineId: originalIntent.tontineId,
+      agenceId: originalIntent.agenceId,
+      metadata: {
+        useCase: "REFUND",
+        originalIntentId: intentId,
+        originalExternalRef: originalIntent.externalRef,
+        isPartialRefund: amount != null && amount < parseFloat(originalIntent.amount),
+      },
+      createdBy: userId,
+    });
+
+    try {
+      const response = await (pawaPayProvider as any).refund({
+        refundId: refundIntent.externalRef,
+        depositId: originalIntent.externalRef,
+        amount: refundAmount,
+        currency: "XAF",
+      } as RefundRequest);
+
+      if (response.status === "REJECTED") {
+        await storage.updatePaymentIntent(refundIntent.id, {
+          status: "FAILED",
+          errorCode: response.rejectionCode || "REJECTED",
+          errorMessage: response.rejectionMessage || "Refund rejected by pawaPay",
+          confirmedAt: new Date(),
+        });
+
+        throw new MobileMoneyError(
+          `Refund rejected: ${response.rejectionCode || "UNKNOWN"}`,
+          response.rejectionCode || "REJECTED",
+          "PAWAPAY",
+          false
+        );
+      }
+
+      // ACCEPTED - wait for callback
+      const updatedIntent = await storage.updatePaymentIntent(refundIntent.id, {
+        providerRef: refundIntent.externalRef,
+        status: "PENDING",
+        initiatedAt: new Date(),
+        expireAt: new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000),
+      });
+
+      logger.info({
+        refundIntentId: refundIntent.id,
+        originalIntentId: intentId,
+        operator,
+        amount: refundAmount,
+      }, 'Refund initiated via pawaPay');
+
+      return updatedIntent!;
+    } catch (error) {
+      if (error instanceof MobileMoneyError) throw error;
+
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      await storage.updatePaymentIntent(refundIntent.id, {
+        status: "FAILED",
+        errorCode: "PROVIDER_ERROR",
+        errorMessage,
+        confirmedAt: new Date(),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère un payment intent par ID.
+   * Si l'intent est PENDING, vérifie le statut auprès de pawaPay (polling fallback)
+   * car en sandbox le webhook ne peut pas atteindre localhost.
    */
   async getPaymentIntent(id: string): Promise<PaymentIntent | undefined> {
-    return storage.getPaymentIntent(id);
+    const intent = await storage.getPaymentIntent(id);
+    if (!intent) return undefined;
+
+    // Si PENDING, vérifier le statut directement auprès de pawaPay
+    if (intent.status === "PENDING" && intent.externalRef) {
+      const updated = await this.checkAndUpdatePendingStatus(intent);
+      if (updated) return updated;
+    }
+
+    return intent;
+  }
+
+  /**
+   * Vérifie le statut d'un intent PENDING auprès de pawaPay (polling fallback).
+   * Utilisé quand le webhook ne peut pas atteindre le serveur (sandbox/localhost).
+   * Retourne l'intent mis à jour si le statut a changé, sinon undefined.
+   */
+  private async checkAndUpdatePendingStatus(intent: PaymentIntent): Promise<PaymentIntent | undefined> {
+    try {
+      const pawaPayProvider = providerRegistry.getPawaPay();
+      const statusResponse = await pawaPayProvider.getStatus(intent.externalRef!);
+
+      if (statusResponse.status === "PENDING") {
+        return undefined; // Pas encore traité par pawaPay
+      }
+
+      logger.info(
+        { intentId: intent.id, externalRef: intent.externalRef, newStatus: statusResponse.status },
+        'Polling fallback: pawaPay status changed'
+      );
+
+      if (statusResponse.status === "SUCCESS") {
+        await this.processSuccessfulPayment(intent, statusResponse.providerTxnId);
+        return (await storage.getPaymentIntent(intent.id))!;
+      }
+
+      if (statusResponse.status === "FAILED") {
+        const errorCode = statusResponse.errorCode || "UNKNOWN";
+        const errorMessage = statusResponse.errorMessage || "Payment failed";
+        await storage.updatePaymentIntent(intent.id, {
+          status: "FAILED",
+          errorCode,
+          errorMessage,
+          confirmedAt: new Date(),
+        });
+        return (await storage.getPaymentIntent(intent.id))!;
+      }
+
+      if (statusResponse.status === "EXPIRED") {
+        await storage.updatePaymentIntent(intent.id, {
+          status: "EXPIRED",
+          confirmedAt: new Date(),
+        });
+        return (await storage.getPaymentIntent(intent.id))!;
+      }
+    } catch (error) {
+      // Polling is best-effort — don't fail the GET request
+      logger.warn({ intentId: intent.id, err: error }, 'Polling fallback: could not check pawaPay status');
+    }
+
+    return undefined;
   }
 
   /**
@@ -716,19 +1069,16 @@ class PaymentService {
     if (params.creditId) return "CREDIT_REPAYMENT";
     if (params.tontineId) return "TONTINE_CONTRIBUTION";
     if (params.compteId) return "DEPOSIT_SAVINGS";
-    return "DEPOSIT_SAVINGS"; // Défaut pour les collections Mobile Money
+    return "DEPOSIT_SAVINGS";
   }
 
   /**
    * Détermine le type de paiement pour le mouvement
-   * Doit correspondre à type_paiement_terrain_enum
    */
   private determineTypePaiement(intent: PaymentIntent): string {
     if (intent.creditId) return "CREDIT_REPAYMENT";
     if (intent.tontineId) return "TONTINE_CONTRIBUTION";
     if (intent.compteId) return "DEPOSIT_SAVINGS";
-
-    // Par défaut pour Mobile Money sans compte spécifique
     return "DEPOSIT_SAVINGS";
   }
 
@@ -771,7 +1121,7 @@ class PaymentService {
 
   /**
    * Traite un reversal/refund du provider
-   * Appelé quand un provider annule une transaction après SUCCESS
+   * Appelé quand pawaPay annule une transaction après SUCCESS
    */
   async processReversal(
     intentId: string,
@@ -789,13 +1139,13 @@ class PaymentService {
     }
 
     const amount = parseFloat(intent.amount);
+    const operator = (intent as any).operator || intent.provider;
 
     // Créer le mouvement inverse
     const { mouvement } = await executeWithLedger(
       "MOBILE_MONEY",
       {
         montant: amount.toString(),
-        // Inverser le sens
         sens: intent.type === "COLLECTION" ? "DEBIT" : "CREDIT",
         clientId: intent.clientId || undefined,
         compteId: intent.compteId || undefined,
@@ -807,7 +1157,8 @@ class PaymentService {
         idempotencyKey: `momo-rev-${intent.id}`,
         agenceId: intent.agenceId || undefined,
         metadata: {
-          provider: intent.provider,
+          provider: operator,
+          gateway: "PAWAPAY",
           originalIntentId: intent.id,
           originalMouvementId: intent.mouvementId,
           reversalReason: "Provider reversal",
@@ -821,14 +1172,13 @@ class PaymentService {
         }
 
         if (intent.creditId && intent.type === "COLLECTION") {
-          // Réaugmenter le solde du crédit si c'était un remboursement
           await updateCreditSolde(tx, intent.creditId, amount);
         }
 
         // Inverser la caisse digitale
         if (intent.agenceId) {
           try {
-            const digitalCaisse = await getOrCreateDigitalCaisse(tx, intent.provider, intent.agenceId);
+            const digitalCaisse = await getOrCreateDigitalCaisse(tx, operator as "MTN" | "AIRTEL", intent.agenceId);
             const delta = intent.type === "COLLECTION" ? -amount : amount;
             await updateDigitalCaisseSolde(tx, digitalCaisse.id, delta, mouvement.id);
           } catch (error) {
@@ -864,7 +1214,6 @@ class PaymentService {
 
   /**
    * Réconciliation manuelle par admin
-   * Permet de forcer un statut sur un intent bloqué
    */
   async manualReconcile(
     intentId: string,
@@ -886,10 +1235,8 @@ class PaymentService {
     logger.info({ intentId, decision, userId }, 'Manual reconciliation');
 
     if (decision === "SUCCESS") {
-      // Traiter comme un succès normal
       await this.processSuccessfulPayment(intent, providerTxnId);
 
-      // Ajouter les notes de réconciliation
       await storage.updatePaymentIntent(intentId, {
         metadata: {
           ...(intent.metadata as Record<string, unknown> || {}),
@@ -903,7 +1250,6 @@ class PaymentService {
         },
       });
     } else {
-      // Marquer comme FAILED
       await storage.updatePaymentIntent(intentId, {
         status: "FAILED",
         errorCode: "MANUAL_RECONCILIATION",
@@ -926,7 +1272,6 @@ class PaymentService {
 
   /**
    * Vérifie si un payout tontine est autorisé
-   * Utilise la logique de calcul retirable
    */
   async validateTontinePayout(
     tontineId: string,

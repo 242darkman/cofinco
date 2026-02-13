@@ -275,6 +275,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '23', label: 'Bâtiments', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '24', label: 'Matériel', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '2711', label: 'Prêts - Principal', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '2718', label: 'Intérêts courus sur prêts', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '2917', label: 'Provisions pour dépréciation des prêts', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
   { num: '28', label: 'Amortissements', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
 
@@ -309,6 +310,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '443', label: 'TVA Facturée', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '445', label: 'TVA Récupérable', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '47', label: 'Comptes transitoires', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '471', label: 'Compte d\'attente — entrées coffre', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
 
   // Classe 5: Trésorerie (Critique pour microfinance)
   { num: '512', label: 'Banque', classe: 5, type: 'Actif', sens: 'Débit', isSystem: true },
@@ -406,6 +408,11 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Approvisionnement caisse depuis coffre-fort',
     priority: 100,
   },
+  // NOTE AUDIT : CAISSE_TO_COFFRE, RESTITUTION et LIQUIDATION_CAISSE partagent
+  // les mêmes comptes GL (D 531 / C 521) mais des eventTypes distincts.
+  // Ce n'est PAS une duplication — chaque règle correspond à un événement métier
+  // différent (versement quotidien, annulation session, fermeture définitive)
+  // nécessaire pour la traçabilité COBAC et la piste d'audit.
   {
     code: 'CAISSE_TO_COFFRE',
     name: 'Transfert Caisse → Coffre',
@@ -838,7 +845,7 @@ const ACCOUNTING_RULES_DATA = [
     paymentMethod: 'CASH',
     journalCode: 'CRD',
     debitAccount: '2711',  // Prêts - Principal
-    creditAccount: '521',  // Caisse centrale
+    creditAccount: '521',  // Caisse centrale (cash sort physiquement de la caisse)
     descriptionTemplate: 'Décaissement crédit #{creditNumber} - {clientName}',
     priority: 10,
   },
@@ -873,13 +880,13 @@ const ACCOUNTING_RULES_DATA = [
   {
     code: 'CREDIT_DECAISS_COMPTE',
     name: 'Décaissement crédit vers compte',
-    description: 'Décaissement d\'un crédit vers compte client',
+    description: 'Mise à disposition crédit sur compte client (SYSCOHADA : pas de mouvement de cash)',
     sourceType: 'MOUVEMENT',
     eventType: 'CREDIT_DISBURSEMENT',
     paymentMethod: 'TRANSFER',
     journalCode: 'CRD',
-    debitAccount: '2711',  // Prêts - Principal
-    creditAccount: '4111', // Dépôts clients - Comptes courants
+    debitAccount: '2711',  // Prêts - Principal (actif : créance sur le client)
+    creditAccount: '4111', // Comptes courants clients (passif : mise à disposition)
     descriptionTemplate: 'Décaissement crédit #{creditNumber} vers compte - {clientName}',
     priority: 10,
   },
@@ -1681,7 +1688,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'ENTREE_COFFRE',
     journalCode: 'OD',
     debitAccount: '531',   // Coffre-fort (reçoit)
-    creditAccount: '401',  // Compte d\'attente (source temporaire)
+    creditAccount: '471',  // Compte d\'attente — entrées coffre (à régulariser)
     descriptionTemplate: 'Abondement coffre-fort',
     priority: 100,
   },
@@ -1692,7 +1699,7 @@ const ACCOUNTING_RULES_DATA = [
     sourceType: 'MOUVEMENT',
     eventType: 'SORTIE_COFFRE',
     journalCode: 'OD',
-    debitAccount: '401',   // Compte d\'attente (destination temporaire)
+    debitAccount: '471',   // Compte d\'attente — sorties coffre (à régulariser)
     creditAccount: '531',  // Coffre-fort (envoie)
     descriptionTemplate: 'Prélèvement coffre-fort',
     priority: 100,
@@ -1711,6 +1718,10 @@ const ACCOUNTING_RULES_DATA = [
     descriptionTemplate: 'Évacuation coffre — fonds en transit',
     priority: 100,
   },
+  // NOTE AUDIT : EVACUATION_COFFRE_BANQUE et EVACUATION_COFFRE_TRANSPORTEUR
+  // partagent les mêmes comptes GL (D 512 / C 581) mais des eventTypes distincts.
+  // La distinction est nécessaire pour le suivi opérationnel (dépôt direct vs
+  // remise transporteur) et les délais de régularisation du compte 581 (transit).
   {
     code: 'EVACUATION_COFFRE_BANQUE',
     name: 'Évacuation coffre — dépôt banque',
@@ -1945,6 +1956,63 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '2711',  // Prêts - Principal (augmentation créance)
     creditAccount: '7073', // Pénalités de retard (produit)
     descriptionTemplate: 'Pénalité retard crédit #{creditNumber} - {clientName}',
+    priority: 10,
+  },
+
+  // C18b: Comptabilisation des intérêts courus (SYSCOHADA art. 46 — engagement)
+  {
+    code: 'CREDIT_INTEREST_ACCRUAL',
+    name: 'Comptabilisation intérêts courus sur prêts',
+    description: 'Constatation mensuelle des intérêts courus non échus (accrual basis SYSCOHADA)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_INTEREST_ACCRUAL',
+    journalCode: 'CRD',
+    debitAccount: '2718',  // Intérêts courus sur prêts (actif)
+    creditAccount: '7071', // Intérêts sur prêts (produit)
+    descriptionTemplate: 'Intérêts courus crédit #{creditNumber} - {clientName}',
+    priority: 10,
+  },
+
+  // C18c: Encaissement intérêts (solde le compte 2718 au lieu de créditer 7071 directement)
+  {
+    code: 'CREDIT_INTEREST_COLLECTION_CASH',
+    name: 'Encaissement intérêts sur prêts espèces',
+    description: 'Encaissement intérêts qui solde le compte d\'intérêts courus (2718)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_INTEREST_COLLECTION',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '521',   // Caisse (encaissement)
+    creditAccount: '2718', // Intérêts courus (solde le compte d\'accrual)
+    descriptionTemplate: 'Encaissement intérêts crédit #{creditNumber} - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CREDIT_INTEREST_COLLECTION_MTN',
+    name: 'Encaissement intérêts sur prêts MTN',
+    description: 'Encaissement intérêts via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_INTEREST_COLLECTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '2718', // Intérêts courus
+    descriptionTemplate: 'Encaissement intérêts crédit #{creditNumber} MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CREDIT_INTEREST_COLLECTION_AIRTEL',
+    name: 'Encaissement intérêts sur prêts Airtel',
+    description: 'Encaissement intérêts via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CREDIT_INTEREST_COLLECTION',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '2718', // Intérêts courus
+    descriptionTemplate: 'Encaissement intérêts crédit #{creditNumber} Airtel - {clientName}',
     priority: 10,
   },
 

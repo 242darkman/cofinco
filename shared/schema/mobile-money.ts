@@ -27,9 +27,14 @@ export const paymentIntents = pgTable(
     agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "set null" }),
 
     // Provider info
-    provider: mobileMoneyProviderEnum("provider").notNull(),
+    provider: mobileMoneyProviderEnum("provider").notNull(),     // Opérateur mobile: MTN | AIRTEL (utilisé pour GL routing)
     type: typePaymentIntentEnum("type").notNull(),
     status: statutPaymentIntentEnum("status").notNull().default("CREATED"),
+
+    // pawaPay gateway info
+    gateway: text("gateway").notNull().default("PAWAPAY"),       // Gateway: toujours "PAWAPAY"
+    operator: text("operator"),                                   // Opérateur: "MTN" | "AIRTEL" (= provider, pour clarté)
+    correspondent: text("correspondent"),                         // pawaPay correspondent: "MTN_MOMO_COG" | "AIRTEL_COG"
 
     // Transaction details
     amount: numeric("amount").notNull(),
@@ -37,9 +42,9 @@ export const paymentIntents = pgTable(
     phone: text("phone").notNull(),
 
     // References
-    externalRef: uuid("external_ref").notNull().defaultRandom(), // Notre ID unique envoyé au provider
-    providerRef: text("provider_ref"),                           // ID de transaction retourné par le provider
-    providerTxnId: text("provider_txn_id"),                      // ID final de confirmation du provider
+    externalRef: uuid("external_ref").notNull().defaultRandom(), // = depositId/payoutId envoyé à pawaPay
+    providerRef: text("provider_ref"),                           // = externalRef (pawaPay utilise notre ID)
+    providerTxnId: text("provider_txn_id"),                      // ID transaction du correspondant (MTN/Airtel)
 
     // Linked entities (pour écritures comptables au SUCCESS)
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
@@ -64,12 +69,21 @@ export const paymentIntents = pgTable(
     errorCode: text("error_code"),
     errorMessage: text("error_message"),
 
-    // Metadata (fees, descriptions, use case, etc.)
+    // Fees (pawaPay 1% + MMO pass-through)
+    feeAmount: numeric("fee_amount"),                            // Total frais facturés
+    feeBreakdown: jsonb("fee_breakdown"),                        // { aggregatorFee, mmoFee, totalFee, currency }
+
+    // Callback audit
+    rawCallbackPayload: jsonb("raw_callback_payload"),           // Payload brut du callback pawaPay
+    callbackSignatureValid: boolean("callback_signature_valid"), // Résultat vérification signature
+
+    // Metadata (descriptions, use case, etc.)
     metadata: jsonb("metadata"),
 
     // Timestamps
-    initiatedAt: timestamp("initiated_at"),           // Quand envoyé au provider
-    confirmedAt: timestamp("confirmed_at"),           // Quand confirmé par provider
+    initiatedAt: timestamp("initiated_at"),           // Quand envoyé à pawaPay
+    confirmedAt: timestamp("confirmed_at"),           // Quand confirmé par pawaPay callback
+    settlementTimestamp: timestamp("settlement_timestamp"), // Quand pawaPay a réglé
     expireAt: timestamp("expire_at"),                 // Deadline timeout
 
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -89,6 +103,9 @@ export const paymentIntents = pgTable(
 
     // Partial index for pending reconciliation
     idxPending: index("idx_payment_intents_pending").on(t.status, t.initiatedAt),
+
+    // Gateway + operator index
+    idxGatewayOperator: index("idx_payment_intents_gateway_operator").on(t.gateway, t.operator),
 
     // Constraints
     chkAmountPos: sql`CONSTRAINT chk_payment_intents_amount_pos CHECK (${t.amount} > 0)`,

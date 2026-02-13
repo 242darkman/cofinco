@@ -174,7 +174,8 @@ export const echeancesCredits = pgTable("echeances_credits", {
   montantInteretPaye: numeric("montant_interet_paye").default('0'),
   penaliteMontant: numeric("penalite_montant").default('0'),
   penalitePayee: numeric("penalite_payee").default('0'),
-  
+  accrualPosted: boolean("accrual_posted").default(false),
+
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => ({
   idxCredit: index("idx_echeances_credits_credit_id").on(t.creditId),

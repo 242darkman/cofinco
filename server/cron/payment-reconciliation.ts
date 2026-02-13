@@ -1,11 +1,12 @@
 /**
  * Payment Reconciliation Cron Job
- * Réconcilie les paiements PENDING en interrogeant les providers
+ * Réconcilie les paiements PENDING en interrogeant pawaPay
  *
  * Fonctionnalités:
- * - Polling des providers pour les paiements sans webhook
+ * - Polling pawaPay getStatus() pour les paiements sans webhook
  * - Retry avec backoff exponentiel sur erreurs temporaires
  * - Expiration automatique des paiements timeout
+ * - DLQ recovery: replay des provider_events non traités
  * - Logs structurés pour monitoring
  */
 
@@ -51,7 +52,7 @@ interface ReconciliationStats {
 interface IntentProcessingLog {
   intentId: string;
   provider: string;
-  providerRef: string;
+  externalRef: string;
   previousStatus: string;
   newStatus: string;
   attempt: number;
@@ -115,7 +116,6 @@ async function withRetry<T>(
 function isNonRetryableError(error: unknown): boolean {
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
-    // Erreurs qui ne peuvent pas être résolues par retry
     return (
       message.includes("not found") ||
       message.includes("invalid") ||
@@ -131,7 +131,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Réconcilie les paiements PENDING
+ * Réconcilie les paiements PENDING via pawaPay getStatus()
+ * pawaPay utilise externalRef (= depositId/payoutId) pour les lookups
  */
 async function reconcilePendingPayments(): Promise<void> {
   if (isRunning) {
@@ -187,46 +188,35 @@ async function reconcilePendingPayments(): Promise<void> {
       stats: { ...stats },
     });
 
-    // 2. Pour chaque intent, interroger le provider avec retry
+    // 2. Obtenir le provider pawaPay
+    const pawaPayProvider = providerRegistry.getPawaPay();
+
+    // 3. Pour chaque intent, interroger pawaPay avec retry
     for (const intent of pendingIntents) {
       const intentStartTime = Date.now();
 
       try {
-        const provider = providerRegistry.get(intent.provider);
+        // pawaPay utilise notre externalRef (= depositId/payoutId) pour les lookups
+        const lookupRef = intent.externalRef;
 
-        if (!provider) {
+        if (!lookupRef) {
           logIntentProcessing({
             intentId: intent.id,
             provider: intent.provider,
-            providerRef: intent.providerRef || "",
+            externalRef: "",
             previousStatus: "PENDING",
             newStatus: "error",
             attempt: 0,
             durationMs: Date.now() - intentStartTime,
-            error: "Provider not found",
+            error: "No externalRef for pawaPay lookup",
           });
           stats.errors++;
           continue;
         }
 
-        if (!intent.providerRef) {
-          logIntentProcessing({
-            intentId: intent.id,
-            provider: intent.provider,
-            providerRef: "",
-            previousStatus: "PENDING",
-            newStatus: "error",
-            attempt: 0,
-            durationMs: Date.now() - intentStartTime,
-            error: "No providerRef",
-          });
-          stats.errors++;
-          continue;
-        }
-
-        // Interroger le provider avec retry
+        // Interroger pawaPay avec retry
         const statusResult = await withRetry(
-          () => provider.getStatus(intent.providerRef!),
+          () => pawaPayProvider.getStatus(lookupRef),
           MAX_RETRY_ATTEMPTS,
           RETRY_DELAY_MS
         );
@@ -235,7 +225,7 @@ async function reconcilePendingPayments(): Promise<void> {
           logIntentProcessing({
             intentId: intent.id,
             provider: intent.provider,
-            providerRef: intent.providerRef,
+            externalRef: lookupRef,
             previousStatus: "PENDING",
             newStatus: "error",
             attempt: statusResult.attempts,
@@ -295,20 +285,20 @@ async function reconcilePendingPayments(): Promise<void> {
         logIntentProcessing({
           intentId: intent.id,
           provider: intent.provider,
-          providerRef: intent.providerRef,
+          externalRef: lookupRef,
           previousStatus: "PENDING",
           newStatus,
           attempt: statusResult.attempts,
           durationMs: Date.now() - intentStartTime,
         });
 
-        // Petit délai entre les appels pour éviter de surcharger les providers
+        // Petit délai entre les appels pour éviter de surcharger pawaPay
         await sleep(200);
       } catch (error) {
         logIntentProcessing({
           intentId: intent.id,
           provider: intent.provider,
-          providerRef: intent.providerRef || "",
+          externalRef: intent.externalRef || "",
           previousStatus: "PENDING",
           newStatus: "error",
           attempt: 1,
@@ -369,7 +359,7 @@ async function expireTimedOutPayments(): Promise<void> {
       logIntentProcessing({
         intentId: intent.id,
         provider: intent.provider,
-        providerRef: intent.providerRef || "",
+        externalRef: intent.externalRef || "",
         previousStatus: "PENDING",
         newStatus: "EXPIRED (timeout)",
         attempt: 0,
@@ -388,115 +378,54 @@ async function expireTimedOutPayments(): Promise<void> {
 }
 
 /**
- * Réconciliation avancée via l'API Transactions Summary d'Airtel
- * Compare les transactions du provider avec nos intents PENDING
- * Utile pour les webhooks manqués
+ * DLQ Recovery: Replay des provider_events non traités
+ * Récupère les événements webhook qui n'ont pas été traités avec succès
+ * et tente de les rejouer via le paymentService
  */
-async function reconcileWithProviderSummary(): Promise<void> {
+async function recoverUnprocessedEvents(): Promise<void> {
   const startTime = Date.now();
 
   try {
-    // Récupérer le provider Airtel
-    const airtelProvider = providerRegistry.get("AIRTEL");
+    const unprocessedEvents = await storage.getUnprocessedEvents();
 
-    // Vérifier si le provider supporte getTransactionsSummary
-    if (!airtelProvider || !("getTransactionsSummary" in airtelProvider)) {
-      return; // Provider sans API summary, skip
-    }
-
-    // Calculer la période de réconciliation (dernières 24h)
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
-
-    const formatDate = (d: Date) => d.toISOString().split("T")[0];
-
-    logger.info('Fetching Airtel transactions summary');
-
-    // Récupérer les transactions du provider
-    const summary = await (airtelProvider as {
-      getTransactionsSummary: (
-        startDate: string,
-        endDate: string
-      ) => Promise<{
-        transactions: Array<{
-          id: string;
-          transaction_id: string;
-          airtel_money_id: string;
-          status: string;
-          amount: string;
-          reference?: string;
-        }>;
-        totalCount: number;
-      }>;
-    }).getTransactionsSummary(formatDate(startDate), formatDate(endDate));
-
-    if (!summary.transactions || summary.transactions.length === 0) {
-      logger.info('No Airtel transactions in summary');
+    if (unprocessedEvents.length === 0) {
       return;
     }
 
-    logger.info({ count: summary.transactions.length }, `Found ${summary.transactions.length} Airtel transactions to check`);
+    logger.info({ count: unprocessedEvents.length }, 'DLQ recovery: found unprocessed events');
 
-    // Récupérer nos intents PENDING pour Airtel
-    const pendingAirtelIntents = await storage.getPendingIntentsByProvider("AIRTEL");
+    let recovered = 0;
+    let failed = 0;
 
-    if (pendingAirtelIntents.length === 0) {
-      return;
-    }
+    for (const event of unprocessedEvents) {
+      try {
+        // Skip events older than 24h (likely orphans)
+        const ageMs = Date.now() - (event.receivedAt?.getTime() || 0);
+        if (ageMs > 24 * 60 * 60 * 1000) {
+          await storage.markEventProcessed(event.id, undefined, "EXPIRED_DLQ");
+          continue;
+        }
 
-    // Créer un index pour lookup rapide
-    const pendingByRef = new Map(
-      pendingAirtelIntents.map((intent) => [intent.providerRef, intent])
-    );
-    const pendingByExternalRef = new Map(
-      pendingAirtelIntents.map((intent) => [intent.externalRef, intent])
-    );
+        // Replay the webhook payload through the payment service
+        await paymentService.handleWebhook(
+          event.payload,
+          JSON.stringify(event.payload), // Reconstruct raw body from stored payload
+          event.signature || "",
+          {} // Headers not available for DLQ replay
+        );
 
-    let reconciled = 0;
-
-    // Pour chaque transaction du provider
-    for (const tx of summary.transactions) {
-      // Chercher l'intent correspondant
-      const intent =
-        pendingByRef.get(tx.id) ||
-        pendingByRef.get(tx.transaction_id) ||
-        pendingByExternalRef.get(tx.reference || "");
-
-      if (!intent) {
-        continue; // Transaction non liée à nos intents
-      }
-
-      // Normaliser le statut
-      const normalizedStatus = airtelProvider.normalizeStatus
-        ? airtelProvider.normalizeStatus(tx.status)
-        : tx.status.toUpperCase();
-
-      if (normalizedStatus === "PENDING") {
-        continue; // Toujours en attente côté provider
-      }
-
-      // Mettre à jour notre intent
-      if (normalizedStatus === "SUCCESS") {
-        await paymentService.handleReconciliationSuccess(intent, {
-          providerTxnId: tx.airtel_money_id,
-        });
-        reconciled++;
-      } else if (normalizedStatus === "FAILED" || normalizedStatus === "EXPIRED") {
-        await storage.updatePaymentIntent(intent.id, {
-          status: normalizedStatus,
-          confirmedAt: new Date(),
-          errorMessage: `Reconciled from provider summary (status: ${tx.status})`,
-        });
-        reconciled++;
+        recovered++;
+      } catch (error) {
+        failed++;
+        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        await storage.markEventProcessed(event.id, undefined, `DLQ_RETRY_FAILED: ${errorMsg}`);
+        logger.warn({ eventId: event.id, err: error }, 'DLQ recovery: event replay failed');
       }
     }
 
-    logger.info({ reconciled, durationMs: Date.now() - startTime }, `Summary reconciliation complete: ${reconciled} intents updated`);
+    logger.info({ recovered, failed, durationMs: Date.now() - startTime }, 'DLQ recovery complete');
   } catch (error) {
-    logger.error({
-      err: error,
-      durationMs: Date.now() - startTime,
-    }, 'Summary reconciliation error');
+    logger.error({ err: error, durationMs: Date.now() - startTime }, 'DLQ recovery error');
   }
 }
 
@@ -515,10 +444,10 @@ export function startPaymentReconciliationCron(): void {
   cronJob = cron.schedule(cronExpression, async () => {
     await reconcilePendingPayments();
     await expireTimedOutPayments();
-    // Réconciliation via API summary (Airtel) - toutes les heures seulement
+    // DLQ recovery: toutes les heures seulement
     const currentMinute = new Date().getMinutes();
     if (currentMinute < parseInt(RECONCILIATION_INTERVAL, 10)) {
-      await reconcileWithProviderSummary();
+      await recoverUnprocessedEvents();
     }
   });
 

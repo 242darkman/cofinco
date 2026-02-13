@@ -75,6 +75,63 @@ import { paymentService } from "../services/mobile-money/payment-service";
 import { MethodePaiement } from "@shared/enum/status-constants";
 import { D, roundMoney, splitEvenly } from "../lib/money";
 
+/**
+ * Génère l'échéancier d'un crédit actif (si pas encore généré).
+ * Appelé automatiquement au décaissement et disponible via l'API.
+ */
+async function generateCreditScheduleIfNeeded(creditId: string): Promise<void> {
+  const credit = await storage.getCredit(creditId);
+  if (!credit) return;
+  if (credit.statut !== StatutCredit.ACTIVE && credit.statut !== StatutCredit.LATE) return;
+
+  // Ne pas regénérer si des échéances existent déjà
+  const existing = await storage.getEcheancesByCredit(creditId);
+  if (existing.length > 0) return;
+
+  const startDate = new Date(credit.dateDebut || Date.now());
+  const dAmount = D(credit.montant);
+  const dRate = D(credit.taux).div(100);
+  const duration = credit.duree;
+  if (!duration || duration <= 0) return;
+
+  const dTotalAmount = dAmount.times(D(1).plus(dRate));
+  const dInterestTotal = dTotalAmount.minus(dAmount);
+  const capitalParts = splitEvenly(dAmount, duration);
+  const interestParts = splitEvenly(dInterestTotal, duration);
+
+  const schedule: any[] = [];
+  let currentDate = new Date(startDate);
+
+  for (let i = 1; i <= duration; i++) {
+    if (credit.echeance === FrequenceRemboursement.WEEKLY) {
+      currentDate.setDate(currentDate.getDate() + 7);
+    } else if (credit.echeance === FrequenceRemboursement.BI_MONTHLY) {
+      currentDate.setDate(currentDate.getDate() + 15);
+    } else if (credit.echeance === FrequenceRemboursement.DAILY) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    } else {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    const dCapital = capitalParts[i - 1];
+    const dInterest = interestParts[i - 1];
+
+    schedule.push({
+      creditId,
+      numeroEcheance: i,
+      dateEcheance: new Date(currentDate),
+      montantCapital: roundMoney(dCapital),
+      montantInteret: roundMoney(dInterest),
+      montantTotal: roundMoney(dCapital.plus(dInterest)),
+      montantPaye: "0",
+      statut: "UPCOMING",
+    });
+  }
+
+  await storage.createEcheances(schedule);
+  logger.info({ creditId, echeances: schedule.length }, 'Échéancier généré automatiquement');
+}
+
 export function registerFinanceRoutes(app: Express) {
   // Credit Plans Routes
   app.get("/api/credit-plans", requireAuth, async (req, res) => {
@@ -283,8 +340,10 @@ export function registerFinanceRoutes(app: Express) {
         disbursementStatus = 'PROCESSING';
       } else {
         // Canal ACCOUNT (par défaut): Flux existant
-        statutInitial = estProgramme ? StatutCredit.PENDING : StatutCredit.ACTIVE;
-        disbursementStatus = estProgramme ? null : 'COMPLETED';
+        // Pour décaissement immédiat: créer en PENDING d'abord, activer APRÈS succès du ledger
+        // Ceci garantit qu'on peut annuler (PENDING→CANCELLED) si le transfert échoue
+        statutInitial = StatutCredit.PENDING;
+        disbursementStatus = estProgramme ? null : 'PENDING';
       }
 
       // 5. Créer le crédit
@@ -309,6 +368,23 @@ export function registerFinanceRoutes(app: Express) {
         disbursementChannel: disbursementChannel as any,
         disbursementStatus: disbursementStatus as any,
       };
+
+      // Guard: Cancel any orphan credits from previous failed disbursement attempts
+      const existingCreditsForDemande = await db.select({ id: credits.id, statut: credits.statut })
+        .from(credits)
+        .where(eq(credits.demandeId, demande.id));
+
+      for (const existing of existingCreditsForDemande) {
+        if (existing.statut === StatutCredit.PENDING || existing.statut === StatutCredit.WAITING_DISBURSEMENT) {
+          await storage.updateCredit(existing.id, { statut: StatutCredit.CANCELLED as any });
+          logger.warn({ creditId: existing.id, demandeId: demande.id }, 'Cancelled orphan credit from previous failed disbursement');
+        } else if (existing.statut === StatutCredit.ACTIVE) {
+          // An active credit already exists for this demande — prevent duplicate
+          return res.status(409).json({
+            message: `Un crédit actif (${existing.id}) existe déjà pour cette demande. Décaissement impossible.`
+          });
+        }
+      }
 
       const parsed = insertCreditSchema.parse(creditData);
       const credit = await storage.createCredit(parsed);
@@ -365,15 +441,36 @@ export function registerFinanceRoutes(app: Express) {
 
               nouveauSolde += montantDecaissement;
 
-              // Mettre à jour le statut de décaissement
+              // Succès: Activer le crédit et marquer le décaissement comme complété
               await storage.updateCredit(credit.id, {
+                statut: StatutCredit.ACTIVE as any,
                 disbursementStatus: 'COMPLETED' as any,
                 disbursedAt: new Date(),
                 disbursedBy: user?.id
               });
 
+              // Générer l'échéancier automatiquement à l'activation
+              try {
+                await generateCreditScheduleIfNeeded(credit.id);
+              } catch (scheduleErr) {
+                logger.warn({ err: scheduleErr, creditId: credit.id }, 'Échéancier non généré (non bloquant)');
+              }
+
             } catch (err: any) {
-              logger.error({ err }, 'Erreur Ledger lors du décaissement');
+              logger.error({ err, creditId: credit.id }, 'Erreur Ledger lors du décaissement');
+
+              // ROLLBACK: Annuler le crédit créé puisque le transfert a échoué
+              // (PENDING → CANCELLED est autorisé par la state machine)
+              try {
+                await storage.updateCredit(credit.id, {
+                  statut: StatutCredit.CANCELLED as any,
+                  disbursementStatus: 'PENDING' as any
+                });
+                logger.info({ creditId: credit.id }, 'Crédit annulé après échec du décaissement');
+              } catch (cleanupErr) {
+                logger.error({ err: cleanupErr, creditId: credit.id }, 'Échec annulation crédit orphelin');
+              }
+
               // Re-throw business errors (coffre guards, insufficient funds) as-is
               // so the outer catch can handle them with structured responses
               if (isCoffreCaisseError(err) || err instanceof DecaissementInsufficientFundsError) {
@@ -957,65 +1054,19 @@ export function registerFinanceRoutes(app: Express) {
     try {
       const creditId = req.params.id;
       const credit = await storage.getCredit(creditId);
-      
+
       if (!credit) return res.status(404).json({ message: "Crédit non trouvé" });
       if (credit.statut !== StatutCredit.ACTIVE && credit.statut !== StatutCredit.LATE) {
         return res.status(400).json({ message: "Le crédit doit être actif pour générer un échéancier" });
       }
 
-      // Vérifier si des échéances existent déjà
       const existing = await storage.getEcheancesByCredit(creditId);
       if (existing.length > 0) {
         return res.status(400).json({ message: "Un échéancier existe déjà pour ce crédit" });
       }
 
-      // Génération de l'échéancier
-      const startDate = new Date(credit.dateDebut || Date.now());
-      const dAmount = D(credit.montant); // Principal
-      const dRate = D(credit.taux).div(100); // Taux en % (ex: 10 => 0.10)
-      const duration = credit.duree; // Nombre d'échéances
-
-      // Calcul montant total avec intérêts (Intérêt simple)
-      // Formule simple: Total = Principal * (1 + Taux)
-      const dTotalAmount = dAmount.times(D(1).plus(dRate));
-      const dInterestTotal = dTotalAmount.minus(dAmount);
-
-      // Split evenly with remainder absorbed by last installment
-      const capitalParts = splitEvenly(dAmount, duration);
-      const interestParts = splitEvenly(dInterestTotal, duration);
-
-      const schedule: any[] = [];
-      let currentDate = new Date(startDate);
-
-      for (let i = 1; i <= duration; i++) {
-        // Avancer la date selon la fréquence
-        if (credit.echeance === FrequenceRemboursement.WEEKLY) {
-          currentDate.setDate(currentDate.getDate() + 7);
-        } else if (credit.echeance === FrequenceRemboursement.BI_MONTHLY) {
-          currentDate.setDate(currentDate.getDate() + 15);
-        } else if (credit.echeance === FrequenceRemboursement.DAILY) {
-            currentDate.setDate(currentDate.getDate() + 1);
-        } else {
-          // MENSUEL par défaut
-          currentDate.setMonth(currentDate.getMonth() + 1);
-        }
-
-        const dCapital = capitalParts[i - 1];
-        const dInterest = interestParts[i - 1];
-
-        schedule.push({
-          creditId,
-          numeroEcheance: i,
-          dateEcheance: new Date(currentDate),
-          montantCapital: roundMoney(dCapital),
-          montantInteret: roundMoney(dInterest),
-          montantTotal: roundMoney(dCapital.plus(dInterest)),
-          montantPaye: "0",
-          statut: "UPCOMING",
-        });
-      }
-
-      const created = await storage.createEcheances(schedule);
+      await generateCreditScheduleIfNeeded(creditId);
+      const created = await storage.getEcheancesByCredit(creditId);
       res.json(created);
 
     } catch (error: any) {

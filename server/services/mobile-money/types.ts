@@ -1,7 +1,20 @@
 /**
  * Mobile Money Provider Types
- * Interfaces et types pour l'intégration MTN/Airtel
+ * Interfaces et types pour l'intégration via pawaPay (agrégateur)
+ *
+ * pawaPay est le gateway unique; l'opérateur (MTN/Airtel) est résolu
+ * via le champ "correspondent" et conservé pour le routage GL.
  */
+
+// ============================================
+// GATEWAY & OPERATOR TYPES
+// ============================================
+
+/** Gateway = quelle API on appelle (migration totale vers pawaPay) */
+export type PaymentGateway = "PAWAPAY";
+
+/** Operator = quel opérateur mobile (pour GL et traçabilité) */
+export type MobileOperator = "MTN" | "AIRTEL";
 
 // ============================================
 // REQUEST TYPES
@@ -10,20 +23,36 @@
 export interface CollectRequest {
   amount: number;
   phone: string;
-  externalRef: string;      // Notre UUID unique
+  externalRef: string;      // Notre UUID unique (= depositId pour pawaPay)
   callbackUrl: string;
   currency?: string;        // Default XAF
   description?: string;
   payerMessage?: string;    // Message affiché au payeur
+  correspondent?: string;   // pawaPay correspondent (ex: MTN_MOMO_COG)
 }
 
 export interface PayoutRequest {
   amount: number;
   phone: string;
-  externalRef: string;
+  externalRef: string;      // Notre UUID unique (= payoutId pour pawaPay)
   currency?: string;
   description?: string;
   payeeNote?: string;       // Note pour le bénéficiaire
+  correspondent?: string;   // pawaPay correspondent (ex: AIRTEL_COG)
+}
+
+export interface RefundRequest {
+  refundId: string;         // Notre UUID unique (= refundId pour pawaPay)
+  depositId: string;        // externalRef du dépôt original (= depositId pawaPay)
+  amount: number;           // Montant à rembourser (toujours requis par pawaPay v2)
+  currency: string;         // ISO 4217 (ex: "XAF") — toujours requis par pawaPay v2
+}
+
+export interface RefundResponse {
+  refundId: string;
+  status: "ACCEPTED" | "REJECTED";
+  rejectionCode?: string;
+  rejectionMessage?: string;
 }
 
 // ============================================
@@ -74,9 +103,10 @@ export interface IMobileMoneyProvider {
   readonly name: string;
 
   /**
-   * Code du provider (MTN ou AIRTEL)
+   * Code du provider
+   * "PAWAPAY" pour l'agrégateur, "MTN"/"AIRTEL" pour legacy
    */
-  readonly code: "MTN" | "AIRTEL";
+  readonly code: string;
 
   /**
    * Initie une collection (argent entrant)
@@ -133,7 +163,8 @@ export interface ProviderBalanceResponse {
 // ============================================
 
 export interface InitiateCollectionParams {
-  provider: "MTN" | "AIRTEL";
+  /** Opérateur mobile (MTN ou AIRTEL) - résolu depuis le téléphone ou la sélection UI */
+  provider: MobileOperator;
   amount: number;
   phone: string;
   clientId: string;
@@ -147,12 +178,14 @@ export interface InitiateCollectionParams {
 }
 
 export interface InitiatePayoutParams {
-  provider: "MTN" | "AIRTEL";
+  /** Opérateur mobile (MTN ou AIRTEL) */
+  provider: MobileOperator;
   amount: number;
   phone: string;
   clientId: string;
   compteId?: string;
   creditId?: string;
+  tontineId?: string;
   description?: string;
   idempotencyKey?: string;
   agenceId?: string;
@@ -163,6 +196,8 @@ export interface PaymentIntentFilter {
   agenceId?: string;
   status?: string;
   provider?: string;
+  gateway?: string;
+  operator?: string;
   type?: string;
   clientId?: string;
   from?: Date;

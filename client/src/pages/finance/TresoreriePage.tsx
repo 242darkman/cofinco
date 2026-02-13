@@ -2,33 +2,22 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   RefreshCw, Wallet, Building2, Smartphone, Banknote,
-  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Loader2, ChevronDown
+  Loader2, ChevronDown, ChevronUp, CreditCard, Landmark, Signal,
+  CheckCircle2, AlertCircle, Link2
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 
-// Safe date format helper
-const safeDateFormat = (dateValue: string | Date | null | undefined, formatStr: string): string => {
-  if (!dateValue) return '-';
-  try {
-    const date = new Date(dateValue);
-    if (isNaN(date.getTime())) return '-';
-    return format(date, formatStr, { locale: fr });
-  } catch {
-    return '-';
-  }
-};
-
-// Provider logos
-const ProviderLogo = ({ provider, size = 'md' }: { provider: string; size?: 'sm' | 'md' | 'lg' }) => {
-  const sizeClass = size === 'sm' ? 'h-5 w-5' : size === 'md' ? 'h-8 w-8' : 'h-12 w-12';
-  if (provider === 'MTN') {
-    return <img src={mtnLogo} alt="MTN" className={sizeClass} />;
-  }
-  return <img src={airtelLogo} alt="Airtel" className={sizeClass} />;
-};
+interface ProviderBalance {
+  provider: string;
+  code: string;
+  balance: string | null;
+  currency: string | null;
+  accountStatus: string | null;
+  shared?: boolean;
+  error: string | null;
+  checkedAt: string;
+}
 
 interface CaisseSummary {
   id: string;
@@ -40,7 +29,6 @@ interface CaisseSummary {
   agenceNom?: string;
 }
 
-// Backend structure from mm-caisse-service
 interface DigitalCaisseByAgence {
   caisseId: string;
   agenceId: string;
@@ -80,12 +68,9 @@ interface TresorerieStats {
   }>;
 }
 
-// Fetch tresorerie data
 async function fetchTresorerieStats(): Promise<TresorerieStats> {
-  // Fetch digital caisses summary
   const digitalRes = await fetch('/api/caisses/digital-summary', { credentials: 'include' });
 
-  // Default values if endpoint doesn't exist
   const defaultDigital: DigitalCaisseSummary = {
     mtn: { total: 0, byAgence: [] },
     airtel: { total: 0, byAgence: [] },
@@ -94,263 +79,400 @@ async function fetchTresorerieStats(): Promise<TresorerieStats> {
 
   if (!digitalRes.ok) {
     return {
-      totalPhysique: 0,
-      totalDigital: 0,
-      totalGlobal: 0,
-      digitalCaisses: defaultDigital,
-      physicalCaisses: [],
-      recentMovements: [],
+      totalPhysique: 0, totalDigital: 0, totalGlobal: 0,
+      digitalCaisses: defaultDigital, physicalCaisses: [], recentMovements: [],
     };
   }
 
   const digitalData: DigitalCaisseSummary = await digitalRes.json();
-
-  // Fetch physical caisses
   const physicalRes = await fetch('/api/caisses?type=PHYSICAL', { credentials: 'include' });
   const physicalData = physicalRes.ok ? await physicalRes.json() : [];
-
   const totalPhysique = physicalData.reduce((sum: number, c: any) => sum + Number(c.solde || 0), 0);
   const totalDigital = digitalData.grandTotal || (digitalData.mtn?.total || 0) + (digitalData.airtel?.total || 0);
 
   return {
-    totalPhysique,
-    totalDigital,
+    totalPhysique, totalDigital,
     totalGlobal: totalPhysique + totalDigital,
-    digitalCaisses: digitalData,
-    physicalCaisses: physicalData,
-    recentMovements: [],
+    digitalCaisses: digitalData, physicalCaisses: physicalData, recentMovements: [],
   };
 }
 
-export default function TresoreriePage() {
-  const [filterAgence, setFilterAgence] = useState<string>('');
+/**
+ * Résout le solde d'un provider depuis la liste des balances pawaPay.
+ * Si le wallet est partagé (shared=true), le solde est le même pour les deux opérateurs.
+ */
+function resolveProviderBalance(
+  providerBalances: ProviderBalance[],
+  code: 'MTN' | 'AIRTEL'
+): { balance: number; currency: string; active: boolean; error: string | null; shared: boolean } | null {
+  if (providerBalances.length === 0) return null;
 
-  const { data: stats, isLoading, refetch, isFetching } = useQuery<TresorerieStats>({
+  // Chercher le provider direct
+  const direct = providerBalances.find(p => p.code === code);
+  if (direct) {
+    return {
+      balance: parseFloat(direct.balance || '0'),
+      currency: direct.currency || 'XAF',
+      active: direct.accountStatus === 'ACTIVE',
+      error: direct.error,
+      shared: !!direct.shared,
+    };
+  }
+
+  // Si wallet partagé, prendre n'importe quel provider avec shared=true
+  const shared = providerBalances.find(p => p.shared);
+  if (shared) {
+    return {
+      balance: parseFloat(shared.balance || '0'),
+      currency: shared.currency || 'XAF',
+      active: shared.accountStatus === 'ACTIVE',
+      error: shared.error,
+      shared: true,
+    };
+  }
+
+  return null;
+}
+
+export default function TresoreriePage() {
+  const [filterAgence] = useState<string>('');
+  const [mtnExpanded, setMtnExpanded] = useState(true);
+  const [airtelExpanded, setAirtelExpanded] = useState(true);
+
+  const { data: stats, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery<TresorerieStats>({
     queryKey: ['tresorerie-stats', filterAgence],
     queryFn: fetchTresorerieStats,
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 60000,
   });
 
+  const { data: providerData } = useQuery<{ providers: ProviderBalance[] }>({
+    queryKey: ['provider-balances'],
+    queryFn: async () => {
+      const res = await fetch('/api/payments/provider-balances');
+      if (!res.ok) throw new Error('Erreur chargement soldes');
+      return res.json();
+    },
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  const providerBalances = providerData?.providers || [];
+  const mtnBalance = resolveProviderBalance(providerBalances, 'MTN');
+  const airtelBalance = resolveProviderBalance(providerBalances, 'AIRTEL');
+
+  // Solde total pawaPay (dédupliqué si wallet partagé)
+  const pawapayTotal = (() => {
+    if (!mtnBalance && !airtelBalance) return 0;
+    if (mtnBalance?.shared) return mtnBalance.balance; // partagé = un seul solde réel
+    return (mtnBalance?.balance || 0) + (airtelBalance?.balance || 0);
+  })();
+
   const totalPhysique = stats?.totalPhysique || 0;
-  const totalDigital = stats?.totalDigital || 0;
-  const totalGlobal = stats?.totalGlobal || 0;
+  const totalGlobal = totalPhysique + pawapayTotal;
   const mtnData = stats?.digitalCaisses?.mtn || { total: 0, byAgence: [] };
   const airtelData = stats?.digitalCaisses?.airtel || { total: 0, byAgence: [] };
 
   return (
-    <div className="flex flex-col h-full space-y-2 relative p-2" data-testid="page-tresorerie">
-      {/* Header - Compact */}
+    <div className="flex flex-col h-full space-y-3 relative p-3" data-testid="page-tresorerie">
+      {/* ─── Header ─── */}
       <div className="shrink-0 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Wallet className="text-cyan-400" size={24} />
+            <Wallet className="text-cyan-400" size={22} />
             Trésorerie
           </h1>
-          <p className="text-slate-400 text-xs mt-0.5">
-            Vue consolidée des caisses physiques et digitales
+          <p className="text-slate-500 text-[11px] mt-0.5">
+            Encaisse disponible — caisses physiques et comptes Mobile Money
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs transition-colors disabled:opacity-50 border border-slate-700"
-        >
-          <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-          Actualiser
-        </button>
+        <div className="flex items-center gap-2">
+          {dataUpdatedAt > 0 && (
+            <span className="text-[10px] text-slate-600 flex items-center gap-1">
+              <Signal size={9} className="text-emerald-500" />
+              {new Date(dataUpdatedAt).toLocaleTimeString('fr-FR')}
+            </span>
+          )}
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-all disabled:opacity-50 border border-slate-700/50"
+          >
+            <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
+            Actualiser
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-full">
-          <Loader2 size={32} className="text-cyan-500 animate-spin" />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 size={28} className="text-cyan-500 animate-spin" />
+            <span className="text-xs text-slate-500">Chargement de la trésorerie...</span>
+          </div>
         </div>
       ) : (
-        <>
-          {/* Global Summary - Compact Grid */}
-          <div className="grid grid-cols-3 gap-2 shrink-0">
-            {/* Total Global */}
-            <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl p-3 flex items-center justify-between relative overflow-hidden group">
-              <div className="absolute right-0 top-0 p-2 opacity-5 scale-150 group-hover:scale-125 transition-transform"><Wallet size={48} /></div>
-              <div>
-                 <p className="text-[10px] text-cyan-300 uppercase tracking-wider font-bold">Total Global</p>
-                 <div className="flex items-baseline gap-1">
-                   <span className="text-2xl font-bold text-white tracking-tight">{totalGlobal.toLocaleString()}</span>
-                   <span className="text-xs text-cyan-400/70 font-medium">FCFA</span>
-                 </div>
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 custom-scrollbar">
+          {/* ─── KPI Cards ─── */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {/* Total Encaisse */}
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-cyan-500/15 via-blue-500/10 to-indigo-500/15 border border-cyan-500/20 p-4">
+              <div className="absolute -right-3 -top-3 opacity-[0.04]">
+                <Wallet size={72} />
               </div>
-              <div className="h-full flex items-end">
-                 <Badge value="Global" variant="info" className="text-[9px] px-1.5 py-0" />
+              <p className="text-[10px] text-cyan-300/80 uppercase tracking-widest font-semibold mb-1">Encaisse Totale</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-extrabold text-white tracking-tight">{totalGlobal.toLocaleString('fr-FR')}</span>
+                <span className="text-xs text-cyan-400/60 font-medium">FCFA</span>
+              </div>
+              <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
+                <span className="flex items-center gap-1"><Banknote size={10} className="text-emerald-400" /> {totalPhysique.toLocaleString('fr-FR')}</span>
+                <span className="text-slate-600">|</span>
+                <span className="flex items-center gap-1"><Smartphone size={10} className="text-violet-400" /> {pawapayTotal.toLocaleString('fr-FR')}</span>
               </div>
             </div>
 
-            {/* Caisses Physiques */}
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between">
-               <div>
-                  <p className="text-[10px] text-emerald-400/80 uppercase tracking-wider font-bold flex items-center gap-1">
-                    <Banknote size={12} /> Physiques
-                  </p>
-                  <div className="flex items-baseline gap-1">
-                     <span className="text-xl font-bold text-white">{totalPhysique.toLocaleString()}</span>
-                     <span className="text-[10px] text-slate-500">FCFA</span>
-                  </div>
-               </div>
-               <div className="text-right">
-                  <span className="text-xs font-bold text-white bg-slate-700 px-1.5 py-0.5 rounded-md">
-                    {stats?.physicalCaisses?.length || 0}
-                  </span>
-                  <p className="text-[9px] text-slate-500 mt-0.5">caisses</p>
-               </div>
+            {/* Espèces (Caisses physiques) */}
+            <div className="relative overflow-hidden rounded-xl bg-slate-800/50 border border-slate-700/40 p-4">
+              <div className="absolute -right-2 -top-2 opacity-[0.04]">
+                <Banknote size={60} />
+              </div>
+              <p className="text-[10px] text-emerald-400/80 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
+                <Banknote size={11} /> Espèces
+              </p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-bold text-white">{totalPhysique.toLocaleString('fr-FR')}</span>
+                <span className="text-[10px] text-slate-500">FCFA</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-[10px] text-slate-500">{stats?.physicalCaisses?.length || 0} caisses</span>
+                <span className="text-[10px] font-medium text-emerald-400/60">{totalGlobal > 0 ? Math.round((totalPhysique / totalGlobal) * 100) : 0}%</span>
+              </div>
             </div>
 
-            {/* Caisses Digitales */}
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between">
-               <div>
-                  <p className="text-[10px] text-violet-400/80 uppercase tracking-wider font-bold flex items-center gap-1">
-                    <Smartphone size={12} /> Digitales
-                  </p>
-                  <div className="flex items-baseline gap-1">
-                     <span className="text-xl font-bold text-white">{totalDigital.toLocaleString()}</span>
-                     <span className="text-[10px] text-slate-500">FCFA</span>
-                  </div>
-               </div>
-               <div className="text-right">
-                  <span className="text-xs font-bold text-white bg-slate-700 px-1.5 py-0.5 rounded-md">
-                    {mtnData.byAgence.length + airtelData.byAgence.length}
-                  </span>
-                  <p className="text-[9px] text-slate-500 mt-0.5">comptes</p>
-               </div>
+            {/* Mobile Money (solde pawaPay réel) */}
+            <div className="relative overflow-hidden rounded-xl bg-slate-800/50 border border-slate-700/40 p-4">
+              <div className="absolute -right-2 -top-2 opacity-[0.04]">
+                <Smartphone size={60} />
+              </div>
+              <p className="text-[10px] text-violet-400/80 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
+                <Smartphone size={11} /> Mobile Money
+              </p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-bold text-white">{pawapayTotal.toLocaleString('fr-FR')}</span>
+                <span className="text-[10px] text-slate-500">FCFA</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-[10px] text-slate-500">via pawaPay</span>
+                <span className="text-[10px] font-medium text-violet-400/60">{totalGlobal > 0 ? Math.round((pawapayTotal / totalGlobal) * 100) : 0}%</span>
+              </div>
             </div>
           </div>
 
-          {/* Main Content - Split View */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden">
-            
-            {/* Left Column: Mobile Money */}
-            <div className="flex flex-col gap-2 min-h-0">
-               {/* MTN Card */}
-               <div className="flex-1 min-h-0 bg-slate-900/40 border border-yellow-500/10 rounded-xl flex flex-col overflow-hidden relative">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500/50"></div>
-                  <div className="p-2 border-b border-slate-700/50 bg-yellow-500/5 flex justify-between items-center shrink-0">
-                     <div className="flex items-center gap-2">
-                        <ProviderLogo provider="MTN" size="sm" />
-                        <span className="font-bold text-sm text-yellow-100">MTN Mobile Money</span>
-                     </div>
-                     <span className="font-mono font-bold text-yellow-400">{mtnData.total.toLocaleString()} F</span>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                    {mtnData.byAgence.length > 0 ? (
-                      mtnData.byAgence.map((caisse) => (
-                        <div key={caisse.caisseId} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 border border-slate-700/30 hover:bg-slate-800/60 transition-colors">
-                           <div className="flex items-center gap-2 overflow-hidden">
-                              <Building2 size={12} className="text-slate-500 shrink-0" />
-                              <span className="text-xs text-slate-300 truncate">{caisse.agenceNom}</span>
-                           </div>
-                           <span className="text-xs font-mono font-medium text-yellow-500 ml-2">{Number(caisse.solde).toLocaleString()}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-500/50">
-                        <Smartphone size={24} className="mb-1 opacity-20" />
-                        <span className="text-[10px]">Aucun compte MTN</span>
-                      </div>
-                    )}
-                  </div>
-               </div>
+          {/* ─── Mobile Money Wallet Cards ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* MTN MoMo Card */}
+            <WalletCard
+              logo={mtnLogo}
+              name="MTN Mobile Money"
+              gradient="bg-gradient-to-br from-yellow-500 via-yellow-600 to-amber-700"
+              borderColor="border-yellow-500/15"
+              textAccent="text-yellow-100"
+              balanceAccent="text-yellow-400"
+              chipBg="bg-yellow-200/30"
+              chipBorder="border-yellow-200/20"
+              badgeBg="bg-yellow-100/10"
+              badgeText="text-yellow-100/40"
+              providerBalance={mtnBalance}
+              agences={mtnData.byAgence}
+              expanded={mtnExpanded}
+              onToggle={() => setMtnExpanded(!mtnExpanded)}
+            />
 
-               {/* Airtel Card */}
-               <div className="flex-1 min-h-0 bg-slate-900/40 border border-red-500/10 rounded-xl flex flex-col overflow-hidden relative">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-red-500/50"></div>
-                  <div className="p-2 border-b border-slate-700/50 bg-red-500/5 flex justify-between items-center shrink-0">
-                     <div className="flex items-center gap-2">
-                        <ProviderLogo provider="AIRTEL" size="sm" />
-                        <span className="font-bold text-sm text-red-100">Airtel Money</span>
-                     </div>
-                     <span className="font-mono font-bold text-red-400">{airtelData.total.toLocaleString()} F</span>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                    {airtelData.byAgence.length > 0 ? (
-                      airtelData.byAgence.map((caisse) => (
-                        <div key={caisse.caisseId} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 border border-slate-700/30 hover:bg-slate-800/60 transition-colors">
-                           <div className="flex items-center gap-2 overflow-hidden">
-                              <Building2 size={12} className="text-slate-500 shrink-0" />
-                              <span className="text-xs text-slate-300 truncate">{caisse.agenceNom}</span>
-                           </div>
-                           <span className="text-xs font-mono font-medium text-red-400 ml-2">{Number(caisse.solde).toLocaleString()}</span>
-                        </div>
-                      ))
-                    ) : (
-                       <div className="h-full flex flex-col items-center justify-center text-slate-500/50">
-                        <Smartphone size={24} className="mb-1 opacity-20" />
-                        <span className="text-[10px]">Aucun compte Airtel</span>
-                      </div>
-                    )}
-                  </div>
-               </div>
-            </div>
-
-            {/* Right Column: Physical Caisses */}
-            <div className="flex flex-col min-h-0 bg-slate-900/50 border border-slate-700/50 rounded-xl overflow-hidden">
-               <div className="p-2 border-b border-slate-700/50 flex items-center justify-between shrink-0 bg-slate-800/50">
-                  <div className="flex items-center gap-2">
-                     <Banknote size={16} className="text-emerald-400" />
-                     <h2 className="text-sm font-bold text-white">Caisses Physiques</h2>
-                  </div>
-                  <Badge value={`${stats?.physicalCaisses?.length || 0} caisses`} variant="neutral" className="text-[10px]" />
-               </div>
-               
-               <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  {stats?.physicalCaisses && stats.physicalCaisses.length > 0 ? (
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-slate-900/80 sticky top-0 z-10 backdrop-blur-sm">
-                        <tr>
-                          <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">Caisse</th>
-                          <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">Agence</th>
-                          <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase text-center">Statut</th>
-                          <th className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase text-right">Solde</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/50">
-                        {stats.physicalCaisses.map((caisse) => (
-                          <tr key={caisse.id} className="hover:bg-slate-800/40 transition-colors group">
-                            <td className="px-3 py-2">
-                              <div className="font-medium text-xs text-white group-hover:text-cyan-400 transition-colors">{caisse.nom}</div>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="text-xs text-slate-400">{caisse.agenceNom || '-'}</div>
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                               <div className={`inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase border ${
-                                 caisse.statut === 'OPEN' 
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                                  : 'bg-slate-700/50 text-slate-400 border-slate-600/50'
-                               }`}>
-                                 {caisse.statut === 'OPEN' ? 'Ouverte' : 'Fermée'}
-                               </div>
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <span className="font-mono text-xs font-bold text-white">{Number(caisse.solde).toLocaleString()}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center p-8 text-slate-500">
-                      <Banknote size={32} className="mb-2 opacity-20" />
-                      <p className="text-xs">Aucune caisse physique</p>
-                    </div>
-                  )}
-               </div>
-            </div>
-
+            {/* Airtel Money Card */}
+            <WalletCard
+              logo={airtelLogo}
+              name="Airtel Money"
+              gradient="bg-gradient-to-br from-red-600 via-red-700 to-rose-800"
+              borderColor="border-red-500/15"
+              textAccent="text-red-100"
+              balanceAccent="text-red-400"
+              chipBg="bg-red-200/30"
+              chipBorder="border-red-200/20"
+              badgeBg="bg-red-100/10"
+              badgeText="text-red-100/40"
+              providerBalance={airtelBalance}
+              agences={airtelData.byAgence}
+              expanded={airtelExpanded}
+              onToggle={() => setAirtelExpanded(!airtelExpanded)}
+            />
           </div>
-        </>
+
+          {/* ─── Caisses & Coffres Physiques ─── */}
+          <div className="bg-slate-900/50 border border-slate-700/40 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-700/40 flex items-center justify-between bg-slate-800/30">
+              <div className="flex items-center gap-2">
+                <Landmark size={15} className="text-emerald-400" />
+                <h2 className="text-sm font-bold text-white">Caisses & Coffres Physiques</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge value={`${totalPhysique.toLocaleString('fr-FR')} FCFA`} variant="success" className="text-[10px]" />
+                <Badge value={`${stats?.physicalCaisses?.length || 0}`} variant="neutral" className="text-[10px]" />
+              </div>
+            </div>
+
+            {stats?.physicalCaisses && stats.physicalCaisses.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-900/80 sticky top-0 z-10 backdrop-blur-sm">
+                    <tr>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Caisse</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agence</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Statut</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Solde</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {stats.physicalCaisses.map((caisse) => (
+                      <tr key={caisse.id} className="hover:bg-slate-800/30 transition-colors group">
+                        <td className="px-4 py-2.5">
+                          <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors">{caisse.nom}</span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-xs text-slate-500">{caisse.agenceNom || '-'}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                            caisse.statut === 'OPEN'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-slate-700/50 text-slate-500 border-slate-600/30'
+                          }`}>
+                            {caisse.statut === 'OPEN' ? 'Ouverte' : 'Fermée'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className="font-mono text-xs font-bold text-white">{Number(caisse.solde).toLocaleString('fr-FR')}</span>
+                          <span className="text-[9px] text-slate-600 ml-1">FCFA</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-600">
+                <Banknote size={28} className="mb-2 opacity-20" />
+                <p className="text-xs">Aucune caisse physique</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-// Simple Badge component to avoid import issues if not available
+// ─── Wallet Card Component ───
+
+interface WalletCardProps {
+  logo: string;
+  name: string;
+  gradient: string;
+  borderColor: string;
+  textAccent: string;
+  balanceAccent: string;
+  chipBg: string;
+  chipBorder: string;
+  badgeBg: string;
+  badgeText: string;
+  providerBalance: ReturnType<typeof resolveProviderBalance>;
+  agences: DigitalCaisseByAgence[];
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+function WalletCard({
+  logo, name, gradient, borderColor, textAccent, balanceAccent,
+  chipBg, chipBorder, badgeBg, badgeText,
+  providerBalance, agences, expanded, onToggle,
+}: WalletCardProps) {
+  const hasAgences = agences.length > 0;
+
+  return (
+    <div className={`rounded-xl overflow-hidden border ${borderColor} bg-slate-900/40`}>
+      {/* Credit card gradient header */}
+      <div className={`${gradient} p-4 relative overflow-hidden`}>
+        <div className="absolute -right-6 -bottom-4 opacity-10">
+          <CreditCard size={80} strokeWidth={1} />
+        </div>
+        <div className="absolute right-3 top-3 opacity-20">
+          <div className={`w-8 h-5 rounded-sm ${chipBg} border ${chipBorder}`} />
+        </div>
+
+        <div className="flex items-center gap-2.5 mb-3">
+          <img src={logo} alt={name} className="h-7 w-7 rounded" />
+          <div>
+            <span className="font-bold text-sm text-white/95">{name}</span>
+            <p className={`text-[9px] ${textAccent}/50`}>Solde disponible</p>
+          </div>
+        </div>
+
+        {/* Balance */}
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-2xl font-extrabold text-white tracking-tight font-mono">
+            {providerBalance
+              ? (providerBalance.error ? '---' : providerBalance.balance.toLocaleString('fr-FR'))
+              : '---'
+            }
+          </span>
+          <span className={`text-xs ${textAccent}/60 font-medium`}>FCFA</span>
+          {providerBalance?.active && <CheckCircle2 size={12} className="text-emerald-300 ml-1" />}
+        </div>
+
+        {providerBalance?.error && (
+          <p className="text-[10px] text-red-300/70 flex items-center gap-1 mt-1">
+            <AlertCircle size={10} /> {providerBalance.error}
+          </p>
+        )}
+
+        <div className="mt-2 flex items-center justify-between">
+          <span className={`text-[10px] ${badgeText} flex items-center gap-1`}>
+            {providerBalance?.shared && <><Link2 size={8} /> Wallet commun</>}
+          </span>
+          <span className={`text-[9px] ${badgeText} ${badgeBg} px-1.5 py-0.5 rounded`}>pawaPay</span>
+        </div>
+      </div>
+
+      {/* Per-agence breakdown — only if there are agences */}
+      {hasAgences && (
+        <div>
+          <button
+            onClick={onToggle}
+            className="w-full flex items-center justify-between px-3 py-2 text-[10px] text-slate-400 hover:text-slate-300 transition-colors bg-slate-800/30"
+          >
+            <span className="uppercase tracking-wider font-semibold">Répartition par agence</span>
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+          {expanded && (
+            <div className="p-2 space-y-1">
+              {agences.map((caisse) => (
+                <div key={caisse.caisseId} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/40 border border-slate-700/20 hover:bg-slate-800/70 transition-colors">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Building2 size={11} className="text-slate-600 shrink-0" />
+                    <span className="text-xs text-slate-300 truncate">{caisse.agenceNom}</span>
+                  </div>
+                  <span className={`text-xs font-mono font-semibold ${balanceAccent} ml-2`}>{Number(caisse.solde).toLocaleString('fr-FR')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Badge ───
+
 function Badge({ value, variant = 'neutral', className = '' }: { value: string | React.ReactNode, variant?: 'success' | 'warning' | 'error' | 'info' | 'neutral', className?: string }) {
   const variants = {
     success: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',

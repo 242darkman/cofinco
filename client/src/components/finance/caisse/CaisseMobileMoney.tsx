@@ -556,7 +556,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                     {selectedClient.nom.charAt(0)}{selectedClient.prenom.charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-bold text-white truncate">{selectedClient.nom} {selectedClient.prenom}</h3>
+                    <h3 className="text-sm font-bold text-white">{selectedClient.nom} {selectedClient.prenom}</h3>
                     <p className="text-xs text-slate-400 font-mono">{selectedClient.telephone || selectedClient.phone}</p>
                   </div>
                 </div>

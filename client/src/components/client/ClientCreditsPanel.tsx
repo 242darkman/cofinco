@@ -199,8 +199,10 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
 
   const montantNum = c.montant;
   const soldeNum = c.soldeRestant;
-  const paid = montantNum - soldeNum;
-  const progressPct = montantNum > 0 ? Math.min(100, (paid / montantNum) * 100) : 0;
+  // Le solde restant inclut les intérêts, donc la base = montant * (1 + taux/100)
+  const totalDue = montantNum * (1 + c.taux / 100);
+  const paid = totalDue - soldeNum;
+  const progressPct = totalDue > 0 ? Math.max(0, Math.min(100, (paid / totalDue) * 100)) : 0;
 
   const statusLabel = CREDIT_STATUS_LABELS[c.statut as keyof typeof CREDIT_STATUS_LABELS] || c.statut;
   const statusColor = CREDIT_STATUS_COLORS[c.statut as keyof typeof CREDIT_STATUS_COLORS] || '';
@@ -305,9 +307,9 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
 
   const credits = (rawCredits || []).map(normalizeCredit);
   const activeCredits = credits.filter(c => c.statut === 'ACTIVE' || c.statut === 'LATE' || c.statut === 'WAITING_DISBURSEMENT');
-  const closedCredits = credits.filter(c => c.statut === 'PAID' || c.statut === 'CLOSED' || c.statut === 'CANCELLED');
+  const closedCredits = credits.filter(c => c.statut === 'PAID' || c.statut === 'CLOSED');
   const totalSoldeRestant = activeCredits.reduce((sum, c) => sum + c.soldeRestant, 0);
-  const totalMontant = activeCredits.reduce((sum, c) => sum + c.montant, 0);
+  const totalDueAll = activeCredits.reduce((sum, c) => sum + c.montant * (1 + c.taux / 100), 0);
   const lateCount = credits.filter(c => c.statut === 'LATE').length;
 
   return (
@@ -359,16 +361,16 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
             </div>
 
             {/* Global progress */}
-            {totalMontant > 0 && (
+            {totalDueAll > 0 && (
               <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
                 <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
                   <span>Progression globale</span>
-                  <span>{((1 - totalSoldeRestant / totalMontant) * 100).toFixed(0)}%</span>
+                  <span>{Math.max(0, (1 - totalSoldeRestant / totalDueAll) * 100).toFixed(0)}%</span>
                 </div>
                 <div className="h-2.5 bg-slate-700/50 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all"
-                    style={{ width: `${Math.min(100, (1 - totalSoldeRestant / totalMontant) * 100)}%` }}
+                    style={{ width: `${Math.max(0, Math.min(100, (1 - totalSoldeRestant / totalDueAll) * 100))}%` }}
                   />
                 </div>
               </div>

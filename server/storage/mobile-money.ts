@@ -1,6 +1,6 @@
 /**
  * Mobile Money Storage Layer
- * Couche d'accès données pour les paiements Mobile Money
+ * Couche d'accès données pour les paiements Mobile Money via pawaPay
  */
 
 import { db } from "../db";
@@ -29,7 +29,7 @@ export async function getPaymentIntent(id: string): Promise<PaymentIntent | unde
 }
 
 /**
- * Récupère un payment intent par external reference (notre UUID)
+ * Récupère un payment intent par external reference (notre UUID = depositId/payoutId pawaPay)
  */
 export async function getPaymentIntentByExternalRef(externalRef: string): Promise<PaymentIntent | undefined> {
   const [intent] = await db.select().from(paymentIntents).where(eq(paymentIntents.externalRef, externalRef));
@@ -37,10 +37,11 @@ export async function getPaymentIntentByExternalRef(externalRef: string): Promis
 }
 
 /**
- * Récupère un payment intent par provider reference
+ * Récupère un payment intent par operator + provider reference
+ * Le champ provider contient l'opérateur (MTN/AIRTEL) pour compatibilité GL
  */
 export async function getPaymentIntentByProviderRef(
-  provider: string,
+  operator: string,
   providerRef: string
 ): Promise<PaymentIntent | undefined> {
   const [intent] = await db
@@ -48,7 +49,7 @@ export async function getPaymentIntentByProviderRef(
     .from(paymentIntents)
     .where(
       and(
-        eq(paymentIntents.provider, provider as "MTN" | "AIRTEL"),
+        eq(paymentIntents.provider, operator as "MTN" | "AIRTEL"),
         eq(paymentIntents.providerRef, providerRef)
       )
     );
@@ -102,6 +103,12 @@ export async function listPaymentIntents(filter: PaymentIntentFilter): Promise<{
   }
   if (filter.provider) {
     conditions.push(eq(paymentIntents.provider, filter.provider as "MTN" | "AIRTEL"));
+  }
+  if (filter.gateway) {
+    conditions.push(eq(paymentIntents.gateway, filter.gateway));
+  }
+  if (filter.operator) {
+    conditions.push(eq(paymentIntents.operator, filter.operator));
   }
   if (filter.type) {
     conditions.push(eq(paymentIntents.type, filter.type as "COLLECTION" | "PAYOUT"));
@@ -173,11 +180,10 @@ export async function getExpiredIntents(): Promise<PaymentIntent[]> {
 }
 
 /**
- * Récupère les payment intents PENDING pour un provider spécifique
- * Utilisé pour la réconciliation via API summary
+ * Récupère les payment intents PENDING pour un opérateur spécifique
  */
 export async function getPendingIntentsByProvider(
-  provider: "MTN" | "AIRTEL"
+  operator: "MTN" | "AIRTEL"
 ): Promise<PaymentIntent[]> {
   return db
     .select()
@@ -185,7 +191,7 @@ export async function getPendingIntentsByProvider(
     .where(
       and(
         eq(paymentIntents.status, "PENDING"),
-        eq(paymentIntents.provider, provider)
+        eq(paymentIntents.provider, operator)
       )
     )
     .orderBy(paymentIntents.initiatedAt);
@@ -196,7 +202,7 @@ export async function getPendingIntentsByProvider(
 // ============================================
 
 /**
- * Crée un nouvel événement provider (log webhook)
+ * Crée un nouvel événement provider (log webhook pawaPay)
  */
 export async function createProviderEvent(data: InsertProviderEvent): Promise<ProviderEvent> {
   const [event] = await db.insert(providerEvents).values(data).returning();
@@ -282,7 +288,7 @@ export async function getEventsForPaymentIntent(paymentIntentId: string): Promis
 // ============================================
 
 /**
- * Statistiques des paiements par provider et statut
+ * Statistiques des paiements par opérateur et statut
  */
 export async function getPaymentStats(filter?: {
   agenceId?: string;

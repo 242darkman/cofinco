@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, User, FileText, Users, CreditCard, ArrowDownLeft, ArrowUpRight, Loader2, Banknote, CheckCircle, Building2 } from 'lucide-react';
-import mtnMomoLogo from '../../../assets/logos/momo_mtna.png';
-import airtelMoneyLogo from '../../../assets/logos/airtel-money.png';
+import mtnMomoLogo from '../../../assets/logos/mtn-logo.png';
+import airtelMoneyLogo from '../../../assets/logos/airtel-logo.png';
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -564,7 +564,7 @@ export default function CaissePaiementModal({
                 <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 border-l border-slate-800 pl-3 sm:pl-4">
                    <div className="min-w-0 flex-1">
                       <div className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Client</div>
-                      <div className="text-xs sm:text-sm font-bold text-white truncate">
+                      <div className="text-xs sm:text-sm font-bold text-white">
                          {selectedClient?.nom || 'Client'} {selectedClient?.prenom || ''}
                       </div>
                    </div>

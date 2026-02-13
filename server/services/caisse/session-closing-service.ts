@@ -268,117 +268,116 @@ export class SessionClosingService {
       const providers: MMReconciliationInfo['providers'] = [];
       let hasDiscrepancy = false;
 
+      // Récupérer les balances pawaPay par correspondent (MTN_MOMO_COG, AIRTEL_COG)
+      let pawaPayBalances: Record<string, number> | null = null;
+      let balanceApiResponseTime = 0;
+      let balanceApiFailed = false;
+      let balanceApiError = '';
+
+      try {
+        const pawaPayProvider = providerRegistry.getPawaPay();
+        if (typeof (pawaPayProvider as any).getBalancePerCorrespondent === 'function') {
+          const startTime = Date.now();
+          const balanceResult = await (pawaPayProvider as any).getBalancePerCorrespondent();
+          balanceApiResponseTime = Date.now() - startTime;
+
+          // Map correspondent balances to operators
+          pawaPayBalances = {};
+          if (balanceResult) {
+            for (const entry of Array.isArray(balanceResult) ? balanceResult : [balanceResult]) {
+              const correspondent = entry.correspondent || '';
+              if (correspondent.includes('MTN')) {
+                pawaPayBalances['MTN'] = (pawaPayBalances['MTN'] || 0) + Number(entry.balance || 0);
+              } else if (correspondent.includes('AIRTEL')) {
+                pawaPayBalances['AIRTEL'] = (pawaPayBalances['AIRTEL'] || 0) + Number(entry.balance || 0);
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        balanceApiFailed = true;
+        balanceApiError = error.message;
+        logger.warn({ err: error }, 'Erreur récupération balances pawaPay');
+      }
+
       // Vérifier MTN
       if (summary.mtn.total > 0) {
-        try {
-          const mtnProvider = providerRegistry.get('MTN');
-          if (mtnProvider && typeof mtnProvider.getBalance === 'function') {
-            const startTime = Date.now();
-            const balance = await mtnProvider.getBalance();
-            const responseTime = Date.now() - startTime;
+        const expectedBalance = summary.mtn.total;
 
-            const expectedBalance = summary.mtn.total;
-            const providerBalance = Number(balance.balance || 0);
-            const ecart = providerBalance - expectedBalance;
-
-            const status = Math.abs(ecart) > MM_DISCREPANCY_THRESHOLD ? 'DISCREPANCY' : 'MATCHED';
-            if (status === 'DISCREPANCY') hasDiscrepancy = true;
-
-            providers.push({
-              provider: 'MTN',
-              expectedBalance,
-              providerBalance,
-              ecart,
-              status,
-            });
-
-            // Enregistrer la réconciliation
-            await db.insert(mmBalanceReconciliations).values({
-              sessionId,
-              provider: 'MTN',
-              expectedBalance: expectedBalance.toString(),
-              providerBalance: providerBalance.toString(),
-              ecart: ecart.toString(),
-              apiCallSuccess: true,
-              apiResponseTimeMs: responseTime.toString(),
-              statut: status,
-            });
-          }
-        } catch (error: any) {
-          logger.warn({ err: error }, 'Erreur récupération balance MTN');
+        if (balanceApiFailed) {
           providers.push({
             provider: 'MTN',
-            expectedBalance: summary.mtn.total,
+            expectedBalance,
             providerBalance: null,
             ecart: 0,
             status: 'API_FAILED',
           });
-
           await db.insert(mmBalanceReconciliations).values({
             sessionId,
             provider: 'MTN',
-            expectedBalance: summary.mtn.total.toString(),
+            expectedBalance: expectedBalance.toString(),
             ecart: '0',
             apiCallSuccess: false,
-            apiErrorMessage: error.message,
+            apiErrorMessage: balanceApiError,
             statut: 'API_FAILED',
+          });
+        } else if (pawaPayBalances) {
+          const providerBalance = pawaPayBalances['MTN'] ?? 0;
+          const ecart = providerBalance - expectedBalance;
+          const status = Math.abs(ecart) > MM_DISCREPANCY_THRESHOLD ? 'DISCREPANCY' : 'MATCHED';
+          if (status === 'DISCREPANCY') hasDiscrepancy = true;
+
+          providers.push({ provider: 'MTN', expectedBalance, providerBalance, ecart, status });
+          await db.insert(mmBalanceReconciliations).values({
+            sessionId,
+            provider: 'MTN',
+            expectedBalance: expectedBalance.toString(),
+            providerBalance: providerBalance.toString(),
+            ecart: ecart.toString(),
+            apiCallSuccess: true,
+            apiResponseTimeMs: balanceApiResponseTime.toString(),
+            statut: status,
           });
         }
       }
 
       // Vérifier Airtel
       if (summary.airtel.total > 0) {
-        try {
-          const airtelProvider = providerRegistry.get('AIRTEL');
-          if (airtelProvider && typeof airtelProvider.getBalance === 'function') {
-            const startTime = Date.now();
-            const balance = await airtelProvider.getBalance();
-            const responseTime = Date.now() - startTime;
+        const expectedBalance = summary.airtel.total;
 
-            const expectedBalance = summary.airtel.total;
-            const providerBalance = Number(balance.balance || 0);
-            const ecart = providerBalance - expectedBalance;
-
-            const status = Math.abs(ecart) > MM_DISCREPANCY_THRESHOLD ? 'DISCREPANCY' : 'MATCHED';
-            if (status === 'DISCREPANCY') hasDiscrepancy = true;
-
-            providers.push({
-              provider: 'AIRTEL',
-              expectedBalance,
-              providerBalance,
-              ecart,
-              status,
-            });
-
-            await db.insert(mmBalanceReconciliations).values({
-              sessionId,
-              provider: 'AIRTEL',
-              expectedBalance: expectedBalance.toString(),
-              providerBalance: providerBalance.toString(),
-              ecart: ecart.toString(),
-              apiCallSuccess: true,
-              apiResponseTimeMs: responseTime.toString(),
-              statut: status,
-            });
-          }
-        } catch (error: any) {
-          logger.warn({ err: error }, 'Erreur récupération balance Airtel');
+        if (balanceApiFailed) {
           providers.push({
             provider: 'AIRTEL',
-            expectedBalance: summary.airtel.total,
+            expectedBalance,
             providerBalance: null,
             ecart: 0,
             status: 'API_FAILED',
           });
-
           await db.insert(mmBalanceReconciliations).values({
             sessionId,
             provider: 'AIRTEL',
-            expectedBalance: summary.airtel.total.toString(),
+            expectedBalance: expectedBalance.toString(),
             ecart: '0',
             apiCallSuccess: false,
-            apiErrorMessage: error.message,
+            apiErrorMessage: balanceApiError,
             statut: 'API_FAILED',
+          });
+        } else if (pawaPayBalances) {
+          const providerBalance = pawaPayBalances['AIRTEL'] ?? 0;
+          const ecart = providerBalance - expectedBalance;
+          const status = Math.abs(ecart) > MM_DISCREPANCY_THRESHOLD ? 'DISCREPANCY' : 'MATCHED';
+          if (status === 'DISCREPANCY') hasDiscrepancy = true;
+
+          providers.push({ provider: 'AIRTEL', expectedBalance, providerBalance, ecart, status });
+          await db.insert(mmBalanceReconciliations).values({
+            sessionId,
+            provider: 'AIRTEL',
+            expectedBalance: expectedBalance.toString(),
+            providerBalance: providerBalance.toString(),
+            ecart: ecart.toString(),
+            apiCallSuccess: true,
+            apiResponseTimeMs: balanceApiResponseTime.toString(),
+            statut: status,
           });
         }
       }

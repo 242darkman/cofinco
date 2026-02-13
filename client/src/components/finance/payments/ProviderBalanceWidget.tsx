@@ -1,6 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, Wallet, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Wallet, AlertCircle, CheckCircle2, Link2 } from 'lucide-react';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 interface ProviderBalance {
   provider: string;
@@ -8,13 +10,14 @@ interface ProviderBalance {
   balance: string | null;
   currency: string | null;
   accountStatus: string | null;
+  shared?: boolean;
   error: string | null;
   checkedAt: string;
 }
 
-const PROVIDER_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  MTN: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400' },
-  AIRTEL: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400' },
+const PROVIDER_STYLES: Record<string, { bg: string; border: string; text: string; logo: string }> = {
+  MTN: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400', logo: mtnLogo },
+  AIRTEL: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', logo: airtelLogo },
 };
 
 export default function ProviderBalanceWidget() {
@@ -25,11 +28,12 @@ export default function ProviderBalanceWidget() {
       if (!res.ok) throw new Error('Erreur chargement soldes');
       return res.json();
     },
-    refetchInterval: 60_000, // Auto-refresh every 60s
+    refetchInterval: 60_000,
     staleTime: 30_000,
   });
 
   const providers = data?.providers || [];
+  const isSharedWallet = providers.some(p => p.shared);
 
   return (
     <div className="space-y-2">
@@ -37,6 +41,12 @@ export default function ProviderBalanceWidget() {
         <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
           <Wallet size={13} className="text-cyan-400" />
           Soldes Providers
+          {isSharedWallet && (
+            <span className="text-[9px] font-normal text-slate-500 flex items-center gap-0.5" title="pawaPay utilise un wallet partagé pour le Congo">
+              <Link2 size={9} />
+              partagé
+            </span>
+          )}
         </h4>
         <button
           onClick={() => refetch()}
@@ -65,15 +75,19 @@ export default function ProviderBalanceWidget() {
       ) : (
         <div className="space-y-1.5">
           {providers.map((p) => {
-            const colors = PROVIDER_COLORS[p.code] || { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400' };
+            const style = PROVIDER_STYLES[p.code] || { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', logo: '' };
             return (
               <div
                 key={p.code}
-                className={`p-2.5 rounded-lg border ${colors.bg} ${colors.border}`}
+                className={`p-2.5 rounded-lg border ${style.bg} ${style.border}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={`font-bold text-xs ${colors.text}`}>{p.code}</span>
+                    {style.logo ? (
+                      <img src={style.logo} alt={p.code} className="h-5 w-auto object-contain" />
+                    ) : (
+                      <span className={`font-bold text-xs ${style.text}`}>{p.code}</span>
+                    )}
                     {p.accountStatus === 'ACTIVE' && (
                       <CheckCircle2 size={11} className="text-emerald-400" />
                     )}

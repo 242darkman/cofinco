@@ -37,6 +37,13 @@ const getTypeCompteLabel = (type: string): string => {
   return TYPE_COMPTE_LABELS[type] || type;
 };
 
+/** Format date safely - handles null, undefined, invalid dates */
+const formatDateSafe = (dateValue: any): string => {
+  if (!dateValue) return '—';
+  const d = new Date(dateValue);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('fr-FR');
+};
+
 interface ActivationAccountData {
   id: string;
   numeroCompte: string;
@@ -309,7 +316,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                          </div>
                          <div className="text-right">
                            <div className="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Ouverture</div>
-                           <div className="text-slate-400">{new Date(compte.dateOuverture || compte.createdAt).toLocaleDateString()}</div>
+                           <div className="text-slate-400">{formatDateSafe(compte.dateOuverture || compte.createdAt)}</div>
                          </div>
                        </div>
                      </div>
@@ -338,7 +345,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                               </div>
                               <div className="text-right shrink-0">
                                  <div className="text-[10px] sm:text-xs opacity-60 uppercase tracking-wider mb-0.5">Ouverture</div>
-                                 <div>{new Date(compte.dateOuverture || compte.createdAt).toLocaleDateString()}</div>
+                                 <div>{formatDateSafe(compte.dateOuverture || compte.createdAt)}</div>
                               </div>
                            </div>
                         </div>
@@ -466,7 +473,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                                   </div>
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-slate-500">Date d'ouverture</span>
-                                     <span className="text-white">{new Date(compte.dateOuverture).toLocaleDateString()}</span>
+                                     <span className="text-white">{formatDateSafe(compte.dateOuverture || compte.createdAt)}</span>
                                   </div>
                                   {uiConfig.interestRate > 0 && (
                                      <div className="flex justify-between items-center py-1.5 sm:py-2">

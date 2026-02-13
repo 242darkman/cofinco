@@ -6,7 +6,8 @@ import { useCredits } from '../../../hooks/credits/useCredits';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { useEnquetes } from '../../../hooks/credits/useEnquetes';
 import { useCreditStats } from '../../../hooks/credits/useCreditStats';
-import { StatutCredit, StatutDemande } from '@shared/enum/status-constants';
+import { StatutCredit, StatutDemande, type StatutCreditType } from '@shared/enum/status-constants';
+import { CREDIT_STATUS_LABELS } from '../../../lib/status-labels';
 import CreditDetailModal from './CreditDetailModal';
 import CreditRequestForm from './CreditRequestForm';
 import EnqueteCreditForm from './EnqueteCreditForm';
@@ -375,11 +376,14 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'numeroCredit', label: 'Numéro', primary: true },
     { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
     { key: 'montantPrincipal', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
-    { 
-      key: 'statut', 
-      label: 'Statut', 
-      align: 'center', 
-      format: (val) => <Badge value={val} className="min-w-[100px] justify-center" />
+    {
+      key: 'statut',
+      label: 'Statut',
+      align: 'center',
+      format: (val) => {
+        const label = CREDIT_STATUS_LABELS[val as StatutCreditType] || val;
+        return <Badge value={label} rawValue className="min-w-[100px] justify-center" />;
+      }
     },
     { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombreEcheancesPayees || 0}/${item.nombreEcheancesTotal || 0}` },
     { key: 'joursRetard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : <span className="text-slate-500">0j</span> }

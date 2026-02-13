@@ -20,6 +20,8 @@ interface ReconciliationResult {
   details: {
     coffres: { operational: number; gl: number; discrepancy: number };
     caisses: { operational: number; gl: number; discrepancy: number };
+    transit581: { gl: number; isZero: boolean };
+    agents573: { operational: number; gl: number; discrepancy: number };
   };
 }
 
@@ -123,12 +125,67 @@ export async function runGlReconciliationCheck(): Promise<ReconciliationResult> 
 
     const totalCaissesGL = parseFloat(caissesGL.rows[0].solde);
 
-    // 6. Évaluation globale
+    // 6. Contrôle compte de transit 581 (SYSCOHADA : doit être soldé à zéro)
+    const transit581 = await client.query(`
+      SELECT
+        COALESCE(SUM(CAST(le.debit AS DECIMAL)), 0) -
+        COALESCE(SUM(CAST(le.credit AS DECIMAL)), 0) as solde
+      FROM lignes_ecritures le
+      INNER JOIN plan_comptable pc ON le.compte_id = pc.id
+      INNER JOIN ecritures_comptables e ON le.ecriture_id = e.id
+      WHERE pc.numero_compte LIKE '581%'
+        AND e.statut = 'POSTED'
+    `);
+
+    const transit581Balance = parseFloat(transit581.rows[0]?.solde || '0');
+    const transit581IsZero = Math.abs(transit581Balance) <= THRESHOLDS.ACCEPTABLE;
+
+    if (!transit581IsZero) {
+      issues.push({
+        severity: Math.abs(transit581Balance) > THRESHOLDS.MAJOR ? 'CRITICAL' : 'MAJOR',
+        entityType: 'TRANSIT',
+        entityId: '581',
+        operationalBalance: 0,
+        glBalance: transit581Balance,
+        discrepancy: Math.abs(transit581Balance),
+        message: `Compte de transit 581 non soldé : ${transit581Balance.toLocaleString()} FCFA (doit être 0 — SYSCOHADA)`,
+      });
+    }
+
+    // 7. Réconciliation agents terrain : GL 573 vs caisses_agent.solde_valide
+    const agents573Op = await client.query(`
+      SELECT COALESCE(SUM(CAST(solde_valide AS DECIMAL)), 0) as total
+      FROM caisses_agent
+      WHERE statut = 'ACTIVE' AND deleted_at IS NULL
+    `);
+
+    const totalAgents573Op = parseFloat(agents573Op.rows[0]?.total || '0');
+
+    const agents573GL = await client.query(`
+      SELECT
+        COALESCE(SUM(CAST(le.debit AS DECIMAL)), 0) -
+        COALESCE(SUM(CAST(le.credit AS DECIMAL)), 0) as solde
+      FROM lignes_ecritures le
+      INNER JOIN plan_comptable pc ON le.compte_id = pc.id
+      INNER JOIN ecritures_comptables e ON le.ecriture_id = e.id
+      WHERE pc.numero_compte LIKE '573%'
+        AND e.statut = 'POSTED'
+    `);
+
+    const totalAgents573GL = parseFloat(agents573GL.rows[0]?.solde || '0');
+    const agents573Discrepancy = Math.abs(totalAgents573Op - totalAgents573GL);
+
+    if (agents573Discrepancy > THRESHOLDS.ACCEPTABLE) {
+      issues.push(
+        assessDiscrepancy('AGENT', '573-global', totalAgents573Op, totalAgents573GL)
+      );
+    }
+
+    // 8. Évaluation globale
     const coffreDiscrepancy = Math.abs(totalCoffresOp - totalCoffresGL);
     const caisseDiscrepancy = Math.abs(totalCaissesOp - totalCaissesGL);
-    const totalDiscrepancy = coffreDiscrepancy + caisseDiscrepancy;
+    const totalDiscrepancy = coffreDiscrepancy + caisseDiscrepancy + agents573Discrepancy + Math.abs(transit581Balance);
 
-    // Ajouter les écarts globaux
     if (coffreDiscrepancy > THRESHOLDS.ACCEPTABLE) {
       issues.push(
         assessDiscrepancy('COFFRE', 'global', totalCoffresOp, totalCoffresGL)
@@ -141,7 +198,7 @@ export async function runGlReconciliationCheck(): Promise<ReconciliationResult> 
       );
     }
 
-    // 7. Déterminer le statut global
+    // 9. Déterminer le statut global
     let status: ReconciliationResult['status'] = 'OK';
     for (const issue of issues) {
       if (issue.severity === 'CRITICAL' && status !== 'CRITICAL') {
@@ -171,10 +228,19 @@ export async function runGlReconciliationCheck(): Promise<ReconciliationResult> 
           gl: totalCaissesGL,
           discrepancy: caisseDiscrepancy,
         },
+        transit581: {
+          gl: transit581Balance,
+          isZero: transit581IsZero,
+        },
+        agents573: {
+          operational: totalAgents573Op,
+          gl: totalAgents573GL,
+          discrepancy: agents573Discrepancy,
+        },
       },
     };
 
-    // 8. Loguer le résultat
+    // 10. Loguer le résultat
     if (status === 'CRITICAL') {
       logger.error(
         { result, durationMs: duration },

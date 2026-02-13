@@ -19,10 +19,12 @@ import {
   MethodePaiement,
   METHODE_PAIEMENT_LABELS
 } from '@shared/enum/status-constants';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
-  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04' },
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06', logo: mtnLogo },
+  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04', logo: airtelLogo },
 ];
 
 /** Mapping modes de paiement UI vers enum */
@@ -948,6 +950,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                             : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                         }`}
                       >
+                        <img src={op.logo} alt={op.name} className="w-5 h-5 rounded-full object-contain" />
                         {op.name}
                       </button>
                     ))}

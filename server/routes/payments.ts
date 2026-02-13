@@ -1,10 +1,10 @@
 /**
  * Payment Routes
- * Routes API pour les paiements Mobile Money et webhooks
+ * Routes API pour les paiements Mobile Money via pawaPay
  *
- * Webhooks sont publics mais protégés par:
- * - Validation de signature HMAC-SHA256
- * - Whitelist IP en production (optionnel)
+ * Webhook sécurisé par:
+ * - Vérification signature RFC 9421 (pawaPay)
+ * - Whitelist IP en production
  * - Rate limiting
  */
 
@@ -24,6 +24,11 @@ import {
 import { db } from "../db";
 import { mmReconciliationReports } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { PAWAPAY_CALLBACK_IPS, resolveOperatorFromPhone, loadPawaPayConfig } from "../services/mobile-money/providers/pawapay/pawapay-config";
+import type { PawaPayProvider } from "../services/mobile-money/providers/pawapay/pawapay-provider";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 
 export const paymentsRouter = Router();
 export const webhooksRouter = Router();
@@ -31,24 +36,6 @@ export const webhooksRouter = Router();
 // ============================================
 // WEBHOOK SECURITY MIDDLEWARE
 // ============================================
-
-/**
- * IP Whitelist pour les webhooks (en production)
- * Ces IPs sont les serveurs MTN et Airtel autorisés
- */
-const WEBHOOK_IP_WHITELIST = {
-  MTN: [
-    // MTN MoMo Production IPs (à mettre à jour selon documentation MTN)
-    "196.201.214.0/24",  // MTN Africa range (exemple)
-    "41.202.219.0/24",   // MTN Congo range (exemple)
-    // Sandbox IPs
-    "20.0.0.0/8",        // Azure (sandbox)
-  ],
-  AIRTEL: [
-    // Airtel Money Production IPs
-    "41.222.0.0/16",     // Airtel Africa range (exemple)
-  ],
-};
 
 /**
  * Vérifie si une IP est dans une plage CIDR
@@ -64,25 +51,23 @@ function isIpInCidr(ip: string, cidr: string): boolean {
 }
 
 /**
- * Vérifie si une IP est dans la whitelist d'un provider
+ * Vérifie si une IP est dans la whitelist pawaPay
  */
-function isIpAllowed(ip: string, provider: "MTN" | "AIRTEL"): boolean {
-  // Bypass en développement
+function isPawaPayIpAllowed(ip: string): boolean {
   if (process.env.NODE_ENV !== "production") {
     return true;
   }
 
-  // Si pas de whitelist configurée, autoriser
   if (process.env.WEBHOOK_IP_VALIDATION !== "true") {
     return true;
   }
 
-  const whitelist = WEBHOOK_IP_WHITELIST[provider] || [];
-
-  // Gérer localhost/loopback
   if (ip === "127.0.0.1" || ip === "::1" || ip === "localhost") {
-    return process.env.NODE_ENV !== "production";
+    return false;
   }
+
+  const environment = (process.env.PAWAPAY_ENVIRONMENT || "sandbox") as "sandbox" | "production";
+  const whitelist = PAWAPAY_CALLBACK_IPS[environment];
 
   return whitelist.some(cidr => {
     if (cidr.includes("/")) {
@@ -104,37 +89,18 @@ function getClientIp(req: Request): string {
 }
 
 /**
- * Middleware de validation IP pour les webhooks
+ * Middleware de validation IP pour les webhooks pawaPay
  */
-function webhookIpValidator(provider: "MTN" | "AIRTEL") {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const clientIp = getClientIp(req);
+function pawaPayIpValidator(req: Request, res: Response, next: NextFunction) {
+  const clientIp = getClientIp(req);
 
-    if (!isIpAllowed(clientIp, provider)) {
-      logger.warn({ provider, clientIp }, 'Webhook rejected request from unauthorized IP');
-      // Retourner 200 pour ne pas révéler la protection
-      return res.status(200).json({ received: true });
-    }
+  if (!isPawaPayIpAllowed(clientIp)) {
+    logger.warn({ clientIp }, 'pawaPay webhook rejected: unauthorized IP');
+    return res.status(200).json({ received: true });
+  }
 
-    // Ajouter l'IP au contexte pour les logs
-    (req as any).webhookClientIp = clientIp;
-    next();
-  };
-}
-
-/**
- * Structure pour les logs webhook
- */
-interface WebhookLogEntry {
-  timestamp: string;
-  provider: string;
-  clientIp: string;
-  hasSignature: boolean;
-  bodySize: number;
-  processingTimeMs?: number;
-  result: "success" | "invalid_signature" | "processing_error" | "not_found";
-  intentId?: string;
-  error?: string;
+  (req as any).webhookClientIp = clientIp;
+  next();
 }
 
 // ============================================
@@ -149,6 +115,7 @@ const collectSchema = z.object({
   compteId: z.string().uuid().optional(),
   creditId: z.string().uuid().optional(),
   tontineId: z.string().uuid().optional(),
+  type: z.string().optional(),
   description: z.string().optional(),
   idempotencyKey: z.string().optional(),
   agenceId: z.string().uuid().optional(),
@@ -162,6 +129,8 @@ const payoutSchema = z.object({
   clientId: z.string().uuid(),
   compteId: z.string().uuid().optional(),
   creditId: z.string().uuid().optional(),
+  tontineId: z.string().uuid().optional(),
+  type: z.string().optional(),
   description: z.string().optional(),
   idempotencyKey: z.string().optional(),
   agenceId: z.string().uuid().optional(),
@@ -181,108 +150,42 @@ const listFilterSchema = z.object({
 });
 
 // ============================================
-// WEBHOOKS (Sans Auth - Publics mais sécurisés)
+// PAWAPAY WEBHOOK (Public, secured by signature + IP)
 // ============================================
 
 /**
- * POST /api/webhooks/mtn
- * Callback webhook MTN MoMo
- *
- * Sécurité:
- * - Validation IP (optionnelle en prod)
- * - Signature HMAC-SHA256 vérifiée par le provider
- * - Logs structurés
+ * POST /api/webhooks/pawapay
+ * Callback webhook pawaPay (deposits + payouts)
  */
-// Handlers webhook réutilisables (montés sur paymentsRouter ET webhooksRouter)
-async function handleMtnWebhook(req: Request, res: Response) {
-  logger.info({ headers: req.headers, body: req.body }, 'MTN WEBHOOK POST');
+async function handlePawaPayWebhook(req: Request, res: Response) {
   const startTime = Date.now();
   const clientIp = (req as any).webhookClientIp || getClientIp(req);
 
-  const logEntry: WebhookLogEntry = {
-    timestamp: new Date().toISOString(),
-    provider: "MTN",
-    clientIp,
-    hasSignature: !!req.headers["x-callback-signature"],
-    bodySize: JSON.stringify(req.body).length,
-    result: "success",
-  };
+  // Utiliser le rawBody (Buffer) pour la vérification de signature, sinon fallback JSON
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+  const bodyForSignature = rawBody ? rawBody.toString("utf-8") : JSON.stringify(req.body);
 
-  logger.debug({ provider: 'MTN' }, 'Webhook received');
+  logger.info({ clientIp, bodySize: bodyForSignature.length }, 'pawaPay webhook received');
 
   try {
-    const signature = (req.headers["x-callback-signature"] as string) || "";
+    const signature = (req.headers["signature"] as string) ||
+                      (req.headers["signature-input"] as string) || "";
     const headers = req.headers as Record<string, string>;
 
-    const bodyData = req.body as Record<string, unknown>;
-    if (bodyData.externalId) {
-      logEntry.intentId = bodyData.externalId as string;
-    }
+    await paymentService.handleWebhook(req.body, bodyForSignature, signature, headers);
 
-    await paymentService.handleWebhook("MTN", req.body, signature, headers);
-
-    logEntry.processingTimeMs = Date.now() - startTime;
-    logger.info({ logEntry }, 'Webhook MTN processed successfully');
+    logger.info({ processingTimeMs: Date.now() - startTime }, 'pawaPay webhook processed');
 
     res.status(200).json({ received: true });
   } catch (error) {
-    logEntry.processingTimeMs = Date.now() - startTime;
-    logEntry.result = "processing_error";
-    logEntry.error = error instanceof Error ? error.message : "Unknown error";
-
-    logger.error({ logEntry }, 'Webhook MTN processing error');
-
+    logger.error({ err: error, processingTimeMs: Date.now() - startTime }, 'pawaPay webhook error');
     res.status(200).json({ received: true, error: "Processing failed" });
   }
 }
 
-async function handleAirtelWebhook(req: Request, res: Response) {
-  const startTime = Date.now();
-  const clientIp = (req as any).webhookClientIp || getClientIp(req);
-
-  const logEntry: WebhookLogEntry = {
-    timestamp: new Date().toISOString(),
-    provider: "AIRTEL",
-    clientIp,
-    hasSignature: !!req.headers["x-airtel-signature"],
-    bodySize: JSON.stringify(req.body).length,
-    result: "success",
-  };
-
-  try {
-    const signature = (req.headers["x-airtel-signature"] as string) || "";
-    const headers = req.headers as Record<string, string>;
-
-    const bodyData = req.body as Record<string, unknown>;
-    const transaction = bodyData.transaction as Record<string, unknown> | undefined;
-    if (transaction?.partner_id) {
-      logEntry.intentId = transaction.partner_id as string;
-    }
-
-    await paymentService.handleWebhook("AIRTEL", req.body, signature, headers);
-
-    logEntry.processingTimeMs = Date.now() - startTime;
-    logger.info({ logEntry }, 'Webhook Airtel processed successfully');
-
-    res.status(200).json({ received: true });
-  } catch (error) {
-    logEntry.processingTimeMs = Date.now() - startTime;
-    logEntry.result = "processing_error";
-    logEntry.error = error instanceof Error ? error.message : "Unknown error";
-
-    logger.error({ logEntry }, 'Webhook Airtel processing error');
-
-    res.status(200).json({ received: true, error: "Processing failed" });
-  }
-}
-
-// Routes webhook sur paymentsRouter: /api/payments/webhooks/mtn
-paymentsRouter.post("/webhooks/mtn", webhookIpValidator("MTN"), handleMtnWebhook);
-paymentsRouter.post("/webhooks/airtel", webhookIpValidator("AIRTEL"), handleAirtelWebhook);
-
-// Routes webhook sur webhooksRouter: /api/webhooks/mtn (path propre pour les providers)
-webhooksRouter.post("/mtn", webhookIpValidator("MTN"), handleMtnWebhook);
-webhooksRouter.post("/airtel", webhookIpValidator("AIRTEL"), handleAirtelWebhook);
+// Webhook routes
+webhooksRouter.post("/pawapay", pawaPayIpValidator, handlePawaPayWebhook);
+paymentsRouter.post("/webhooks/pawapay", pawaPayIpValidator, handlePawaPayWebhook);
 
 // ============================================
 // API AUTHENTIFIÉE
@@ -290,15 +193,9 @@ webhooksRouter.post("/airtel", webhookIpValidator("AIRTEL"), handleAirtelWebhook
 
 /**
  * POST /api/payments/collect
- * Initier une collection (dépôt, remboursement)
  */
-paymentsRouter.post("/collect", async (req, res) => {
+paymentsRouter.post("/collect", requireAuth, attachAbility, requireAbility(Actions.COLLECT, Subjects.CAISSE), async (req, res) => {
   try {
-    // Vérifier l'authentification
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
     const parsed = collectSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -309,7 +206,7 @@ paymentsRouter.post("/collect", async (req, res) => {
 
     const intent = await paymentService.initiateCollection(
       parsed.data,
-      req.session.user.id
+      req.session!.user!.id
     );
 
     res.status(201).json(intent);
@@ -317,21 +214,16 @@ paymentsRouter.post("/collect", async (req, res) => {
     logger.error({ err: error }, 'Payments collection error');
     res.status(500).json({
       error: "Erreur lors de l'initiation de la collection",
-      message: "Erreur interne du serveur",
+      message: error instanceof Error ? error.message : "Erreur interne du serveur",
     });
   }
 });
 
 /**
  * POST /api/payments/payout
- * Initier un payout (décaissement, retrait)
  */
-paymentsRouter.post("/payout", async (req, res) => {
+paymentsRouter.post("/payout", requireAuth, attachAbility, requireAbility(Actions.WITHDRAW, Subjects.CAISSE), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
     const parsed = payoutSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -342,7 +234,7 @@ paymentsRouter.post("/payout", async (req, res) => {
 
     const intent = await paymentService.initiatePayout(
       parsed.data,
-      req.session.user.id
+      req.session!.user!.id
     );
 
     res.status(201).json(intent);
@@ -350,34 +242,31 @@ paymentsRouter.post("/payout", async (req, res) => {
     logger.error({ err: error }, 'Payments payout error');
     res.status(500).json({
       error: "Erreur lors de l'initiation du payout",
-      message: "Erreur interne du serveur",
+      message: error instanceof Error ? error.message : "Erreur interne du serveur",
     });
   }
 });
 
 /**
  * GET /api/payments/sandbox-info
- * Obtenir les informations de configuration sandbox
  */
-paymentsRouter.get("/sandbox-info", async (req, res) => {
+paymentsRouter.get("/sandbox-info", requireAuth, async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
-    // Import dynamique pour éviter les dépendances circulaires
-    const { loadMtnConfigFromEnv } = await import("../services/mobile-money/providers/mtn/mtn-config");
-    const { getSandboxHelpMessage, MTN_SANDBOX_TEST_NUMBERS } = await import("../services/mobile-money/providers/mtn/mtn-sandbox-helpers");
-
-    const config = loadMtnConfigFromEnv();
+    const config = loadPawaPayConfig();
 
     res.json({
+      gateway: "PAWAPAY",
       environment: config.environment,
       isSandbox: config.environment === "sandbox",
-      testNumbers: config.environment === "sandbox" ? MTN_SANDBOX_TEST_NUMBERS : undefined,
-      helpMessage: getSandboxHelpMessage(config.environment),
       currency: config.currency,
-      targetEnvironment: config.targetEnvironment
+      country: config.country,
+      correspondents: {
+        MTN: "MTN_MOMO_COG",
+        AIRTEL: "AIRTEL_COG",
+      },
+      testInfo: config.environment === "sandbox" ? {
+        note: "En sandbox pawaPay, tous les numéros sont acceptés. Le résultat dépend du montant.",
+      } : undefined,
     });
   } catch (error) {
     logger.error({ err: error }, 'Sandbox info error');
@@ -387,43 +276,24 @@ paymentsRouter.get("/sandbox-info", async (req, res) => {
 
 /**
  * POST /api/payments/validate-phone
- * Valider un numéro de téléphone en sandbox
  */
-paymentsRouter.post("/validate-phone", async (req, res) => {
+paymentsRouter.post("/validate-phone", requireAuth, async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: "Numéro requis" });
     }
 
-    const { phone, provider } = req.body;
+    const operator = resolveOperatorFromPhone(phone);
 
-    if (!phone || !provider) {
-      return res.status(400).json({ error: "Numéro et provider requis" });
-    }
-
-    if (provider === "MTN") {
-      const { loadMtnConfigFromEnv } = await import("../services/mobile-money/providers/mtn/mtn-config");
-      const { validateSandboxPhoneNumber, getMtnSandboxBehavior } = await import("../services/mobile-money/providers/mtn/mtn-sandbox-helpers");
-
-      const config = loadMtnConfigFromEnv();
-
-      if (config.environment === "sandbox") {
-        const validation = validateSandboxPhoneNumber(phone);
-        const behavior = getMtnSandboxBehavior(phone);
-
-        return res.json({
-          ...validation,
-          behavior: behavior.isTestNumber ? {
-            expectedStatus: behavior.expectedStatus,
-            expectedDelay: behavior.expectedDelay,
-            reason: behavior.reason
-          } : undefined
-        });
-      }
-    }
-
-    // En production ou pour Airtel, pas de validation spécifique
-    res.json({ isValid: true });
+    res.json({
+      isValid: !!operator,
+      operator,
+      message: operator
+        ? `Numéro ${operator} détecté (Congo-Brazzaville)`
+        : "Impossible de détecter l'opérateur. Vérifiez le numéro.",
+    });
   } catch (error) {
     logger.error({ err: error }, 'Phone validation error');
     res.status(500).json({ error: "Erreur lors de la validation du numéro" });
@@ -431,38 +301,10 @@ paymentsRouter.post("/validate-phone", async (req, res) => {
 });
 
 /**
- * GET /api/payments/:id
- * Récupérer le statut d'un paiement
- */
-paymentsRouter.get("/:id", async (req, res) => {
-  try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
-    const intent = await paymentService.getPaymentIntent(req.params.id);
-
-    if (!intent) {
-      return res.status(404).json({ error: "Paiement non trouvé" });
-    }
-
-    res.json(intent);
-  } catch (error) {
-    logger.error({ err: error }, 'Payments get error');
-    res.status(500).json({ error: "Erreur lors de la récupération du paiement" });
-  }
-});
-
-/**
  * GET /api/payments
- * Lister les paiements avec filtres
  */
-paymentsRouter.get("/", async (req, res) => {
+paymentsRouter.get("/", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
     const parsed = listFilterSchema.safeParse(req.query);
     if (!parsed.success) {
       return res.status(400).json({
@@ -473,7 +315,6 @@ paymentsRouter.get("/", async (req, res) => {
 
     const filter = {
       ...parsed.data,
-      // Appliquer le filtre d'agence si l'utilisateur n'est pas admin
       agenceId: (req as any).agenceFilter?.agenceId || parsed.data.agenceId,
       from: parsed.data.from ? new Date(parsed.data.from) : undefined,
       to: parsed.data.to ? new Date(parsed.data.to) : undefined,
@@ -488,38 +329,52 @@ paymentsRouter.get("/", async (req, res) => {
   }
 });
 
-/**
- * POST /api/payments/:id/cancel
- * Annuler un paiement PENDING
- */
-paymentsRouter.post("/:id/cancel", async (req, res) => {
+// ============================================
+// PROVIDER BALANCE CHECK (pawaPay)
+// Registered BEFORE /:id to avoid route shadowing
+// ============================================
+
+paymentsRouter.get("/provider-balances", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.TREASURY), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
+    const pawaPayProvider = providerRegistry.getPawaPay() as PawaPayProvider;
+    const checkedAt = new Date().toISOString();
+
+    if (typeof pawaPayProvider.getBalancePerCorrespondent === "function") {
+      const balances = await pawaPayProvider.getBalancePerCorrespondent();
+      // Map to format expected by ProviderBalanceWidget
+      const providers = balances.map(b => ({
+        provider: b.operator,
+        code: b.operator,
+        balance: b.balance,
+        currency: b.currency,
+        accountStatus: "ACTIVE",
+        shared: b.shared, // true = wallet partagé, solde = total MTN+Airtel
+        error: null,
+        checkedAt,
+      }));
+      res.json({ success: true, gateway: "PAWAPAY", providers, checkedAt });
+    } else if (typeof pawaPayProvider.getBalance === "function") {
+      const balance = await pawaPayProvider.getBalance();
+      res.json({
+        success: true,
+        gateway: "PAWAPAY",
+        providers: [{ provider: "PAWAPAY", code: "PAWAPAY", balance: balance.balance, currency: balance.currency, accountStatus: balance.accountStatus, error: null, checkedAt }],
+        checkedAt,
+      });
+    } else {
+      res.json({ success: true, gateway: "PAWAPAY", providers: [], checkedAt });
     }
-
-    const intent = await paymentService.cancelPayment(
-      req.params.id,
-      req.session.user.id
-    );
-
-    res.json(intent);
   } catch (error) {
-    logger.error({ err: error }, 'Payments cancel error');
-    res.status(500).json({
-      error: "Erreur lors de l'annulation du paiement",
-      message: "Erreur interne du serveur",
-    });
+    logger.error({ err: error }, 'Provider balance check error');
+    res.status(500).json({ error: "Erreur lors de la vérification des soldes" });
   }
 });
 
 // ============================================
-// RECONCILIATION API (Admin only)
+// RECONCILIATION API (Admin only - MANAGE CAISSE)
+// Registered BEFORE /:id to avoid route shadowing
 // ============================================
 
-/**
- * Validation schemas for reconciliation
- */
 const reconciliationReportsFilterSchema = z.object({
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
@@ -538,27 +393,11 @@ const reviewReportSchema = z.object({
   notes: z.string().optional(),
 });
 
-/**
- * GET /api/payments/reconciliation/reports
- * List reconciliation reports with filters
- */
-paymentsRouter.get("/reconciliation/reports", async (req, res) => {
+paymentsRouter.get("/reconciliation/reports", requireAuth, attachAbility, requireAbility(Actions.RECONCILE, Subjects.CAISSE), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
-    // TODO: Add admin role check
-    // if (!req.session.user.roles?.includes("ADMIN")) {
-    //   return res.status(403).json({ error: "Accès refusé" });
-    // }
-
     const parsed = reconciliationReportsFilterSchema.safeParse(req.query);
     if (!parsed.success) {
-      return res.status(400).json({
-        error: "Paramètres invalides",
-        details: parsed.error.errors,
-      });
+      return res.status(400).json({ error: "Paramètres invalides", details: parsed.error.errors });
     }
 
     const reports = await getReconciliationReports({
@@ -571,25 +410,14 @@ paymentsRouter.get("/reconciliation/reports", async (req, res) => {
 
     res.json({ reports });
   } catch (error) {
-    logger.error({ err: error }, 'Payments reconciliation reports list error');
+    logger.error({ err: error }, 'Reconciliation reports list error');
     res.status(500).json({ error: "Erreur lors de la récupération des rapports" });
   }
 });
 
-/**
- * GET /api/payments/reconciliation/reports/:id
- * Get reconciliation report details with anomalies
- */
-paymentsRouter.get("/reconciliation/reports/:id", async (req, res) => {
+paymentsRouter.get("/reconciliation/reports/:id", requireAuth, attachAbility, requireAbility(Actions.RECONCILE, Subjects.CAISSE), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
-    const [report] = await db
-      .select()
-      .from(mmReconciliationReports)
-      .where(eq(mmReconciliationReports.id, req.params.id));
+    const [report] = await db.select().from(mmReconciliationReports).where(eq(mmReconciliationReports.id, req.params.id));
 
     if (!report) {
       return res.status(404).json({ error: "Rapport non trouvé" });
@@ -597,79 +425,46 @@ paymentsRouter.get("/reconciliation/reports/:id", async (req, res) => {
 
     res.json(report);
   } catch (error) {
-    logger.error({ err: error }, 'Payments reconciliation report detail error');
+    logger.error({ err: error }, 'Reconciliation report detail error');
     res.status(500).json({ error: "Erreur lors de la récupération du rapport" });
   }
 });
 
-/**
- * POST /api/payments/reconciliation/reports/:id/review
- * Mark a report as reviewed
- */
-paymentsRouter.post("/reconciliation/reports/:id/review", async (req, res) => {
+paymentsRouter.post("/reconciliation/reports/:id/review", requireAuth, attachAbility, requireAbility(Actions.RECONCILE, Subjects.CAISSE), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
     const parsed = reviewReportSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({
-        error: "Données invalides",
-        details: parsed.error.errors,
-      });
+      return res.status(400).json({ error: "Données invalides", details: parsed.error.errors });
     }
 
-    await markReportReviewed(
-      req.params.id,
-      req.session.user.id,
-      parsed.data.notes
-    );
-
+    await markReportReviewed(req.params.id, req.session!.user!.id, parsed.data.notes);
     res.json({ success: true, message: "Rapport marqué comme reviewé" });
   } catch (error) {
-    logger.error({ err: error }, 'Payments review report error');
+    logger.error({ err: error }, 'Review report error');
     res.status(500).json({ error: "Erreur lors du marquage du rapport" });
   }
 });
 
-/**
- * POST /api/payments/reconciliation/reports/:id/resolve
- * Mark a report as resolved
- */
-paymentsRouter.post("/reconciliation/reports/:id/resolve", async (req, res) => {
+paymentsRouter.post("/reconciliation/reports/:id/resolve", requireAuth, attachAbility, requireAbility(Actions.RECONCILE, Subjects.CAISSE), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
-    await markReportResolved(req.params.id, req.session.user.id);
-
+    await markReportResolved(req.params.id, req.session!.user!.id);
     res.json({ success: true, message: "Rapport marqué comme résolu" });
   } catch (error) {
-    logger.error({ err: error }, 'Payments resolve report error');
+    logger.error({ err: error }, 'Resolve report error');
     res.status(500).json({ error: "Erreur lors de la résolution du rapport" });
   }
 });
 
-/**
- * POST /api/payments/reconciliation/generate
- * Manually trigger report generation for a specific date
- */
-paymentsRouter.post("/reconciliation/generate", async (req, res) => {
+paymentsRouter.post("/reconciliation/generate", requireAuth, attachAbility, requireAbility(Actions.RECONCILE, Subjects.CAISSE), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
     const { date, provider } = req.body;
 
     if (!provider || !["MTN", "AIRTEL"].includes(provider)) {
-      return res.status(400).json({ error: "Provider invalide" });
+      return res.status(400).json({ error: "Provider invalide (MTN ou AIRTEL)" });
     }
 
     const reportDate = date ? new Date(date) : new Date();
-    reportDate.setDate(reportDate.getDate() - 1); // Default to yesterday
+    reportDate.setDate(reportDate.getDate() - 1);
 
     const result = await generateReconciliationReport(reportDate, provider);
 
@@ -682,32 +477,154 @@ paymentsRouter.post("/reconciliation/generate", async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error({ err: error }, 'Payments generate report error');
+    logger.error({ err: error }, 'Generate report error');
     res.status(500).json({ error: "Erreur lors de la génération du rapport" });
   }
 });
 
-/**
- * POST /api/payments/:id/manual-reconcile
- * Manually reconcile a payment intent (admin override)
- */
-paymentsRouter.post("/:id/manual-reconcile", async (req, res) => {
+// ============================================
+// CIRCUIT BREAKER STATUS (Admin)
+// ============================================
+
+paymentsRouter.get("/circuit-breaker", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.ALL), async (req, res) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
+    const pawaPayProvider = providerRegistry.getPawaPay() as PawaPayProvider;
+    const stats = pawaPayProvider.getCircuitBreakerStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ error: "Erreur lors de la récupération du statut circuit breaker" });
+  }
+});
+
+paymentsRouter.post("/circuit-breaker/reset", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.ALL), async (req, res) => {
+  try {
+    const pawaPayProvider = providerRegistry.getPawaPay() as PawaPayProvider;
+    pawaPayProvider.resetCircuitBreaker();
+    res.json({ success: true, message: "Circuit breaker réinitialisé" });
+  } catch (error) {
+    res.status(500).json({ error: "Erreur lors du reset du circuit breaker" });
+  }
+});
+
+// ============================================
+// PARAMETERIZED ROUTES (/:id) - MUST be LAST to avoid shadowing named routes
+// ============================================
+
+/**
+ * GET /api/payments/:id
+ */
+paymentsRouter.get("/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE), async (req, res) => {
+  try {
+    const intent = await paymentService.getPaymentIntent(req.params.id);
+
+    if (!intent) {
+      return res.status(404).json({ error: "Paiement non trouvé" });
     }
 
-    // TODO: Add admin role check
-    // if (!req.session.user.roles?.includes("ADMIN")) {
-    //   return res.status(403).json({ error: "Accès refusé - Admin requis" });
-    // }
+    res.json(intent);
+  } catch (error) {
+    logger.error({ err: error }, 'Payments get error');
+    res.status(500).json({ error: "Erreur lors de la récupération du paiement" });
+  }
+});
 
+/**
+ * POST /api/payments/:id/cancel
+ */
+paymentsRouter.post("/:id/cancel", requireAuth, attachAbility, requireAbility(Actions.CANCEL, Subjects.CAISSE), async (req, res) => {
+  try {
+    const intent = await paymentService.cancelPayment(
+      req.params.id,
+      req.session!.user!.id
+    );
+
+    res.json(intent);
+  } catch (error) {
+    logger.error({ err: error }, 'Payments cancel error');
+    res.status(500).json({
+      error: "Erreur lors de l'annulation du paiement",
+      message: "Erreur interne du serveur",
+    });
+  }
+});
+
+/**
+ * POST /api/payments/:id/refund
+ * Initie un remboursement total ou partiel d'une collection
+ */
+paymentsRouter.post("/:id/refund", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
+  try {
+    const { amount } = req.body; // optional: omit for full refund
+
+    if (amount != null && (typeof amount !== "number" || amount <= 0)) {
+      return res.status(400).json({ error: "Le montant doit être un nombre positif" });
+    }
+
+    const intent = await paymentService.initiateRefund(
+      req.params.id,
+      amount,
+      req.session!.user!.id
+    );
+
+    res.status(201).json({
+      success: true,
+      message: amount ? `Remboursement partiel de ${amount} XAF initié` : "Remboursement total initié",
+      intent,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Refund error');
+    res.status(500).json({
+      error: "Erreur lors du remboursement",
+      message: error instanceof Error ? error.message : "Erreur interne",
+    });
+  }
+});
+
+/**
+ * POST /api/payments/:id/fail-enqueued
+ * Annule un payout en attente (ENQUEUED) sur pawaPay
+ */
+paymentsRouter.post("/:id/fail-enqueued", requireAuth, attachAbility, requireAbility(Actions.CANCEL, Subjects.CAISSE), async (req, res) => {
+  try {
+    const intent = await paymentService.getPaymentIntent(req.params.id);
+
+    if (!intent) {
+      return res.status(404).json({ error: "Paiement non trouvé" });
+    }
+
+    if (intent.status !== "PENDING") {
+      return res.status(400).json({ error: `Impossible d'annuler un paiement en statut: ${intent.status}` });
+    }
+
+    if (!intent.externalRef) {
+      return res.status(400).json({ error: "Pas de référence externe pour ce paiement" });
+    }
+
+    const pawaPayProvider = providerRegistry.getPawaPay() as PawaPayProvider;
+    await pawaPayProvider.failEnqueuedPayout(intent.externalRef);
+
+    // Update intent status
+    const updated = await paymentService.cancelPayment(req.params.id, req.session!.user!.id);
+
+    res.json({
+      success: true,
+      message: "Payout en file d'attente annulé",
+      intent: updated,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Fail enqueued payout error');
+    res.status(500).json({
+      error: "Erreur lors de l'annulation du payout",
+      message: error instanceof Error ? error.message : "Erreur interne",
+    });
+  }
+});
+
+paymentsRouter.post("/:id/manual-reconcile", requireAuth, attachAbility, requireAbility(Actions.RECONCILE, Subjects.CAISSE), async (req, res) => {
+  try {
     const parsed = manualReconcileSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({
-        error: "Données invalides",
-        details: parsed.error.errors,
-      });
+      return res.status(400).json({ error: "Données invalides", details: parsed.error.errors });
     }
 
     const intent = await paymentService.manualReconcile(
@@ -715,100 +632,13 @@ paymentsRouter.post("/:id/manual-reconcile", async (req, res) => {
       parsed.data.decision,
       parsed.data.providerTxnId,
       parsed.data.notes,
-      req.session.user.id
+      req.session!.user!.id
     );
 
-    res.json({
-      success: true,
-      message: `Paiement marqué comme ${parsed.data.decision}`,
-      intent,
-    });
+    res.json({ success: true, message: `Paiement marqué comme ${parsed.data.decision}`, intent });
   } catch (error) {
-    logger.error({ err: error }, 'Payments manual reconcile error');
-    res.status(500).json({
-      error: "Erreur lors de la réconciliation manuelle",
-      message: "Erreur interne du serveur",
-    });
-  }
-});
-
-// ============================================
-// PROVIDER BALANCE CHECK
-// ============================================
-
-/**
- * GET /api/payments/provider-balances
- * Fetch real-time balances from all registered mobile money providers
- */
-paymentsRouter.get("/provider-balances", async (req, res) => {
-  try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
-
-    const providers = providerRegistry.getAll();
-    const results: Array<{
-      provider: string;
-      code: string;
-      balance: string | null;
-      currency: string | null;
-      accountStatus: string | null;
-      error: string | null;
-      checkedAt: string;
-    }> = [];
-
-    // Fetch balances in parallel
-    const balancePromises = providers.map(async (provider) => {
-      try {
-        if (typeof provider.getBalance === "function") {
-          const balance = await provider.getBalance();
-          return {
-            provider: provider.name,
-            code: provider.code,
-            balance: balance.balance,
-            currency: balance.currency,
-            accountStatus: balance.accountStatus,
-            error: null,
-            checkedAt: new Date().toISOString(),
-          };
-        }
-        return {
-          provider: provider.name,
-          code: provider.code,
-          balance: null,
-          currency: null,
-          accountStatus: null,
-          error: "Balance check not supported by this provider",
-          checkedAt: new Date().toISOString(),
-        };
-      } catch (err) {
-        const error = err as Error;
-        logger.error({ err: error, providerCode: provider.code }, 'Payments balance check failed');
-        return {
-          provider: provider.name,
-          code: provider.code,
-          balance: null,
-          currency: null,
-          accountStatus: null,
-          error: error.message,
-          checkedAt: new Date().toISOString(),
-        };
-      }
-    });
-
-    const balances = await Promise.all(balancePromises);
-
-    res.json({
-      success: true,
-      providers: balances,
-      checkedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    logger.error({ err: error }, 'Payments provider balance check error');
-    res.status(500).json({
-      error: "Erreur lors de la vérification des soldes",
-      message: "Erreur interne du serveur",
-    });
+    logger.error({ err: error }, 'Manual reconcile error');
+    res.status(500).json({ error: "Erreur lors de la réconciliation manuelle" });
   }
 });
 
@@ -816,11 +646,8 @@ paymentsRouter.get("/provider-balances", async (req, res) => {
 // INITIALISATION
 // ============================================
 
-/**
- * Initialise les providers au chargement du module
- */
 initializeProviders().catch((error) => {
-  logger.error({ err: error }, 'Payments failed to initialize providers');
+  logger.error({ err: error }, 'Failed to initialize pawaPay provider');
 });
 
 export default paymentsRouter;

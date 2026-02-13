@@ -76,7 +76,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     nom?: string | null;
     prenom?: string | null;
     telephone?: string | null;
+    phone?: string | null;
     photoProfile?: string | null;
+    photoUrl?: string | null;
   }
 
   export type EnrichedCredit = Credit & {
@@ -85,6 +87,11 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     nombre_echeances_total: number;
     nombre_echeances_payees: number;
     jours_retard: number;
+    // camelCase aliases for frontend compatibility
+    montantPrincipal: number;
+    nombreEcheancesTotal: number;
+    nombreEcheancesPayees: number;
+    joursRetard: number;
     clients?: EnrichedCreditClient;
   };
 
@@ -190,13 +197,20 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       nombre_echeances_total: totalEcheances,
       nombre_echeances_payees,
       jours_retard,
+      // camelCase aliases for frontend compatibility
+      montantPrincipal: principal,
+      nombreEcheancesTotal: totalEcheances,
+      nombreEcheancesPayees: nombre_echeances_payees,
+      joursRetard: jours_retard,
       prochaineEcheance: prochaine_echeance_calc,
       montantEcheance: credit.montantEcheance || installmentAmount.toString(),
       clients: client ? {
         nom: client.nom,
         prenom: client.prenom,
         telephone: client.telephone,
-        photoProfile: client.photoProfile
+        phone: client.telephone,
+        photoProfile: client.photoProfile,
+        photoUrl: client.photoProfile,
       } : undefined
     };
   }
@@ -687,7 +701,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       blocage_actif: compte.blocageActif,
       blocage_motif: compte.blocageMotif,
       created_at: compte.createdAt,
-      date_ouverture: compte.createdAt, // Alias for frontend
+      date_ouverture: compte.createdAt, // Alias for frontend (snake_case)
+      dateOuverture: compte.createdAt, // Alias for frontend (camelCase)
     };
   }
 
@@ -2817,17 +2832,15 @@ export async function createDecaissementWithLedger(data: {
             }
         },
         async (tx, mouvement) => {
-             // Guard: acquire lock + verify balance + solde minimum + plafond journalier
-             const { soldeBefore } = await assertCoffreCanDebit(
-                 tx, coffreId, montant,
-                 { userId: userId || "system", operationType: "CREDIT_DISBURSEMENT" }
-             );
+             // SYSCOHADA : la mise à disposition sur compte client ne déplace PAS de cash physique.
+             // Le coffre n'est PAS débité — seul le compte client (4111) est crédité en GL.
+             // Le cash ne sortira du coffre que lorsque le client retirera effectivement.
+             // On log le coffreId pour traçabilité mais sans modifier son solde.
+             logger.info({ coffreId, montant, creditId: data.creditId },
+                 'Décaissement sur compte : mise à disposition sans mouvement de cash (coffre non débité)');
 
              // Update Account Balance (Credit the user's account)
              const nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, parseFloat(data.montant));
-
-             // Debit the Agency Safe atomically (SQL-native)
-             await updateCoffreBalance(tx, coffreId, -montant);
 
              // Create Transaction Record (for account history)
              await tx.insert(transactionsCompte).values({
@@ -2850,22 +2863,8 @@ export async function createDecaissementWithLedger(data: {
         },
         userId
     ).then(({ result, mouvement }) => {
-        // Broadcast coffre balance update for real-time UI
-        try {
-            const previousBalance = parseFloat(targetCoffre.solde || "0");
-            balanceService.broadcastBalanceUpdate({
-                entityType: 'coffre',
-                entityId: coffreId,
-                agenceId: credit.agenceId!,
-                newBalance: previousBalance - montant,
-                previousBalance,
-                mouvementRef: mouvement.reference || mouvement.id,
-                sourceModule: 'CREDIT',
-                typePaiement: 'CREDIT_DISBURSEMENT',
-            });
-        } catch (e) {
-            logger.error({ err: e }, 'Error broadcasting coffre disbursement');
-        }
+        // Pas de broadcast coffre : la mise à disposition sur compte ne touche pas le coffre physique.
+        // Le client pourra retirer plus tard (WITHDRAWAL_CURRENT : D 4111 / C 521).
         return { credit: result, mouvement };
     }).then(async (result) => {
         // Generate repayment schedule (echeancier)

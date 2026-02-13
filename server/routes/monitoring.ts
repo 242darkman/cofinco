@@ -9,6 +9,7 @@
  * - GET  /api/monitoring/reconciliation         - Lancer une réconciliation
  * - POST /api/monitoring/reconciliation/fix     - Corriger les anomalies
  * - GET  /api/monitoring/health                 - Health check simple
+ * - GET  /api/monitoring/pawapay-status         - Statut pawaPay
  */
 
 import type { Express } from "express";
@@ -34,8 +35,6 @@ import {
   runReconciliation,
   type ReconciliationOptions,
 } from "../services/transaction-integrity-service";
-
-import { MtnAuthService } from "../services/mobile-money/providers/mtn/mtn-auth-service";
 
 const logger = createLogger("Routes:Monitoring");
 
@@ -419,34 +418,48 @@ export function registerMonitoringRoutes(app: Express): void {
   );
 
   // ============================================================================
-  // MTN TOKEN STATS
+  // PAWAPAY STATUS
   // ============================================================================
 
   /**
-   * GET /api/monitoring/mtn-tokens
-   * Retourne les statistiques des tokens MTN Mobile Money
+   * GET /api/monitoring/pawapay-status
+   * Retourne le statut du provider pawaPay (disponibilité, circuit breaker)
    */
   app.get(
-    "/api/monitoring/mtn-tokens",
+    "/api/monitoring/pawapay-status",
     requireAuth,
     attachAbility,
     requireAbility(Actions.MANAGE, Subjects.ALL), // Admin only
     async (req, res) => {
       try {
-        const tokenStats = MtnAuthService.getTokenStats();
+        const { providerRegistry } = await import("../services/mobile-money/provider-registry");
+
+        const providers = providerRegistry.getCodes();
+        const pawaPayProvider = providerRegistry.has("PAWAPAY")
+          ? providerRegistry.getPawaPay()
+          : null;
+
+        let balances = null;
+        if (pawaPayProvider && typeof (pawaPayProvider as any).getBalancePerCorrespondent === "function") {
+          try {
+            balances = await (pawaPayProvider as any).getBalancePerCorrespondent();
+          } catch (error) {
+            logger.warn({ err: error }, "Could not fetch pawaPay balances");
+          }
+        }
 
         res.json({
           success: true,
           data: {
-            tokens: tokenStats,
-            proactiveRefreshIntervalMinutes: 50,
-            tokenExpirationSeconds: 3600,
-            refreshBufferMinutes: 5,
+            gateway: "PAWAPAY",
+            registered: providers.length > 0,
+            providers,
+            balances,
           },
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Erreur interne";
-        logger.error({ err: error }, "Error fetching MTN token stats");
+        logger.error({ err: error }, "Error fetching pawaPay status");
         res.status(500).json({ success: false, message });
       }
     }

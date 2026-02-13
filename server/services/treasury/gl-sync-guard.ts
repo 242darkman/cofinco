@@ -26,7 +26,7 @@ const THRESHOLDS = {
 
 export interface ReconciliationIssue {
   severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'ACCEPTABLE';
-  entityType: 'COFFRE' | 'CAISSE' | 'MOBILE_MONEY' | 'BANK';
+  entityType: 'COFFRE' | 'CAISSE' | 'MOBILE_MONEY' | 'BANK' | 'TRANSIT' | 'AGENT';
   entityId: string;
   operationalBalance: number;
   glBalance: number;
@@ -78,7 +78,7 @@ export function assertMouvementHasGlPosting(
  * Vérifie qu'un écart de réconciliation est dans les limites acceptables
  */
 export function assessDiscrepancy(
-  entityType: 'COFFRE' | 'CAISSE' | 'MOBILE_MONEY' | 'BANK',
+  entityType: 'COFFRE' | 'CAISSE' | 'MOBILE_MONEY' | 'BANK' | 'TRANSIT' | 'AGENT',
   entityId: string,
   operationalBalance: number,
   glBalance: number

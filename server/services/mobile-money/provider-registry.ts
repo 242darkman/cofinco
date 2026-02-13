@@ -1,6 +1,6 @@
 /**
  * Provider Registry
- * Singleton registry pour les providers Mobile Money
+ * Singleton registry pour le provider Mobile Money (pawaPay uniquement)
  */
 
 import type { IMobileMoneyProvider } from "./types";
@@ -41,6 +41,13 @@ class ProviderRegistry {
   }
 
   /**
+   * Récupère le provider pawaPay (raccourci)
+   */
+  getPawaPay(): IMobileMoneyProvider {
+    return this.getOrThrow("PAWAPAY");
+  }
+
+  /**
    * Liste tous les providers enregistrés
    */
   getAll(): IMobileMoneyProvider[] {
@@ -66,31 +73,21 @@ class ProviderRegistry {
 export const providerRegistry = new ProviderRegistry();
 
 /**
- * Initialise tous les providers
+ * Initialise le provider pawaPay
  * À appeler au démarrage de l'application
  */
 export async function initializeProviders(): Promise<void> {
-  logger.info('Initializing providers');
+  logger.info('Initializing pawaPay provider');
 
   try {
-    // Import dynamique pour éviter les dépendances circulaires
-    // MTN Provider production-ready (avec subscription keys séparées et OAuth cache)
-    const { MtnProvider } = await import("./providers/mtn/mtn-provider");
-    const { AirtelProvider } = await import("./providers/airtel/airtel-provider");
+    const { PawaPayProvider } = await import("./providers/pawapay/pawapay-provider");
 
-    // Initialiser MTN (charge config depuis env)
-    const mtnProvider = new MtnProvider();
-    providerRegistry.register(mtnProvider);
-
-    // Initialiser Airtel
-    const airtelProvider = new AirtelProvider();
-    providerRegistry.register(airtelProvider);
+    const pawaPayProvider = new PawaPayProvider();
+    providerRegistry.register(pawaPayProvider);
 
     logger.info({ count: providerRegistry.getCodes().length, providers: providerRegistry.getCodes() }, 'Providers initialized');
   } catch (error) {
-    logger.error({ err: error }, 'Failed to initialize providers');
-    // Ne pas planter l'app si les providers ne sont pas configurés
-    // Utile en dev sans clés MTN
+    logger.error({ err: error }, 'Failed to initialize pawaPay provider');
     if (process.env.NODE_ENV === "production") {
       throw error;
     }

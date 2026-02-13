@@ -2438,6 +2438,57 @@ export async function ensureCustomFunctions(): Promise<void> {
     }
     console.log(`[DB] ✓ HR audit triggers attached to ${hrAuditTables.length} tables`);
 
+    // ── Guard: Prevent orphan mouvements (PENDING GL at commit time) ──────
+    // Un mouvement avec requires_gl_posting=true DOIT avoir son gl_posting_status
+    // résolu (POSTED/SKIPPED/FAILED) avant le COMMIT de la transaction.
+    // Si le status est encore PENDING au commit, c'est que le mouvement a été créé
+    // en dehors de executeWithLedger() — ce qui viole l'invariant GL.
+    try {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fn_guard_mouvement_gl_pending()
+        RETURNS trigger AS $$
+        DECLARE
+          current_status text;
+        BEGIN
+          -- Ne vérifier que les mouvements nécessitant un posting GL
+          IF NEW.requires_gl_posting IS NOT TRUE THEN
+            RETURN NEW;
+          END IF;
+
+          -- Relire le status actuel (la ligne a pu être UPDATE depuis l'INSERT)
+          SELECT gl_posting_status INTO current_status
+          FROM mouvements_financiers
+          WHERE id = NEW.id;
+
+          IF current_status = 'PENDING' THEN
+            RAISE EXCEPTION 'MOUVEMENT_GL_GUARD: mouvement % still has gl_posting_status=PENDING at commit. Use executeWithLedger() to create mouvements with GL posting.', NEW.id;
+          END IF;
+
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      console.log('[DB] ✓ FUNCTION: fn_guard_mouvement_gl_pending');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create FUNCTION "fn_guard_mouvement_gl_pending":', err instanceof Error ? err.message : err);
+    }
+
+    try {
+      await db.execute(sql`
+        DROP TRIGGER IF EXISTS trg_guard_mouvement_gl ON mouvements_financiers;
+        CREATE CONSTRAINT TRIGGER trg_guard_mouvement_gl
+          AFTER INSERT ON mouvements_financiers
+          DEFERRABLE INITIALLY DEFERRED
+          FOR EACH ROW
+          EXECUTE FUNCTION fn_guard_mouvement_gl_pending();
+      `);
+      console.log('[DB] ✓ TRIGGER: trg_guard_mouvement_gl (anti-orphan, DEFERRED)');
+      objectCount++;
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to create TRIGGER "trg_guard_mouvement_gl":', err instanceof Error ? err.message : err);
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

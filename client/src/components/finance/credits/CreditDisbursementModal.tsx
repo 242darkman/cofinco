@@ -11,6 +11,13 @@ import { formatMoney, formatClientName } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Button, FormField } from '../../ui';
 import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type DisbursementChannelType } from '@shared/enum/status-constants';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
+
+const MOBILE_OPERATORS = [
+  { id: 'MTN', name: 'MTN Mobile Money', color: 'from-yellow-500 to-yellow-600', logo: mtnLogo },
+  { id: 'AIRTEL', name: 'Airtel Money', color: 'from-red-600 to-red-700', logo: airtelLogo },
+] as const;
 
 interface Demande {
   id: string;
@@ -81,6 +88,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
 
   // Canal de décaissement (ACCOUNT, CASH, MOBILE_MONEY)
   const [disbursementChannel, setDisbursementChannel] = useState<DisbursementChannelType>(DisbursementChannel.ACCOUNT);
+  const [mobileProvider, setMobileProvider] = useState<string>('');
 
   // Helper: convert storage key to display URL for avatars
   const getAvatarUrl = (photoUrl: string | null | undefined): string | null => {
@@ -174,7 +182,8 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
         dateSolvabilite: dateFin.toISOString().split('T')[0],
         soldeRestant: montantTotal.toString(),
         decaissementImmediat: decaissementType === 'immediat',
-        disbursementChannel // Nouveau paramètre
+        disbursementChannel,
+        provider: disbursementChannel === DisbursementChannel.MOBILE_MONEY ? mobileProvider : undefined
       });
 
       toast.success(result.message || 'Crédit décaissé avec succès');
@@ -507,7 +516,11 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                             : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600'
                         }`}
                     >
-                        <Smartphone size={20} />
+                        {mobileProvider ? (
+                          <img src={MOBILE_OPERATORS.find(o => o.id === mobileProvider)?.logo} alt={mobileProvider} className="w-5 h-5 rounded-full object-contain" />
+                        ) : (
+                          <Smartphone size={20} />
+                        )}
                         <span className="text-xs font-medium">Mobile</span>
                     </button>
                 </div>
@@ -530,6 +543,30 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                          </p>
                     )}
                 </div>
+
+                {/* Provider selection for Mobile Money */}
+                {disbursementChannel === DisbursementChannel.MOBILE_MONEY && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Opérateur</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {MOBILE_OPERATORS.map(op => (
+                        <button
+                          key={op.id}
+                          type="button"
+                          onClick={() => setMobileProvider(op.id)}
+                          className={`flex items-center gap-2.5 p-3 rounded-lg border text-sm font-medium transition-all ${
+                            mobileProvider === op.id
+                              ? `bg-gradient-to-r ${op.color} border-transparent text-white shadow-lg`
+                              : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-slate-600'
+                          }`}
+                        >
+                          <img src={op.logo} alt={op.name} className="w-7 h-7 rounded-full object-contain bg-white/10" />
+                          {op.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
             </div>
 
             {/* 3. SCHEDULING (Compact Segment) */}
@@ -616,7 +653,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                  <Button
                     variant="primary"
                     onClick={() => setShowConfirm(true)}
-                    disabled={loading}
+                    disabled={loading || (disbursementChannel === DisbursementChannel.MOBILE_MONEY && !mobileProvider)}
                     className={`flex-1 font-bold shadow-lg ${
                         disbursementChannel === DisbursementChannel.CASH 
                         ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/20' 

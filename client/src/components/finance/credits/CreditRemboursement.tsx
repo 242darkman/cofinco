@@ -15,15 +15,17 @@ import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
 import { StatutCredit, StatutEcheanceCredit, STATUT_ECHEANCE_CREDIT_LABELS } from '@shared/enum/status-constants';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
-  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04' }
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06', logo: mtnLogo },
+  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04', logo: airtelLogo }
 ] as const;
 
 const PAYMENT_MODES = [
   { id: 'Cash', icon: Banknote, label: 'Cash', disabled: false },
-  { id: 'Mobile Money', icon: Smartphone, label: 'Mobile', disabled: true },
+  { id: 'Mobile Money', icon: Smartphone, label: 'Mobile', disabled: false },
   { id: 'Virement', icon: Building, label: 'Virement', disabled: false },
   { id: 'Chèque', icon: FileCheck, label: 'Chèque', disabled: false },
   { id: 'Prélèvement', icon: ReceiptText, label: 'Prélèvement', disabled: false },
@@ -740,9 +742,7 @@ export default function CreditRemboursement() {
                               : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
                           } disabled:opacity-50`}
                         >
-                          <div className={`w-8 h-8 rounded-full ${selectedOperator === op.id ? 'bg-white/20' : op.color} flex items-center justify-center`}>
-                            <Smartphone size={16} className="text-white" aria-hidden="true" />
-                          </div>
+                          <img src={op.logo} alt={op.name} className="w-8 h-8 rounded-full object-contain bg-white/10" />
                           <div className="text-left">
                             <p className="font-semibold text-sm">{op.name.split(' ')[0]}</p>
                             <p className="text-xs opacity-75">{op.prefix}</p>
