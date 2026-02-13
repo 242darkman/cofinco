@@ -29,6 +29,16 @@ interface CaisseSummary {
   agenceNom?: string;
 }
 
+interface CoffreFortSummary {
+  id: string;
+  nom: string;
+  solde: string;
+  statut: string;
+  ownerType: string;
+  agenceId?: string;
+  agenceNom?: string;
+}
+
 interface DigitalCaisseByAgence {
   caisseId: string;
   agenceId: string;
@@ -53,10 +63,12 @@ interface DigitalCaisseSummary {
 
 interface TresorerieStats {
   totalPhysique: number;
+  totalCoffres: number;
   totalDigital: number;
   totalGlobal: number;
   digitalCaisses: DigitalCaisseSummary;
   physicalCaisses: CaisseSummary[];
+  coffresForts: CoffreFortSummary[];
   recentMovements: Array<{
     id: string;
     type: string;
@@ -69,31 +81,37 @@ interface TresorerieStats {
 }
 
 async function fetchTresorerieStats(): Promise<TresorerieStats> {
-  const digitalRes = await fetch('/api/caisses/digital-summary', { credentials: 'include' });
-
   const defaultDigital: DigitalCaisseSummary = {
     mtn: { total: 0, byAgence: [] },
     airtel: { total: 0, byAgence: [] },
     grandTotal: 0,
   };
 
+  const [digitalRes, physicalRes, coffresRes] = await Promise.all([
+    fetch('/api/caisses/digital-summary', { credentials: 'include' }),
+    fetch('/api/caisses?type=PHYSICAL', { credentials: 'include' }),
+    fetch('/api/caisses/coffres-summary', { credentials: 'include' }),
+  ]);
+
   if (!digitalRes.ok) {
     return {
-      totalPhysique: 0, totalDigital: 0, totalGlobal: 0,
-      digitalCaisses: defaultDigital, physicalCaisses: [], recentMovements: [],
+      totalPhysique: 0, totalCoffres: 0, totalDigital: 0, totalGlobal: 0,
+      digitalCaisses: defaultDigital, physicalCaisses: [], coffresForts: [], recentMovements: [],
     };
   }
 
   const digitalData: DigitalCaisseSummary = await digitalRes.json();
-  const physicalRes = await fetch('/api/caisses?type=PHYSICAL', { credentials: 'include' });
   const physicalData = physicalRes.ok ? await physicalRes.json() : [];
+  const coffresData: CoffreFortSummary[] = coffresRes.ok ? await coffresRes.json() : [];
+
   const totalPhysique = physicalData.reduce((sum: number, c: any) => sum + Number(c.solde || 0), 0);
+  const totalCoffres = coffresData.reduce((sum: number, c: CoffreFortSummary) => sum + Number(c.solde || 0), 0);
   const totalDigital = digitalData.grandTotal || (digitalData.mtn?.total || 0) + (digitalData.airtel?.total || 0);
 
   return {
-    totalPhysique, totalDigital,
-    totalGlobal: totalPhysique + totalDigital,
-    digitalCaisses: digitalData, physicalCaisses: physicalData, recentMovements: [],
+    totalPhysique, totalCoffres, totalDigital,
+    totalGlobal: totalPhysique + totalCoffres + totalDigital,
+    digitalCaisses: digitalData, physicalCaisses: physicalData, coffresForts: coffresData, recentMovements: [],
   };
 }
 
@@ -169,16 +187,32 @@ export default function TresoreriePage() {
   })();
 
   const totalPhysique = stats?.totalPhysique || 0;
-  const totalGlobal = totalPhysique + pawapayTotal;
+  const totalCoffres = stats?.totalCoffres || 0;
+  const totalEspeces = totalPhysique + totalCoffres;
+  const totalGlobal = totalEspeces + pawapayTotal;
   const mtnData = stats?.digitalCaisses?.mtn || { total: 0, byAgence: [] };
   const airtelData = stats?.digitalCaisses?.airtel || { total: 0, byAgence: [] };
 
-  const filteredPhysicalCaisses = (stats?.physicalCaisses || []).filter((c: CaisseSummary) => {
-    if (physicalFilter === 'ALL') return true;
-    const isCoffre = /coffre/i.test(c.nom);
-    return physicalFilter === 'COFFRE' ? isCoffre : !isCoffre;
-  });
-  const filteredTotal = filteredPhysicalCaisses.reduce((sum: number, c: CaisseSummary) => sum + Number(c.solde || 0), 0);
+  // Caisses pures (exclure celles nommées "coffre" car on a les vrais coffres-forts)
+  const pureCaisses = (stats?.physicalCaisses || []).filter((c: CaisseSummary) => !/coffre/i.test(c.nom));
+  // Vrais coffres-forts (depuis la table coffres_forts)
+  const realCoffres = (stats?.coffresForts || []).map((cf: CoffreFortSummary) => ({
+    id: cf.id,
+    nom: cf.nom,
+    type: 'COFFRE',
+    solde: cf.solde,
+    statut: cf.statut === 'ACTIVE' ? 'OPEN' : 'CLOSED',
+    agenceId: cf.agenceId,
+    agenceNom: cf.agenceNom || (cf.ownerType === 'SIEGE' ? 'Siège' : '-'),
+  } satisfies CaisseSummary));
+
+  const unifiedList: CaisseSummary[] = physicalFilter === 'CAISSE'
+    ? pureCaisses
+    : physicalFilter === 'COFFRE'
+      ? realCoffres
+      : [...pureCaisses, ...realCoffres];
+
+  const filteredTotal = unifiedList.reduce((sum: number, c: CaisseSummary) => sum + Number(c.solde || 0), 0);
 
   return (
     <div className="flex flex-col h-full space-y-3 relative p-3" data-testid="page-tresorerie">
@@ -233,13 +267,13 @@ export default function TresoreriePage() {
                 <span className="text-xs text-cyan-400/60 font-medium">FCFA</span>
               </div>
               <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
-                <span className="flex items-center gap-1"><Banknote size={10} className="text-emerald-400" /> {totalPhysique.toLocaleString('fr-FR')}</span>
+                <span className="flex items-center gap-1"><Banknote size={10} className="text-emerald-400" /> {totalEspeces.toLocaleString('fr-FR')}</span>
                 <span className="text-slate-600">|</span>
                 <span className="flex items-center gap-1"><Smartphone size={10} className="text-violet-400" /> {pawapayTotal.toLocaleString('fr-FR')}</span>
               </div>
             </div>
 
-            {/* Espèces (Caisses physiques) */}
+            {/* Espèces (Caisses + Coffres) */}
             <div className="relative overflow-hidden rounded-xl bg-slate-800/50 border border-slate-700/40 p-4">
               <div className="absolute -right-2 -top-2 opacity-[0.04]">
                 <Banknote size={60} />
@@ -248,12 +282,14 @@ export default function TresoreriePage() {
                 <Banknote size={11} /> Espèces
               </p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-white">{totalPhysique.toLocaleString('fr-FR')}</span>
+                <span className="text-xl font-bold text-white">{totalEspeces.toLocaleString('fr-FR')}</span>
                 <span className="text-[10px] text-slate-500">FCFA</span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-slate-500">{stats?.physicalCaisses?.length || 0} caisses</span>
-                <span className="text-[10px] font-medium text-emerald-400/60">{totalGlobal > 0 ? Math.round((totalPhysique / totalGlobal) * 100) : 0}%</span>
+                <span className="text-[10px] text-slate-500">
+                  {pureCaisses.length} caisses · {realCoffres.length} coffres
+                </span>
+                <span className="text-[10px] font-medium text-emerald-400/60">{totalGlobal > 0 ? Math.round((totalEspeces / totalGlobal) * 100) : 0}%</span>
               </div>
             </div>
 
@@ -345,27 +381,27 @@ export default function TresoreriePage() {
                   ))}
                 </div>
                 <Badge value={`${filteredTotal.toLocaleString('fr-FR')} FCFA`} variant="success" className="text-[10px]" />
-                <Badge value={`${filteredPhysicalCaisses.length}`} variant="neutral" className="text-[10px]" />
+                <Badge value={`${unifiedList.length}`} variant="neutral" className="text-[10px]" />
               </div>
             </div>
 
-            {filteredPhysicalCaisses.length > 0 ? (
+            {unifiedList.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-slate-900/80 sticky top-0 z-10 backdrop-blur-sm">
                     <tr>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Caisse</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nom</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agence</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Statut</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Solde</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
-                    {filteredPhysicalCaisses.map((caisse: CaisseSummary) => (
+                    {unifiedList.map((caisse: CaisseSummary) => (
                       <tr key={caisse.id} className="hover:bg-slate-800/30 transition-colors group">
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5">
-                            {/coffre/i.test(caisse.nom) ? (
+                            {caisse.type === 'COFFRE' ? (
                               <Vault size={12} className="text-amber-400/60 shrink-0" />
                             ) : (
                               <Banknote size={12} className="text-emerald-400/60 shrink-0" />
