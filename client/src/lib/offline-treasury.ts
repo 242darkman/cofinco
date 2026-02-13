@@ -27,6 +27,7 @@ import {
   generateOperationRef,
   type AppendEntryOptions,
 } from './journal-service';
+import { offlineBus } from './offline-bus';
 
 // ========== CASH IMPACT CALCULATION ==========
 
@@ -91,7 +92,7 @@ export async function openDaySession(params: {
   const id = await db.agentDaySessions.add(session);
 
   // Record opening in the journal
-  await appendJournalEntry({
+  const openEntry = await appendJournalEntry({
     type: 'CAISSE_OPEN',
     agentId: params.agentId,
     agenceId: params.agenceId,
@@ -102,6 +103,10 @@ export async function openDaySession(params: {
       billetage: params.billetage,
     },
   });
+
+  // Emit to OfflineBus
+  offlineBus.emit(openEntry);
+  offlineBus.emitSystem('SESSION_OPENED', { agentId: params.agentId, date: today });
 
   return { ...session, id };
 }
@@ -149,7 +154,7 @@ export async function closeDaySession(params: {
   });
 
   // Record closing in the journal
-  await appendJournalEntry({
+  const closeEntry = await appendJournalEntry({
     type: 'CAISSE_CLOSE',
     agentId: params.agentId,
     agenceId: params.agenceId,
@@ -162,6 +167,14 @@ export async function closeDaySession(params: {
       billetage: params.billetage,
       justification: params.justification,
     },
+  });
+
+  // Emit to OfflineBus
+  offlineBus.emit(closeEntry);
+  offlineBus.emitSystem('SESSION_CLOSED', {
+    agentId: params.agentId,
+    date: session.date,
+    discrepancy,
   });
 
   const updated = await db.agentDaySessions.get(session.id);
@@ -339,6 +352,9 @@ export async function executeOfflineOperation(params: {
     lastJournalSequence: entry.sequence,
     firstJournalSequence: session.firstJournalSequence ?? entry.sequence,
   });
+
+  // 5. Emit to OfflineBus — reactors handle cache invalidation, sync, UI, limits, audit
+  offlineBus.emit(entry);
 
   return {
     journalUuid: entry.uuid,

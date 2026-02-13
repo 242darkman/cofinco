@@ -22,6 +22,7 @@ import { useNetwork } from './contexts/NetworkContext';
 import NetworkOverlay from './components/shared/NetworkOverlay';
 import NetworkBanner from './components/shared/NetworkBanner';
 import SessionExpirationWarning from './components/shared/SessionExpirationWarning';
+import { useOfflineBus } from './hooks/useOfflineBus';
 
 // Lazy load heavy components
 const COFINPlatform = lazy(() => import('./COFINPlatform'));
@@ -41,6 +42,9 @@ function App() {
   const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
+
+  // Initialize OfflineBus reactors (cache invalidation, toasts, sync, limits, audit)
+  useOfflineBus(isAuthenticated);
 
   // Show NetworkOverlay only for prolonged offline (not just unstable)
   // The NetworkBanner handles showing status for unstable connections

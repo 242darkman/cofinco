@@ -29,6 +29,7 @@ import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { SyncConflictResolver } from "../services/sync-conflict-resolver";
 import { OfflineAnomalyDetector } from "../services/offline-anomaly-detector";
 import { OfflineReconciliationService } from "../services/offline-reconciliation-service";
+import { processConfirmedBatch, type ConfirmedEntry } from "../services/offline-event-reactor";
 import {
   executeWithLedger,
   updateCompteSolde,
@@ -196,6 +197,7 @@ syncJournalRouter.post('/journal', async (req, res) => {
     const accepted: string[] = [];
     const rejected: Array<{ uuid: string; reason: string }> = [];
     const conflicts: Array<{ uuid: string; conflictWith: string; reason: string }> = [];
+    const confirmedEntries: ConfirmedEntry[] = [];
 
     for (const entry of entries) {
       try {
@@ -317,8 +319,9 @@ syncJournalRouter.post('/journal', async (req, res) => {
           .where(eq(deviceKeys.id, entry.deviceKeyId));
 
         // 10. Execute business operation via ledger (creates mouvement + GL + events)
+        let mouvementId: string | null = null;
         try {
-          const mouvementId = await executeJournalBusinessOperation(entry, agentId);
+          mouvementId = await executeJournalBusinessOperation(entry, agentId);
           if (mouvementId) {
             await db
               .update(offlineJournalEntries)
@@ -333,6 +336,19 @@ syncJournalRouter.post('/journal', async (req, res) => {
 
         accepted.push(entry.uuid);
 
+        // Track confirmed entry for reactor processing
+        confirmedEntries.push({
+          uuid: entry.uuid,
+          type: entry.type,
+          agentId: entry.agentId,
+          agenceId: entry.agenceId,
+          payload: entry.payload as Record<string, unknown>,
+          operationRef: entry.operationRef,
+          mouvementId,
+          sessionDate: entry.sessionId,
+          serverTimestamp: Date.now(),
+        });
+
       } catch (entryError: any) {
         logger.error(`Error processing entry ${entry.uuid}:`, entryError);
         rejected.push({ uuid: entry.uuid, reason: 'processing_error' });
@@ -340,21 +356,34 @@ syncJournalRouter.post('/journal', async (req, res) => {
     }
 
     // 10. Run anomaly detection on the batch
+    let anomalies: Awaited<ReturnType<typeof OfflineAnomalyDetector.analyzeBatch>> = [];
     try {
-      await OfflineAnomalyDetector.analyzeBatch(entries, agentId);
+      anomalies = await OfflineAnomalyDetector.analyzeBatch(entries, agentId);
     } catch (anomalyError) {
       logger.warn('Anomaly detection error (non-blocking):', anomalyError);
     }
 
     // 11. Trigger reconciliation for closed sessions
+    let reconciliationResults: Awaited<ReturnType<typeof OfflineReconciliationService.reconcileAllPending>> = [];
     try {
-      const reconciliationResults = await OfflineReconciliationService.reconcileAllPending(agentId);
+      reconciliationResults = await OfflineReconciliationService.reconcileAllPending(agentId);
       if (reconciliationResults.length > 0) {
         logger.info(`Reconciled ${reconciliationResults.length} session(s) for agent ${agentId}`);
       }
     } catch (reconcileError) {
       logger.warn('Reconciliation error (non-blocking):', reconcileError);
     }
+
+    // 12. Process through event reactors (non-blocking: balance WS, notifications, COBAC reports)
+    processConfirmedBatch(confirmedEntries, agentId, {
+      accepted,
+      rejected,
+      conflicts,
+      anomalies,
+      reconciliations: reconciliationResults,
+    }).catch(reactorError => {
+      logger.warn('Event reactor error (non-blocking):', reactorError);
+    });
 
     res.json({
       accepted,

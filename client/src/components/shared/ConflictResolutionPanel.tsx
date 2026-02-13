@@ -30,6 +30,7 @@ import {
   ConflictRecord,
   OperationType
 } from '../../lib/offline-db';
+import { offlineBus } from '../../lib/offline-bus';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 
@@ -339,13 +340,18 @@ export function ConflictResolutionPanel() {
   useEffect(() => {
     loadConflicts();
 
-    // Subscribe to new conflicts
+    // Subscribe to new conflicts from sync service
     const unsubscribe = syncService.subscribeToConflicts((conflict) => {
       setRecentConflict(conflict);
       loadConflicts();
     });
 
-    return unsubscribe;
+    // Also listen for conflicts via OfflineBus
+    const unsubBus = offlineBus.onSystem('CONFLICT_DETECTED', () => {
+      loadConflicts();
+    });
+
+    return () => { unsubscribe(); unsubBus(); };
   }, [loadConflicts]);
 
   const handleResolve = async (id: number, resolution: Resolution, mergedData?: any) => {
@@ -363,6 +369,14 @@ export function ConflictResolutionPanel() {
           // This will be handled by the sync service
         }
       }
+
+      // Emit resolution event via OfflineBus
+      offlineBus.emitSystem('RECONCILIATION_COMPLETE', {
+        conflictId: id,
+        resolution,
+        entityType: conflicts.find(c => c.id === id)?.entityType,
+        timestamp: Date.now(),
+      });
 
       // Reload conflicts
       await loadConflicts();
