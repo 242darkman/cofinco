@@ -16,7 +16,7 @@ import {
   users,
   type CaissePaymentRequest,
 } from "@shared/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, aliasedTable } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { getWsInstance } from "../ws-server";
 
@@ -102,16 +102,19 @@ export async function createCaisseRequest(
 // ============================================================================
 
 export async function getPendingRequests(
-  agenceId: string,
+  agenceId?: string,
   category?: string
 ): Promise<EnrichedCaisseRequest[]> {
-  const clientAlias = clients;
-  const creatorAlias = users;
+  const clientUserAlias = aliasedTable(users, "client_user");
+  const creatorAlias = aliasedTable(users, "creator");
 
   const conditions = [
-    eq(caissePaymentRequests.agenceId, agenceId),
     eq(caissePaymentRequests.statut, "PENDING"),
   ];
+
+  if (agenceId) {
+    conditions.push(eq(caissePaymentRequests.agenceId, agenceId));
+  }
 
   if (category) {
     conditions.push(eq(caissePaymentRequests.category, category as any));
@@ -120,12 +123,13 @@ export async function getPendingRequests(
   const rows = await db
     .select({
       request: caissePaymentRequests,
-      clientNom: clientAlias.nom,
-      clientPrenom: clientAlias.prenom,
+      clientNom: clientUserAlias.nom,
+      clientPrenom: clientUserAlias.prenom,
       createdByNom: creatorAlias.nom,
     })
     .from(caissePaymentRequests)
-    .leftJoin(clientAlias, eq(caissePaymentRequests.clientId, clientAlias.id))
+    .leftJoin(clients, eq(caissePaymentRequests.clientId, clients.id))
+    .leftJoin(clientUserAlias, eq(clients.userId, clientUserAlias.id))
     .leftJoin(creatorAlias, eq(caissePaymentRequests.createdBy, creatorAlias.id))
     .where(and(...conditions))
     .orderBy(desc(caissePaymentRequests.createdAt));
@@ -142,16 +146,16 @@ export async function getPendingRequests(
 // COUNT PENDING (for badge)
 // ============================================================================
 
-export async function getPendingCount(agenceId: string): Promise<number> {
+export async function getPendingCount(agenceId?: string): Promise<number> {
+  const conditions = [eq(caissePaymentRequests.statut, "PENDING")];
+  if (agenceId) {
+    conditions.push(eq(caissePaymentRequests.agenceId, agenceId));
+  }
+
   const [result] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(caissePaymentRequests)
-    .where(
-      and(
-        eq(caissePaymentRequests.agenceId, agenceId),
-        eq(caissePaymentRequests.statut, "PENDING")
-      )
-    );
+    .where(and(...conditions));
 
   return result?.count || 0;
 }

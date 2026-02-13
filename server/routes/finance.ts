@@ -1974,6 +1974,42 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
+  // Check caisse payment status for multiple credit demands (batch)
+  app.get("/api/demandes-credit/caisse-statuses", requireAuth, async (req, res) => {
+    try {
+      const idsParam = req.query.ids as string;
+      if (!idsParam) return res.json({});
+
+      const ids = idsParam.split(",").filter(Boolean).slice(0, 50);
+      if (ids.length === 0) return res.json({});
+
+      const { caissePaymentRequests } = await import("@shared/schema");
+      const { eq: eqOp, and: andOp, inArray: inArrayOp } = await import("drizzle-orm");
+
+      const rows = await db
+        .select({
+          sourceId: caissePaymentRequests.sourceId,
+          statut: caissePaymentRequests.statut,
+        })
+        .from(caissePaymentRequests)
+        .where(andOp(
+          eqOp(caissePaymentRequests.sourceType, "demande_credit"),
+          inArrayOp(caissePaymentRequests.sourceId, ids),
+          eqOp(caissePaymentRequests.statut, "PENDING"),
+        ));
+
+      const result: Record<string, { hasPending: boolean }> = {};
+      for (const row of rows) {
+        result[row.sourceId] = { hasPending: true };
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur vérification statuts caisse demandes");
+      res.status(500).json({ message: error.message || "Erreur interne" });
+    }
+  });
+
   // Initiate refund for already rejected demande
   app.post("/api/demandes-credit/:id/initiate-refund", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REMBOURSEMENT), async (req, res) => {
     try {

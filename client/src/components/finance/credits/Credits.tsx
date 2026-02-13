@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, Play, UserCheck } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
@@ -27,6 +27,7 @@ import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 import { PipelineFunnel } from './PipelineFunnel';
 import { differenceInDays } from 'date-fns';
+import { useWebSocket } from '../../../hooks/useWebSocket';
 
 type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements' | 'echeancier' | 'archives';
 
@@ -115,6 +116,61 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const enquetes = useEnquetes();
   const stats = useCreditStats();
   const { counts: badgeCounts } = useCreditCounts();
+
+  // Track which PENDING_FEES demands have been sent to caisse
+  const [caisseStatuses, setCaisseStatuses] = useState<Record<string, { hasPending: boolean }>>({});
+  const { socket } = useWebSocket();
+
+  const fetchCaisseStatuses = useCallback(async () => {
+    const pendingFeesDemandes = demandes.demandes
+      .filter(d => d.statut === StatutDemande.PENDING_FEES && !d.deletedAt);
+    if (pendingFeesDemandes.length === 0) {
+      setCaisseStatuses({});
+      return;
+    }
+    try {
+      const ids = pendingFeesDemandes.map(d => d.id).join(',');
+      const res = await fetch(`/api/demandes-credit/caisse-statuses?ids=${ids}`, { credentials: 'include' });
+      if (res.ok) {
+        setCaisseStatuses(await res.json());
+      }
+    } catch { /* silent */ }
+  }, [demandes.demandes]);
+
+  // Fetch caisse statuses when demandes change
+  const prevDemandesRef = useRef<string>('');
+  useEffect(() => {
+    const key = demandes.demandes
+      .filter(d => d.statut === StatutDemande.PENDING_FEES && !d.deletedAt)
+      .map(d => d.id).sort().join(',');
+    if (key !== prevDemandesRef.current) {
+      prevDemandesRef.current = key;
+      if (key) fetchCaisseStatuses();
+      else setCaisseStatuses({});
+    }
+  }, [demandes.demandes, fetchCaisseStatuses]);
+
+  // Listen for caisse request events to re-fetch statuses in real-time
+  useEffect(() => {
+    const handler = () => fetchCaisseStatuses();
+    window.addEventListener('caisse-request-update', handler);
+    return () => window.removeEventListener('caisse-request-update', handler);
+  }, [fetchCaisseStatuses]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (['CAISSE_REQUEST_COMPLETED', 'CAISSE_REQUEST_CANCELLED', 'CAISSE_REQUEST_CREATED'].includes(data.type)) {
+          fetchCaisseStatuses();
+          demandes.fetchDemandes?.();
+        }
+      } catch { /* ignore */ }
+    };
+    socket.addEventListener('message', handler);
+    return () => socket.removeEventListener('message', handler);
+  }, [socket, fetchCaisseStatuses]);
 
   // Real-time: refetch enquête data when the detail modal is open and a credit event arrives
   const refreshOpenEnquete = useCallback(async () => {
@@ -873,10 +929,9 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             loading={isLoading}
             onRowClick={(item) => {
               setSelectedDemande(item);
-              if (item.statut === StatutDemande.PENDING_FEES) {
+              if (item.statut === StatutDemande.PENDING_FEES && !caisseStatuses[item.id]?.hasPending) {
                 setShowFeesModal(true);
               } else {
-                // For Rejetée, Annulée
                 setShowApprovalModal(true);
               }
             }}
@@ -891,17 +946,24 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             actions={(item) => (
               <div className="flex gap-1">
                  {item.statut === StatutDemande.PENDING_FEES && (
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={(e) => { 
-                        e.stopPropagation();
-                        setSelectedDemande(item);
-                        setShowFeesModal(true);
-                      }}
-                    >
-                      Payer Frais
-                    </Button>
+                    caisseStatuses[item.id]?.hasPending ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                        <Clock size={11} />
+                        En attente caisse
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDemande(item);
+                          setShowFeesModal(true);
+                        }}
+                      >
+                        Payer Frais
+                      </Button>
+                    )
                  )}
                   <IconButton 
                     icon={Eye} 

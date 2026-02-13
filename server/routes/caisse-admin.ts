@@ -19,6 +19,7 @@ import { sessionsCaisseAuditLogs, denominationTemplates, caisses } from "@shared
 import { caisseSecurityCodes } from "@shared/schema/operations";
 import { users, userRoles, coffresForts, agences } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, or } from "drizzle-orm";
+import { isAdminRole } from "@shared/types/roles";
 
 export const caisseAdminRouter = Router();
 
@@ -1732,10 +1733,13 @@ caisseAdminRouter.get(
   attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
   async (req, res) => {
     try {
-      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+      const userRole = req.session.user?.role;
+      const isAdmin = isAdminRole(userRole);
+      // Admins see all agencies (ignore agenceId param); regular users filter by their agency
+      const agenceId = isAdmin ? undefined : (req.query.agenceId as string || req.session.user?.agenceId);
       const category = req.query.category as string | undefined;
 
-      if (!agenceId) {
+      if (!isAdmin && !agenceId) {
         return res.status(400).json({ error: "Agence non spécifiée" });
       }
 
@@ -1759,9 +1763,13 @@ caisseAdminRouter.get(
   requireAuth,
   async (req, res) => {
     try {
-      const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
+      const userRole = req.session.user?.role;
+      const isAdmin = isAdminRole(userRole);
 
-      if (!agenceId) {
+      // Admins see all agencies (ignore agenceId param); regular users filter by their agency
+      const agenceId = isAdmin ? undefined : (req.query.agenceId as string || req.session.user?.agenceId);
+
+      if (!isAdmin && !agenceId) {
         return res.status(400).json({ error: "Agence non spécifiée" });
       }
 

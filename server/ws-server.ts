@@ -7,6 +7,7 @@ import { sessionMiddleware } from "./auth";
 import { storage } from "./storage";
 import { createLogger } from "./lib/logger";
 import { isSessionValid, updateSessionActivity } from "./session-tracker";
+import { isAdminRole } from "@shared/types/roles";
 
 const logger = createLogger('WebSocket');
 
@@ -672,12 +673,11 @@ export function setupWebSocket(server: Server) {
     },
     broadcastToAgency: (agency: string, message: GlobalMessage) => {
       wss.clients.forEach((client) => {
-        // Broadscast only to users in the same agency
-        // For admin (who might not have agence set or be cross-agency), we might want to include them too 
-        // but per requirements we stick to strict agency matching or if user is admin we might want to send?
-        // Let's simpler: match agency property. 
-        // Note: Admin users usually have an agency attached too (e.g. 'Siège').
-        if (client.readyState === WebSocket.OPEN && (client as any).agence === agency) {
+        if (client.readyState !== WebSocket.OPEN) return;
+        const clientAgence = (client as any).agence;
+        const clientRole = (client as any).role;
+        // Send to same agency OR admin users (who need visibility across all agencies)
+        if (clientAgence === agency || isAdminRole(clientRole)) {
           client.send(JSON.stringify(message));
         }
       });

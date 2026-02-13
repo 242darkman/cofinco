@@ -184,7 +184,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                             demande.montantFraisEngagement && demande.montantFraisEngagement > 0 &&
                             !hasAnyRefund;
 
-  const showActions = (!isFinished && !isRejected && !isCancelled) || isReevaluating;
+  const isPendingFees = demande.statut === StatutDemande.PENDING_FEES;
+  const showActions = ((!isFinished && !isRejected && !isCancelled && !isPendingFees) || isReevaluating);
 
   // Helper: convert V2 duration to days
   const convertDureeEnJours = (valeur: number, unite: string): number => {
@@ -211,8 +212,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
   // Memoized financial calculations - V2
   const { montantBase, mensualite, nombreEcheancesCalc, tauxEndettement } = useMemo(() => {
-    const base = demande.montantDemande;
-    const rev = demande.revenusMensuels ?? 0;
+    const base = Number(demande.montantDemande) || 0;
+    const rev = Number(demande.revenusMensuels) || 0;
     
     // V2: Use duree_valeur and duree_unite
     const dureeValeur = demande.dureeValeur || 0;
@@ -227,17 +228,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     const mens = nombreEcheances > 0 ? total / nombreEcheances : 0;
     
     // Calculate debt ratio (convert to monthly equivalent)
+    const freq = (frequence || '').toUpperCase();
     let montantMensuelEquivalent = mens;
-    if (frequence === 'Journalier') {
+    if (freq === 'DAILY') {
       montantMensuelEquivalent = mens * 30;
-    } else if (frequence === 'Hebdomadaire') {
+    } else if (freq === 'WEEKLY') {
       montantMensuelEquivalent = mens * 4;
-    } else if (frequence === 'Bimensuel') {
+    } else if (freq === 'BI_MONTHLY') {
       montantMensuelEquivalent = mens * 2;
-    } else if (frequence === 'Trimestriel') {
+    } else if (freq === 'QUARTERLY') {
       montantMensuelEquivalent = mens / 3;
     }
-    const endettement = rev > 0 ? (montantMensuelEquivalent / rev) * 100 : 0;
+    const charges = Number(demande.chargesMensuelles) || 0;
+    const totalDettesMensuelles = charges + montantMensuelEquivalent;
+    const endettement = rev > 0 ? (totalDettesMensuelles / rev) * 100 : 0;
 
     return {
       montantBase: base,
@@ -264,8 +268,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     }
 
     // 2. Residual Income (Max 30 pts)
-    const revenu = demande.revenusMensuels ?? 0;
-    const charges = demande.chargesMensuelles ?? 0; // Note: charges might need to come from survey if not in demande
+    const revenu = Number(demande.revenusMensuels) || 0;
+    const charges = Number(demande.chargesMensuelles) || 0;
     // Using a simple estimate: Residual = Income - Estimated Charges (default 30% if unknown) - New Loan Payment
     const estimatedCharges = charges > 0 ? charges : (revenu * 0.3);
     const resteAVivre = revenu - estimatedCharges - mensualite;
@@ -607,6 +611,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                         <PiggyBank size={14} className="text-emerald-400" /> Revenus Net
                     </div>
                     <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.revenusMensuels ?? 0)}</div>
+                    <div className="text-[10px] text-slate-500">Charges: {formatMoney(Number(demande.chargesMensuelles) || 0)}</div>
                 </div>
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-amber-500/50 transition-colors">
                     <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">

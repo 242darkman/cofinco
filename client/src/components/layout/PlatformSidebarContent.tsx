@@ -45,8 +45,8 @@ export default function PlatformSidebarContent({
   // Use combined validations badge (operations + closures)
   const { totalCount: pendingValidationsCount } = useValidationsBadge();
 
-  // Caisse payment requests badge
-  const { pendingCount: pendingCaisseRequestsCount } = useCaisseBadge();
+  // Caisse payment requests badge (session-aware: only shows when caisse is open or user is admin)
+  const { pendingCount: pendingCaisseRequestsCount } = useCaisseBadge(userRole);
 
   // Unread messages count for badge
   const { totalUnread: unreadMessagesCount } = useUnreadMessagesCount();

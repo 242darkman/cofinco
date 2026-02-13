@@ -22,6 +22,8 @@ import { ConfirmDialog } from '../../ui';
 import { toast } from 'sonner';
 import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { formatDistance } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -164,13 +166,7 @@ const CATEGORY_CONFIG: Record<CategoryKey, {
 };
 
 function timeSince(dateStr: string): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return "À l'instant";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}j`;
+  return formatDistance(new Date(dateStr), new Date(), { addSuffix: true, locale: fr });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -698,10 +694,10 @@ export default function CaisseDemandesTab({
                             <button
                               onClick={(e) => { e.stopPropagation(); setCancelTarget(item); }}
                               disabled={!!actionLoading}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all"
-                              title="Annuler"
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all"
+                              title="Rejeter la demande"
                             >
-                              <XCircle size={14} />
+                              <XCircle size={14} className="inline mr-1" />Rejeter
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); setProcessTarget(item); }}
@@ -780,7 +776,7 @@ export default function CaisseDemandesTab({
                         className="flex-1 py-2 px-3 text-xs font-bold text-rose-400 border border-rose-500/30 rounded-lg hover:bg-rose-500/10 transition flex items-center justify-center gap-1"
                       >
                         <XCircle size={14} />
-                        Annuler
+                        Rejeter
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setProcessTarget(item); }}
@@ -920,6 +916,14 @@ export default function CaisseDemandesTab({
               <p className="text-sm text-slate-300">
                 Annuler: <span className="text-white font-medium">{cancelTarget.label}</span> — {formatMoney(cancelTarget.montant)} FCFA
               </p>
+              {cancelTarget.category === 'ENGAGEMENT_FEE' && (
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <AlertCircle size={14} className="text-blue-400 mt-0.5 shrink-0" />
+                  <p className="text-[10px] text-blue-300/80">
+                    En annulant, le bouton de paiement réapparaîtra dans le module Crédits. Le client pourra re-payer via Mobile Money ou espèces.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-semibold text-slate-400 mb-1 block">Motif d'annulation</label>
                 <textarea
