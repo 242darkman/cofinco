@@ -220,6 +220,9 @@ export const comptabiliteKeys = {
 export const treasuryKeys = {
   all: ['treasury'] as const,
 
+  // Stats page Trésorerie (caisses, coffres, soldes)
+  stats: () => ['tresorerie-stats'] as const,
+
   // Encaisse canonique (Single Source of Truth depuis GL)
   encaisse: (agenceId?: string) => ['treasury', 'encaisse', agenceId] as const,
 

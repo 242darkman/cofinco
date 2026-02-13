@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { treasuryKeys } from '../../lib/query-keys';
 import {
   RefreshCw, Wallet, Building2, Smartphone, Banknote,
   Loader2, ChevronDown, ChevronUp, CreditCard, Landmark, Signal,
@@ -158,11 +159,23 @@ export default function TresoreriePage() {
   const [airtelExpanded, setAirtelExpanded] = useState(true);
   const [physicalFilter, setPhysicalFilter] = useState<'ALL' | 'CAISSE' | 'COFFRE'>('ALL');
 
+  const queryClient = useQueryClient();
+
   const { data: stats, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery<TresorerieStats>({
-    queryKey: ['tresorerie-stats', filterAgence],
+    queryKey: [...treasuryKeys.stats(), filterAgence],
     queryFn: fetchTresorerieStats,
     refetchInterval: 60000,
   });
+
+  // Real-time: écouter les événements caisse/coffre via WebSocket
+  const handleCaisseUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: treasuryKeys.stats() });
+  }, [queryClient]);
+
+  useEffect(() => {
+    window.addEventListener('caisse-update', handleCaisseUpdate);
+    return () => window.removeEventListener('caisse-update', handleCaisseUpdate);
+  }, [handleCaisseUpdate]);
 
   const { data: providerData } = useQuery<{ providers: ProviderBalance[] }>({
     queryKey: ['provider-balances'],

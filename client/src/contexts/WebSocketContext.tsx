@@ -556,9 +556,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(caisseKeys.operationsToday());
          debounceInvalidate(caisseKeys.supervision());
          debounceInvalidate(caisseKeys.all);
+         // Rafraîchir la page Trésorerie (statuts caisses/coffres)
+         debounceInvalidate(treasuryKeys.stats());
          // Filet de sécurité: rafraîchir aussi le dashboard principal
-         // BALANCE_UPDATED le fait déjà pour les opérations financières, mais certaines
-         // actions caisse (ouverture, annulation) peuvent ne pas émettre BALANCE_UPDATED
          debounceInvalidate(dashboardKeys.stats());
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
          break;
