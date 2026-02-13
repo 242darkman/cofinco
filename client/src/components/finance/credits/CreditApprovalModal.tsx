@@ -132,8 +132,12 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   useEffect(() => {
     if (demande?.id) {
        fetch(`/api/demandes-credit/${demande.id}/enquete`)
-         .then(res => res.json())
+         .then(res => {
+           if (!res.ok) return null;
+           return res.json();
+         })
          .then(data => {
+           if (!data) return;
            const enquetesList = Array.isArray(data) ? data : (data ? [data] : []);
            setEnquetes(enquetesList);
            // Auto-expand the latest enquete for better UX
@@ -141,7 +145,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
              setExpandedEnquete(enquetesList[0].id);
            }
          })
-         .catch(err => console.warn("No enquete found", err));
+         .catch(() => { /* No enquete for this demande */ });
     }
   }, [demande?.id]);
 
