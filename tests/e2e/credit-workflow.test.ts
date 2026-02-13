@@ -1,81 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { db } from '../../server/db';
-import { users, activeSessions } from '../../shared/schema/auth';
-import { clients } from '../../shared/schema/clients';
-import { demandesCredit, enquetesCredit, credits } from '../../shared/schema/finance';
+import { demandesCredit, credits } from '../../shared/schema/finance';
 import { agentActivities } from '../../shared/schema/agent-activities';
-import { agences } from '../../shared/schema/agences';
-import { eq, and, desc } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+import { eq, desc } from 'drizzle-orm';
+import { createTestFixture, type TestFixture } from './test-fixtures';
 
-// Test data
-const testAgence = {
-  id: uuidv4(),
-  nom: "Agence Test E2E",
-  ville: "Brazzaville",
-  codeAgence: "AG-TEST-E2E"
-};
-
-const testSupervisor = {
-  id: uuidv4(),
-  nom: "Superviseur Test",
-  email: "supervisor@test.com",
-  password: "Test@1234",
-  role: "superviseur",
-  agenceId: testAgence.id
-};
-
-const testAgent = {
-  id: uuidv4(),
-  nom: "Agent Terrain Test",
-  email: "agent@test.com",
-  password: "Test@1234",
-  role: "agent_terrain",
-  agenceId: testAgence.id
-};
-
-const testCaissier = {
-  id: uuidv4(),
-  nom: "Caissier Test",
-  email: "caissier@test.com",
-  password: "Test@1234",
-  role: "caissier",
-  agenceId: testAgence.id
-};
-
-const testClient = {
-  id: uuidv4(),
-  nom: "Client Test",
-  telephone: "+242060000000",
-  email: "client@test.com",
-  numeroCompte: "CLT-TEST-001",
-  agenceId: testAgence.id
-};
-
-// Helper functions
-async function setupTestData() {
-  // Create test agency
-  await db.insert(agences).values(testAgence).onConflictDoNothing();
-  
-  // Create test users
-  await db.insert(users).values([testSupervisor, testAgent, testCaissier]).onConflictDoNothing();
-  
-  // Create test client
-  await db.insert(clients).values(testClient).onConflictDoNothing();
-}
-
-async function cleanupTestData() {
-  // Delete in reverse order of dependencies
-  await db.delete(credits).where(eq(credits.clientId, testClient.id));
-  await db.delete(enquetesCredit).where(eq(enquetesCredit.clientId, testClient.id));
-  await db.delete(agentActivities).where(eq(agentActivities.assignedAgentId, testAgent.id));
-  await db.delete(demandesCredit).where(eq(demandesCredit.clientId, testClient.id));
-  await db.delete(clients).where(eq(clients.id, testClient.id));
-  await db.delete(users).where(eq(users.id, testSupervisor.id));
-  await db.delete(users).where(eq(users.id, testAgent.id));
-  await db.delete(users).where(eq(users.id, testCaissier.id));
-  await db.delete(agences).where(eq(agences.id, testAgence.id));
-}
+let fixture: TestFixture;
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login');
@@ -88,11 +18,7 @@ async function login(page: Page, email: string, password: string) {
 // E2E Tests
 test.describe('Credit Workflow with Investigation', () => {
   test.beforeAll(async () => {
-    await setupTestData();
-  });
-
-  test.afterAll(async () => {
-    await cleanupTestData();
+    fixture = await createTestFixture('credit');
   });
 
   test('Complete credit workflow from application to disbursement', async ({ page, context }) => {
@@ -117,18 +43,18 @@ test.describe('Credit Workflow with Investigation', () => {
     // Step 2: Supervisor assigns investigation to agent
     await test.step('Supervisor assigns investigation to agent', async () => {
       // Login as supervisor
-      await login(page, testSupervisor.email, testSupervisor.password);
+      await login(page, fixture.supervisorEmail, fixture.password);
       
       // Navigate to credit applications
       await page.click('text=Crédits');
       await page.click('text=Demandes en attente');
       
       // Find the test client's application
-      await page.click(`tr:has-text("${testClient.nom}")`);
+      await page.click(`tr:has-text("${fixture.clientNom}")`);
       
       // Assign investigation
       await page.click('button:text("Assigner enquête")');
-      await page.selectOption('select[name="agentId"]', testAgent.id);
+      await page.selectOption('select[name="agentId"]', fixture.agentId);
       await page.fill('input[name="dueDate"]', '2024-12-31');
       await page.selectOption('select[name="priority"]', 'HIGH');
       await page.fill('textarea[name="notes"]', 'Enquête urgente pour client important');
@@ -143,7 +69,7 @@ test.describe('Credit Workflow with Investigation', () => {
     // Step 3: Agent receives notification and conducts investigation
     await test.step('Agent conducts field investigation', async () => {
       // Login as agent
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       
       // Check notification
       await expect(page.locator('[data-notification-badge]')).toHaveText('1');
@@ -205,14 +131,14 @@ test.describe('Credit Workflow with Investigation', () => {
     // Step 4: Supervisor reviews investigation
     await test.step('Supervisor reviews investigation', async () => {
       // Login as supervisor
-      await login(page, testSupervisor.email, testSupervisor.password);
+      await login(page, fixture.supervisorEmail, fixture.password);
       
       // Navigate to pending investigations
       await page.click('text=Crédits');
       await page.click('text=Enquêtes à valider');
       
       // Find and open investigation
-      await page.click(`tr:has-text("${testClient.nom}"):has-text("SUBMITTED")`);
+      await page.click(`tr:has-text("${fixture.clientNom}"):has-text("SUBMITTED")`);
       
       // Review investigation details
       await expect(page.locator('text=Recommandation agent: APPROVE')).toBeVisible();
@@ -230,7 +156,7 @@ test.describe('Credit Workflow with Investigation', () => {
     await test.step('Credit committee approves loan', async () => {
       // Navigate to credit approval
       await page.click('text=Comité de crédit');
-      await page.click(`tr:has-text("${testClient.nom}")`);
+      await page.click(`tr:has-text("${fixture.clientNom}")`);
       
       // Review all information
       await expect(page.locator('text=Enquête terrain: APPROVED')).toBeVisible();
@@ -250,14 +176,14 @@ test.describe('Credit Workflow with Investigation', () => {
     // Step 6: Cashier disburses the loan
     await test.step('Cashier disburses the loan', async () => {
       // Login as cashier
-      await login(page, testCaissier.email, testCaissier.password);
+      await login(page, fixture.caissierEmail, fixture.password);
       
       // Navigate to pending disbursements
       await page.click('text=Caisse');
       await page.click('text=Décaissements en attente');
       
       // Find the approved credit
-      await page.click(`tr:has-text("${testClient.nom}")`);
+      await page.click(`tr:has-text("${fixture.clientNom}")`);
       
       // Process disbursement
       await page.click('button:text("Procéder au décaissement")');
@@ -279,7 +205,7 @@ test.describe('Credit Workflow with Investigation', () => {
       const [credit] = await db
         .select()
         .from(credits)
-        .where(eq(credits.clientId, testClient.id))
+        .where(eq(credits.clientId, fixture.clientId))
         .limit(1);
       
       expect(credit).toBeDefined();
@@ -288,7 +214,7 @@ test.describe('Credit Workflow with Investigation', () => {
       
       // Navigate to active credits
       await page.click('text=Crédits actifs');
-      await expect(page.locator(`tr:has-text("${testClient.nom}"):has-text("ACTIVE")`)).toBeVisible();
+      await expect(page.locator(`tr:has-text("${fixture.clientNom}"):has-text("ACTIVE")`)).toBeVisible();
     });
   });
 
@@ -340,17 +266,17 @@ test.describe('Credit Workflow with Investigation', () => {
     
     await test.step('Setup: Login both users', async () => {
       // Login supervisor
-      await login(supervisorPage, testSupervisor.email, testSupervisor.password);
+      await login(supervisorPage, fixture.supervisorEmail, fixture.password);
       
       // Login agent
-      await login(agentPage, testAgent.email, testAgent.password);
+      await login(agentPage, fixture.agentEmail, fixture.password);
     });
     
     await test.step('Real-time assignment notification', async () => {
       // Supervisor assigns investigation
       await supervisorPage.goto('/credits/investigations');
       await supervisorPage.click('button:text("Nouvelle assignation")');
-      await supervisorPage.selectOption('select[name="agentId"]', testAgent.id);
+      await supervisorPage.selectOption('select[name="agentId"]', fixture.agentId);
       await supervisorPage.click('button:text("Assigner")');
       
       // Agent should receive notification in real-time
@@ -375,12 +301,12 @@ test.describe('Credit Workflow with Investigation', () => {
 
   test('Investigation reassignment flow', async ({ page }) => {
     await test.step('Initial assignment', async () => {
-      await login(page, testSupervisor.email, testSupervisor.password);
+      await login(page, fixture.supervisorEmail, fixture.password);
       
       // Create and assign investigation
       await page.goto('/credits/investigations');
       await page.click('button:text("Nouvelle enquête")');
-      await page.selectOption('select[name="agentId"]', testAgent.id);
+      await page.selectOption('select[name="agentId"]', fixture.agentId);
       await page.click('button:text("Assigner")');
       
       const investigationId = await page.getAttribute('[data-investigation-id]', 'data-investigation-id');
@@ -409,7 +335,7 @@ test.describe('Credit Workflow with Investigation', () => {
 
   test('Credit workflow with rejection at investigation stage', async ({ page }) => {
     await test.step('Agent recommends rejection', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       
       // Open investigation
       await page.goto('/agent/activities');
@@ -424,7 +350,7 @@ test.describe('Credit Workflow with Investigation', () => {
     });
     
     await test.step('Supervisor reviews rejection', async () => {
-      await login(page, testSupervisor.email, testSupervisor.password);
+      await login(page, fixture.supervisorEmail, fixture.password);
       
       await page.goto('/credits/investigations');
       await page.click('text=À valider');
@@ -445,7 +371,7 @@ test.describe('Credit Workflow with Investigation', () => {
       const [demande] = await db
         .select()
         .from(demandesCredit)
-        .where(eq(demandesCredit.clientId, testClient.id))
+        .where(eq(demandesCredit.clientId, fixture.clientId))
         .orderBy(desc(demandesCredit.createdAt))
         .limit(1);
       
@@ -456,6 +382,10 @@ test.describe('Credit Workflow with Investigation', () => {
 
 // Performance tests
 test.describe('Credit Workflow Performance', () => {
+  test.beforeAll(async () => {
+    if (!fixture) fixture = await createTestFixture('credit-perf');
+  });
+
   test('Should handle concurrent investigations', async ({ browser }) => {
     const contexts = [];
     const pages = [];
@@ -486,12 +416,12 @@ test.describe('Credit Workflow Performance', () => {
   
   test('Should maintain data consistency under load', async ({ page }) => {
     // Simulate rapid status changes
-    await login(page, testSupervisor.email, testSupervisor.password);
+    await login(page, fixture.supervisorEmail, fixture.password);
     
     for (let i = 0; i < 20; i++) {
       await page.goto('/credits/investigations');
       await page.click('button:text("Assigner")');
-      await page.selectOption('select[name="agentId"]', testAgent.id);
+      await page.selectOption('select[name="agentId"]', fixture.agentId);
       await page.click('button:text("Confirmer")');
       
       // Immediately reassign

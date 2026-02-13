@@ -3,14 +3,18 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright Configuration for Cofinco E2E Tests
  *
- * Run via Docker:
- *   docker compose run --rm test-e2e
+ * Run via Docker (uses isolated cofinco_test database):
+ *   docker compose --profile test run --rm test-e2e
  *
- * Or locally (requires running app):
+ * Or locally (requires running app + DATABASE_URL pointing to test DB):
  *   npx playwright test
  */
 export default defineConfig({
   testDir: './tests/e2e',
+
+  /* Global setup/teardown — truncates transactional tables for clean test runs */
+  globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
 
   fullyParallel: true,
 

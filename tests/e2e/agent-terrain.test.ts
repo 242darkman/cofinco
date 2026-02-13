@@ -1,115 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { db } from '../../server/db';
-import { users, loginAttempts, userRoles } from '../../shared/schema/auth';
 import { agentActivities } from '../../shared/schema/agent-activities';
-import { enquetesCredit } from '../../shared/schema/finance';
-import { prospections } from '../../shared/schema/operations';
-import { agences } from '../../shared/schema/agences';
-import { eq, and, gte, or, sql, inArray } from 'drizzle-orm';
-
-// ... (existing code top) ...
-
-async function cleanupTestData() {
-  // First, find the IDs of the users by username to handle dynamic IDs or stale data
-  const existingUsers = await db.select({ id: users.id }).from(users).where(
-    or(
-      eq(users.username, testAgent.username),
-      eq(users.username, testSupervisor.username)
-    )
-  );
-  
-  const userIds = existingUsers.map(u => u.id);
-  
-  if (userIds.length > 0) {
-    // Delete audit logs (raw SQL as table definition might be missing/legacy)
-    // We use sql template literal for safe parameter injection, assuming generic sql usage if not dialect specific
-    // But drizzle-orm/sql is generic. postgres logic:
-    // DELETE FROM "audit_logs" WHERE "user_id" IN (uuid1, uuid2)
-    // We construct the IN clause manually or loop.
-    // Simpler: just raw sql with string interpolation if safe (these are UUIDs from DB)
-    // Or better: sql`DELETE FROM audit_logs WHERE user_id IN ${userIds}` might not verify array correctly depending on driver
-    // Safety: iterate
-    for (const id of userIds) {
-      await db.execute(sql`DELETE FROM audit_logs WHERE user_id = ${id}`);
-    }
-
-    // Delete related tables using Drizzle where possible
-    await db.delete(agentActivities).where(inArray(agentActivities.assignedAgentId, userIds));
-    await db.delete(prospections).where(inArray(prospections.agentId, userIds));
-    await db.delete(userRoles).where(inArray(userRoles.userId, userIds));
-    await db.delete(loginAttempts).where(inArray(loginAttempts.username, [testAgent.username, testSupervisor.username]));
-    
-    // Finally delete users
-    await db.delete(users).where(inArray(users.id, userIds));
-  }
-
-  // Delete agency by ID (assuming ID is constant/known)
-  await db.delete(agences).where(eq(agences.id, testAgence.id));
-}
+import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-import * as bcrypt from 'bcrypt';
+import { createTestFixture, type TestFixture } from './test-fixtures';
 
-// Test data
-const testAgence = {
-  id: uuidv4(),
-  nom: "Agence Test Agent",
-  ville: "Brazzaville",
-  codeAgence: "AG-TEST-AGENT"
-};
-
-const testAgent = {
-  id: uuidv4(),
-  nom: "Agent Test E2E",
-  email: "agent.e2e@test.com",
-  password: "Test@1234", // Plain text for login
-  role: "AGENT_TERRAIN",
-  agenceId: testAgence.id,
-  telephone: "+242060000001",
-  username: "agent.e2e@test.com"
-};
-
-const testSupervisor = {
-  id: uuidv4(),
-  nom: "Superviseur Agent Test",
-  email: "supervisor.agent@test.com",
-  password: "Test@1234", // Plain text for login
-  role: "SUPERVISEUR",
-  agenceId: testAgence.id,
-  username: "supervisor.agent@test.com"
-};
-
-// Helper functions
-async function setupTestData() {
-  const hashedPassword = await bcrypt.hash(testAgent.password, 10);
-  
-  await db.insert(agences).values(testAgence).onConflictDoNothing();
-  
-  // Update objects with hashed password for DB insertion logic
-  // We use spread to override password, but keep strict object structure if needed
-  // But db.insert takes values.
-  
-  await db.insert(users).values([
-    { ...testAgent, password: hashedPassword },
-    { ...testSupervisor, password: hashedPassword }
-  ]).onConflictDoNothing();
-
-  // Insert roles (Required for V3 Auth)
-  // Since db.insert(users) ignores 'role' property, we must insert into userRoles manually
-  await db.insert(userRoles).values([
-    {
-      userId: testAgent.id,
-      role: testAgent.role as any, // Cast to any or actual enum type if available
-      isPrimary: true,
-      agenceId: testAgence.id
-    },
-    {
-      userId: testSupervisor.id,
-      role: testSupervisor.role as any,
-      isPrimary: true,
-      agenceId: testAgence.id
-    }
-  ]).onConflictDoNothing();
-}
+let fixture: TestFixture;
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login');
@@ -127,17 +23,12 @@ async function mockGeolocation(page: Page, lat: number, lng: number) {
 // E2E Tests for Agent Terrain Module
 test.describe('Agent Terrain Module', () => {
   test.beforeAll(async () => {
-    await cleanupTestData();
-    await setupTestData();
-  });
-
-  test.afterAll(async () => {
-    await cleanupTestData();
+    fixture = await createTestFixture('agent');
   });
 
   test('Agent dashboard displays activities and metrics', async ({ page }) => {
     await test.step('Login as agent', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       await expect(page).toHaveURL(/\/agent\/(dashboard|terrain)/);
     });
 
@@ -176,7 +67,7 @@ test.describe('Agent Terrain Module', () => {
     await mockGeolocation(page, -4.2634, 15.2429); // Brazzaville coordinates
     
     await test.step('Login and navigate to prospection', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       await page.click('text=Nouvelle prospection');
     });
 
@@ -233,7 +124,7 @@ test.describe('Agent Terrain Module', () => {
     await mockGeolocation(page, -4.2634, 15.2429);
     
     await test.step('Receive investigation assignment', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       
       // Check for notification
       await expect(page.locator('[data-notification-badge]')).toBeVisible();
@@ -299,7 +190,7 @@ test.describe('Agent Terrain Module', () => {
 
   test('Agent activity tracking and performance', async ({ page }) => {
     await test.step('View activity history', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       await page.click('text=Mon historique');
       
       // Filter by date range
@@ -343,7 +234,7 @@ test.describe('Agent Terrain Module', () => {
 
   test('Offline mode functionality', async ({ page, context }) => {
     await test.step('Login and cache data', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       
       // Wait for initial data sync
       await page.waitForSelector('text=Synchronisé');
@@ -404,17 +295,17 @@ test.describe('Agent Terrain Module', () => {
     
     await test.step('Setup connections', async () => {
       // Login agent
-      await login(agentPage, testAgent.email, testAgent.password);
+      await login(agentPage, fixture.agentEmail, fixture.password);
       
       // Login supervisor
-      await login(supervisorPage, testSupervisor.email, testSupervisor.password);
+      await login(supervisorPage, fixture.supervisorEmail, fixture.password);
     });
 
     await test.step('Supervisor assigns activity', async () => {
       // Supervisor creates and assigns activity
       await supervisorPage.goto('/supervisor/activities');
       await supervisorPage.click('button:text("Nouvelle activité")');
-      await supervisorPage.selectOption('select[name="agentId"]', testAgent.id);
+      await supervisorPage.selectOption('select[name="agentId"]', fixture.agentId);
       await supervisorPage.selectOption('select[name="activityType"]', 'CLIENT_VISIT');
       await supervisorPage.fill('input[name="title"]', 'Visite client urgent');
       await supervisorPage.selectOption('select[name="priority"]', 'URGENT');
@@ -459,7 +350,7 @@ test.describe('Agent Terrain Module', () => {
     await mockGeolocation(page, -4.2634, 15.2429);
     
     await test.step('Enable location tracking', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       await page.click('text=Paramètres');
       await page.check('input[name="enableLocationTracking"]');
       await page.click('button:text("Enregistrer")');
@@ -513,7 +404,7 @@ test.describe('Agent Terrain Module', () => {
 
   test('Agent document management', async ({ page }) => {
     await test.step('Upload documents', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       await page.click('text=Documents');
       
       // Upload multiple documents
@@ -555,7 +446,7 @@ test.describe('Agent Terrain Module', () => {
 
   test('Agent planning and scheduling', async ({ page }) => {
     await test.step('View weekly planning', async () => {
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       await page.click('text=Mon planning');
       
       // Calendar should be displayed
@@ -597,6 +488,10 @@ test.describe('Agent Terrain Module', () => {
 
 // Performance and stress tests
 test.describe('Agent Module Performance', () => {
+  test.beforeAll(async () => {
+    if (!fixture) fixture = await createTestFixture('agent-perf');
+  });
+
   test('Handle large activity list', async ({ page }) => {
     // Create 100 activities for the agent
     const priorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
@@ -604,19 +499,19 @@ test.describe('Agent Module Performance', () => {
     for (let i = 0; i < 100; i++) {
       activities.push({
         id: uuidv4(),
-        assignedAgentId: testAgent.id,
-        agenceId: testAgence.id,
+        assignedAgentId: fixture.agentId,
+        agenceId: fixture.agenceId,
         activityType: 'CLIENT_VISIT' as const,
         title: `Activity ${i + 1}`,
         status: (i % 3 === 0 ? 'COMPLETED' : 'PENDING') as 'COMPLETED' | 'PENDING',
         priority: priorities[i % 4],
         dueDate: new Date(Date.now() + i * 86400000), // Spread over days
-        assignedBy: testSupervisor.id
+        assignedBy: fixture.supervisorId
       });
     }
     await db.insert(agentActivities).values(activities);
 
-    await login(page, testAgent.email, testAgent.password);
+    await login(page, fixture.agentEmail, fixture.password);
     await page.goto('/agent/activities');
 
     // Page should load within acceptable time
@@ -651,7 +546,7 @@ test.describe('Agent Module Performance', () => {
       });
     }
 
-    await login(page, testAgent.email, testAgent.password);
+    await login(page, fixture.agentEmail, fixture.password);
     
     // Go offline
     await context.setOffline(true);
@@ -680,7 +575,7 @@ test.describe('Agent Module Performance', () => {
     for (let i = 0; i < 5; i++) {
       const context = await browser.newContext();
       const page = await context.newPage();
-      await login(page, testAgent.email, testAgent.password);
+      await login(page, fixture.agentEmail, fixture.password);
       contexts.push(context);
       pages.push(page);
     }
@@ -703,7 +598,7 @@ test.describe('Agent Module Performance', () => {
       .select()
       .from(agentActivities)
       .where(and(
-        eq(agentActivities.assignedAgentId, testAgent.id),
+        eq(agentActivities.assignedAgentId, fixture.agentId),
         eq(agentActivities.status, 'IN_PROGRESS')
       ));
 
