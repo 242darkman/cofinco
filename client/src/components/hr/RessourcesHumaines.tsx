@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
-import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Award } from 'lucide-react';
+import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3 } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 
@@ -35,8 +35,7 @@ const TABS = [
   { key: 'conges', label: 'Congés', icon: Calendar },
   { key: 'formations', label: 'Formations', icon: GraduationCap },
   { key: 'sanctions', label: 'Sanctions', icon: AlertTriangle },
-  { key: 'avantages', label: 'Avantages', icon: Gift },
-  { key: 'primes', label: 'Primes', icon: Award },
+  { key: 'avantages', label: 'Avantages & Primes', icon: Gift },
   { key: 'paie', label: 'Paie & Docs', icon: FileText },
   { key: 'recrutement', label: 'Recrutement', icon: UserPlus },
   { key: 'organigramme', label: 'Organigramme', icon: Building2 }
@@ -258,17 +257,19 @@ export default function RessourcesHumaines() {
 
       case 'avantages':
         return (
-          <AvantagesManager
-            avantages={avantagesList}
-            employes={employes}
-            onCreate={createAvantage}
-            onUpdate={updateAvantage}
-            onDelete={deleteAvantage}
-          />
+          <div className="space-y-6">
+            <AvantagesManager
+              avantages={avantagesList}
+              employes={employes}
+              onCreate={createAvantage}
+              onUpdate={updateAvantage}
+              onDelete={deleteAvantage}
+            />
+            <div className="border-t border-slate-700/50 pt-4">
+              <ProspectionPrimeConfig />
+            </div>
+          </div>
         );
-
-      case 'primes':
-        return <ProspectionPrimeConfig />;
 
       case 'paie':
         return <PaieManager />;
