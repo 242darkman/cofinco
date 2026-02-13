@@ -8,6 +8,7 @@ import { ReceiptData } from '../../../ui/printable/ReceiptTemplate';
 import { toast } from 'sonner';
 import { formatClientName } from '@/lib/format';
 import { ReceiptActions } from '../../shared/ReceiptActions';
+import { currencySymbol } from '@shared/config/currency';
 
 // Sparkle position configuration
 interface SparkleConfig {
@@ -68,7 +69,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   // Extract values with defaults for type safety
   const reference = data?.reference || '';
   const total = data?.total || 0;
-  const devise = data?.devise || 'FCFA';
+  const devise = data?.devise || currencySymbol();
   const date = data?.date ? new Date(data.date) : new Date();
   const type = data?.type || '';
   const modePaiement = data?.modePaiement || 'Espèces';

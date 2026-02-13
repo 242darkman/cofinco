@@ -8,6 +8,7 @@ import { db } from "../db";
 import { pushSubscriptions, pushNotificationLogs, users, userRoles } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
+import { currencySymbol } from "@shared/config/currency";
 
 const logger = createLogger('Push');
 
@@ -293,7 +294,7 @@ export async function sendCreditApprovedPush(
 ) {
   return sendPushToUser(userId, {
     title: "Crédit Approuvé! 🎉",
-    body: `Votre demande de crédit #${creditNumber} de ${amount.toLocaleString()} FCFA a été approuvée.`,
+    body: `Votre demande de crédit #${creditNumber} de ${amount.toLocaleString()} ${currencySymbol()} a été approuvée.`,
     icon: "/icons/credit-approved.png",
     tag: `credit-approved-${creditNumber}`,
     data: {
@@ -315,7 +316,7 @@ export async function sendPaymentReminderPush(
 ) {
   return sendPushToUser(userId, {
     title: "Rappel d'échéance",
-    body: `Votre échéance de ${amount.toLocaleString()} FCFA est prévue pour le ${dueDate}.`,
+    body: `Votre échéance de ${amount.toLocaleString()} ${currencySymbol()} est prévue pour le ${dueDate}.`,
     icon: "/icons/payment-reminder.png",
     tag: `payment-reminder-${dueDate}`,
     data: {
@@ -336,7 +337,7 @@ export async function sendTontineReminderPush(
 ) {
   return sendPushToUser(userId, {
     title: `Rappel Tontine: ${tontineName}`,
-    body: `Réunion prévue le ${meetingDate}. Cotisation: ${amount.toLocaleString()} FCFA`,
+    body: `Réunion prévue le ${meetingDate}. Cotisation: ${amount.toLocaleString()} ${currencySymbol()}`,
     icon: "/icons/tontine.png",
     tag: `tontine-${tontineName}`,
     data: {

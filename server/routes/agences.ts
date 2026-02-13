@@ -23,6 +23,7 @@ import {
 import { agencyMigrationService, MigrationError } from "../services/agency-migration";
 import { getWsInstance } from "../ws-server";
 import { TypeAgence, StatutAgence, StatutUser, StatutClient } from "../../shared/enum/status-constants";
+import { currencyCode } from "@shared/config/currency";
 
 export function registerAgencesRoutes(app: Express) {
   // ============================================
@@ -223,7 +224,7 @@ export function registerAgencesRoutes(app: Express) {
             nom: coffreNom,
             ownerType: "AGENCE",
             ownerId: newAgence.id,
-            devise: "XAF",
+            devise: currencyCode(),
             solde: "0",
             plafondEncaisse: data.plafondEncaisseCoffre?.toString() || null,
             soldeMinimum: data.soldeMinimumCoffre?.toString() || "0",

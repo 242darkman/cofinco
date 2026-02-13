@@ -10,6 +10,7 @@ import { addPdfLogoHeader } from '../../../lib/pdf-logo';
 import { useChartOfAccounts, useGrandLivre, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
 import { loadExportLibraries } from '../../../lib/lazy-export';
+import { currencyCode } from '@shared/config/currency';
 
 interface GrandLivreEntry {
   id: string;
@@ -378,7 +379,7 @@ export default function GrandLivre() {
              {soldeOuverture !== 0 && (
                <StatCard
                  title="Solde Ouverture"
-                 value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(soldeOuverture)}
+                 value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currencyCode(), minimumFractionDigits: 0 }).format(soldeOuverture)}
                  icon={Info}
                  color="neutral"
                  subtitle="Report a nouveau"
@@ -387,7 +388,7 @@ export default function GrandLivre() {
              )}
              <StatCard
                title="Total Debits"
-               value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(totalDebit)}
+               value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currencyCode(), minimumFractionDigits: 0 }).format(totalDebit)}
                icon={ArrowDownRight}
                color="warning"
                subtitle={`${entries.length} mouvements`}
@@ -395,7 +396,7 @@ export default function GrandLivre() {
              />
              <StatCard
                title="Total Credits"
-               value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(totalCredit)}
+               value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currencyCode(), minimumFractionDigits: 0 }).format(totalCredit)}
                icon={ArrowUpRight}
                color="success"
                subtitle="Cumul credit"
@@ -403,7 +404,7 @@ export default function GrandLivre() {
              />
              <StatCard
                title="Solde Final"
-               value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(soldeFinal)}
+               value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currencyCode(), minimumFractionDigits: 0 }).format(soldeFinal)}
                icon={DollarSign}
                color={soldeFinal >= 0 ? 'success' : 'primary'}
                subtitle={grandLivreData?.sensNormal || ''}

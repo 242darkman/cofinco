@@ -3,6 +3,7 @@ import { caisses, configCoffreFort, users, userRoles } from "@shared/schema";
 import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, and } from "drizzle-orm";
 import { validateTransition } from "./state-machine";
+import { currencySymbol } from "@shared/config/currency";
 
 export class TransfertCoffreValidator {
   private normalizeRoleToken(role?: string | null): string {
@@ -124,7 +125,7 @@ export class TransfertCoffreValidator {
       return {
         valid: false,
         soldeDisponible: solde,
-        error: `Solde insuffisant. Disponible: ${solde.toLocaleString("fr-FR")} FCFA, Requis: ${montant.toLocaleString("fr-FR")} FCFA`,
+        error: `Solde insuffisant. Disponible: ${solde.toLocaleString("fr-FR")} ${currencySymbol()}, Requis: ${montant.toLocaleString("fr-FR")} ${currencySymbol()}`,
       };
     }
 

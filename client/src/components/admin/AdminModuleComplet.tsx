@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin,
   MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock,
-  AlertTriangle, ShieldCheck, LayoutGrid, UserCog, Lock, ChevronLeft, ChevronRight, Percent
+  AlertTriangle, ShieldCheck, LayoutGrid, UserCog, Lock, ChevronLeft, ChevronRight, Percent, Coins
 } from 'lucide-react';
 import { Button, ConfirmDialog } from '../ui';
 
@@ -46,6 +46,7 @@ import RegularizationDashboard from './RegularizationDashboard';
 import AdminClientCredentials from './AdminClientCredentials';
 import AdminProductRates from './AdminProductRates';
 import ZoneManagement from './ZoneManagement';
+import AdminCurrencySettings from './AdminCurrencySettings';
 
 
 interface AdminModuleCompletProps {
@@ -250,7 +251,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const iconMap: Record<string, any> = {
     'BarChart3': BarChart3, 'UserPlus': UserPlus, 'Users': Users, 'Building2': Building2,
     'MapPin': MapPin, 'KeyRound': KeyRound, 'Activity': Activity, 'Monitor': Monitor,
-    'Power': Power, 'Shield': Shield, 'Key': Key, 'MessageSquare': MessageSquare,
+    'Power': Power, 'Shield': Shield, 'Key': Key, 'MessageSquare': MessageSquare, 'Coins': Coins,
     'Settings': Settings, 'Clock': Clock, 'Award': Award, 'Package': Package,
     'CalendarClock': CalendarClock,
     'CreditCard': CreditCard,
@@ -383,6 +384,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'client-credentials' && <AdminClientCredentials />}
                   {activeTab === 'product-rates' && <AdminProductRates />}
                   {activeTab === 'zones-commerciales' && <ZoneManagement />}
+                  {activeTab === 'currency' && <AdminCurrencySettings />}
 
                   {activeTab === 'roles' && (
                     <div className="flex flex-col h-full overflow-hidden space-y-2">

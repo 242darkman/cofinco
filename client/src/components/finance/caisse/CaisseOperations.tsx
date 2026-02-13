@@ -11,6 +11,7 @@ import ConfirmDialog from '../../ui/ConfirmDialog';
 import { ReceiptData, ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
+import { currencySymbol } from '@shared/config/currency';
 
 // Types and Interfaces
 interface Client {
@@ -356,7 +357,7 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
       ],
       total: amountValue,
       modePaiement: 'Espèces',
-      devise: 'FCFA'
+      devise: currencySymbol()
     };
   }, [selectedClient, montant, selectedDestination, direction, lastOperationReference, clientComptes, tontines]);
 

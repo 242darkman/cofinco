@@ -53,6 +53,7 @@ import {
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
 import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-posting-service";
+import { currencySymbol } from "@shared/config/currency";
 
 const logger = createLogger('AgencyMigration');
 
@@ -563,7 +564,7 @@ export class AgencyMigrationService {
     return {
       passed,
       message: passed
-        ? `Solde coffre cohérent (${soldeDb.toLocaleString()} FCFA)`
+        ? `Solde coffre cohérent (${soldeDb.toLocaleString()} ${currencySymbol()})`
         : `Écart de solde détecté sur le coffre "${sourceCoffre.nom}": DB=${soldeDb}, Calculé=${soldeCalculated}, Écart=${ecart}`,
       details: { coffreId: sourceCoffre.id, soldeDb, soldeCalculated, ecart },
       resolution: !passed
@@ -653,7 +654,7 @@ export class AgencyMigrationService {
       const plafond = parseFloat(targetConfig.plafondJournalierEntrant);
       if (plafond > 0 && amount > plafond) {
         warnings.push(
-          `Le montant à transférer (${amount.toLocaleString()} FCFA) dépasse le plafond journalier entrant du coffre cible (${plafond.toLocaleString()} FCFA). Ajustez le plafond avant la migration.`
+          `Le montant à transférer (${amount.toLocaleString()} ${currencySymbol()}) dépasse le plafond journalier entrant du coffre cible (${plafond.toLocaleString()} ${currencySymbol()}). Ajustez le plafond avant la migration.`
         );
       }
     }
@@ -668,7 +669,7 @@ export class AgencyMigrationService {
       const plafond = parseFloat(sourceConfig.plafondJournalierSortant);
       if (plafond > 0 && amount > plafond) {
         warnings.push(
-          `Le montant à transférer (${amount.toLocaleString()} FCFA) dépasse le plafond journalier sortant du coffre source (${plafond.toLocaleString()} FCFA). Ajustez le plafond avant la migration.`
+          `Le montant à transférer (${amount.toLocaleString()} ${currencySymbol()}) dépasse le plafond journalier sortant du coffre source (${plafond.toLocaleString()} ${currencySymbol()}). Ajustez le plafond avant la migration.`
         );
       }
     }
@@ -677,7 +678,7 @@ export class AgencyMigrationService {
     const soldeMinimum = parseFloat(sourceCoffre.soldeMinimum || "0");
     if (soldeMinimum > 0) {
       warnings.push(
-        `Le coffre source a un solde minimum de ${soldeMinimum.toLocaleString()} FCFA. Le transfert de migration videra le coffre (montant: ${amount.toLocaleString()} FCFA).`
+        `Le coffre source a un solde minimum de ${soldeMinimum.toLocaleString()} ${currencySymbol()}. Le transfert de migration videra le coffre (montant: ${amount.toLocaleString()} ${currencySymbol()}).`
       );
     }
 

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, Badge, TabGroup, StatCard, Modal, ResponsiveTable, FormField, SelectField } from '../../ui';
 import TransactionFlow from './TransactionFlow';
+import { currencyCode } from '@shared/config/currency';
 
 import airtelMoneyLogo from '../../../assets/logos/airtel-logo.png';
 import mtnMomoLogo from '../../../assets/logos/mtn-logo.png';
@@ -86,7 +87,7 @@ const feeStructure = {
 
 function TransferCalculator({ onClose }: { onClose: () => void }) {
   const [amount, setAmount] = useState('100000');
-  const [fromCurrency, setFromCurrency] = useState('XAF');
+  const [fromCurrency, setFromCurrency] = useState(currencyCode());
   const [toCurrency, setToCurrency] = useState('EUR');
   const [transferType, setTransferType] = useState<'local' | 'international'>('international');
 
@@ -222,7 +223,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
     recipientCountry: 'CD',
     recipientCity: '',
     amount: '',
-    currency: 'XAF',
+    currency: currencyCode(),
     paymentMethod: 'cash',
     deliveryMethod: 'cash_pickup',
     purpose: 'family_support'
@@ -231,7 +232,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
   const [success, setSuccess] = useState(false);
 
   const selectedCountry = countries.find(c => c.code === formData.recipientCountry);
-  const rate = selectedCountry ? exchangeRates[selectedCountry.currency] / exchangeRates['XAF'] : 1;
+  const rate = selectedCountry ? exchangeRates[selectedCountry.currency] / exchangeRates[currencyCode()] : 1;
   const amount = parseFloat(formData.amount) || 0;
   
   const calculateFees = () => {
@@ -283,7 +284,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
                 </div>
                 <div className="flex justify-between border-b border-slate-800 pb-2">
                     <span>Montant Reçu</span>
-                    <strong className="text-white">{receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCountry?.currency || 'XAF'}</strong>
+                    <strong className="text-white">{receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCountry?.currency || currencyCode()}</strong>
                 </div>
                 <div className="flex justify-between">
                     <span>Mode</span>
@@ -393,7 +394,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
             {step === 3 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                     <div>
-                        <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-2">Montant à envoyer (XAF)</label>
+                        <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-2">Montant à envoyer ({currencyCode()})</label>
                         <input 
                             type="number"
                             value={formData.amount}
@@ -407,18 +408,18 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
                     <div className="bg-slate-800 rounded-xl p-4 space-y-3 border border-slate-700/50">
                         <div className="flex justify-between text-xs">
                         <span className="text-slate-400">Frais COFIN</span>
-                        <span className="text-amber-400 font-bold">- {fees.toLocaleString()} XAF</span>
+                        <span className="text-amber-400 font-bold">- {fees.toLocaleString()} {currencyCode()}</span>
                         </div>
                         {type === 'international' && (
                         <div className="flex justify-between text-xs">
                             <span className="text-slate-400">Taux</span>
-                            <span className="text-cyan-400 font-bold">1 XAF = {rate.toFixed(4)} {selectedCountry?.currency}</span>
+                            <span className="text-cyan-400 font-bold">1 {currencyCode()} = {rate.toFixed(4)} {selectedCountry?.currency}</span>
                         </div>
                         )}
                         <div className="border-t border-slate-700 pt-3 flex justify-between items-end">
                             <span className="text-slate-300 text-xs font-medium">Bénéficiaire reçoit</span>
                             <span className="text-emerald-400 text-lg font-bold">
-                                {receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCountry?.currency || 'XAF'}
+                                {receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCountry?.currency || currencyCode()}
                             </span>
                         </div>
                     </div>
@@ -528,7 +529,7 @@ export default function TransfertArgent() {
                 columns={[
                   { key: 'id', label: 'Code', primary: true, format: (v) => <span className="font-mono text-xs">{v}</span> },
                   { key: 'recipient', label: 'Bénéficiaire', hideOnMobile: true },
-                  { key: 'amount', label: 'Envoyé', format: (v) => <span className="font-bold text-white">{v.toLocaleString()} XAF</span> },
+                  { key: 'amount', label: 'Envoyé', format: (v) => <span className="font-bold text-white">{v.toLocaleString()} {currencyCode()}</span> },
                   { key: 'status', label: 'Statut', format: (v) => <Badge value={v === 'completed' ? 'Terminé' : 'En cours'} variant={v === 'completed' ? 'success' : 'warning'} /> },
                   { key: 'date', label: 'Date', hideOnMobile: true }
                 ]}

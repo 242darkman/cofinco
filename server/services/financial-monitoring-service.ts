@@ -20,6 +20,7 @@ import { eq, sql, and, gte, lte, isNull, desc, lt } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { getWsInstance } from "../ws-server";
 import { runReconciliation, type ReconciliationAnomaly } from "./transaction-integrity-service";
+import { currencySymbol } from "@shared/config/currency";
 
 const logger = createLogger("FinancialMonitoring");
 
@@ -248,7 +249,7 @@ async function checkHighValueTransactions(config: MonitoringConfig): Promise<voi
       "HIGH_VALUE_TRANSACTION",
       "info",
       "Transaction à montant élevé",
-      `Transaction de ${parseFloat(tx.montant).toLocaleString()} FCFA détectée`,
+      `Transaction de ${parseFloat(tx.montant).toLocaleString()} ${currencySymbol()} détectée`,
       "transaction_compte",
       tx.id,
       {
@@ -291,7 +292,7 @@ async function checkPendingTransfers(config: MonitoringConfig): Promise<void> {
       "PENDING_TRANSFER_TIMEOUT",
       "warning",
       "Virement programmé en retard",
-      `Virement de ${parseFloat(transfer.montant || "0").toLocaleString()} FCFA en attente d'exécution depuis plus de ${config.pendingTransferTimeoutHours}h`,
+      `Virement de ${parseFloat(transfer.montant || "0").toLocaleString()} ${currencySymbol()} en attente d'exécution depuis plus de ${config.pendingTransferTimeoutHours}h`,
       "virement_programme",
       transfer.id,
       {

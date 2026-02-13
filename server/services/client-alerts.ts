@@ -9,6 +9,7 @@
 import { storage } from "../storage";
 import { getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 import { StatutCredit, StatutCompte } from "@shared/enum/status-constants";
+import { currencySymbol } from "@shared/config/currency";
 
 // ============================================================================
 // TYPES
@@ -108,7 +109,7 @@ export async function evaluateClientAlerts(clientId: string): Promise<ClientAler
         client_id: clientId,
         alert_type: "credit_late",
         alert_level: "critical",
-        message: `${lateCredits.length} credit(s) en retard. Solde restant: ${totalOverdue.toLocaleString("fr-FR")} FCFA.`,
+        message: `${lateCredits.length} credit(s) en retard. Solde restant: ${totalOverdue.toLocaleString("fr-FR")} ${currencySymbol()}.`,
         is_resolved: false,
         created_at: now,
       });
@@ -133,7 +134,7 @@ export async function evaluateClientAlerts(clientId: string): Promise<ClientAler
         client_id: clientId,
         alert_type: "low_balance",
         alert_level: "info",
-        message: `Solde compte courant tres faible (${Number(compteCourant.soldeCourant).toLocaleString("fr-FR")} FCFA).`,
+        message: `Solde compte courant tres faible (${Number(compteCourant.soldeCourant).toLocaleString("fr-FR")} ${currencySymbol()}).`,
         is_resolved: false,
         created_at: now,
       });

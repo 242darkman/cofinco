@@ -15,6 +15,7 @@ import {
 import { TransfertInterCoffresValidator, UserContext, ValidationResult } from "./business-rules";
 import { executeDispatch, executeReceive } from "./transfer-executor";
 import { generateReference } from "../ledger";
+import { currencyCode } from "@shared/config/currency";
 
 interface ServiceResult<T = any> {
   success: boolean;
@@ -111,7 +112,7 @@ export class TransfertInterCoffresService {
       coffreSourceId,
       coffreDestinationId,
       montant,
-      devise = "XAF",
+      devise = currencyCode(),
       motif,
       typeConditionnement,
       numeroScelle,

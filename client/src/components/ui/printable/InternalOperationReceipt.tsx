@@ -1,5 +1,6 @@
 import React from 'react';
 import { InternalTransactionType, InternalTransactionInfo } from './ReceiptTemplate';
+import { currencySymbol } from '@shared/config/currency';
 
 export interface InternalOperationReceiptData {
   companyInfo?: {
@@ -90,7 +91,7 @@ const formatDateTime = (value: string | Date) => {
   });
 };
 
-const formatAmount = (amount: number, currency: string = 'FCFA') => {
+const formatAmount = (amount: number, currency: string = currencySymbol()) => {
   const formatted = new Intl.NumberFormat('fr-FR')
     .format(amount)
     .replace(/[\u00A0\u202F]/g, ' ');
@@ -100,7 +101,7 @@ const formatAmount = (amount: number, currency: string = 'FCFA') => {
 export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, InternalOperationReceiptProps>(
   ({ data }, ref) => {
     const company = { ...DEFAULT_COMPANY, ...data.companyInfo };
-    const currency = data.devise || 'FCFA';
+    const currency = data.devise || currencySymbol();
     const typeLabel = INTERNAL_TYPE_LABELS[data.type] || data.type;
     const statutInfo = data.statut ? STATUT_LABELS[data.statut] : null;
     const operateurName = data.operateur

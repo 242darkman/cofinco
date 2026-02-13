@@ -4,6 +4,7 @@ import { StatutObjectif } from '@shared/enum/status-constants';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { authService } from '../../lib/auth';
+import { currencySymbol } from '@shared/config/currency';
 
 interface Objectif {
   id: string;
@@ -46,7 +47,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
     periode: new Date().toISOString().slice(0, 7),
     type_objectif: 'Collecte',
     valeur_objectif: 0,
-    unite: 'FCFA',
+    unite: currencySymbol(),
     recompense: 0
   });
 
@@ -96,7 +97,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         periode: new Date().toISOString().slice(0, 7),
         type_objectif: 'Collecte',
         valeur_objectif: 0,
-        unite: 'FCFA',
+        unite: currencySymbol(),
         recompense: 0
       });
     } catch (error: any) {
@@ -234,10 +235,10 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
               </FormField>
               <FormField label="Unité">
                 <select value={formData.unite} onChange={(e) => setFormData({ ...formData, unite: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs">
-                  <option value="FCFA">FCFA</option><option value="Clients">Clients</option><option value="Visites">Visites</option><option value="%">%</option><option value="Points">Points</option>
+                  <option value={currencySymbol()}>{currencySymbol()}</option><option value="Clients">Clients</option><option value="Visites">Visites</option><option value="%">%</option><option value="Points">Points</option>
                 </select>
               </FormField>
-              <FormField label="Prime (FCFA)">
+              <FormField label={`Prime (${currencySymbol()})`}>
                 <input type="number" value={formData.recompense} onChange={(e) => setFormData({ ...formData, recompense: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
               </FormField>
             </div>

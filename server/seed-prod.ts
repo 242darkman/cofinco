@@ -74,6 +74,7 @@ import { caissesAgent } from '@shared/schema/caisse-agent';
 import { agentsTerrain } from '@shared/schema/operations';
 import { tontineRulesets } from '@shared/schema/tontines';
 import { configEcartCaisse } from '@shared/schema/caisse-closing';
+import { currencyPresets } from '@shared/schema/settings';
 import { hashPassword } from './auth';
 import { SystemRole } from '@shared/types/roles';
 import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse } from '@shared/enum/status-constants';
@@ -2389,6 +2390,26 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
     results.push({ table: 'systemSettings', action: 'created', count: 1 });
   } else {
     results.push({ table: 'systemSettings', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // Currency Presets
+  const existingPresets = await db.select().from(currencyPresets);
+  if (existingPresets.length === 0 || context === 'EMPTY') {
+    if (existingPresets.length > 0) {
+      await db.delete(currencyPresets);
+    }
+    await db.insert(currencyPresets).values([
+      { code: 'XAF', symbol: 'FCFA', symbolPosition: 'after', locale: 'fr-FR', decimals: 0, actif: true, ordre: 0 },
+      { code: 'XOF', symbol: 'FCFA', symbolPosition: 'after', locale: 'fr-FR', decimals: 0, actif: true, ordre: 1 },
+      { code: 'EUR', symbol: '€',    symbolPosition: 'after', locale: 'fr-FR', decimals: 2, actif: true, ordre: 2 },
+      { code: 'USD', symbol: '$',    symbolPosition: 'before',locale: 'en-US', decimals: 2, actif: true, ordre: 3 },
+      { code: 'CDF', symbol: 'FC',   symbolPosition: 'after', locale: 'fr-CD', decimals: 2, actif: true, ordre: 4 },
+      { code: 'GNF', symbol: 'FG',   symbolPosition: 'after', locale: 'fr-GN', decimals: 0, actif: true, ordre: 5 },
+      { code: 'MGA', symbol: 'Ar',   symbolPosition: 'after', locale: 'fr-MG', decimals: 0, actif: true, ordre: 6 },
+    ]);
+    results.push({ table: 'currencyPresets', action: 'created', count: 7 });
+  } else {
+    results.push({ table: 'currencyPresets', action: 'skipped', count: existingPresets.length, details: 'exists' });
   }
 
   // Security Settings - singleton

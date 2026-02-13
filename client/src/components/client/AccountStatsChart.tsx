@@ -3,6 +3,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { currencyCode } from '@shared/config/currency';
 
 interface StatPoint {
   date: string;
@@ -60,7 +61,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'XAF',
+      currency: currencyCode(),
       maximumFractionDigits: 0,
     }).format(val);
   };

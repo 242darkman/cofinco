@@ -9,6 +9,7 @@ import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '@/lib/status-labels';
 import { v4 as uuidv4 } from 'uuid';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { currencySymbol } from '@shared/config/currency';
 
 interface AccountInfo {
   id: string;
@@ -133,7 +134,7 @@ export function AccountActivationModal({
         ],
         total: parsedMontant,
         modePaiement: 'Espèces',
-        devise: 'FCFA',
+        devise: currencySymbol(),
         notes: `Compte ${getStatusLabel(account.typeCompte, ACCOUNT_TYPE_LABELS)} activé`
       };
 

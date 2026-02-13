@@ -30,6 +30,7 @@ import { formatMoney } from '../../../lib/format';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { InternalOperationReceipt, InternalOperationReceiptData } from '../../ui/printable';
 import { useReactToPrint } from 'react-to-print';
+import { currencyCode } from '@shared/config/currency';
 
 interface CoffreFort {
   id: string;
@@ -143,7 +144,7 @@ export default function TransfertInterCoffresDetail({
     date: transfert.dateTransfert || transfert.createdAt,
     type: 'TRANSFER_INTER_CAISSE',
     montant: parseFloat(transfert.montant),
-    devise: transfert.devise || 'XAF',
+    devise: transfert.devise || currencyCode(),
     source: transfert.coffreSource ? {
       type: 'COFFRE',
       id: transfert.coffreSource.id,

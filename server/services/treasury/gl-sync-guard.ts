@@ -6,6 +6,7 @@
  */
 
 import { logger } from "../../lib/logger";
+import { currencySymbol } from "@shared/config/currency";
 
 /**
  * Configuration des seuils d'alerte
@@ -55,7 +56,7 @@ export function assertMouvementHasGlPosting(
   if (!mouvement.glPostingStatus) {
     throw new Error(
       `[GL GUARD] ${operationName}: Mouvement ${mouvement.id} n'a pas de GL posting status. ` +
-      `Montant: ${mouvement.montant} FCFA. ` +
+      `Montant: ${mouvement.montant} ${currencySymbol()}. ` +
       `Toute opération de trésorerie DOIT poster au GL.`
     );
   }
@@ -64,7 +65,7 @@ export function assertMouvementHasGlPosting(
   if (mouvement.glPostingStatus === 'FAILED') {
     throw new Error(
       `[GL GUARD] ${operationName}: Mouvement ${mouvement.id} a un GL posting FAILED. ` +
-      `Montant: ${mouvement.montant} FCFA. ` +
+      `Montant: ${mouvement.montant} ${currencySymbol()}. ` +
       `Transaction annulée pour éviter désynchronisation.`
     );
   }
@@ -90,16 +91,16 @@ export function assessDiscrepancy(
 
   if (discrepancy <= THRESHOLDS.ACCEPTABLE) {
     severity = 'ACCEPTABLE';
-    message = `Écart acceptable de ${discrepancy.toLocaleString()} FCFA`;
+    message = `Écart acceptable de ${discrepancy.toLocaleString()} ${currencySymbol()}`;
   } else if (discrepancy <= THRESHOLDS.MINOR) {
     severity = 'MINOR';
-    message = `Écart mineur de ${discrepancy.toLocaleString()} FCFA - À surveiller`;
+    message = `Écart mineur de ${discrepancy.toLocaleString()} ${currencySymbol()} - À surveiller`;
   } else if (discrepancy <= THRESHOLDS.MAJOR) {
     severity = 'MAJOR';
-    message = `Écart majeur de ${discrepancy.toLocaleString()} FCFA - Investigation requise`;
+    message = `Écart majeur de ${discrepancy.toLocaleString()} ${currencySymbol()} - Investigation requise`;
   } else {
     severity = 'CRITICAL';
-    message = `ÉCART CRITIQUE de ${discrepancy.toLocaleString()} FCFA - Intervention immédiate`;
+    message = `ÉCART CRITIQUE de ${discrepancy.toLocaleString()} ${currencySymbol()} - Intervention immédiate`;
   }
 
   const issue: ReconciliationIssue = {

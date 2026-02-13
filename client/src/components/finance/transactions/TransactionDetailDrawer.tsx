@@ -18,6 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
+import { currencySymbol } from '@shared/config/currency';
 import { formatMoney, formatDate } from '../../../lib/format';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { ReceiptActions } from '../shared/ReceiptActions';
@@ -440,7 +441,7 @@ export default function TransactionDetailDrawer({
         }
       ],
       total: transaction.amount,
-      devise: 'FCFA',
+      devise: currencySymbol(),
       modePaiement: transaction.modePaiement || 'Espèces',
     };
   }, [transaction]);

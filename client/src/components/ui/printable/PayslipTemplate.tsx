@@ -1,5 +1,6 @@
 import React from 'react';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
+import { currencySymbol } from '@shared/config/currency';
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -262,12 +263,12 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
             <tr className="bg-blue-100 text-slate-900">
               <th className="border border-slate-700 px-1 py-0.5 w-10 text-center">Code</th>
               <th className="border border-slate-700 px-1 py-0.5 text-left">Libellé</th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Base<br/><span className="font-normal text-slate-500">(FCFA)</span></div></th>
+              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Base<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div></th>
               <th className="border border-slate-700 px-1 py-0.5 w-12 text-center">Taux</th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Gains<br/><span className="font-normal text-slate-500">(FCFA)</span></div></th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Retenues<br/><span className="font-normal text-slate-500">(FCFA)</span></div></th>
+              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Gains<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div></th>
+              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Retenues<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div></th>
               <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right bg-slate-200">
-                <div className="text-[8px] leading-tight text-center">Cotis. Pat.<br/><span className="font-normal text-slate-500">(FCFA)</span></div>
+                <div className="text-[8px] leading-tight text-center">Cotis. Pat.<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div>
               </th>
             </tr>
           </thead>
@@ -360,15 +361,15 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
               <div className="space-y-0.5">
                 <div className="flex justify-between">
                   <span>Brut S.S.</span>
-                  <span className="font-mono">{fmt(bulletin.salaireBrut)} FCFA</span>
+                  <span className="font-mono">{fmt(bulletin.salaireBrut)} {currencySymbol()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Retenues</span>
-                  <span className="font-mono text-red-600">{fmt(bulletin.totalRetenues)} FCFA</span>
+                  <span className="font-mono text-red-600">{fmt(bulletin.totalRetenues)} {currencySymbol()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Cotis. Patronales</span>
-                  <span className="font-mono text-slate-500">{fmt(bulletin.totalChargesPatronales)} FCFA</span>
+                  <span className="font-mono text-slate-500">{fmt(bulletin.totalChargesPatronales)} {currencySymbol()}</span>
                 </div>
               </div>
             </div>
@@ -381,7 +382,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
             </div>
             <div className="flex-1 flex items-center justify-center bg-white px-2">
               <span className="text-lg font-black font-mono tracking-tight">
-                {fmt(bulletin.salaireNet)} <span className="text-xs font-normal">FCFA</span>
+                {fmt(bulletin.salaireNet)} <span className="text-xs font-normal">{currencySymbol()}</span>
               </span>
             </div>
             <div className="text-[8px] text-center bg-slate-100 p-1 border-t border-slate-200 capitalize">

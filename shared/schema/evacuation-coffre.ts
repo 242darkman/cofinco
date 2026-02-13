@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { agences } from "./agences";
+import { DEFAULT_CURRENCY } from "../config/currency";
 import { coffresForts } from "./coffres-forts";
 import { mouvementsFinanciers } from "./finance";
 import {
@@ -48,7 +49,7 @@ export const evacuationsCoffre = pgTable(
 
     // ====== MONTANT & DEVISE ======
     montant: numeric("montant", { precision: 15, scale: 2 }).notNull(),
-    devise: text("devise").notNull().default("XAF"),
+    devise: text("devise").notNull().default(DEFAULT_CURRENCY.code),
 
     // ====== MOTIF ======
     motifEvacuation: motifEvacuationEnum("motif_evacuation").notNull(),

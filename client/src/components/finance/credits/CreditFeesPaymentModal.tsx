@@ -11,6 +11,7 @@ import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { MethodePaiement, METHODE_PAIEMENT_LABELS, type MethodePaiementType } from '@shared/enum/status-constants';
 import mtnMomoLogo from '@/assets/logos/mtn-logo.png';
 import airtelMoneyLogo from '@/assets/logos/airtel-logo.png';
+import { currencySymbol } from '@shared/config/currency';
 
 interface CreditFeesPaymentModalProps {
   demande: any;
@@ -948,7 +949,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
             }],
             total: parseFloat(paidFacture.montantTotal || feeAmount),
             modePaiement: getMethodLabel(),
-            devise: 'FCFA',
+            devise: currencySymbol(),
             notes: `Demande de crédit: ${formatMoney(demande.montantDemande)}`,
           } as ReceiptData}
         />

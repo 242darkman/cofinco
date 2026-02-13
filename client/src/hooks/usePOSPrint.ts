@@ -7,6 +7,7 @@
 
 import { useCallback, useState } from 'react';
 import { ReceiptData } from '@/components/ui/printable/ReceiptTemplate';
+import { currencySymbol } from '@shared/config/currency';
 
 type PrintBackend = 'browser' | 'escpos' | 'usb';
 
@@ -57,7 +58,7 @@ export function usePOSPrint() {
     const reference = data.transaction?.id || data.reference || 'N/A';
     const type = data.transaction?.type || data.type || data.title || 'Transaction';
     const date = data.transaction?.date || data.date || new Date();
-    const currency = data.devise || 'FCFA';
+    const currency = data.devise || currencySymbol();
     const cashierName =
       data.transaction?.cashierName ||
       [data.agent?.prenom, data.agent?.nom].filter(Boolean).join(' ').trim() ||

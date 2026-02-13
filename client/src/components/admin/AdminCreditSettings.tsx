@@ -3,12 +3,13 @@ import { Save, Settings } from 'lucide-react';
 import { Card, Button, FormField, LoadingSpinner } from '../ui';
 import { systemSettingsApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import { currencySymbol } from '@shared/config/currency';
 
 export default function AdminCreditSettings() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [settings, setSettings] = useState({
-    default_currency: 'FCFA',
+    default_currency: currencySymbol(),
     enable_notifications: true,
     auto_approve_limit: 0,
   });

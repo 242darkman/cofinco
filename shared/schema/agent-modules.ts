@@ -19,6 +19,7 @@ import { agentsTerrain } from "./operations";
 import { agences } from "./agences";
 import { users } from "./auth";
 import { relations } from "drizzle-orm";
+import { DEFAULT_CURRENCY } from "../config/currency";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AGENT COMMISSIONS
@@ -66,7 +67,7 @@ export const agentObjectifs = pgTable("agent_objectifs", {
   typeObjectif: text("type_objectif").notNull().default("Collecte"),
   valeurObjectif: numeric("valeur_objectif").notNull().default("0"),
   valeurRealisee: numeric("valeur_realisee").notNull().default("0"),
-  unite: text("unite").notNull().default("FCFA"),
+  unite: text("unite").notNull().default(DEFAULT_CURRENCY.symbol),
   statut: text("statut").notNull().default("IN_PROGRESS"),
   recompense: numeric("recompense").notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

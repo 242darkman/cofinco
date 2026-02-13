@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { SessionCaisse, CaisseTransaction } from '@/types/finance';
 import { computeSessionStatus, getSessionStatusLabel } from '@/lib/format';
 import { addPdfLogoHeader as addSharedLogoHeader, addPdfLogoFooter as addSharedLogoFooter } from '@/lib/pdf-logo';
+import { currencySymbol } from '@shared/config/currency';
 
 // ============================================================================
 // TYPES & HELPERS
@@ -50,7 +51,7 @@ function formatNumber(value: number): string {
 }
 
 function formatMoney(value: number): string {
-  return formatNumber(value) + ' FCFA';
+  return formatNumber(value) + ' ' + currencySymbol();
 }
 
 function formatDate(date: string | Date): string {
@@ -266,7 +267,7 @@ export function exportJournalPDF(
   doc.text('TOTAL ENTRÉES', 20, cardY + 9);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`+${formatNumber(totalEntrees)} FCFA`, 20, cardY + 18);
+  doc.text(`+${formatNumber(totalEntrees)} ${currencySymbol()}`, 20, cardY + 18);
 
   // Card 2: Sorties
   doc.setFillColor(244, 63, 94);
@@ -277,7 +278,7 @@ export function exportJournalPDF(
   doc.text('TOTAL SORTIES', 20 + cardWidth + cardGap, cardY + 9);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`-${formatNumber(totalSorties)} FCFA`, 20 + cardWidth + cardGap, cardY + 18);
+  doc.text(`-${formatNumber(totalSorties)} ${currencySymbol()}`, 20 + cardWidth + cardGap, cardY + 18);
 
   // Card 3: Opérations
   doc.setFillColor(6, 182, 212);
@@ -308,7 +309,7 @@ export function exportJournalPDF(
 
   autoTable(doc, {
     startY: y,
-    head: [['Date & Heure', 'Opération', 'Client / Caissier', 'Référence', 'Entrée (FCFA)', 'Sortie (FCFA)', 'Solde (FCFA)']],
+    head: [['Date & Heure', 'Opération', 'Client / Caissier', 'Référence', `Entrée (${currencySymbol()})`, `Sortie (${currencySymbol()})`, `Solde (${currencySymbol()})`]],
     body: tableData,
     theme: 'striped',
     styles: {
@@ -426,7 +427,7 @@ export function exportSynthesePDF(
   doc.text('TOTAL ENTRÉES', 20, y + 10);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`+${formatNumber(totalEntrees)} FCFA`, 20, y + 22);
+  doc.text(`+${formatNumber(totalEntrees)} ${currencySymbol()}`, 20, y + 22);
 
   // Card: Total Sorties
   doc.setFillColor(244, 63, 94);
@@ -437,7 +438,7 @@ export function exportSynthesePDF(
   doc.text('TOTAL SORTIES', 20 + cardWidth + gap, y + 10);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`-${formatNumber(totalSorties)} FCFA`, 20 + cardWidth + gap, y + 22);
+  doc.text(`-${formatNumber(totalSorties)} ${currencySymbol()}`, 20 + cardWidth + gap, y + 22);
 
   y += cardHeight + gap;
 
@@ -452,7 +453,7 @@ export function exportSynthesePDF(
   doc.text('SOLDE NET', 20, y + 10);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${soldeNet >= 0 ? '+' : ''}${formatNumber(soldeNet)} FCFA`, 20, y + 22);
+  doc.text(`${soldeNet >= 0 ? '+' : ''}${formatNumber(soldeNet)} ${currencySymbol()}`, 20, y + 22);
 
   // Card: Conformité
   const confColor = tauxConformite >= 95 ? COLORS.success : tauxConformite >= 80 ? COLORS.warning : COLORS.danger;
@@ -711,7 +712,7 @@ export function exportEcartsPDF(
   doc.text('EXCÉDENTS', 20 + cardWidth + gap, y + 10);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`+${formatNumber(totalEcartPositif)} FCFA`, 20 + cardWidth + gap, y + 22);
+  doc.text(`+${formatNumber(totalEcartPositif)} ${currencySymbol()}`, 20 + cardWidth + gap, y + 22);
 
   // Card 3: Manquants
   doc.setFillColor(...COLORS.danger);
@@ -722,7 +723,7 @@ export function exportEcartsPDF(
   doc.text('MANQUANTS', 20 + (cardWidth + gap) * 2, y + 10);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`-${formatNumber(totalEcartNegatif)} FCFA`, 20 + (cardWidth + gap) * 2, y + 22);
+  doc.text(`-${formatNumber(totalEcartNegatif)} ${currencySymbol()}`, 20 + (cardWidth + gap) * 2, y + 22);
 
   // Card 4: Sessions
   doc.setFillColor(...COLORS.secondary);
@@ -760,7 +761,7 @@ export function exportEcartsPDF(
 
   autoTable(doc, {
     startY: y,
-    head: [['Date & Heure', 'Caissier', 'Théorique (FCFA)', 'Réel (FCFA)', 'Écart (FCFA)', '%', 'Status', 'Justification']],
+    head: [['Date & Heure', 'Caissier', `Théorique (${currencySymbol()})`, `Réel (${currencySymbol()})`, `Écart (${currencySymbol()})`, '%', 'Status', 'Justification']],
     body: tableData,
     theme: 'striped',
     styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },

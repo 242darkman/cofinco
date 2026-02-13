@@ -3,6 +3,17 @@ import { createLogger } from "../lib/logger";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { D, roundFCFA } from "../lib/money";
+import {
+  getActiveCurrency,
+  setPresetsCache,
+  getPresetsCache,
+  type CurrencyConfig,
+} from "@shared/config/currency";
+import { currencyPresets } from "@shared/schema/settings";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { getWsInstance } from "../ws-server";
 
 const logger = createLogger('Routes:Config');
 import {
@@ -207,6 +218,154 @@ export function registerConfigRoutes(app: Express) {
       res.status(500).json({ message: "Erreur lors du calcul" });
     }
   });
+
+  // ============================================================
+  // CURRENCY CONFIGURATION
+  // ============================================================
+
+  /** GET /api/config/currency — active currency (public, needed before auth) */
+  app.get("/api/config/currency", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=60");
+    res.json(getActiveCurrency());
+  });
+
+  /** GET /api/config/currency/presets — all active presets from DB */
+  app.get("/api/config/currency/presets", requireAuth, async (_req, res) => {
+    try {
+      const rows = await db.select().from(currencyPresets)
+        .where(eq(currencyPresets.actif, true))
+        .orderBy(currencyPresets.ordre);
+
+      const presets: (CurrencyConfig & { id: string })[] = rows.map(r => ({
+        id: r.id,
+        code: r.code,
+        symbol: r.symbol,
+        symbolPosition: r.symbolPosition as "before" | "after",
+        locale: r.locale,
+        decimals: r.decimals,
+      }));
+
+      res.json(presets);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching currency presets');
+      // Fallback to in-memory cache
+      res.json(getPresetsCache());
+    }
+  });
+
+  const currencyPresetSchema = z.object({
+    code: z.string().min(2).max(5).transform(v => v.toUpperCase()),
+    symbol: z.string().min(1).max(10),
+    symbolPosition: z.enum(["before", "after"]).default("after"),
+    locale: z.string().min(2).max(10).default("fr-FR"),
+    decimals: z.number().int().min(0).max(4).default(0),
+    ordre: z.number().int().min(0).optional(),
+  });
+
+  /** POST /api/config/currency/presets — create a new preset */
+  app.post("/api/config/currency/presets", requireAuth, async (req, res) => {
+    try {
+      const data = currencyPresetSchema.parse(req.body);
+
+      // Check uniqueness
+      const existing = await db.select({ id: currencyPresets.id })
+        .from(currencyPresets).where(eq(currencyPresets.code, data.code));
+      if (existing.length > 0) {
+        return res.status(409).json({ message: `La devise ${data.code} existe deja` });
+      }
+
+      const [created] = await db.insert(currencyPresets).values({
+        code: data.code,
+        symbol: data.symbol,
+        symbolPosition: data.symbolPosition,
+        locale: data.locale,
+        decimals: data.decimals,
+        ordre: data.ordre ?? 99,
+        actif: true,
+      }).returning();
+
+      await refreshPresetsCache();
+      res.status(201).json(created);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Donnees invalides", errors: error.errors });
+      }
+      logger.error({ err: error }, 'Error creating currency preset');
+      res.status(500).json({ message: "Erreur lors de la creation" });
+    }
+  });
+
+  /** PUT /api/config/currency/presets/:id — update a preset */
+  app.put("/api/config/currency/presets/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = currencyPresetSchema.partial().parse(req.body);
+
+      const [updated] = await db.update(currencyPresets)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(currencyPresets.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Preset non trouve" });
+      }
+
+      await refreshPresetsCache();
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Donnees invalides", errors: error.errors });
+      }
+      logger.error({ err: error }, 'Error updating currency preset');
+      res.status(500).json({ message: "Erreur lors de la mise a jour" });
+    }
+  });
+
+  /** DELETE /api/config/currency/presets/:id — delete a preset (not the active one) */
+  app.delete("/api/config/currency/presets/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Find the preset
+      const [preset] = await db.select().from(currencyPresets).where(eq(currencyPresets.id, id));
+      if (!preset) {
+        return res.status(404).json({ message: "Preset non trouve" });
+      }
+
+      // Prevent deleting the active currency
+      const active = getActiveCurrency();
+      if (preset.code === active.code) {
+        return res.status(400).json({ message: "Impossible de supprimer la devise active" });
+      }
+
+      await db.delete(currencyPresets).where(eq(currencyPresets.id, id));
+      await refreshPresetsCache();
+      res.json({ message: "Preset supprime" });
+    } catch (error) {
+      logger.error({ err: error }, 'Error deleting currency preset');
+      res.status(500).json({ message: "Erreur lors de la suppression" });
+    }
+  });
+}
+
+/** Reload presets from DB into runtime cache + notify clients */
+async function refreshPresetsCache() {
+  const rows = await db.select().from(currencyPresets)
+    .where(eq(currencyPresets.actif, true))
+    .orderBy(currencyPresets.ordre);
+
+  setPresetsCache(rows.map(r => ({
+    code: r.code,
+    symbol: r.symbol,
+    symbolPosition: r.symbolPosition as "before" | "after",
+    locale: r.locale,
+    decimals: r.decimals,
+  })));
+
+  const wsInstance = getWsInstance();
+  if (wsInstance) {
+    wsInstance.broadcast({ type: "PRESETS_CHANGED", payload: getPresetsCache() });
+  }
 }
 
 // Helper functions

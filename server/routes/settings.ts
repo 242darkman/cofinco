@@ -27,6 +27,7 @@ import { db } from "../db";
 import { eq, sql, desc, and, gte, lte, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
+import { setActiveCurrencyByCode, getActiveCurrency } from "@shared/config/currency";
 
 // Helper for parsing with schema
 const parseWithSchema = <T extends z.ZodTypeAny>(schema: T, data: unknown): z.infer<T> => {
@@ -52,7 +53,7 @@ export function registerSettingsRoutes(app: Express) {
         return res.json({
           agence_name: 'COFIN&CO-M',
           agence_code: 'COF001',
-          devise: 'XAF',
+          devise: getActiveCurrency().code,
           pays: 'République du Congo',
           adresse: '',
           telephone: '',
@@ -113,10 +114,18 @@ export function registerSettingsRoutes(app: Express) {
           }
         });
 
-      // Notify
+      // If devise changed, update the runtime currency config
+      if (settings.devise) {
+        setActiveCurrencyByCode(settings.devise);
+      }
+
+      // Notify all connected clients (triggers currency refetch on frontend)
       const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'settings_changed' } });
+          if (settings.devise) {
+            wsInstance.broadcast({ type: "CURRENCY_CHANGED", payload: getActiveCurrency() });
+          }
       }
 
       res.json({ success: true, message: 'Settings updated successfully' });

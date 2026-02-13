@@ -18,6 +18,7 @@ import { StatutCredit, StatutEcheanceCredit, STATUT_ECHEANCE_CREDIT_LABELS } fro
 import { useNetworkStatus } from '../../../contexts/NetworkContext';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { executeOfflineOperation } from '../../../lib/offline-treasury';
+import { currencySymbol } from '@shared/config/currency';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
@@ -445,7 +446,7 @@ export default function CreditRemboursement() {
       }],
       total: lastPaymentAmount,
       modePaiement: paymentData.mode_paiement || 'Espèces',
-      devise: 'FCFA'
+      devise: currencySymbol()
     };
   }, [
     selectedCredit,

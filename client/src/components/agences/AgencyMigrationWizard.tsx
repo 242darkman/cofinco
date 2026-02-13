@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { addPdfLogoHeader, addPdfLogoFooter } from '@/lib/pdf-logo';
+import { formatMoney as formatCurrency, currencyCode } from '@shared/config/currency';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 
@@ -284,7 +285,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   };
 
   const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 }).format(amount);
+    return formatCurrency(amount);
   };
 
   // Navigation
@@ -430,7 +431,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
       // Financials table
       if (report.financials) {
-        const fmtMoney = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 }).format(v);
+        const fmtMoney = (v: number) => formatCurrency(v);
 
         if (y + 60 > H) { doc.addPage(); y = 20; }
 

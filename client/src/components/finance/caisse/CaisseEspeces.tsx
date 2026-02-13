@@ -13,6 +13,7 @@ import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
 import { StatutCredit, TypeCompte, TypeOperationCaisse } from '@shared/enum/status-constants';
 import { useOperationInfo } from './hooks/useOperationInfo';
+import { currencySymbol } from '@shared/config/currency';
 
 // Mapping des types UI (français) vers les enums système (EN)
 const mapToOperationEnum = (typeOp: string | null, typeDetaille: string | null): string => {
@@ -507,9 +508,9 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       ],
       total: lastOperationData.montant,
       modePaiement: 'CASH',
-      devise: 'FCFA'
+      devise: currencySymbol()
     };
-    
+
     setReceiptData(rData);
     setShowSuccessModal(true);
   }, [lastOperationData, user]);

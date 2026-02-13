@@ -12,6 +12,7 @@ import { VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { currencySymbol } from '@shared/config/currency';
 import { v4 as uuidv4 } from 'uuid';
 import {
   StatutCompte,
@@ -411,7 +412,7 @@ export default function CaissePaiementModal({
         items: [{ description: formData.description, montant: operationData.amount, quantite: 1 }],
         total: Number(formData.montant),
         modePaiement: METHODE_PAIEMENT_LABELS[formData.mode_paiement] || formData.mode_paiement,
-        devise: 'FCFA',
+        devise: currencySymbol(),
         agent: { nom: 'Caissier', prenom: '' }
       };
 

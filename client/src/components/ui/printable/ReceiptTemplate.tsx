@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
+import { currencySymbol } from '@shared/config/currency';
 
 // Types pour les transactions internes (sans client)
 export type InternalTransactionType =
@@ -307,7 +308,7 @@ const normalizeReceiptData = (data: ReceiptData, companyInfo?: ReceiptCompanyInf
   const clientName = [data.client?.nom, data.client?.prenom].filter(Boolean).join(' ').trim();
   const clientPhone = data.client?.telephone;
   const clientAccount = maskAccountNumber(data.client?.numeroCompte);
-  const currency = data.devise || 'FCFA';
+  const currency = data.devise || currencySymbol();
   const details: { label: string; value: string; isBold?: boolean }[] =
     data.details?.length
       ? data.details

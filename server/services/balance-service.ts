@@ -39,6 +39,7 @@ import { RECONCILIATION_THRESHOLDS } from "@shared/types/balances";
 import { getWsInstance } from "../ws-server";
 import { randomUUID } from "crypto";
 import { createLogger } from "../lib/logger";
+import { currencySymbol } from "@shared/config/currency";
 
 const logger = createLogger('BalanceService');
 
@@ -77,7 +78,7 @@ class BalanceService {
       current,
       available: isBlocked ? 0 : current,
       pending: 0, // TODO: calculer transactions en attente si applicable
-      currency: 'FCFA',
+      currency: currencySymbol(),
       asOf: new Date()
     };
   }
@@ -109,7 +110,7 @@ class BalanceService {
         current,
         available: current,
         pending: 0,
-        currency: 'FCFA',
+        currency: currencySymbol(),
         asOf: new Date()
       };
     }
@@ -134,7 +135,7 @@ class BalanceService {
       current,
       available: current,
       pending: 0,
-      currency: 'FCFA',
+      currency: currencySymbol(),
       asOf: new Date()
     };
   }
@@ -164,7 +165,7 @@ class BalanceService {
       current,
       available: session.closedAt ? 0 : current, // Session fermée = 0 disponible
       pending: 0,
-      currency: 'FCFA',
+      currency: currencySymbol(),
       asOf: new Date()
     };
   }
@@ -192,7 +193,7 @@ class BalanceService {
       current,
       available: current,
       pending: 0,
-      currency: 'FCFA',
+      currency: currencySymbol(),
       asOf: new Date()
     };
   }
@@ -221,7 +222,7 @@ class BalanceService {
       current,
       available: 0, // Un solde de crédit n'est pas "disponible"
       pending: 0,
-      currency: 'FCFA',
+      currency: currencySymbol(),
       asOf: new Date()
     };
   }
@@ -249,7 +250,7 @@ class BalanceService {
       current,
       available: current, // TODO: Peut-être exclure les distributions en cours
       pending: 0,
-      currency: 'FCFA',
+      currency: currencySymbol(),
       asOf: new Date()
     };
   }
@@ -277,7 +278,7 @@ class BalanceService {
       current,
       available: current,
       pending: 0, // TODO: Calculer les opérations SUBMITTED non approuvées
-      currency: 'FCFA',
+      currency: currencySymbol(),
       asOf: new Date()
     };
   }

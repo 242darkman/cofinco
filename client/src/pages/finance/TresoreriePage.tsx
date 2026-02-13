@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
+import { currencyCode } from '@shared/config/currency';
 
 interface ProviderBalance {
   provider: string;
@@ -131,7 +132,7 @@ function resolveProviderBalance(
   if (direct) {
     return {
       balance: parseFloat(direct.balance || '0'),
-      currency: direct.currency || 'XAF',
+      currency: direct.currency || currencyCode(),
       active: direct.accountStatus === 'ACTIVE',
       error: direct.error,
       shared: !!direct.shared,
@@ -143,7 +144,7 @@ function resolveProviderBalance(
   if (shared) {
     return {
       balance: parseFloat(shared.balance || '0'),
-      currency: shared.currency || 'XAF',
+      currency: shared.currency || currencyCode(),
       active: shared.accountStatus === 'ACTIVE',
       error: shared.error,
       shared: true,

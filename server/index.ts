@@ -20,6 +20,7 @@ import {
 } from "./middleware/security";
 import { csrfProtection } from "./middleware/csrf";
 import { etagMiddleware } from "./middleware/etag";
+import { eq } from "drizzle-orm";
 import { startOutboxWorker } from "./services/outbox-worker";
 import { startNotificationWorker } from "./services/notifications/notification-worker";
 import { startReminderProcessor } from "./services/notifications/reminder-processor";
@@ -194,6 +195,34 @@ app.get("/api/health", async (_req, res) => {
     }
   } else {
     logger.info('Skipping ensureCustomFunctions (pgbouncer detected — handled by db-init)');
+  }
+
+  // Load currency presets + active currency from DB (overrides compile-time defaults)
+  try {
+    const { db } = await import("./db");
+    const { setActiveCurrencyByCode, setPresetsCache } = await import("@shared/config/currency");
+    const { currencyPresets: cpTable } = await import("@shared/schema/settings");
+
+    // Load all active presets into runtime cache
+    const presetRows = await db.select().from(cpTable).where(eq(cpTable.actif, true)).orderBy(cpTable.ordre);
+    if (presetRows.length > 0) {
+      setPresetsCache(presetRows.map((r: typeof cpTable.$inferSelect) => ({
+        code: r.code,
+        symbol: r.symbol,
+        symbolPosition: r.symbolPosition as "before" | "after",
+        locale: r.locale,
+        decimals: r.decimals,
+      })));
+      logger.info(`Loaded ${presetRows.length} currency presets from DB`);
+    }
+
+    // Set active currency from system_settings
+    const row = await db.query.systemSettings.findFirst();
+    if (row?.devise && setActiveCurrencyByCode(row.devise)) {
+      logger.info(`Currency set to ${row.devise} from system_settings`);
+    }
+  } catch (error) {
+    logger.warn({ err: error }, 'Currency config load failed — using compile-time defaults');
   }
 
   // GL STRICT mode boot guard

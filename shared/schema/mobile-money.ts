@@ -5,6 +5,7 @@ import { z } from "zod";
 import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
+import { DEFAULT_CURRENCY } from "../config/currency";
 import { mouvementsFinanciers, comptes, credits, remboursements, operationsCaisse } from "./finance";
 import {
   mobileMoneyProviderEnum,
@@ -38,7 +39,7 @@ export const paymentIntents = pgTable(
 
     // Transaction details
     amount: numeric("amount").notNull(),
-    currency: text("currency").notNull().default("XAF"),
+    currency: text("currency").notNull().default(DEFAULT_CURRENCY.code),
     phone: text("phone").notNull(),
 
     // References

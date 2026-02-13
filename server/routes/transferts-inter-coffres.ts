@@ -17,6 +17,7 @@ import {
   configTransfertInterCoffres,
 } from "@shared/schema";
 import { StatutCoffre, StatutReconciliation, StatutTacheRegularisation } from "@shared/enum/status-constants";
+import { currencyCode } from "@shared/config/currency";
 import { eq, and, desc, asc, gte, isNull } from "drizzle-orm";
 
 export const transfertsInterCoffresRouter = Router();
@@ -221,7 +222,7 @@ transfertsInterCoffresRouter.post("/transferts", async (req, res) => {
       coffreSourceId: z.string().uuid(),
       coffreDestinationId: z.string().uuid(),
       montant: z.number().positive(),
-      devise: z.string().default("XAF"),
+      devise: z.string().default(currencyCode()),
       motif: z.string().min(10),
       typeConditionnement: z.enum(["Sac scellé", "Mallette", "Enveloppe", "Autre"]),
       numeroScelle: z.string().optional(),

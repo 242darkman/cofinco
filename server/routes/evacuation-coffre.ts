@@ -5,6 +5,7 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { EvacuationCoffreService } from "../services/evacuation-coffre";
+import { currencyCode } from "@shared/config/currency";
 
 const logger = createLogger("Routes:EvacuationCoffre");
 
@@ -65,7 +66,7 @@ evacuationCoffreRouter.post("/", attachAbility, requireAbility(Actions.CREATE, S
       transporteurContact: z.string().optional(),
       transporteurReference: z.string().optional(),
       montant: z.number().positive(),
-      devise: z.string().default("XAF"),
+      devise: z.string().default(currencyCode()),
       motifEvacuation: z.enum(["EXCEDENT_ENCAISSE", "FIN_EXERCICE", "SECURITE", "FERMETURE_AGENCE", "APPROVISIONNEMENT_SIEGE", "TRANSFERT_BANCAIRE", "AUTRE"]),
       motifDetail: z.string().min(10),
       idempotencyKey: z.string().optional(),

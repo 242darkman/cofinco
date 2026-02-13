@@ -7,6 +7,7 @@ import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { useReceiptPDF } from '@/hooks/finance/useReceiptPDF';
+import { currencySymbol } from '@shared/config/currency';
 
 export interface ReceiptActionsProps {
   data: ReceiptData;
@@ -25,7 +26,7 @@ export interface ReceiptActionsProps {
 }
 
 // Format money helper
-const formatMoney = (amount: number, devise = 'FCFA') => {
+const formatMoney = (amount: number, devise = currencySymbol()) => {
   return `${new Intl.NumberFormat('fr-FR').format(amount)} ${devise}`;
 };
 
@@ -59,7 +60,7 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
   // Extract values with defaults for type safety
   const reference = data.reference || '';
   const total = data.total || 0;
-  const devise = data.devise || 'FCFA';
+  const devise = data.devise || currencySymbol();
   const date = data.date ? new Date(data.date) : new Date();
   const type = data.type || '';
 

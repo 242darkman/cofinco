@@ -10,6 +10,7 @@ const logger = createLogger('Routes:PaymentsTest');
 import * as storage from "../storage/mobile-money";
 import { paymentService } from "../services/mobile-money/payment-service";
 import { operatorToCorrespondent, resolveOperatorFromPhone } from "../services/mobile-money/providers/pawapay/pawapay-config";
+import { currencyCode } from "@shared/config/currency";
 
 export const paymentsTestRouter = Router();
 
@@ -58,7 +59,7 @@ paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
           depositId: intent.externalRef,
           status: status === "SUCCESS" ? "COMPLETED" : status === "FAILED" ? "FAILED" : "EXPIRED",
           amount: intent.amount,
-          currency: intent.currency || "XAF",
+          currency: intent.currency || currencyCode(),
           correspondent,
           country: "COG",
           payer: { type: "MSISDN", address: { value: intent.phone } },
@@ -74,7 +75,7 @@ paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
           payoutId: intent.externalRef,
           status: status === "SUCCESS" ? "COMPLETED" : status === "FAILED" ? "FAILED" : "EXPIRED",
           amount: intent.amount,
-          currency: intent.currency || "XAF",
+          currency: intent.currency || currencyCode(),
           correspondent,
           country: "COG",
           recipient: { type: "MSISDN", address: { value: intent.phone } },
@@ -139,7 +140,7 @@ paymentsTestRouter.post("/create-mock-intent", async (req, res) => {
       correspondent,
       type,
       amount: amount.toString(),
-      currency: "XAF",
+      currency: currencyCode(),
       phone,
       clientId,
       compteId,

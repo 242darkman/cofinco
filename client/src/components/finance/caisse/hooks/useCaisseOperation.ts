@@ -9,6 +9,7 @@ import {
   type MethodePaiementType,
 } from '@shared/enum/status-constants';
 import type { ReceiptData } from '@/components/ui/printable/ReceiptTemplate';
+import { currencySymbol } from '@shared/config/currency';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -371,7 +372,7 @@ export function useCaisseOperation({
       },
       total: parsedAmount,
       modePaiement: METHODE_PAIEMENT_LABELS[paymentMethod] || paymentMethod,
-      devise: 'FCFA',
+      devise: currencySymbol(),
       items: [
         {
           description: `${operationType === 'DEPOT' ? 'Dépôt' : 'Retrait'} — Compte ${accountLabel}`,

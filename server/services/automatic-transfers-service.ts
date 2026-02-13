@@ -11,6 +11,7 @@ import {
 } from "@shared/enum/status-constants";
 import { createLogger } from "../lib/logger";
 import { postGlForMouvement } from "./accounting-posting-service";
+import { currencySymbol } from "@shared/config/currency";
 
 const logger = createLogger('AutoTransfer');
 
@@ -126,7 +127,7 @@ export async function executeAutomaticTransfer(
       if (soldeSource < montantVersement) {
         return {
           success: false,
-          error: `Solde insuffisant: ${soldeSource} FCFA disponible, ${montantVersement} FCFA requis`,
+          error: `Solde insuffisant: ${soldeSource} ${currencySymbol()} disponible, ${montantVersement} ${currencySymbol()} requis`,
           attempts,
         };
       }

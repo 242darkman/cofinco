@@ -2,6 +2,7 @@ import { pgTable, text, varchar, integer, boolean, numeric, timestamp, uuid, jso
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth"; // Assuming auth is created
+import { DEFAULT_CURRENCY } from "../config/currency";
 
 // Helper to generate agency code (crypto-secure)
 function generateAgenceCode(): string {
@@ -19,7 +20,7 @@ export const systemSettings = pgTable("system_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   agenceName: text("agence_name").default("COFIN&CO-M"),
   agenceCode: text("agence_code").$defaultFn(generateAgenceCode).unique(),
-  devise: text("devise").default("XAF"),
+  devise: text("devise").default(DEFAULT_CURRENCY.code),
   pays: text("pays").default("République du Congo"),
   adresse: text("adresse"),
   telephone: text("telephone"),
@@ -583,3 +584,28 @@ export const systemAlerts = pgTable("system_alerts", {
 export const insertSystemAlertSchema = createInsertSchema(systemAlerts).omit({ id: true, createdAt: true });
 export type InsertSystemAlert = z.infer<typeof insertSystemAlertSchema>;
 export type SystemAlert = typeof systemAlerts.$inferSelect;
+
+// ============================================================
+// Currency Presets — devises configurables depuis l'admin
+// ============================================================
+
+export const currencyPresets = pgTable("currency_presets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),                              // ISO 4217: "XAF", "EUR"
+  symbol: text("symbol").notNull(),                                   // Display: "FCFA", "€"
+  symbolPosition: text("symbol_position").notNull().default("after"), // "before" | "after"
+  locale: text("locale").notNull().default("fr-FR"),                  // Intl locale
+  decimals: integer("decimals").notNull().default(0),                 // 0 for FCFA, 2 for EUR/USD
+  actif: boolean("actif").notNull().default(true),
+  ordre: integer("ordre").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCurrencyPresetSchema = createInsertSchema(currencyPresets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCurrencyPreset = z.infer<typeof insertCurrencyPresetSchema>;
+export type CurrencyPreset = typeof currencyPresets.$inferSelect;

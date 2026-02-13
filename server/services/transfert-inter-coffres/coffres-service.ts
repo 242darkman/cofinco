@@ -8,6 +8,7 @@ import {
   mouvementsFinanciers,
 } from "@shared/schema";
 import { StatutCoffre } from "@shared/enum/status-constants";
+import { currencyCode } from "@shared/config/currency";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "../../lib/logger";
@@ -55,7 +56,7 @@ export class CoffresFortsService {
         nom,
         ownerType: "AGENCE",
         ownerId: agenceId,
-        devise: "XAF",
+        devise: currencyCode(),
         solde: "0",
         plafondEncaisse: options?.plafondEncaisse?.toString(),
         soldeMinimum: options?.soldeMinimum?.toString() || "0",
@@ -93,7 +94,7 @@ export class CoffresFortsService {
         nom: "Coffre-fort Siège",
         ownerType: "SIEGE",
         ownerId: null,
-        devise: "XAF",
+        devise: currencyCode(),
         solde: "0",
         plafondEncaisse: options?.plafondEncaisse?.toString(),
         soldeMinimum: options?.soldeMinimum?.toString() || "0",

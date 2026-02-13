@@ -313,6 +313,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/administration/acces-clients', subModule: 'client-credentials', label: 'Accès Clients' },
       { path: '/administration/taux-produits', subModule: 'product-rates', label: 'Taux Produits' },
       { path: '/administration/zones-commerciales', subModule: 'zones-commerciales', label: 'Arrondissements & Marchés' },
+      { path: '/administration/devise', subModule: 'currency', label: 'Devise' },
     ],
   },
   {

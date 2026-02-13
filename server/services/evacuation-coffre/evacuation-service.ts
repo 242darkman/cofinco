@@ -13,6 +13,7 @@ import { executeDispatch, executeDeposit } from "./evacuation-executor";
 import { isValidTransition, isCancellable } from "./state-machine";
 import { StatutEvacuationCoffre } from "@shared/enum/status-constants";
 import { createLogger } from "../../lib/logger";
+import { currencyCode } from "@shared/config/currency";
 
 const logger = createLogger("EvacuationCoffreService");
 
@@ -103,7 +104,7 @@ export class EvacuationCoffreService {
         banqueCompte: data.banqueCompte,
         transporteurNom: data.transporteurNom,
         montant: data.montant,
-        devise: data.devise || "XAF",
+        devise: data.devise || currencyCode(),
         motifDetail: data.motifDetail,
       }, data.agenceId);
 
@@ -130,7 +131,7 @@ export class EvacuationCoffreService {
           transporteurContact: data.transporteurContact,
           transporteurReference: data.transporteurReference,
           montant: data.montant.toString(),
-          devise: data.devise || "XAF",
+          devise: data.devise || currencyCode(),
           motifEvacuation: data.motifEvacuation as any,
           motifDetail: data.motifDetail,
           statut: StatutEvacuationCoffre.DRAFT,

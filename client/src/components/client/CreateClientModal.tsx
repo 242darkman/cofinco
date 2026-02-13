@@ -9,6 +9,7 @@ import { isAdminRole, SystemRole } from '@shared/types/roles';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { StatutAgence, CLIENT_ORIGIN_OPTIONS } from '@shared/enum/status-constants';
 import { toast } from '../../lib/toast';
+import { currencySymbol } from '@shared/config/currency';
 
 async function uploadEntityFile(
   file: File,
@@ -351,7 +352,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                     label={`Revenu ${formData.typeRevenu} (Est.)`} 
                     type="number" 
                     placeholder="0" 
-                    suffix="FCFA" 
+                    suffix={currencySymbol()} 
                     value={formData.revenu} 
                     onChange={e => updatedField('revenu', e.target.value)} 
                   />

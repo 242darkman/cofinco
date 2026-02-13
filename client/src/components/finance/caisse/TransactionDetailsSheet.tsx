@@ -31,6 +31,7 @@ import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { caisseOperationApi } from '../../../lib/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { treasuryKeys } from '../../../lib/query-keys';
+import { currencySymbol } from '@shared/config/currency';
 
 // --- Types ---
 
@@ -130,7 +131,7 @@ export default function TransactionDetailsSheet({
                 }
             ],
             total: transaction.amount,
-            devise: 'FCFA',
+            devise: currencySymbol(),
             modePaiement: 'Espèces', // Defaulting to Espèces per visual cues, could be dynamic
         };
     }, [transaction]);

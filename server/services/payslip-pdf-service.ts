@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getLogoBase64 } from '../lib/company-logo';
 import { createLogger } from '../lib/logger';
+import { currencySymbol, currencyLabel } from '@shared/config/currency';
 
 const logger = createLogger('PayslipPDF');
 
@@ -268,7 +269,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
 
   autoTable(doc, {
     startY: y,
-    head: [['Code', 'Libelle', 'Base (FCFA)', 'Taux', 'Gains (FCFA)', 'Retenues (FCFA)', 'Patronal (FCFA)']],
+    head: [['Code', 'Libelle', currencyLabel('Base'), 'Taux', currencyLabel('Gains'), currencyLabel('Retenues'), currencyLabel('Patronal')]],
     body: tableBody,
     theme: 'grid',
     styles: {
@@ -363,9 +364,9 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
   doc.setTextColor(0, 0, 0);
 
   const recapItems: [string, string][] = [
-    ['Salaire Brut', `${fmt(bulletin.salaireBrut)} FCFA`],
-    ['Retenues', `${fmt(bulletin.totalRetenues)} FCFA`],
-    ['Cotis. Patronales', `${fmt(bulletin.totalChargesPatronales)} FCFA`],
+    ['Salaire Brut', `${fmt(bulletin.salaireBrut)} ${currencySymbol()}`],
+    ['Retenues', `${fmt(bulletin.totalRetenues)} ${currencySymbol()}`],
+    ['Cotis. Patronales', `${fmt(bulletin.totalChargesPatronales)} ${currencySymbol()}`],
   ];
   let ry = y + 8;
   for (const [label, val] of recapItems) {
@@ -386,7 +387,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
   doc.setTextColor(78, 187, 107);
   doc.text(`${fmt(bulletin.salaireNet)}`, netX + netW / 2, y + 13, { align: 'center' });
   doc.setFontSize(9);
-  doc.text('FCFA', netX + netW / 2, y + 17.5, { align: 'center' });
+  doc.text(currencySymbol(), netX + netW / 2, y + 17.5, { align: 'center' });
 
   // ── FOOTER ──
   doc.setFontSize(6);

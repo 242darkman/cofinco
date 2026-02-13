@@ -7,6 +7,7 @@ import {
 import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, isNull } from "drizzle-orm";
 import { CANCELLABLE_STATES } from "./state-machine";
+import { currencySymbol } from "@shared/config/currency";
 
 export interface ValidationResult {
   valid: boolean;
@@ -276,14 +277,14 @@ export class EvacuationCoffreValidator {
     // Montant minimum
     const montantMin = parseFloat(config.montantMinEvacuation?.toString() || "0");
     if (data.montant < montantMin) {
-      return { valid: false, errorCode: "EVC_001", error: `Le montant minimum d'évacuation est de ${montantMin.toLocaleString()} XAF` };
+      return { valid: false, errorCode: "EVC_001", error: `Le montant minimum d'évacuation est de ${montantMin.toLocaleString()} ${currencySymbol()}` };
     }
 
     // Montant maximum
     if (config.montantMaxEvacuation) {
       const montantMax = parseFloat(config.montantMaxEvacuation.toString());
       if (data.montant > montantMax) {
-        return { valid: false, errorCode: "EVC_001", error: `Le montant maximum d'évacuation est de ${montantMax.toLocaleString()} XAF` };
+        return { valid: false, errorCode: "EVC_001", error: `Le montant maximum d'évacuation est de ${montantMax.toLocaleString()} ${currencySymbol()}` };
       }
     }
 
@@ -312,7 +313,7 @@ export class EvacuationCoffreValidator {
       return {
         valid: false,
         errorCode: "EVC_003",
-        error: `Solde insuffisant. Disponible: ${soldeSource.toLocaleString()} XAF, Demandé: ${data.montant.toLocaleString()} XAF`,
+        error: `Solde insuffisant. Disponible: ${soldeSource.toLocaleString()} ${currencySymbol()}, Demandé: ${data.montant.toLocaleString()} ${currencySymbol()}`,
       };
     }
 
@@ -341,7 +342,7 @@ export class EvacuationCoffreValidator {
           return {
             valid: false,
             errorCode: "EVC_004",
-            error: `Le plafond du coffre destination serait dépassé. Plafond: ${plafondDest.toLocaleString()} XAF`,
+            error: `Le plafond du coffre destination serait dépassé. Plafond: ${plafondDest.toLocaleString()} ${currencySymbol()}`,
           };
         }
       }

@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { agences } from "./agences";
+import { DEFAULT_CURRENCY } from "../config/currency";
 import { mouvementsFinanciers } from "./finance";
 import {
   ownerTypeCoffreEnum,
@@ -27,7 +28,7 @@ export const coffresForts = pgTable("coffres_forts", {
   nom: text("nom").notNull(),
   ownerType: ownerTypeCoffreEnum("owner_type").notNull(), // AGENCE ou SIEGE
   ownerId: uuid("owner_id").references(() => agences.id, { onDelete: "restrict" }), // NULL si SIEGE
-  devise: text("devise").notNull().default("XAF"),
+  devise: text("devise").notNull().default(DEFAULT_CURRENCY.code),
   solde: numeric("solde", { precision: 15, scale: 2 }).notNull().default("0"),
   plafondEncaisse: numeric("plafond_encaisse", { precision: 15, scale: 2 }), // Maximum autorisé
   soldeMinimum: numeric("solde_minimum", { precision: 15, scale: 2 }).default("0"), // Minimum requis
@@ -87,7 +88,7 @@ export const transfertsInterCoffres = pgTable("transferts_inter_coffres", {
 
   // Montant et devise
   montant: numeric("montant", { precision: 15, scale: 2 }).notNull(),
-  devise: text("devise").notNull().default("XAF"),
+  devise: text("devise").notNull().default(DEFAULT_CURRENCY.code),
 
   // Type et conditionnement
   typeTransfert: typeTransfertInterCoffreEnum("type_transfert").notNull(),

@@ -39,6 +39,7 @@ import { canMemberWithdraw } from "../tontine-logic";
 import { TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
 import { operatorToCorrespondent, correspondentToOperator, resolveOperatorFromPhone } from "./providers/pawapay/pawapay-config";
 import { createLogger } from "../../lib/logger";
+import { currencyCode } from "@shared/config/currency";
 
 const logger = createLogger('PaymentService');
 
@@ -124,7 +125,7 @@ class PaymentService {
       operator,
       correspondent,
       amount: amount.toString(),
-      currency: "XAF",
+      currency: currencyCode(),
       phone,
       clientId,
       compteId,
@@ -232,7 +233,7 @@ class PaymentService {
       operator,
       correspondent,
       amount: amount.toString(),
-      currency: "XAF",
+      currency: currencyCode(),
       phone,
       clientId,
       compteId,
@@ -881,7 +882,7 @@ class PaymentService {
       operator,
       correspondent,
       amount: refundAmount.toString(),
-      currency: "XAF",
+      currency: currencyCode(),
       phone: originalIntent.phone,
       clientId: originalIntent.clientId,
       compteId: originalIntent.compteId,
@@ -902,7 +903,7 @@ class PaymentService {
         refundId: refundIntent.externalRef,
         depositId: originalIntent.externalRef,
         amount: refundAmount,
-        currency: "XAF",
+        currency: currencyCode(),
       } as RefundRequest);
 
       if (response.status === "REJECTED") {

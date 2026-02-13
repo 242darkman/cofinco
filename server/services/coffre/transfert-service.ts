@@ -16,6 +16,7 @@ import { TransfertCoffreValidator } from "./transfert-validator";
 import { isAdminRole } from "@shared/types/roles";
 import { getDailyCoffreTotal } from "./coffre-guard";
 import { randomInt } from "crypto";
+import { currencyCode } from "@shared/config/currency";
 
 export class TransfertCoffreService {
   private validator = new TransfertCoffreValidator();
@@ -576,7 +577,7 @@ export class TransfertCoffreService {
       nom: `Coffre-fort ${agence?.nom || "Agence"}`,
       ownerType: "AGENCE",
       ownerId: agenceId,
-      devise: "XAF",
+      devise: currencyCode(),
       solde: "0",
       statut: StatutCoffre.ACTIVE,
     }).returning();

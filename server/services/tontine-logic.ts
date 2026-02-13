@@ -38,6 +38,7 @@ import {
   MethodePaiement,
   TypeOperationCaisse,
 } from "@shared/enum/status-constants";
+import { currencySymbol } from "@shared/config/currency";
 
 // ============ STATUS CONSTANTS (for DB values) ============
 // These map to the enum values and are used for DB queries
@@ -677,7 +678,7 @@ export async function distributeTontineGain(
   const soldeDisponible = Number(tontineData.solde || 0);
   if (soldeDisponible < montantTotal) {
     throw new Error(
-      `Solde insuffisant. Disponible: ${soldeDisponible} FCFA, Requis: ${montantTotal} FCFA`
+      `Solde insuffisant. Disponible: ${soldeDisponible} ${currencySymbol()}, Requis: ${montantTotal} ${currencySymbol()}`
     );
   }
 
@@ -993,9 +994,9 @@ export async function calculateTontineRetirable(
 
   if (montantRetirable < droitMembre) {
     if (potDisponible < droitMembre && potDisponible <= montantRetirable) {
-      raison = `Pot insuffisant: ${potDisponible.toLocaleString()} FCFA disponible`;
+      raison = `Pot insuffisant: ${potDisponible.toLocaleString()} ${currencySymbol()} disponible`;
     } else if (reglesCycle < droitMembre && reglesCycle <= montantRetirable) {
-      raison = `Limite par cycle: ${reglesCycle.toLocaleString()} FCFA maximum`;
+      raison = `Limite par cycle: ${reglesCycle.toLocaleString()} ${currencySymbol()} maximum`;
     }
   }
 
@@ -1036,7 +1037,7 @@ export async function canMemberWithdraw(
   if (montant > retirable.montantRetirable) {
     return {
       canWithdraw: false,
-      reason: `Montant demandé (${montant.toLocaleString()} FCFA) dépasse le retirable (${retirable.montantRetirable.toLocaleString()} FCFA). ${retirable.raison || ""}`.trim(),
+      reason: `Montant demandé (${montant.toLocaleString()} ${currencySymbol()}) dépasse le retirable (${retirable.montantRetirable.toLocaleString()} ${currencySymbol()}). ${retirable.raison || ""}`.trim(),
       maxAmount: retirable.montantRetirable,
     };
   }

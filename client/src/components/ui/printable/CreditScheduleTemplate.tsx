@@ -5,6 +5,7 @@ import { Installment, getInstallmentStatusLabel } from '../../../lib/credit-logi
 import { StatutEcheanceCredit } from '@shared/enum/status-constants';
 import { MapPin, Phone, Mail, QrCode } from 'lucide-react';
 import { formatClientName } from '../../../lib/format';
+import { formatMoney } from '@shared/config/currency';
 
 interface CreditSchedulePDFProps {
   credit: any;
@@ -84,11 +85,11 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Résumé du Crédit</h3>
               <div className="grid grid-cols-2 gap-x-4 text-sm">
                 <span className="text-slate-500">Montant Initial:</span>
-                <span className="font-bold">{totalPrincipal.toLocaleString()} FCFA</span>
+                <span className="font-bold">{formatMoney(totalPrincipal)}</span>
                 <span className="text-slate-500">Taux:</span>
                 <span className="font-bold">{credit.taux}%</span>
                 <span className="text-slate-500">Total à payer:</span>
-                <span className="font-bold">{totalWithInterest.toLocaleString()} FCFA</span>
+                <span className="font-bold">{formatMoney(totalWithInterest)}</span>
                 <span className="text-slate-500">Fréquence:</span>
                 <span className="font-bold">{credit.echeance}</span>
               </div>
@@ -111,8 +112,8 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
                 <tr key={item.number}>
                   <td className="text-center">{item.number}</td>
                   <td>{format(item.dueDate, 'dd MMMM yyyy', { locale: fr })}</td>
-                  <td className="text-right font-mono">{item.amount.toLocaleString()} FCFA</td>
-                  <td className="text-right font-mono">{item.remainingBalance.toLocaleString()} FCFA</td>
+                  <td className="text-right font-mono">{formatMoney(item.amount)}</td>
+                  <td className="text-right font-mono">{formatMoney(item.remainingBalance)}</td>
                   <td className="text-center">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${
                       item.status === StatutEcheanceCredit.PAID || item.status === StatutEcheanceCredit.SETTLED ? 'bg-green-100 text-green-700' :

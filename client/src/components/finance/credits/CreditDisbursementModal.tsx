@@ -13,6 +13,7 @@ import { Button, FormField } from '../../ui';
 import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type DisbursementChannelType } from '@shared/enum/status-constants';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
+import { currencyCode } from '@shared/config/currency';
 
 const MOBILE_OPERATORS = [
   { id: 'MTN', name: 'MTN Mobile Money', color: 'from-yellow-500 to-yellow-600', logo: mtnLogo },
@@ -851,7 +852,7 @@ function TransfertInterCoffresFormWithPrefill({
           coffreSourceId,
           coffreDestinationId,
           montant: parseFloat(montant),
-          devise: 'XAF',
+          devise: currencyCode(),
           motif: motif.trim(),
           typeConditionnement,
           numeroScelle: typeConditionnement === 'Sac scellé' ? numeroScelle : undefined,
@@ -994,7 +995,7 @@ function TransfertInterCoffresFormWithPrefill({
 
           {/* Montant */}
           <section className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase">Montant (XAF) *</label>
+            <label className="text-xs font-medium text-slate-400 uppercase">Montant ({currencyCode()}) *</label>
             <div className="relative">
               <input
                 type="number"
@@ -1005,7 +1006,7 @@ function TransfertInterCoffresFormWithPrefill({
                   errors.montant ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
                 }`}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">XAF</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">{currencyCode()}</span>
             </div>
             {errors.montant && <p className="text-xs text-red-400">{errors.montant}</p>}
 

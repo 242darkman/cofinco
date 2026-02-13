@@ -10,6 +10,7 @@ import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi, clientApi, agentTerrainApi } from '../../lib/api-client';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
+import { currencySymbol } from '@shared/config/currency';
 
 // MM Payment status types
 type MMPaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
@@ -723,7 +724,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         }],
         total: montant,
         modePaiement: paiementData.methode_paiement,
-        devise: 'FCFA',
+        devise: currencySymbol(),
         notes: `${validationMethod} - En attente validation`
       };
 
@@ -876,7 +877,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       }],
       total: montant,
       modePaiement: formData.methode_paiement,
-      devise: 'FCFA',
+      devise: currencySymbol(),
       notes: `Confirmé via ${intent.provider} - ${intent.providerTxnId || ''}`,
     };
 

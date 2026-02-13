@@ -18,6 +18,7 @@ import {
 import { Button, Badge } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
+import { currencyCode } from '@shared/config/currency';
 
 interface CoffreFort {
   id: string;
@@ -195,7 +196,7 @@ export default function TransfertInterCoffresForm({
           coffreSourceId,
           coffreDestinationId,
           montant: parseFloat(montant),
-          devise: 'XAF',
+          devise: currencyCode(),
           motif: motif.trim(),
           typeConditionnement,
           numeroScelle: typeConditionnement === 'Sac scellé' ? numeroScelle : undefined,

@@ -7,6 +7,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ServerHealthProvider, getServerHealthBridge, isNetworkFailure } from './contexts/ServerHealthContext';
 import { NetworkProvider } from './contexts/NetworkContext';
+import { CurrencyProvider } from './contexts/CurrencyContext';
 import { SERVER_HEALTH_ENDPOINT } from './lib/serverHealthConfig';
 import { networkManager } from './lib/networkManager';
 import { isOfflineError, isApiDownError, CircuitOpenError } from './lib/networkErrors';
@@ -334,7 +335,9 @@ createRoot(document.getElementById('root')!).render(
         <NetworkProvider>
           <ThemeProvider>
             <LanguageProvider>
-              <App />
+              <CurrencyProvider>
+                <App />
+              </CurrencyProvider>
             </LanguageProvider>
           </ThemeProvider>
         </NetworkProvider>

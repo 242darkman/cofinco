@@ -17,6 +17,7 @@
 import { db } from "../db";
 import { createLogger } from "../lib/logger";
 import { getWsInstance } from "../ws-server";
+import { currencySymbol } from "@shared/config/currency";
 import { offlineJournalEntries, offlineDaySessions } from "@shared/schema/device-keys";
 import { eq, and, sql } from "drizzle-orm";
 import type { AnomalyAlert } from "./offline-anomaly-detector";
@@ -169,7 +170,7 @@ async function runNotifReactor(
       notifications.push({
         type: 'LARGE_OFFLINE_OPERATION',
         level: 'info',
-        message: `Operation offline de ${amount.toLocaleString('fr-FR')} XAF (${entry.type}) par agent ${agentId}`,
+        message: `Operation offline de ${amount.toLocaleString('fr-FR')} ${currencySymbol()} (${entry.type}) par agent ${agentId}`,
         data: {
           entryUuid: entry.uuid,
           operationRef: entry.operationRef,
@@ -327,8 +328,8 @@ async function runReconcNotifReactor(
           type: 'OFFLINE_RECONCILIATION_ALERT',
           level: isCritical ? 'critical' : 'warning',
           message: isCritical
-            ? `Ecart critique de ${recon.discrepancy} XAF pour agent ${agentId} le ${recon.date}`
-            : `Ecart de ${recon.discrepancy} XAF a verifier pour agent ${agentId} le ${recon.date}`,
+            ? `Ecart critique de ${recon.discrepancy} ${currencySymbol()} pour agent ${agentId} le ${recon.date}`
+            : `Ecart de ${recon.discrepancy} ${currencySymbol()} a verifier pour agent ${agentId} le ${recon.date}`,
           source: 'offline_reconciliation',
           sessionId: recon.sessionId,
           agentId,

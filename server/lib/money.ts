@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js';
+import { getActiveCurrency } from '@shared/config/currency';
 
 // Configure Decimal for financial use: 20 digits of precision, half-up rounding
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -9,9 +10,20 @@ export function D(value: string | number | null | undefined): Decimal {
   return new Decimal(value);
 }
 
-/** Round to 0 decimal places (FCFA has no centimes), return string for DB */
+/**
+ * Round to the active currency's decimal places, return string for DB.
+ * For FCFA/XAF (0 decimals) this rounds to integer.
+ * For EUR/USD (2 decimals) this rounds to cents.
+ * @deprecated Use roundCurrency() for new code — roundFCFA kept for backward compat.
+ */
 export function roundFCFA(value: Decimal): string {
-  return value.toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toFixed(0);
+  return roundCurrency(value);
+}
+
+/** Round to the active currency's decimal places, return string for DB */
+export function roundCurrency(value: Decimal): string {
+  const decimals = getActiveCurrency().decimals;
+  return value.toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP).toFixed(decimals);
 }
 
 /** Round to 2 decimal places (for DB numeric(15,2) compatibility), return string */

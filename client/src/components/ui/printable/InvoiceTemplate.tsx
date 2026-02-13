@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ReceiptData } from './ReceiptTemplate';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
+import { currencySymbol } from '@shared/config/currency';
 
 // Default Company Info
 const COMPANY = {
@@ -91,7 +92,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
     const items = data.items ?? [];
     const total = data.total ?? 0;
     const tax = data.tax ?? 0;
-    const devise = data.devise || 'FCFA';
+    const devise = data.devise || currencySymbol();
     const reference = data.reference || 'N/A';
     const type = data.type || 'Opération';
     const typeLabel = translateType(type);

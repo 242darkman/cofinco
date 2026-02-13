@@ -11,6 +11,7 @@
 
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import { currencyLabel, currencySymbol } from "@shared/config/currency";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -629,7 +630,7 @@ export function bilanToMarkdown(bilan: Bilan): string {
   md += `**Date generation**: ${bilan.generatedAt.slice(0, 19)}\n\n`;
 
   md += `## ACTIF\n\n`;
-  md += `| Compte | Intitule | Montant (FCFA) |\n`;
+  md += `| Compte | Intitule | ${currencyLabel('Montant')} |\n`;
   md += `|--------|----------|----------------|\n`;
   for (const section of bilan.actif) {
     md += `| **${section.titre}** | | |\n`;
@@ -641,7 +642,7 @@ export function bilanToMarkdown(bilan: Bilan): string {
   md += `| | **TOTAL ACTIF** | **${fmt(bilan.totalActif)}** |\n\n`;
 
   md += `## PASSIF\n\n`;
-  md += `| Compte | Intitule | Montant (FCFA) |\n`;
+  md += `| Compte | Intitule | ${currencyLabel('Montant')} |\n`;
   md += `|--------|----------|----------------|\n`;
   for (const section of bilan.passif) {
     md += `| **${section.titre}** | | |\n`;
@@ -664,7 +665,7 @@ export function compteResultatToMarkdown(cr: CompteResultat): string {
   md += `**Date generation**: ${cr.generatedAt.slice(0, 19)}\n\n`;
 
   md += `## CHARGES\n\n`;
-  md += `| Compte | Intitule | Montant (FCFA) |\n`;
+  md += `| Compte | Intitule | ${currencyLabel('Montant')} |\n`;
   md += `|--------|----------|----------------|\n`;
   for (const section of cr.charges) {
     md += `| **${section.titre}** | | |\n`;
@@ -676,7 +677,7 @@ export function compteResultatToMarkdown(cr: CompteResultat): string {
   md += `| | **TOTAL CHARGES** | **${fmt(cr.totalCharges)}** |\n\n`;
 
   md += `## PRODUITS\n\n`;
-  md += `| Compte | Intitule | Montant (FCFA) |\n`;
+  md += `| Compte | Intitule | ${currencyLabel('Montant')} |\n`;
   md += `|--------|----------|----------------|\n`;
   for (const section of cr.produits) {
     md += `| **${section.titre}** | | |\n`;
@@ -687,7 +688,7 @@ export function compteResultatToMarkdown(cr: CompteResultat): string {
   }
   md += `| | **TOTAL PRODUITS** | **${fmt(cr.totalProduits)}** |\n\n`;
 
-  md += `**Resultat net**: ${cr.resultatNet >= 0 ? "Benefice" : "Perte"} de **${fmt(Math.abs(cr.resultatNet))} FCFA**\n`;
+  md += `**Resultat net**: ${cr.resultatNet >= 0 ? "Benefice" : "Perte"} de **${fmt(Math.abs(cr.resultatNet))} ${currencySymbol()}**\n`;
   return md;
 }
 
@@ -712,7 +713,7 @@ export function livreInventaireToMarkdown(li: LivreInventaire): string {
   }
 
   md += `\n## Totaux\n\n`;
-  md += `| Categorie | Montant (FCFA) |\n`;
+  md += `| Categorie | ${currencyLabel('Montant')} |\n`;
   md += `|-----------|----------------|\n`;
   md += `| Total Actif | ${fmt(li.totalActif)} |\n`;
   md += `| Total Passif | ${fmt(li.totalPassif)} |\n`;

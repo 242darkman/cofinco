@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { RefreshCw, Wallet, AlertCircle, CheckCircle2, Link2 } from 'lucide-react';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
+import { currencyCode } from '@shared/config/currency';
 
 interface ProviderBalance {
   provider: string;
@@ -99,7 +100,7 @@ export default function ProviderBalanceWidget() {
                   ) : (
                     <span className="font-mono font-bold text-sm text-white">
                       {p.balance ? parseFloat(p.balance).toLocaleString('fr-FR') : '---'}
-                      <span className="text-[10px] text-slate-400 ml-1">{p.currency || 'XAF'}</span>
+                      <span className="text-[10px] text-slate-400 ml-1">{p.currency || currencyCode()}</span>
                     </span>
                   )}
                 </div>

@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { agences } from "./agences";
+import { DEFAULT_CURRENCY } from "../config/currency";
 import { coffresForts } from "./coffres-forts";
 import { caisses, sessionsCaisse, operationsCaisse, mouvementsFinanciers } from "./finance";
 import { 
@@ -33,7 +34,7 @@ export const transfertsCoffreCaisse = pgTable(
     
     // Montant et devise
     montant: numeric("montant").notNull(),
-    devise: text("devise").notNull().default("XAF"),
+    devise: text("devise").notNull().default(DEFAULT_CURRENCY.code),
     
     // Motif et commentaire
     motif: text("motif").notNull(),

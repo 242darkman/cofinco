@@ -46,6 +46,7 @@ import {
   deriveSensFromType,
   formatTransactionDescription,
 } from "@shared/config/transaction-labels";
+import { currencyCode } from "@shared/config/currency";
 import {
   createFactureForDepot,
   createFactureForRetrait,
@@ -1632,7 +1633,7 @@ export async function getCompteStats(
 
   return {
     period,
-    currency: 'XAF',
+    currency: currencyCode(),
     trend,
     data_points: dataPoints
   };

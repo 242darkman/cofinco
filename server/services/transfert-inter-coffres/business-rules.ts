@@ -7,6 +7,7 @@ import {
 } from "@shared/schema";
 import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, and, isNull } from "drizzle-orm";
+import { currencySymbol } from "@shared/config/currency";
 
 export interface ValidationResult {
   valid: boolean;
@@ -275,14 +276,14 @@ export class TransfertInterCoffresValidator {
     // Vérifier montant minimum
     const montantMin = parseFloat(config.montantMinTransfert?.toString() || "0");
     if (data.montant < montantMin) {
-      return { valid: false, errorCode: "TIC_001", error: `Le montant minimum est de ${montantMin.toLocaleString()} XAF` };
+      return { valid: false, errorCode: "TIC_001", error: `Le montant minimum est de ${montantMin.toLocaleString()} ${currencySymbol()}` };
     }
 
     // Vérifier montant maximum
     if (config.montantMaxTransfert) {
       const montantMax = parseFloat(config.montantMaxTransfert.toString());
       if (data.montant > montantMax) {
-        return { valid: false, errorCode: "TIC_001", error: `Le montant maximum est de ${montantMax.toLocaleString()} XAF` };
+        return { valid: false, errorCode: "TIC_001", error: `Le montant maximum est de ${montantMax.toLocaleString()} ${currencySymbol()}` };
       }
     }
 
@@ -330,7 +331,7 @@ export class TransfertInterCoffresValidator {
       return {
         valid: false,
         errorCode: "TIC_003",
-        error: `Solde insuffisant. Disponible: ${soldeSource.toLocaleString()} XAF, Demandé: ${data.montant.toLocaleString()} XAF`,
+        error: `Solde insuffisant. Disponible: ${soldeSource.toLocaleString()} ${currencySymbol()}, Demandé: ${data.montant.toLocaleString()} ${currencySymbol()}`,
       };
     }
 
@@ -340,7 +341,7 @@ export class TransfertInterCoffresValidator {
       return {
         valid: false,
         errorCode: "TIC_005",
-        error: `Le solde après transfert (${(soldeSource - data.montant).toLocaleString()} XAF) serait inférieur au minimum requis (${soldeMinSource.toLocaleString()} XAF)`,
+        error: `Le solde après transfert (${(soldeSource - data.montant).toLocaleString()} ${currencySymbol()}) serait inférieur au minimum requis (${soldeMinSource.toLocaleString()} ${currencySymbol()})`,
       };
     }
 
@@ -352,7 +353,7 @@ export class TransfertInterCoffresValidator {
         return {
           valid: false,
           errorCode: "TIC_004",
-          error: `Le plafond du coffre destination serait dépassé. Plafond: ${plafondDest.toLocaleString()} XAF, Solde après: ${(soldeDest + data.montant).toLocaleString()} XAF`,
+          error: `Le plafond du coffre destination serait dépassé. Plafond: ${plafondDest.toLocaleString()} ${currencySymbol()}, Solde après: ${(soldeDest + data.montant).toLocaleString()} ${currencySymbol()}`,
         };
       }
     }
@@ -378,7 +379,7 @@ export class TransfertInterCoffresValidator {
       return {
         valid: false,
         errorCode: "TIC_003",
-        error: `Solde insuffisant pour le dispatch. Disponible: ${solde.toLocaleString()} XAF`,
+        error: `Solde insuffisant pour le dispatch. Disponible: ${solde.toLocaleString()} ${currencySymbol()}`,
       };
     }
 

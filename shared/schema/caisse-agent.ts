@@ -7,6 +7,7 @@ import { pgTable, text, numeric, boolean, timestamp, uuid, json, index, uniqueIn
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { DEFAULT_CURRENCY } from "../config/currency";
 
 // Imports des tables existantes
 import { users } from "./auth";
@@ -40,8 +41,8 @@ export const caissesAgent = pgTable(
     // Solde validé (seules les opérations APPROVED impactent ce solde)
     soldeValide: numeric("solde_valide").notNull().default("0"),
 
-    // Devise (XOF par défaut, cohérent avec le système existant)
-    devise: text("devise").notNull().default("XOF"),
+    // Devise (défaut depuis shared/config/currency.ts)
+    devise: text("devise").notNull().default(DEFAULT_CURRENCY.code),
 
     // Statut de la caisse
     statut: statutCaisseAgentEnum("statut").notNull().default("ACTIVE"),
@@ -136,7 +137,7 @@ export const operationsTerrain = pgTable(
 
     // Montant et devise
     montant: numeric("montant").notNull(),
-    devise: text("devise").notNull().default("XOF"),
+    devise: text("devise").notNull().default(DEFAULT_CURRENCY.code),
 
     // ========== WORKFLOW ==========
     statut: statutOperationTerrainEnum("statut").notNull().default("SUBMITTED"),
