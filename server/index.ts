@@ -363,6 +363,10 @@ app.get("/api/health", async (_req, res) => {
     // Initialize Interest Scheduler (Daily Accrual & Monthly Capitalization)
     const { interestScheduler } = await import("./services/interest-scheduler");
     logger.info('Interest Scheduler initialized');
+
+    // Initialize Maintenance Fee Scheduler (Monthly account maintenance fees)
+    const { maintenanceFeeScheduler } = await import("./services/maintenance-fee-scheduler");
+    logger.info('Maintenance Fee Scheduler initialized');
   }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

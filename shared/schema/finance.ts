@@ -599,6 +599,9 @@ export const comptes = pgTable(
     accruedInterest: numeric("accrued_interest").notNull().default("0"),
     dateDerniereCapitalisation: timestamp("date_derniere_capitalisation"),
 
+    // Frais de tenue de compte
+    dateDerniereFraisTenue: timestamp("date_derniere_frais_tenue"),
+
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),

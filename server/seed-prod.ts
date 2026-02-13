@@ -1426,6 +1426,50 @@ const ACCOUNTING_RULES_DATA = [
   },
 
   // ============================================================================
+  // FRAIS DE TENUE DE COMPTE (prélèvement mensuel automatique)
+  // ============================================================================
+
+  // Frais de tenue - Compte épargne
+  {
+    code: 'MAINTENANCE_FEE_SAVINGS',
+    name: 'Frais tenue compte épargne',
+    description: 'Frais de tenue mensuel prélevé sur dépôt client épargne',
+    sourceType: 'MOUVEMENT',
+    eventType: 'MAINTENANCE_FEE_SAVINGS',
+    journalCode: 'OD',
+    debitAccount: '4112',    // Dépôts clients - Comptes épargne
+    creditAccount: '708200', // Frais de tenue de compte (Produit)
+    descriptionTemplate: 'Frais tenue compte épargne - {clientName}',
+    priority: 10,
+  },
+  // Frais de tenue - Compte courant
+  {
+    code: 'MAINTENANCE_FEE_CURRENT',
+    name: 'Frais tenue compte courant',
+    description: 'Frais de tenue mensuel prélevé sur dépôt client courant',
+    sourceType: 'MOUVEMENT',
+    eventType: 'MAINTENANCE_FEE_CURRENT',
+    journalCode: 'OD',
+    debitAccount: '4111',    // Dépôts clients - Comptes courants
+    creditAccount: '708200', // Frais de tenue de compte
+    descriptionTemplate: 'Frais tenue compte courant - {clientName}',
+    priority: 10,
+  },
+  // Frais de tenue - Compte bloqué
+  {
+    code: 'MAINTENANCE_FEE_BLOCKED',
+    name: 'Frais tenue compte bloqué',
+    description: 'Frais de tenue mensuel prélevé sur dépôt client bloqué',
+    sourceType: 'MOUVEMENT',
+    eventType: 'MAINTENANCE_FEE_BLOCKED',
+    journalCode: 'OD',
+    debitAccount: '4113',    // Dépôts clients - Comptes bloqués
+    creditAccount: '708200', // Frais de tenue de compte
+    descriptionTemplate: 'Frais tenue compte bloqué - {clientName}',
+    priority: 10,
+  },
+
+  // ============================================================================
   // RESTITUTION CLÔTURE (payout client)
   // ============================================================================
 
@@ -2558,7 +2602,7 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
       actif: true,
     },
     {
-      code: 'TONTINE_STD', nom: 'Compte Tontine', typeCompte: 'BLOCKED' as const, tauxInteret: '0',
+      code: 'TONTINE_STD', nom: 'Compte Bloqué', typeCompte: 'BLOCKED' as const, tauxInteret: '0',
       frais: { cloture: 1000 },
       regles: { validationOuvertureRequise: true, autoriserSoldeNegatifCloture: true },
       actif: true,
