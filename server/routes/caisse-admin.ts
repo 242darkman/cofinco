@@ -17,7 +17,7 @@ import { Actions, Subjects } from "@shared/ability";
 import { db } from "../db";
 import { sessionsCaisseAuditLogs, denominationTemplates, caisses } from "@shared/schema/finance";
 import { caisseSecurityCodes } from "@shared/schema/operations";
-import { users, userRoles } from "@shared/schema";
+import { users, userRoles, coffresForts, agences } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, or } from "drizzle-orm";
 
 export const caisseAdminRouter = Router();
@@ -317,6 +317,39 @@ caisseAdminRouter.get(
       res.status(500).json({
         error: error.message || "Erreur interne",
       });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - COFFRES-FORTS SUMMARY (pour Trésorerie)
+// ============================================================================
+
+/**
+ * GET /api/caisses/coffres-summary
+ * Retourne la liste des coffres-forts avec leurs soldes réels (table coffres_forts)
+ */
+caisseAdminRouter.get(
+  "/coffres-summary",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (_req, res) => {
+    try {
+      const allCoffres = await db.select({
+        id: coffresForts.id,
+        nom: coffresForts.nom,
+        solde: coffresForts.solde,
+        statut: coffresForts.statut,
+        ownerType: coffresForts.ownerType,
+        agenceId: coffresForts.ownerId,
+        agenceNom: agences.nom,
+      })
+      .from(coffresForts)
+      .leftJoin(agences, eq(coffresForts.ownerId, agences.id));
+
+      res.json(allCoffres);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur récupération coffres-forts summary');
+      res.status(500).json({ error: error.message || "Erreur interne" });
     }
   }
 );

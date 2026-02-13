@@ -2843,12 +2843,10 @@ export function registerFinanceRoutes(app: Express) {
       // Admin only: Get ALL caisses
       const caisses = await storage.getAllCaisses();
       const activeSessions = await storage.getActiveSessions();
-      
-      // Need agency names for grouping
-      // We can fetch all agencies or assume frontend has them. 
-      // Better to enrich here if possible, but storage.getAllCaisses returns flat Caisse objects.
-      // Frontend can match agenceId to Agency Name if it constructs the map.
-      // Let's stick to returning the caisses list. Frontend will handle grouping.
+
+      // Build agence name map for enrichment
+      const allAgences = await storage.getAllAgences();
+      const agenceMap = new Map(allAgences.map(a => [a.id, a.nom]));
 
       const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
          const activeSession = activeSessions.find(s => s.caisseId === c.id && !s.closedAt);
@@ -2902,6 +2900,7 @@ export function registerFinanceRoutes(app: Express) {
          return {
              ...c,
              solde: currentSolde,
+             agenceNom: agenceMap.get(c.agenceId) || null,
              isOccupied: !!activeSession,
              occupiedBy: activeSession ? activeSession.caissierId : null,
              sessionId: activeSession ? activeSession.id : null,

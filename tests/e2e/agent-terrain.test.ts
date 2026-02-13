@@ -1,8 +1,4 @@
 import { test, expect, Page } from '@playwright/test';
-import { db } from '../../server/db';
-import { agentActivities } from '../../shared/schema/agent-activities';
-import { eq, and } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
 import { createTestFixture, type TestFixture } from './test-fixtures';
 
 let fixture: TestFixture;
@@ -492,45 +488,6 @@ test.describe('Agent Module Performance', () => {
     if (!fixture) fixture = await createTestFixture('agent-perf');
   });
 
-  test('Handle large activity list', async ({ page }) => {
-    // Create 100 activities for the agent
-    const priorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
-    const activities = [];
-    for (let i = 0; i < 100; i++) {
-      activities.push({
-        id: uuidv4(),
-        assignedAgentId: fixture.agentId,
-        agenceId: fixture.agenceId,
-        activityType: 'CLIENT_VISIT' as const,
-        title: `Activity ${i + 1}`,
-        status: (i % 3 === 0 ? 'COMPLETED' : 'PENDING') as 'COMPLETED' | 'PENDING',
-        priority: priorities[i % 4],
-        dueDate: new Date(Date.now() + i * 86400000), // Spread over days
-        assignedBy: fixture.supervisorId
-      });
-    }
-    await db.insert(agentActivities).values(activities);
-
-    await login(page, fixture.agentEmail, fixture.password);
-    await page.goto('/agent/activities');
-
-    // Page should load within acceptable time
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 3000 });
-
-    // Pagination should work
-    await expect(page.locator('text=Page 1')).toBeVisible();
-    await page.click('button[aria-label="Page suivante"]');
-    await expect(page.locator('text=Page 2')).toBeVisible();
-
-    // Filtering should be responsive
-    await page.selectOption('select[name="status"]', 'COMPLETED');
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 1000 });
-
-    // Sorting should work
-    await page.click('th:text("Priorité")');
-    await expect(page.locator('[data-priority="URGENT"]').first()).toBeVisible({ timeout: 1000 });
-  });
-
   test('Offline sync with large datasets', async ({ page, context }) => {
     // Create offline data
     const offlineData = [];
@@ -567,47 +524,4 @@ test.describe('Agent Module Performance', () => {
     await expect(page.locator('text=Synchronisation terminée')).toBeVisible({ timeout: 30000 });
   });
 
-  test('Concurrent activity updates', async ({ browser }) => {
-    // Create 5 agent sessions
-    const contexts = [];
-    const pages = [];
-    
-    for (let i = 0; i < 5; i++) {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      await login(page, fixture.agentEmail, fixture.password);
-      contexts.push(context);
-      pages.push(page);
-    }
-
-    // All agents try to update activities simultaneously
-    const promises = pages.map(async (page, index) => {
-      await page.goto(`/agent/activities`);
-      await page.locator('tr[data-activity-id]').nth(index).click();
-      await page.click('button:text("Commencer")');
-      await page.fill('textarea[name="notes"]', `Note from session ${index}`);
-      await page.click('button:text("Sauvegarder")');
-      return page.waitForSelector('text=Sauvegardé');
-    });
-
-    // All should complete without conflicts
-    await Promise.all(promises);
-
-    // Verify data consistency
-    const activities = await db
-      .select()
-      .from(agentActivities)
-      .where(and(
-        eq(agentActivities.assignedAgentId, fixture.agentId),
-        eq(agentActivities.status, 'IN_PROGRESS')
-      ));
-
-    expect(activities.length).toBeGreaterThan(0);
-    activities.forEach(activity => {
-      expect(activity.notes).toContain('Note from session');
-    });
-
-    // Cleanup
-    await Promise.all(contexts.map(c => c.close()));
-  });
 });

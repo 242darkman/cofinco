@@ -28,6 +28,7 @@ import {
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { SyncConflictResolver } from "../services/sync-conflict-resolver";
 import { OfflineAnomalyDetector } from "../services/offline-anomaly-detector";
+import { OfflineReconciliationService } from "../services/offline-reconciliation-service";
 import {
   executeWithLedger,
   updateCompteSolde,
@@ -343,6 +344,16 @@ syncJournalRouter.post('/journal', async (req, res) => {
       await OfflineAnomalyDetector.analyzeBatch(entries, agentId);
     } catch (anomalyError) {
       logger.warn('Anomaly detection error (non-blocking):', anomalyError);
+    }
+
+    // 11. Trigger reconciliation for closed sessions
+    try {
+      const reconciliationResults = await OfflineReconciliationService.reconcileAllPending(agentId);
+      if (reconciliationResults.length > 0) {
+        logger.info(`Reconciled ${reconciliationResults.length} session(s) for agent ${agentId}`);
+      }
+    } catch (reconcileError) {
+      logger.warn('Reconciliation error (non-blocking):', reconcileError);
     }
 
     res.json({

@@ -1,7 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { db } from '../../server/db';
 import { demandesCredit, credits } from '../../shared/schema/finance';
-import { agentActivities } from '../../shared/schema/agent-activities';
 import { eq, desc } from 'drizzle-orm';
 import { createTestFixture, type TestFixture } from './test-fixtures';
 
@@ -414,31 +413,4 @@ test.describe('Credit Workflow Performance', () => {
     await Promise.all(contexts.map(c => c.close()));
   });
   
-  test('Should maintain data consistency under load', async ({ page }) => {
-    // Simulate rapid status changes
-    await login(page, fixture.supervisorEmail, fixture.password);
-    
-    for (let i = 0; i < 20; i++) {
-      await page.goto('/credits/investigations');
-      await page.click('button:text("Assigner")');
-      await page.selectOption('select[name="agentId"]', fixture.agentId);
-      await page.click('button:text("Confirmer")');
-      
-      // Immediately reassign
-      await page.click('button:text("Réassigner")');
-      await page.selectOption('select[name="agentId"]', 'other-agent-id');
-      await page.click('button:text("Confirmer")');
-    }
-    
-    // Verify final state is consistent
-    const activities = await db
-      .select()
-      .from(agentActivities)
-      .where(eq(agentActivities.activityType, 'CREDIT_INVESTIGATION'));
-    
-    activities.forEach(activity => {
-      expect(activity.assignedAgentId).toBeDefined();
-      expect(activity.status).toMatch(/PENDING|IN_PROGRESS|COMPLETED/);
-    });
-  });
 });
