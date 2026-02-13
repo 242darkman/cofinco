@@ -723,12 +723,13 @@ export class ApprovalService {
       })
       .where(eq(caissesAgent.id, operation.caisseAgentId));
 
-    // 3b. Post GL entry for caisse agent mouvement
-    const agenceIdAgent = await getAgenceIdFromAgent(tx, operation.agentId);
-    await tryPostGl(tx, mouvementCaisseAgent, agenceIdAgent, approvedBy, {
-      operationType: "SETTLEMENT_CASH",
-      caisseAgentId: operation.caisseAgentId,
-    });
+    // 3b. Skip GL for agent mouvement — the combined entry is posted
+    // via the AGENT_REMISE_TRANSFER rule on the caisse mouvement (step 4b).
+    // Posting here would double-count (debit 521 / credit 573).
+    await tx
+      .update(mouvementsFinanciers)
+      .set({ glPostingStatus: "SKIPPED" })
+      .where(eq(mouvementsFinanciers.id, mouvementCaisseAgent.id));
 
     // 4. Créer mouvement CaisseAgence (Crédit = entrée)
     const refCaisse = generateReference("CAISSE");

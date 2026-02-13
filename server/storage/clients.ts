@@ -70,7 +70,7 @@ export const createClientApiSchema = z.object({
   // Données d'identité (iront dans users)
   nom: z.string().min(1, "Le nom est requis"),
   prenom: z.string().optional().nullable(),
-  email: z.string().email("Email invalide").optional().nullable(),
+  email: z.preprocess(v => v === '' ? null : v, z.string().email("Email invalide").optional().nullable()),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
   photoProfile: z.string().optional().nullable(),

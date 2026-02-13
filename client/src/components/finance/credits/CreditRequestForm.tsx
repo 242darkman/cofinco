@@ -959,9 +959,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
            ) : (
              <button 
                 onClick={handleSubmit}
-                disabled={loading || calculatedData.tauxEndettement > 55}
+                disabled={loading || calculatedData.tauxEndettement > 50}
                 className={`px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg ${
-                    loading || calculatedData.tauxEndettement > 55
+                    loading || calculatedData.tauxEndettement > 50
                     ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20 hover:shadow-emerald-500/30 hover:translate-y-[-1px]'
                 }`}

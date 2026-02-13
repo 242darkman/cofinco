@@ -454,9 +454,9 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       format: (_: any, row: any) => (
         <div className="flex items-center gap-1.5">
             {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
-                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px] w-[60px] justify-center" />
+                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px] whitespace-nowrap" />
             ) : (
-                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px] w-[60px] justify-center" />
+                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px] whitespace-nowrap" />
             )}
             <span className="text-[10px] text-slate-400 hidden xl:inline">
                 {row.typeTransfert === "COFFRE_VERS_CAISSE" ? "Vers Caisse" : "De Caisse"}

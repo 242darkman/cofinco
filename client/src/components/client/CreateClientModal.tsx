@@ -69,6 +69,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
     clientOrigin: 'OTHER',
     
     // Step 4 (Docs)
+    typePiece: 'CNI' as 'CNI' | 'PASSEPORT',
     files: { photo: null, cniRecto: null, cniVerso: null } as any
   });
 
@@ -131,6 +132,21 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
     updatedField('telephone', `+242${raw}`);
   };
 
+  const isStepValid = (s: number) => {
+    switch (s) {
+      case 1: return formData.nom.trim().length > 0 && formData.prenom.trim().length > 0;
+      case 2: return formData.telephoneRaw.trim().length > 0;
+      case 3: return isAdmin ? formData.agenceId.trim().length > 0 : true;
+      case 4:
+        if (!formData.files.cniRecto) return false;
+        if (formData.typePiece === 'CNI' && !formData.files.cniVerso) return false;
+        return true;
+      default: return true;
+    }
+  };
+
+  const isFormValid = isStepValid(1) && isStepValid(2) && isStepValid(3) && isStepValid(4);
+
   const handleSave = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -149,7 +165,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
         if (key) {
           documents.push({
             id: crypto.randomUUID(),
-            documentType: 'ID_CARD_FRONT',
+            documentType: formData.typePiece === 'PASSEPORT' ? 'PASSPORT' : 'ID_CARD_FRONT',
             documentName: formData.files.cniRecto.name,
             documentUrl: key,
             status: 'pending',
@@ -159,7 +175,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
         }
       }
 
-      if (formData.files.cniVerso) {
+      if (formData.typePiece === 'CNI' && formData.files.cniVerso) {
         const key = await uploadEntityFile(formData.files.cniVerso, 'kyc', tempEntityId);
         if (key) {
           documents.push({
@@ -242,8 +258,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
            {/* STEP 1: IDENTITÉ */}
            {step === 1 && (
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 animate-in slide-in-from-right fade-in duration-300">
-                <Input label="Nom" placeholder="Ex: Dupont" value={formData.nom} onChange={e => updatedField('nom', e.target.value)} />
-                <Input label="Prénom" placeholder="Ex: Jean" value={formData.prenom} onChange={e => updatedField('prenom', e.target.value)} />
+                <Input label="Nom" placeholder="Ex: Dupont" value={formData.nom} onChange={e => updatedField('nom', e.target.value)} required />
+                <Input label="Prénom" placeholder="Ex: Jean" value={formData.prenom} onChange={e => updatedField('prenom', e.target.value)} required />
 
                 <Input label="Date de Naissance" type="date" value={formData.dateNaissance} onChange={e => updatedField('dateNaissance', e.target.value)} />
                 <Select label="Sexe" value={formData.sexe} onChange={e => updatedField('sexe', e.target.value)}>
@@ -263,7 +279,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
            {step === 2 && (
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 animate-in slide-in-from-right fade-in duration-300">
                 <div className="col-span-1 sm:col-span-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Téléphone *</label>
+                   <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Téléphone<span className="text-red-400 ml-0.5">*</span></label>
                    <div className="flex h-11 sm:h-12">
                       <span className="bg-slate-900 border border-slate-700 border-r-0 rounded-l-xl px-3 sm:px-4 flex items-center text-slate-400 text-sm font-mono">+242</span>
                       <input
@@ -353,7 +369,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                 <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-800 mt-2">
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                       {isAdmin ? (
-                        <Select label="Agence de rattachement" value={formData.agenceId} onChange={e => updatedField('agenceId', e.target.value)}>
+                        <Select label="Agence de rattachement" required value={formData.agenceId} onChange={e => updatedField('agenceId', e.target.value)}>
                            <option value="">Sélectionner...</option>
                            {agences.map(a => <option key={a.id} value={a.id}>{a.nom}</option>)}
                         </Select>
@@ -390,31 +406,66 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                     <div className="p-3 sm:p-4 bg-slate-900 border border-slate-800 rounded-xl">
                        <h4 className="text-sm font-bold text-white mb-2">Documents Requis</h4>
                        <ul className="text-xs text-slate-400 space-y-1">
-                          <li className="flex gap-2"><Check size={12} className={formData.files.cniRecto ? "text-emerald-500" : "text-emerald-500"}/> Pièce d'identité valide</li>
-                          <li className="flex gap-2"><Check size={12} className={formData.files.photo ? "text-emerald-500" : "text-emerald-500"}/> Photo claire et récente</li>
+                          <li className="flex gap-2"><Check size={12} className={formData.files.cniRecto ? "text-emerald-500" : "text-slate-600"}/> {formData.typePiece === 'CNI' ? 'CNI (Recto + Verso)' : 'Passeport'}</li>
+                          <li className="flex gap-2"><Check size={12} className={formData.files.photo ? "text-emerald-500" : "text-slate-600"}/> Photo claire et récente (Opt.)</li>
                           <li className="flex gap-2"><Check size={12} className="text-slate-600"/> Justificatif de domicile (Opt.)</li>
                        </ul>
                     </div>
                  </div>
 
-                {/* CNI Grid */}
-                <div className="col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Type de pièce d'identité */}
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">
+                    Type de pièce d'identité<span className="text-red-400 ml-0.5">*</span>
+                  </label>
+                  <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 h-11 sm:h-12">
+                    {([{ value: 'CNI', label: 'Carte Nationale d\'Identité' }, { value: 'PASSEPORT', label: 'Passeport' }] as const).map((opt) => {
+                      const isActive = formData.typePiece === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => {
+                            updatedField('typePiece', opt.value);
+                            if (opt.value === 'PASSEPORT') {
+                              setFormData(prev => ({ ...prev, files: { ...prev.files, cniVerso: null } }));
+                            }
+                          }}
+                          className={`flex-1 rounded-lg text-xs font-bold flex items-center justify-center transition-all duration-300 ${
+                            isActive
+                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                          type="button"
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Documents Grid */}
+                <div className={`col-span-1 sm:col-span-2 grid grid-cols-1 ${formData.typePiece === 'CNI' ? 'sm:grid-cols-2' : ''} gap-4`}>
                    <DocUpload
-                     label="CNI / Passeport (Recto)"
+                     label={formData.typePiece === 'CNI' ? 'CNI (Recto)' : 'Passeport'}
                      file={formData.files.cniRecto}
+                     required
                      onFileChange={(file) => setFormData(prev => ({
                        ...prev,
                        files: { ...prev.files, cniRecto: file }
                      }))}
                    />
-                   <DocUpload
-                     label="CNI / Passeport (Verso)"
-                     file={formData.files.cniVerso}
-                     onFileChange={(file) => setFormData(prev => ({
-                       ...prev,
-                       files: { ...prev.files, cniVerso: file }
-                     }))}
-                   />
+                   {formData.typePiece === 'CNI' && (
+                     <DocUpload
+                       label="CNI (Verso)"
+                       file={formData.files.cniVerso}
+                       required
+                       onFileChange={(file) => setFormData(prev => ({
+                         ...prev,
+                         files: { ...prev.files, cniVerso: file }
+                       }))}
+                     />
+                   )}
                 </div>
              </div>
            )}
@@ -440,16 +491,25 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
 
               {step < 4 ? (
                 <button
-                  onClick={() => setStep(step + 1)}
-                  className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20 text-sm sm:text-base"
+                  onClick={() => isStepValid(step) && setStep(step + 1)}
+                  disabled={!isStepValid(step)}
+                  className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base ${
+                    isStepValid(step)
+                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/20'
+                      : 'bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+                  }`}
                 >
                    Suivant <ChevronRight size={18} />
                 </button>
               ) : (
                 <button
                   onClick={handleSave}
-                  disabled={isSubmitting}
-                  className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-wait text-sm sm:text-base"
+                  disabled={isSubmitting || !isFormValid}
+                  className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base ${
+                    isFormValid
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'
+                      : 'bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+                  } ${isSubmitting ? 'opacity-50 cursor-wait' : ''}`}
                 >
                    {isSubmitting ? 'Enregistrement...' : <> <Save size={18} /> <span className="hidden sm:inline">Enregistrer Client</span><span className="sm:hidden">Enregistrer</span> </>}
                 </button>
@@ -480,12 +540,13 @@ function StepItem({ num, icon: Icon, label, current }: { num: number, icon: any,
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   suffix?: string;
+  required?: boolean;
 }
 
-function Input({ label, suffix, className, ...props }: InputProps) {
+function Input({ label, suffix, required: isRequired, className, ...props }: InputProps) {
   return (
     <div className="w-full">
-       <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">{label}</label>
+       <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">{label}{isRequired && <span className="text-red-400 ml-0.5">*</span>}</label>
        <div className="relative">
           <input className={`w-full h-11 sm:h-12 bg-slate-900 border border-slate-700 rounded-xl px-3 sm:px-4 text-sm sm:text-base text-white placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${className}`} {...props} />
           {suffix && <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] sm:text-xs font-bold bg-slate-800 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded">{suffix}</span>}
@@ -496,12 +557,13 @@ function Input({ label, suffix, className, ...props }: InputProps) {
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
+  required?: boolean;
 }
 
-function Select({ label, children, ...props }: SelectProps) {
+function Select({ label, required: isRequired, children, ...props }: SelectProps) {
   return (
     <div className="w-full">
-       <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">{label}</label>
+       <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">{label}{isRequired && <span className="text-red-400 ml-0.5">*</span>}</label>
        <div className="relative">
          <select className="w-full h-11 sm:h-12 bg-slate-900 border border-slate-700 rounded-xl px-3 sm:px-4 text-sm sm:text-base text-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer" {...props}>
             {children}
@@ -546,8 +608,16 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
     };
   }, [cameraStream]);
 
+  const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'application/pdf'];
+  const ACCEPTED_LABEL = 'JPEG, PNG, GIF, WEBP, BMP, PDF';
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] || null;
+    if (selected && !selected.type.startsWith('image/') && selected.type !== 'application/pdf') {
+      toast.error(`Format non supporté. Formats acceptés : ${ACCEPTED_LABEL}`);
+      e.target.value = '';
+      return;
+    }
     onFileChange(selected);
   };
 
@@ -681,6 +751,7 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
                   <UploadCloud size={14} /> Importer
                 </button>
               </div>
+              <p className="text-[9px] sm:text-[10px] text-slate-600 mt-2">Formats : JPG, PNG, PDF</p>
             </div>
           )}
        </div>
@@ -737,7 +808,7 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
   );
 }
 
-function DocUpload({ label, file, onFileChange }: { label: string; file: File | null; onFileChange: (file: File | null) => void }) {
+function DocUpload({ label, file, onFileChange, required: isRequired }: { label: string; file: File | null; onFileChange: (file: File | null) => void; required?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const isPdf = file?.type === 'application/pdf';
@@ -754,14 +825,21 @@ function DocUpload({ label, file, onFileChange }: { label: string; file: File | 
 
   const handleClick = () => inputRef.current?.click();
 
+  const ACCEPTED_LABEL = 'JPEG, PNG, GIF, WEBP, BMP, PDF';
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] || null;
+    if (selected && !selected.type.startsWith('image/') && selected.type !== 'application/pdf') {
+      toast.error(`Format non supporté. Formats acceptés : ${ACCEPTED_LABEL}`);
+      e.target.value = '';
+      return;
+    }
     onFileChange(selected);
   };
 
   return (
     <div className="flex-1 min-w-0">
-       <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block truncate">{label}</label>
+       <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block truncate">{label}{isRequired && <span className="text-red-400 ml-0.5">*</span>}</label>
        <input
          ref={inputRef}
          type="file"
@@ -799,6 +877,7 @@ function DocUpload({ label, file, onFileChange }: { label: string; file: File | 
             <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 p-2">
               <UploadCloud className="w-5 h-5 sm:w-5 sm:h-5 text-slate-500 group-hover:scale-110 group-hover:text-indigo-400 transition-all"/>
               <span className="text-[10px] sm:text-xs text-slate-500 group-hover:text-indigo-400 text-center leading-tight">Scanner / Uploader</span>
+              <span className="text-[8px] sm:text-[9px] text-slate-600 mt-0.5">JPG, PNG, PDF</span>
             </div>
           )}
        </div>
