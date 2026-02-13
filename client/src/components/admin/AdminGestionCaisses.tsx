@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Monitor, Lock, MoreVertical, User, XCircle, Trash2, Clock, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Monitor, Lock, MoreVertical, User, UserMinus, UserPlus, XCircle, Trash2, Clock, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight, CalendarDays, X, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button, FormField, SelectField, Modal, ConfirmDialog } from '../ui';
+import { Button, FormField, SelectField, Modal, ConfirmDialog, SearchableSelect } from '../ui';
 import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
@@ -11,6 +11,15 @@ import AssignCashierModal from './AssignCashierModal';
 import CaisseOperatingHoursModal from './CaisseOperatingHoursModal';
 import { isAdminRole, normalizeRole } from '@shared/types/roles';
 import { StatutClient, StatutCaisseAgent, StatutCaisse, StatutCaisseType, TYPE_CAISSE_LABELS, TypeCaisseType } from '@shared/enum/status-constants';
+
+interface AssignmentDetail {
+  id: string;
+  userId: string;
+  assignedAt: string | null;
+  nom: string;
+  prenom: string;
+  photoProfile?: string | null;
+}
 
 interface Caisse {
   id: string;
@@ -21,6 +30,7 @@ interface Caisse {
   isOccupied?: boolean;
   occupiedBy?: string;
   agenceId: string;
+  assignmentsDetails?: AssignmentDetail[];
   // Operating hours
   operatingHoursEnabled?: boolean;
   operatingHoursStart?: string;
@@ -50,13 +60,15 @@ export default function AdminGestionCaisses() {
   
   const [formData, setFormData] = useState({
     nom: '',
-    type: 'Physique',
+    type: 'PHYSICAL',
     agenceId: user?.agenceId || '', 
   }); 
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedCaisseForAssign, setSelectedCaisseForAssign] = useState<Caisse | null>(null);
   const [currentAssigneeIds, setCurrentAssigneeIds] = useState<string[]>([]);
+  const [agentsPanelCaisse, setAgentsPanelCaisse] = useState<Caisse | null>(null);
+  const [agentsSearch, setAgentsSearch] = useState('');
   
   const [isForceCloseModalOpen, setIsForceCloseModalOpen] = useState(false);
   const [selectedCaisseForClose, setSelectedCaisseForClose] = useState<Caisse | null>(null);
@@ -105,6 +117,12 @@ export default function AdminGestionCaisses() {
       onError: () => toast.error("Erreur lors de l'assignation")
   });
 
+  const unassignAgent = (caisse: Caisse, userIdToRemove: string) => {
+      const currentIds = (caisse as any).assignments || [];
+      const newIds = currentIds.filter((id: string) => id !== userIdToRemove);
+      assignMutation.mutate({ caisseId: caisse.id, userIds: newIds });
+  };
+
   const handleOpenAssign = (caisse: Caisse) => {
       setSelectedCaisseForAssign(caisse);
       // Récupérer les assignés actuels depuis la BDD
@@ -152,7 +170,7 @@ export default function AdminGestionCaisses() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['caisses'] });
       setIsModalOpen(false);
-      setFormData({ nom: '', type: 'Physique', agenceId: user?.agenceId || '' });
+      setFormData({ nom: '', type: 'PHYSICAL', agenceId: user?.agenceId || '' });
       toast.success('Caisse créée');
     },
     onError: (err: any) => toast.error(err.error || "Erreur")
@@ -202,7 +220,8 @@ export default function AdminGestionCaisses() {
       }
   };
 
-  const filteredCaisses = caisses.filter(c => 
+  const filteredCaisses = caisses.filter(c =>
+    c.type === 'PHYSICAL' &&
     c.nom.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -247,7 +266,7 @@ export default function AdminGestionCaisses() {
                 <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Agence</th>
                 <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Statut</th>
                 <th className="px-3 py-2 text-right text-[10px] font-medium text-slate-400 uppercase tracking-wider">Solde</th>
-                <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Agent</th>
+                <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider min-w-[180px]">Agents assignés</th>
                 <th className="px-3 py-2 text-right text-[10px] font-medium text-slate-400 uppercase tracking-wider w-8"></th>
               </tr>
             </thead>
@@ -298,24 +317,56 @@ export default function AdminGestionCaisses() {
                     <div className="text-xs text-slate-500">FCFA</div>
                   </td>
                   <td className="px-3 py-1.5">
-                    {caisse.isOccupied ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-medium border border-emerald-500/30">
-                          {(caisse.occupiedBy || 'A')[0].toUpperCase()}
-                        </div>
-                        <span className="text-xs text-slate-300 truncate max-w-[120px]">{caisse.occupiedBy}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-slate-600" />
-                        <span className="text-xs text-slate-500">
-                          {(caisse as any).assignments?.length > 0 
-                            ? `${(caisse as any).assignments.length} agent(s)`
-                            : 'Non assignée'
-                          }
-                        </span>
-                      </div>
-                    )}
+                    {(() => {
+                      const details: AssignmentDetail[] = caisse.assignmentsDetails || [];
+                      if (details.length === 0) {
+                        return (
+                          <span className="text-xs text-slate-500 italic flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-slate-600" />
+                            Non assignée
+                          </span>
+                        );
+                      }
+                      const onlineAgent = details.find(a => caisse.isOccupied && caisse.occupiedBy === a.userId);
+                      return (
+                        <button
+                          onClick={() => { setAgentsPanelCaisse(caisse); setAgentsSearch(''); }}
+                          className="flex items-center gap-2 group/btn hover:bg-slate-700/30 rounded-md px-1.5 py-1 -mx-1.5 -my-1 transition-colors w-full text-left"
+                        >
+                          {/* Avatar stack */}
+                          <div className="flex -space-x-1.5">
+                            {details.slice(0, 3).map((a, i) => (
+                              <div
+                                key={a.userId}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-slate-800 ${
+                                  caisse.isOccupied && caisse.occupiedBy === a.userId
+                                    ? 'bg-emerald-500/30 text-emerald-300'
+                                    : 'bg-cyan-500/15 text-cyan-400'
+                                }`}
+                                style={{ zIndex: 3 - i }}
+                              >
+                                {(a.prenom?.[0] || a.nom?.[0] || '?').toUpperCase()}
+                              </div>
+                            ))}
+                            {details.length > 3 && (
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-slate-800 bg-slate-700 text-slate-300">
+                                +{details.length - 3}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-medium text-slate-300 group-hover/btn:text-white transition-colors">
+                              {details.length} agent{details.length > 1 ? 's' : ''}
+                            </span>
+                            {onlineAgent && (
+                              <span className="block text-[10px] text-emerald-400 truncate">
+                                {onlineAgent.prenom} en ligne
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td className="px-3 py-1.5 text-right">
                     <div className="relative">
@@ -475,26 +526,18 @@ export default function AdminGestionCaisses() {
               onChange={e => setFormData({...formData, nom: e.target.value})}
             />
             {isAdmin && (
-                <SelectField
+                <SearchableSelect
                   label="Agence"
                   name="agenceId"
                   required
+                  variant="dark"
+                  placeholder="Rechercher une agence..."
                   options={agences.filter((a: any) => a.statut === StatutClient.ACTIVE).map((a: any) => ({ value: a.id, label: a.nom }))}
                   value={formData.agenceId}
-                  onChange={e => setFormData({...formData, agenceId: e.target.value})}
+                  onChange={val => setFormData({...formData, agenceId: String(val)})}
                 />
             )}
-            <SelectField
-              label="Type"
-              name="type"
-              options={[
-                { value: 'Physique', label: 'Physique' },
-                { value: 'Coffre-Fort', label: 'Coffre-Fort' },
-                { value: 'Virtuelle', label: 'Virtuelle' }
-              ]}
-              value={formData.type}
-              onChange={e => setFormData({...formData, type: e.target.value})}
-            />
+            <input type="hidden" name="type" value="PHYSICAL" />
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Annuler</Button>
               <Button type="submit" isLoading={createMutation.isPending}>Créer</Button>
@@ -543,6 +586,145 @@ export default function AdminGestionCaisses() {
           setSelectedCaisseForHours(null);
         }}
       />
+
+      {/* Agents Panel Slide-over */}
+      {agentsPanelCaisse && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setAgentsPanelCaisse(null)} />
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md flex flex-col bg-slate-900 border-l border-slate-700 shadow-2xl animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="shrink-0 px-5 py-4 border-b border-slate-700/60 bg-slate-800/50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                    <Users size={16} className="text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">{agentsPanelCaisse.nom}</h3>
+                    <p className="text-[10px] text-slate-500">
+                      {(agentsPanelCaisse.assignmentsDetails || []).length} agent{(agentsPanelCaisse.assignmentsDetails || []).length > 1 ? 's' : ''} assigné{(agentsPanelCaisse.assignmentsDetails || []).length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setAgentsPanelCaisse(null)} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              {/* Search */}
+              {(agentsPanelCaisse.assignmentsDetails || []).length > 4 && (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un agent..."
+                    value={agentsSearch}
+                    onChange={e => setAgentsSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-600"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Agent list - scrollable */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+              {(() => {
+                const allDetails = agentsPanelCaisse.assignmentsDetails || [];
+                const filtered = agentsSearch
+                  ? allDetails.filter(a =>
+                      `${a.prenom} ${a.nom}`.toLowerCase().includes(agentsSearch.toLowerCase())
+                    )
+                  : allDetails;
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-600">
+                      <User size={28} className="mb-2 opacity-20" />
+                      <p className="text-xs">{agentsSearch ? 'Aucun résultat' : 'Aucun agent assigné'}</p>
+                    </div>
+                  );
+                }
+
+                return filtered.map(agent => {
+                  const isOnline = agentsPanelCaisse.isOccupied && agentsPanelCaisse.occupiedBy === agent.userId;
+                  return (
+                    <div
+                      key={agent.userId}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 border border-slate-700/40 hover:bg-slate-800 transition-colors group/item"
+                    >
+                      {/* Avatar */}
+                      <div className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-sm font-bold ${
+                        isOnline
+                          ? 'bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/30'
+                          : 'bg-cyan-500/10 text-cyan-400'
+                      }`}>
+                        {(agent.prenom?.[0] || agent.nom?.[0] || '?').toUpperCase()}
+                      </div>
+
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-semibold text-white truncate">
+                            {agent.prenom} {agent.nom}
+                          </span>
+                          {isOnline && (
+                            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              EN LIGNE
+                            </span>
+                          )}
+                        </div>
+                        {agent.assignedAt && (
+                          <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                            <CalendarDays size={10} />
+                            Assigné le {new Date(agent.assignedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Unassign button */}
+                      {!isOnline && (
+                        <button
+                          onClick={() => {
+                            openConfirm({
+                              title: 'Désassigner ?',
+                              message: `Retirer ${agent.prenom} ${agent.nom} de "${agentsPanelCaisse.nom}" ?`,
+                              variant: 'danger',
+                              confirmText: 'Retirer',
+                              onConfirm: () => {
+                                unassignAgent(agentsPanelCaisse, agent.userId);
+                                setAgentsPanelCaisse(null);
+                              },
+                            });
+                          }}
+                          className="shrink-0 p-2 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100 transition-all"
+                          title="Désassigner"
+                        >
+                          <UserMinus size={14} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Footer actions */}
+            <div className="shrink-0 p-4 border-t border-slate-700/60 bg-slate-800/30">
+              <Button
+                size="sm"
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                onClick={() => {
+                  handleOpenAssign(agentsPanelCaisse);
+                  setAgentsPanelCaisse(null);
+                }}
+              >
+                <UserPlus size={14} className="mr-1.5" />
+                Gérer les assignations
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
 
       <ConfirmDialog
         isOpen={confirmState.isOpen}

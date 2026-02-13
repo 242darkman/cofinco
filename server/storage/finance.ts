@@ -1535,6 +1535,20 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       return db.select().from(caisseAssignations).where(eq(caisseAssignations.caisseId, caisseId));
   }
 
+  export async function getCaisseAssignmentsEnriched(caisseId: string) {
+      return db.select({
+        id: caisseAssignations.id,
+        userId: caisseAssignations.userId,
+        assignedAt: caisseAssignations.assignedAt,
+        nom: users.nom,
+        prenom: users.prenom,
+        photoProfile: users.photoProfile,
+      })
+      .from(caisseAssignations)
+      .innerJoin(users, eq(caisseAssignations.userId, users.id))
+      .where(eq(caisseAssignations.caisseId, caisseId));
+  }
+
   export async function getUserCaisseAssignments(userId: string): Promise<CaisseAssignation[]> {
       return db.select().from(caisseAssignations).where(eq(caisseAssignations.userId, userId));
   }

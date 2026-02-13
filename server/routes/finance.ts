@@ -2825,14 +2825,15 @@ export function registerFinanceRoutes(app: Express) {
             }
          }
 
-         const assignments = await storage.getCaisseAssignments(c.id);
+         const assignments = await storage.getCaisseAssignmentsEnriched(c.id);
          return {
              ...c,
              solde: currentSolde,
              isOccupied: !!activeSession,
              occupiedBy: activeSession ? activeSession.caissierId : null,
              sessionId: activeSession ? activeSession.id : null,
-             assignments: assignments.map(a => a.userId)
+             assignments: assignments.map(a => a.userId),
+             assignmentsDetails: assignments,
          };
       }));
 
@@ -2896,7 +2897,7 @@ export function registerFinanceRoutes(app: Express) {
             }
          }
 
-         const assignments = await storage.getCaisseAssignments(c.id);
+         const assignments = await storage.getCaisseAssignmentsEnriched(c.id);
          return {
              ...c,
              solde: currentSolde,
@@ -2904,7 +2905,8 @@ export function registerFinanceRoutes(app: Express) {
              isOccupied: !!activeSession,
              occupiedBy: activeSession ? activeSession.caissierId : null,
              sessionId: activeSession ? activeSession.id : null,
-             assignments: assignments.map(a => a.userId)
+             assignments: assignments.map(a => a.userId),
+             assignmentsDetails: assignments,
          };
       }));
 
