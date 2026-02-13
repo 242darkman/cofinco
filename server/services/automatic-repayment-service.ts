@@ -88,18 +88,18 @@ async function executeAutomaticRepayment(credit: any) {
     "CREDIT",
     {
       montant: amountToPay.toString(),
-      sens: "CREDIT", // Input to Credit module
+      sens: "CREDIT",
       clientId: credit.clientId,
       creditId: credit.id,
-      compteId: sourceAccountId, // Determines which account is debited in the event logic?
-      
+      compteId: sourceAccountId,
+      agenceId: credit.agenceId || undefined,
       typePaiement: "CREDIT_REPAYMENT",
       methodePaiement: "TRANSFER",
       referenceExterne: `AUTO-${generateReference("CREDIT")}`,
       metadata: {
         description: `Remboursement automatique échéance du ${credit.prochaineEcheance?.toLocaleDateString()}`,
-        compteSourceId: sourceAccountId
-      }
+        compteSourceId: sourceAccountId,
+      },
     },
     async (tx, mouvement) => {
       // 1. Debit Source Account

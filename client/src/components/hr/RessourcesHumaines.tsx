@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
-import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3 } from 'lucide-react';
+import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Award } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 
@@ -26,6 +26,7 @@ import OrganigrammeView from './OrganigrammeView';
 import PaieManager from './PaieManager';
 import ImportEmployeesModal from './ImportEmployeesModal';
 import HrAnalyticsDashboard from './HrAnalyticsDashboard';
+import ProspectionPrimeConfig from '../admin/ProspectionPrimeConfig';
 
 const TABS = [
   { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
@@ -35,6 +36,7 @@ const TABS = [
   { key: 'formations', label: 'Formations', icon: GraduationCap },
   { key: 'sanctions', label: 'Sanctions', icon: AlertTriangle },
   { key: 'avantages', label: 'Avantages', icon: Gift },
+  { key: 'primes', label: 'Primes', icon: Award },
   { key: 'paie', label: 'Paie & Docs', icon: FileText },
   { key: 'recrutement', label: 'Recrutement', icon: UserPlus },
   { key: 'organigramme', label: 'Organigramme', icon: Building2 }
@@ -264,6 +266,9 @@ export default function RessourcesHumaines() {
             onDelete={deleteAvantage}
           />
         );
+
+      case 'primes':
+        return <ProspectionPrimeConfig />;
 
       case 'paie':
         return <PaieManager />;

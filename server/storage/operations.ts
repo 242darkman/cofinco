@@ -884,20 +884,20 @@ export async function validatePaiementTerrain(
     "TERRAIN",
     {
       montant: paiement.montant,
-      sens: "CREDIT", // Entrée d'argent
+      sens: "CREDIT",
       clientId: paiement.clientId,
       creditId: paiement.creditId || undefined,
       compteId: paiement.compteId || undefined,
       agentId: paiement.agentId,
+      agenceId: (paiement as any).agenceId || undefined,
       methodePaiement: paiement.methodePaiement || "CASH",
       typePaiement: paiement.typePaiement || "Autre",
       referenceExterne: paiement.referenceExterne || undefined,
-      // On utilise l'ID du paiement comme idempotency key pour le mouvement pour garantir 1-1
-      idempotencyKey: `val-${paiement.id}`, 
+      idempotencyKey: `val-${paiement.id}`,
       metadata: {
         paiementId: paiement.id,
-        validatedBy
-      }
+        validatedBy,
+      },
     },
     async (tx, mouvement) => {
       // 1. Update credit solde if applicable

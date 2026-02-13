@@ -355,6 +355,12 @@ export const FEATURE_DESCRIPTIONS = {
     helpText: 'Traitez les demandes de congés, visualisez le planning d\'équipe, et suivez les soldes de congés. Le calendrier affiche les absences prévues.'
   },
 
+  'hr.primes': {
+    title: 'Config Primes',
+    subtitle: 'Configurez les primes de prospection et de performance',
+    helpText: 'Définissez les règles de calcul des primes pour vos agents : montant fixe ou pourcentage du brut annuel. Activez des conditions comme le premier crédit obtenu ou un revenu minimum. Les primes actives sont automatiquement appliquées lors du calcul de la paie.'
+  },
+
   // Agent (for future use)
   'agent.dashboard': {
     title: 'Tableau de Bord Agent',

@@ -68,6 +68,7 @@ export async function createRemboursementWithAllocation(
       sens: "CREDIT",
       clientId: credit.clientId,
       creditId: data.creditId,
+      agenceId: credit.agenceId || undefined,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
       typePaiement: "CREDIT_REPAYMENT",

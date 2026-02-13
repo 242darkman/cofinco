@@ -18,18 +18,19 @@ const transactionSchema = z.object({
   amount: z.number().positive("Le montant doit être positif"),
   paymentMethod: z.enum(["CASH", "MOBILE_MONEY", "TRANSFER"]),
   natureOperation: z.string(),
-  
+
   // Champs optionnels selon le type
   targetId: z.string().optional(),
   tontineId: z.string().optional(),
   membreId: z.string().optional(),
   compteId: z.string().optional(),
   creditId: z.string().optional(),
-  
+  agenceId: z.string().uuid().optional(),
+
   description: z.string().optional(),
   referenceExterne: z.string().optional(),
   numeroTransaction: z.string().optional(),
-  numeroTelephone: z.string().optional()
+  numeroTelephone: z.string().optional(),
 });
 
 transactionsRouter.post(
@@ -45,6 +46,11 @@ transactionsRouter.post(
 
     // Validation Zod
     const payload = transactionSchema.parse(req.body);
+
+    // Inject agenceId from user session if not provided in payload
+    if (!payload.agenceId && req.user.agenceId) {
+      payload.agenceId = req.user.agenceId;
+    }
 
     const result = await GlobalTransactionService.process(req.user.id, payload);
 

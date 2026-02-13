@@ -2502,6 +2502,302 @@ export async function ensureCustomFunctions(): Promise<void> {
       console.warn('[DB] ⚠ Failed data migration "legacy account statuses":', err instanceof Error ? err.message : err);
     }
 
+    // ── One-time fix: repair orphan ecritures (headers without lignes) ──
+    try {
+      await db.execute(sql`
+        DO $$
+        DECLARE
+          v_fixed INT := 0;
+          v_deleted INT := 0;
+          r RECORD;
+          v_amount NUMERIC;
+          v_debit_compte_id UUID;
+          v_credit_compte_id UUID;
+          v_debit_numero TEXT;
+          v_credit_numero TEXT;
+        BEGIN
+          -- Find ecritures linked to mouvements that have NO lignes but mouvement has real amount
+          FOR r IN
+            SELECT e.id AS ecriture_id, e.metadata, m.montant
+            FROM ecritures e
+            JOIN mouvements_financiers m ON e.mouvement_id = m.id
+            WHERE e.source_type = 'MOUVEMENT'
+              AND NOT EXISTS (SELECT 1 FROM lignes_ecritures le WHERE le.ecriture_id = e.id)
+              AND m.montant IS NOT NULL AND m.montant::numeric > 0
+          LOOP
+            v_amount := r.montant::numeric;
+
+            -- Extract rule info from metadata
+            v_debit_numero := NULL;
+            v_credit_numero := NULL;
+
+            -- Try rule code from metadata
+            IF r.metadata ? 'ruleCode' THEN
+              SELECT ar.debit_account, ar.credit_account
+              INTO v_debit_numero, v_credit_numero
+              FROM accounting_rules ar
+              WHERE ar.code = r.metadata->>'ruleCode' AND ar.active = true
+              LIMIT 1;
+            END IF;
+
+            -- Fallback: try typePaiement + methodePaiement
+            IF v_debit_numero IS NULL AND r.metadata ? 'typePaiement' THEN
+              SELECT ar.debit_account, ar.credit_account
+              INTO v_debit_numero, v_credit_numero
+              FROM accounting_rules ar
+              WHERE ar.event_type = r.metadata->>'typePaiement'
+                AND ar.active = true
+              LIMIT 1;
+            END IF;
+
+            IF v_debit_numero IS NULL OR v_credit_numero IS NULL THEN
+              CONTINUE;
+            END IF;
+
+            SELECT id INTO v_debit_compte_id FROM plan_comptable WHERE numero_compte = v_debit_numero LIMIT 1;
+            SELECT id INTO v_credit_compte_id FROM plan_comptable WHERE numero_compte = v_credit_numero LIMIT 1;
+
+            IF v_debit_compte_id IS NULL OR v_credit_compte_id IS NULL THEN
+              CONTINUE;
+            END IF;
+
+            -- Create the missing debit/credit lines
+            INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+            VALUES (r.ecriture_id, v_debit_compte_id, v_debit_numero, 'Ligne reconstituée (auto-fix)', v_amount, 0);
+
+            INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+            VALUES (r.ecriture_id, v_credit_compte_id, v_credit_numero, 'Ligne reconstituée (auto-fix)', 0, v_amount);
+
+            v_fixed := v_fixed + 1;
+          END LOOP;
+
+          -- Delete truly orphan ecritures that can't be repaired
+          DELETE FROM ecritures e
+          WHERE e.source_type = 'MOUVEMENT'
+            AND NOT EXISTS (SELECT 1 FROM lignes_ecritures le WHERE le.ecriture_id = e.id)
+            AND (
+              e.mouvement_id IS NULL
+              OR NOT EXISTS (SELECT 1 FROM mouvements_financiers m WHERE m.id = e.mouvement_id AND m.montant::numeric > 0)
+            );
+          GET DIAGNOSTICS v_deleted = ROW_COUNT;
+
+          IF v_fixed > 0 OR v_deleted > 0 THEN
+            RAISE NOTICE 'Orphan ecritures fix: repaired %, deleted %', v_fixed, v_deleted;
+          END IF;
+        END $$;
+      `);
+      console.log('[DB] ✓ DATA FIX: orphan ecritures repaired');
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed data fix "orphan ecritures":', err instanceof Error ? err.message : err);
+    }
+
+    // ── One-time fix: retroactively post GL entries for payroll runs missing them ──
+    try {
+      await db.execute(sql`
+        DO $$
+        DECLARE
+          r RECORD;
+          v_agence_id UUID;
+          v_journal_od_id UUID;
+          v_journal_cai_id UUID;
+          v_exercice_id UUID;
+          v_period_id UUID;
+          v_ecriture_id UUID;
+          v_piece_number TEXT;
+          v_entry_date DATE;
+          v_total_brut NUMERIC;
+          v_total_net NUMERIC;
+          v_total_charges_salariales NUMERIC;
+          v_total_charges_patronales NUMERIC;
+          v_total_irpp NUMERIC;
+          v_total_formation NUMERIC;
+          v_cnss_patronale_pure NUMERIC;
+          v_acct_6611 UUID;
+          v_acct_4211 UUID;
+          v_acct_4311 UUID;
+          v_acct_4421 UUID;
+          v_acct_6641 UUID;
+          v_acct_6651 UUID;
+          v_acct_4471 UUID;
+          v_acct_521 UUID;
+          v_runs_fixed INT := 0;
+        BEGIN
+          -- Resolve GL accounts once
+          SELECT id INTO v_acct_6611 FROM plan_comptable WHERE numero_compte = '6611' LIMIT 1;
+          SELECT id INTO v_acct_4211 FROM plan_comptable WHERE numero_compte = '4211' LIMIT 1;
+          SELECT id INTO v_acct_4311 FROM plan_comptable WHERE numero_compte = '4311' LIMIT 1;
+          SELECT id INTO v_acct_4421 FROM plan_comptable WHERE numero_compte = '4421' LIMIT 1;
+          SELECT id INTO v_acct_6641 FROM plan_comptable WHERE numero_compte = '6641' LIMIT 1;
+          SELECT id INTO v_acct_6651 FROM plan_comptable WHERE numero_compte = '6651' LIMIT 1;
+          SELECT id INTO v_acct_4471 FROM plan_comptable WHERE numero_compte = '4471' LIMIT 1;
+          SELECT id INTO v_acct_521 FROM plan_comptable WHERE numero_compte = '521' LIMIT 1;
+
+          -- Skip if accounts not seeded yet
+          IF v_acct_6611 IS NULL OR v_acct_4211 IS NULL THEN
+            RAISE NOTICE 'Payroll GL fix: accounts not seeded yet, skipping';
+            RETURN;
+          END IF;
+
+          FOR r IN
+            SELECT pr.*
+            FROM payroll_runs pr
+            WHERE pr.status IN ('VALIDATED', 'PAID')
+              AND pr.cancelled_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM ecritures e
+                WHERE e.source_type = 'PAYROLL_ENGAGEMENT'
+                  AND e.source_id = 'run-' || pr.id || '-engagement'
+              )
+          LOOP
+            -- Resolve agence
+            v_agence_id := r.agence_id;
+            IF v_agence_id IS NULL THEN
+              SELECT id INTO v_agence_id FROM agences LIMIT 1;
+            END IF;
+            IF v_agence_id IS NULL THEN
+              CONTINUE;
+            END IF;
+
+            -- Resolve journals
+            SELECT id INTO v_journal_od_id FROM journaux WHERE code = 'OD' AND (agence_id = v_agence_id OR agence_id IS NULL) LIMIT 1;
+            SELECT id INTO v_journal_cai_id FROM journaux WHERE code = 'CAI' AND (agence_id = v_agence_id OR agence_id IS NULL) LIMIT 1;
+            IF v_journal_od_id IS NULL THEN
+              CONTINUE;
+            END IF;
+
+            -- Resolve exercice
+            v_entry_date := COALESCE(r.validated_at, r.created_at)::date;
+            SELECT id INTO v_exercice_id FROM exercices WHERE agence_id = v_agence_id AND annee = EXTRACT(YEAR FROM v_entry_date) LIMIT 1;
+            IF v_exercice_id IS NULL THEN
+              INSERT INTO exercices (agence_id, annee, date_debut, date_fin, statut)
+              VALUES (v_agence_id, EXTRACT(YEAR FROM v_entry_date), (EXTRACT(YEAR FROM v_entry_date) || '-01-01')::date, (EXTRACT(YEAR FROM v_entry_date) || '-12-31')::date, 'OUVERT')
+              RETURNING id INTO v_exercice_id;
+            END IF;
+
+            -- Resolve period
+            SELECT id INTO v_period_id FROM periodes WHERE exercice_id = v_exercice_id AND mois = EXTRACT(MONTH FROM v_entry_date) LIMIT 1;
+            IF v_period_id IS NULL THEN
+              INSERT INTO periodes (exercice_id, mois, statut)
+              VALUES (v_exercice_id, EXTRACT(MONTH FROM v_entry_date), 'OUVERT')
+              RETURNING id INTO v_period_id;
+            END IF;
+
+            -- Aggregate totals from bulletins
+            SELECT
+              COALESCE(SUM(salaire_brut::numeric), 0),
+              COALESCE(SUM(salaire_net::numeric), 0),
+              COALESCE(SUM(total_charges_salariales::numeric), 0),
+              COALESCE(SUM(total_charges_patronales::numeric), 0),
+              COALESCE(SUM(irpp::numeric), 0)
+            INTO v_total_brut, v_total_net, v_total_charges_salariales, v_total_charges_patronales, v_total_irpp
+            FROM bulletins_paie
+            WHERE payroll_run_id = r.id AND cancelled = false;
+
+            -- CFC + TAP portion of charges patronales
+            SELECT COALESCE(SUM(montant_patronal), 0) INTO v_total_formation
+            FROM payslip_lines pl
+            JOIN bulletins_paie bp ON pl.bulletin_id = bp.id
+            WHERE bp.payroll_run_id = r.id AND bp.cancelled = false AND pl.code IN ('CFC_P', 'TAP_P');
+
+            v_cnss_patronale_pure := v_total_charges_patronales - v_total_formation;
+
+            IF v_total_brut <= 0 THEN
+              CONTINUE;
+            END IF;
+
+            -- ═══ ENTRY 1: Engagement charges de personnel ═══
+            v_piece_number := 'OD-' || EXTRACT(YEAR FROM v_entry_date) || '-PAY-' || r.id;
+
+            INSERT INTO ecritures (exercice_id, journal_id, date_ecriture, numero_piece, libelle, statut, source_type, source_id, agence_id, metadata)
+            VALUES (v_exercice_id, v_journal_od_id, v_entry_date, v_piece_number,
+                    'Engagement charges personnel - Paie ' || r.period || ' v' || r.version,
+                    'POSTED', 'PAYROLL_ENGAGEMENT', 'run-' || r.id || '-engagement', v_agence_id,
+                    jsonb_build_object('payrollRunId', r.id, 'period', r.period, 'type', 'ENGAGEMENT', 'retroactive', true))
+            RETURNING id INTO v_ecriture_id;
+
+            -- D 6611 Brut
+            INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+            VALUES (v_ecriture_id, v_acct_6611, '6611', 'Rémunérations du personnel - ' || r.period, v_total_brut, 0);
+
+            -- C 4211 Net
+            INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+            VALUES (v_ecriture_id, v_acct_4211, '4211', 'Personnel rémunérations dues - ' || r.period, 0, v_total_net);
+
+            -- C 4311 CNSS salariale
+            IF v_total_charges_salariales > 0 AND v_acct_4311 IS NOT NULL THEN
+              INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+              VALUES (v_ecriture_id, v_acct_4311, '4311', 'CNSS cotisations salariales - ' || r.period, 0, v_total_charges_salariales);
+            END IF;
+
+            -- C 4421 IRPP
+            IF v_total_irpp > 0 AND v_acct_4421 IS NOT NULL THEN
+              INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+              VALUES (v_ecriture_id, v_acct_4421, '4421', 'IRPP retenu sur salaires - ' || r.period, 0, v_total_irpp);
+            END IF;
+
+            -- ═══ ENTRY 2: Charges patronales ═══
+            IF v_total_charges_patronales > 0 THEN
+              v_piece_number := 'OD-' || EXTRACT(YEAR FROM v_entry_date) || '-PAT-' || r.id;
+
+              INSERT INTO ecritures (exercice_id, journal_id, date_ecriture, numero_piece, libelle, statut, source_type, source_id, agence_id, metadata)
+              VALUES (v_exercice_id, v_journal_od_id, v_entry_date, v_piece_number,
+                      'Charges patronales - Paie ' || r.period || ' v' || r.version,
+                      'POSTED', 'PAYROLL_PATRONAL', 'run-' || r.id || '-patronal', v_agence_id,
+                      jsonb_build_object('payrollRunId', r.id, 'period', r.period, 'type', 'PATRONAL', 'retroactive', true))
+              RETURNING id INTO v_ecriture_id;
+
+              -- D 6641 CNSS patronale pure
+              IF v_cnss_patronale_pure > 0 AND v_acct_6641 IS NOT NULL THEN
+                INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+                VALUES (v_ecriture_id, v_acct_6641, '6641', 'Charges sociales patronales - ' || r.period, v_cnss_patronale_pure, 0);
+
+                INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+                VALUES (v_ecriture_id, v_acct_4311, '4311', 'CNSS patronales à reverser - ' || r.period, 0, v_cnss_patronale_pure);
+              END IF;
+
+              -- D 6651 / C 4471 Formation
+              IF v_total_formation > 0 AND v_acct_6651 IS NOT NULL AND v_acct_4471 IS NOT NULL THEN
+                INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+                VALUES (v_ecriture_id, v_acct_6651, '6651', 'Formation professionnelle - ' || r.period, v_total_formation, 0);
+
+                INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+                VALUES (v_ecriture_id, v_acct_4471, '4471', 'CFC + TAP à reverser - ' || r.period, 0, v_total_formation);
+              END IF;
+            END IF;
+
+            -- ═══ ENTRY 3: Paiement (si run PAID) ═══
+            IF r.status = 'PAID' AND v_journal_cai_id IS NOT NULL AND v_acct_521 IS NOT NULL THEN
+              v_piece_number := 'CAI-' || EXTRACT(YEAR FROM v_entry_date) || '-PAY-' || r.id;
+
+              INSERT INTO ecritures (exercice_id, journal_id, date_ecriture, numero_piece, libelle, statut, source_type, source_id, agence_id, metadata)
+              VALUES (v_exercice_id, v_journal_cai_id, COALESCE(r.paid_at, v_entry_date)::date, v_piece_number,
+                      'Paiement salaires - Paie ' || r.period || ' v' || r.version,
+                      'POSTED', 'PAYROLL_PAYMENT', 'run-' || r.id || '-payment', v_agence_id,
+                      jsonb_build_object('payrollRunId', r.id, 'period', r.period, 'type', 'PAIEMENT', 'retroactive', true))
+              RETURNING id INTO v_ecriture_id;
+
+              -- D 4211 Personnel rémun. dues
+              INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+              VALUES (v_ecriture_id, v_acct_4211, '4211', 'Personnel rémun. dues - ' || r.period, v_total_net, 0);
+
+              -- C 521 Caisse
+              INSERT INTO lignes_ecritures (ecriture_id, compte_id, numero_compte, libelle, debit, credit)
+              VALUES (v_ecriture_id, v_acct_521, '521', 'Caisse - Paiement salaires ' || r.period, 0, v_total_net);
+            END IF;
+
+            v_runs_fixed := v_runs_fixed + 1;
+          END LOOP;
+
+          IF v_runs_fixed > 0 THEN
+            RAISE NOTICE 'Payroll GL fix: posted retroactive GL entries for % payroll runs', v_runs_fixed;
+          END IF;
+        END $$;
+      `);
+      console.log('[DB] ✓ DATA FIX: retroactive payroll GL entries posted');
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed data fix "retroactive payroll GL":', err instanceof Error ? err.message : err);
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

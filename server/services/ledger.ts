@@ -740,6 +740,25 @@ export async function executeWithLedger<T>(
   // 6. Emit BALANCE_UPDATED + ACCOUNTING_UPDATE events via WebSocket (after commit)
   emitBalanceUpdates(transactionResult.mouvement, mouvementData.agenceId, transactionResult.additionalEventData);
 
+  // 7. Emit ACCOUNTING_UPDATE so client accounting screens refresh in real-time
+  if (transactionResult.mouvement.glPostingStatus === "POSTED") {
+    try {
+      const { getWsInstance } = await import("../ws-server");
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "ACCOUNTING_UPDATE",
+          payload: {
+            type: "gl_entry_posted",
+            mouvementId: transactionResult.mouvement.id,
+          },
+        });
+      }
+    } catch {
+      // Don't let WS failure break business flow
+    }
+  }
+
   return { result: transactionResult.result, mouvement: transactionResult.mouvement };
 }
 

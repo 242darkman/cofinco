@@ -123,11 +123,12 @@ export class InterestSchedulerService {
                     sens: "CREDIT",
                     clientId: compte.clientId,
                     compteId: compte.id,
-                    methodePaiement: "TRANSFER", // Ou 'Interne'
+                    agenceId: compte.agenceId || undefined,
+                    methodePaiement: "TRANSFER",
                     typePaiement: "INTEREST_PAYMENT",
                     metadata: {
-                        observations: "Capitalisation mensuelle des intérêts"
-                    }
+                        observations: "Capitalisation mensuelle des intérêts",
+                    },
                 },
                 async (tx, mouvement) => {
                     // Update compte: Créditer solde + Reset accruedInterest + Update date

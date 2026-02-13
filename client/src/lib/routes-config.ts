@@ -279,6 +279,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/ressources-humaines/formations', subModule: 'formations', label: 'Formations' },
       { path: '/ressources-humaines/sanctions', subModule: 'sanctions', label: 'Sanctions' },
       { path: '/ressources-humaines/avantages', subModule: 'avantages', label: 'Avantages' },
+      { path: '/ressources-humaines/primes', subModule: 'primes', label: 'Primes' },
       { path: '/ressources-humaines/paie', subModule: 'paie', label: 'Paie & Docs' },
       { path: '/ressources-humaines/recrutement', subModule: 'recrutement', label: 'Recrutement' },
       { path: '/ressources-humaines/organigramme', subModule: 'organigramme', label: 'Organigramme' },
@@ -313,7 +314,6 @@ export const ROUTES: RouteConfig[] = [
       { path: '/administration/acces-clients', subModule: 'client-credentials', label: 'Accès Clients' },
       { path: '/administration/taux-produits', subModule: 'product-rates', label: 'Taux Produits' },
       { path: '/administration/zones-commerciales', subModule: 'zones-commerciales', label: 'Arrondissements & Marchés' },
-      { path: '/administration/primes-config', subModule: 'primes-config', label: 'Config Primes' },
     ],
   },
   {

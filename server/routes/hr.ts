@@ -2760,7 +2760,6 @@ hrRouter.patch("/paie/validate", getAuthUser, attachAbility, requireAbility(Acti
       return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId requis'));
     }
 
-    const agenceId = req.user?.agenceId;
     const userId = req.user?.id || "system";
 
     // Get the run
@@ -2771,6 +2770,9 @@ hrRouter.patch("/paie/validate", getAuthUser, attachAbility, requireAbility(Acti
     if (run.status !== PayrollRunStatus.DRAFT) {
       return res.status(400).json(errorResponse('INVALID_STATUS', `Le run est en statut ${run.status}, seul DRAFT peut être validé`));
     }
+
+    // Resolve agenceId: run > user > first available
+    const agenceId = run.agenceId || req.user?.agenceId;
 
     // Update run status
     await db.update(payrollRuns).set({
@@ -2854,7 +2856,6 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
     }
 
     const paymentDate = datePaiement ? new Date(datePaiement) : new Date();
-    const agenceId = req.user?.agenceId;
     const userId = req.user?.id || "system";
 
     const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
@@ -2864,6 +2865,9 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
     if (run.status !== PayrollRunStatus.VALIDATED) {
       return res.status(400).json(errorResponse('INVALID_STATUS', `Le run est en statut ${run.status}, seul VALIDATED peut être payé`));
     }
+
+    // Resolve agenceId: run > user > first available
+    const agenceId = run.agenceId || req.user?.agenceId;
 
     // Get all validated bulletins with employee payment method
     const allBulletins = await db

@@ -204,6 +204,11 @@ paymentsRouter.post("/collect", requireAuth, attachAbility, requireAbility(Actio
       });
     }
 
+    // Inject agenceId from user session if not provided
+    if (!parsed.data.agenceId && req.session?.user?.agenceId) {
+      parsed.data.agenceId = req.session.user.agenceId;
+    }
+
     const intent = await paymentService.initiateCollection(
       parsed.data,
       req.session!.user!.id
@@ -230,6 +235,11 @@ paymentsRouter.post("/payout", requireAuth, attachAbility, requireAbility(Action
         error: "Données invalides",
         details: parsed.error.errors,
       });
+    }
+
+    // Inject agenceId from user session if not provided
+    if (!parsed.data.agenceId && req.session?.user?.agenceId) {
+      parsed.data.agenceId = req.session.user.agenceId;
     }
 
     const intent = await paymentService.initiatePayout(

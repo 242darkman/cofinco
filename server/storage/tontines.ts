@@ -352,19 +352,23 @@ export async function createContributionTontineWithLedger(
     throw new Error("Une session de caisse active est requise pour les paiements en espèces");
   }
 
+  // Get tontine for agenceId (required for GL posting)
+  const [tontine] = await db.select({ agenceId: tontines.agenceId }).from(tontines).where(eq(tontines.id, data.tontineId));
+
   return await executeWithLedger(
     "TONTINE",
     {
       montant: data.montant.toString(),
-      sens: "CREDIT", 
+      sens: "CREDIT",
       sourceModule: "TONTINE",
       tontineId: data.tontineId,
+      agenceId: tontine?.agenceId || undefined,
       sessionCaisseId: isCash ? sessionCaisseId : undefined,
-      typePaiement: "Versement Tontine", // Fixed Enum
+      typePaiement: "Versement Tontine",
       methodePaiement: data.methodePaiement,
       referenceExterne: data.reference,
       idempotencyKey: data.idempotencyKey || undefined,
-      description: `Versement Tontine (Tour ${data.tourNumero})` // Changed text to verify reload
+      description: `Versement Tontine (Tour ${data.tourNumero})`,
     } as any,
     async (tx, mouvement) => {   
       // 1. Update Tontine Balance

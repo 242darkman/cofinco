@@ -46,7 +46,7 @@ import RegularizationDashboard from './RegularizationDashboard';
 import AdminClientCredentials from './AdminClientCredentials';
 import AdminProductRates from './AdminProductRates';
 import ZoneManagement from './ZoneManagement';
-import ProspectionPrimeConfig from './ProspectionPrimeConfig';
+
 
 interface AdminModuleCompletProps {
   activeView?: string;
@@ -383,7 +383,6 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'client-credentials' && <AdminClientCredentials />}
                   {activeTab === 'product-rates' && <AdminProductRates />}
                   {activeTab === 'zones-commerciales' && <ZoneManagement />}
-                  {activeTab === 'primes-config' && <ProspectionPrimeConfig />}
 
                   {activeTab === 'roles' && (
                     <div className="flex flex-col h-full overflow-hidden space-y-2">

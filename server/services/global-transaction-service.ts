@@ -45,13 +45,16 @@ export interface GlobalTransactionPayload {
   natureOperation: string; // Enum TypeOperationCaisse
   targetId?: string; // TontineId, CompteId, CreditId
   description?: string;
-  
+
   // Specific fields
   tontineId?: string;
   membreId?: string;
   compteId?: string;
   creditId?: string;
-  
+
+  // Agence (required for GL posting)
+  agenceId?: string;
+
   // Metadata for external refs
   referenceExterne?: string;
   numeroTransaction?: string;
@@ -85,22 +88,29 @@ export class GlobalTransactionService {
 
     // 2. Validation Session Caisse (si ESPÈCES)
     let sessionCaisseId: string | undefined;
+    let resolvedAgenceId: string | undefined = payload.agenceId;
+
     if (payload.paymentMethod === MethodePaiement.CASH) {
       if (!userId) {
          throw new Error("Utilisateur requis pour les opérations en espèces");
       }
-      
+
       const session = await db.query.sessionsCaisse.findFirst({
         where: and(
           eq(sessionsCaisse.caissierId, userId),
           eq(sessionsCaisse.statut, StatutSessionCaisse.OPEN)
         )
       });
-      
+
       if (!session) {
         throw new Error("Aucune session de caisse ouverte pour cet agent");
       }
       sessionCaisseId = session.id;
+
+      // Derive agenceId from session if not explicitly provided
+      if (!resolvedAgenceId && session.agenceId) {
+        resolvedAgenceId = session.agenceId;
+      }
 
       // Vérification Solde Caisse pour les SORTIES
       const isSortie = [
@@ -134,9 +144,10 @@ export class GlobalTransactionService {
       sourceModule,
       {
         montant: payload.amount.toString(),
-        sens: this.getSensByOperation(payload.natureOperation), // Helper needed or hardcoded logic
+        sens: this.getSensByOperation(payload.natureOperation),
         clientId: payload.clientId,
         sessionCaisseId,
+        agenceId: resolvedAgenceId,
         typePaiement: payload.natureOperation,
         methodePaiement: payload.paymentMethod,
         compteId: payload.compteId,
@@ -145,8 +156,8 @@ export class GlobalTransactionService {
         referenceExterne: payload.referenceExterne || payload.numeroTransaction,
         metadata: {
           description: payload.description,
-          telephone: payload.numeroTelephone
-        }
+          telephone: payload.numeroTelephone,
+        },
       },
       async (tx, mouvement) => {
         let result: any;

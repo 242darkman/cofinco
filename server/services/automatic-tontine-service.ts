@@ -158,10 +158,11 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
         "TONTINE",
         {
           montant: amount.toString(),
-          sens: "CREDIT", // Tontine receives money
+          sens: "CREDIT",
           clientId: membre.clientId,
           tontineId: tontine.id,
-          compteId: compte.id, // Source Account
+          compteId: compte.id,
+          agenceId: tontine.agenceId || undefined,
           typePaiement: "TONTINE_CONTRIBUTION",
           methodePaiement: "TRANSFER",
           referenceExterne: `AUTO-TON-${generateReference("TONTINE")}`,
@@ -171,8 +172,8 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
                 : `Contribution automatique Tour ${tourNumero}`,
               tourNumero,
               compteSourceId: compte.id,
-              isPartialPayment: !!montantAPrevelever
-          }
+              isPartialPayment: !!montantAPrevelever,
+          },
         },
         async (tx, mouvement) => {
             // 1. Debit Account

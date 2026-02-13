@@ -85,8 +85,8 @@ export async function getAllEcritures(filter?: { journalId?: string; dateDebut?:
     numero_piece: ecritures.numeroPiece,
     libelle: ecritures.libelle,
     journal_id: ecritures.journalId,
-    total_debit: sql<number>`(SELECT SUM(debit) FROM ${lignesEcritures} WHERE ${lignesEcritures.ecritureId} = ${ecritures.id})`,
-    total_credit: sql<number>`(SELECT SUM(credit) FROM ${lignesEcritures} WHERE ${lignesEcritures.ecritureId} = ${ecritures.id})`
+    total_debit: sql<number>`COALESCE((SELECT SUM(debit) FROM ${lignesEcritures} WHERE ${lignesEcritures.ecritureId} = ${ecritures.id}), 0)`,
+    total_credit: sql<number>`COALESCE((SELECT SUM(credit) FROM ${lignesEcritures} WHERE ${lignesEcritures.ecritureId} = ${ecritures.id}), 0)`
   })
   .from(ecritures);
 

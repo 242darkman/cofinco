@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, Save, Loader2, Plus, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, Save, Loader2, Plus, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Award } from 'lucide-react';
 import { prospectionPrimeApi } from '../../lib/api-client';
 import { toast } from 'sonner';
+import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 
 type FilterTab = 'all' | 'active' | 'inactive';
 
@@ -94,6 +95,14 @@ export default function ProspectionPrimeConfig() {
 
   return (
     <div className="space-y-3">
+      <FeatureHeader
+        featureKey="hr.primes"
+        title={FEATURE_DESCRIPTIONS['hr.primes'].title}
+        subtitle={`${activeCount} active${activeCount > 1 ? 's' : ''} • ${FEATURE_DESCRIPTIONS['hr.primes'].subtitle}`}
+        helpText={FEATURE_DESCRIPTIONS['hr.primes'].helpText}
+        icon={<Award size={20} />}
+      />
+
       {/* Controls Bar */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-0.5 bg-slate-800/50 rounded-lg p-0.5 border border-slate-700/50 text-[11px]">

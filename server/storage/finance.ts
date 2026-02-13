@@ -1980,6 +1980,7 @@ export async function createTransactionCompteWithLedger(data: {
       sens,
       clientId: compte.clientId,
       compteId: data.compteId,
+      agenceId: compte.agenceId || undefined,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
       typePaiement,
@@ -2179,6 +2180,7 @@ export async function createRemboursementWithLedger(data: {
       sens: "CREDIT", // Money coming in
       clientId: credit.clientId,
       creditId: data.creditId,
+      agenceId: credit.agenceId || undefined,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
       typePaiement: "CREDIT_REPAYMENT",

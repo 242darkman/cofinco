@@ -452,6 +452,11 @@ export async function postGlForMouvement(
 
   // 5. Build description from template
   const amount = parseFloat(mouvement.montant);
+  if (!amount || amount <= 0 || isNaN(amount)) {
+    logger.warn({ mouvementId: mouvement.id, montant: mouvement.montant }, 'Skipping GL posting: montant is 0 or invalid');
+    return null;
+  }
+
   let description = rule.descriptionTemplate || rule.name;
   description = description
     .replace("{clientName}", additionalMetadata?.clientName || "Client")
@@ -729,9 +734,14 @@ export async function postEntry(request: PostEntryRequest): Promise<PostEntryRes
       }
     }
 
-    // 2. Validate balance
-    const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
-    const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+    // 2. Filter zero-amount lines and validate balance
+    const nonZeroLines = lines.filter(l => l.debit !== 0 || l.credit !== 0);
+    if (nonZeroLines.length === 0) {
+      throw new Error('All entry lines are zero — nothing to post');
+    }
+
+    const totalDebit = nonZeroLines.reduce((sum, l) => sum + l.debit, 0);
+    const totalCredit = nonZeroLines.reduce((sum, l) => sum + l.credit, 0);
 
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       throw new Error(`Entry is not balanced: Debit=${totalDebit}, Credit=${totalCredit}`);
@@ -777,11 +787,8 @@ export async function postEntry(request: PostEntryRequest): Promise<PostEntryRes
       })
       .returning();
 
-    // 8. Create lignes (entry lines)
-    for (const line of lines) {
-      // Skip zero lines
-      if (line.debit === 0 && line.credit === 0) continue;
-
+    // 8. Create lignes (entry lines — already filtered for zero)
+    for (const line of nonZeroLines) {
       await tx.insert(lignesEcritures).values({
         ecritureId: ecriture.id,
         compteId: line.compteId,
