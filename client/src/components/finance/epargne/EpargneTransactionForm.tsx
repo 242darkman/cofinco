@@ -66,10 +66,14 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentModalType, setPaymentModalType] = useState<'mobile_money' | 'especes'>('especes');
 
-  // Detect if this is a PENDING_ACTIVATION account (initial deposit)
-  const isPendingActivation = compte.statut === StatutCompte.PENDING_ACTIVATION;
+  // Detect if this is a pending-payment account (initial deposit)
+  const isPendingActivation = [
+    StatutCompte.PENDING_ACTIVATION,
+    StatutCompte.PENDING_PAYMENT,
+    StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+  ].includes(compte.statut as any);
   const pendingDepositAmount = isPendingActivation ? (compte.solde ?? 0) : 0;
-  // For pending accounts, actual balance is 0
+  // For pending-payment accounts, actual balance is 0
   const actualBalance = isPendingActivation ? 0 : (compte.solde ?? 0);
 
   const [formData, setFormData] = useState({

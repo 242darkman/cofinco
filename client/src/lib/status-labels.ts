@@ -103,6 +103,10 @@ import type {
 export const ACCOUNT_STATUS_LABELS: Record<StatutCompteType, string> = {
   ACTIVE: "Actif",
   PENDING_ACTIVATION: "En attente d'activation",
+  PENDING_VALIDATION: "En attente de validation",
+  PENDING_PAYMENT: "En attente de paiement",
+  PENDING_APPROVAL: "En attente de validation",
+  PENDING_PAYMENT_AND_APPROVAL: "En attente paiement & validation",
   SUSPENDED: "Suspendu",
   CLOSED: "Clôturé",
   CANCELLED: "Annulé",
@@ -112,6 +116,10 @@ export const ACCOUNT_STATUS_LABELS: Record<StatutCompteType, string> = {
 export const ACCOUNT_STATUS_COLORS: Record<StatutCompteType, string> = {
   ACTIVE: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
   PENDING_ACTIVATION: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  PENDING_VALIDATION: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  PENDING_PAYMENT: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  PENDING_APPROVAL: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  PENDING_PAYMENT_AND_APPROVAL: "bg-orange-500/10 text-orange-400 border-orange-500/20",
   SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   CLOSED: "bg-slate-700 text-slate-400 border-transparent",
   CANCELLED: "bg-red-500/20 text-red-400 border-red-500/30",

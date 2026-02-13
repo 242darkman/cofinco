@@ -192,8 +192,13 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       return;
     }
 
-    // Handle pending activation accounts specially
-    if (compte.statut === StatutCompte.PENDING_ACTIVATION && type === 'Dépôt') {
+    // Handle pending activation/payment accounts specially
+    const isPendingPayment = [
+      StatutCompte.PENDING_ACTIVATION,
+      StatutCompte.PENDING_PAYMENT,
+      StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+    ].includes(compte.statut as StatutCompteType);
+    if (isPendingPayment && type === 'Dépôt') {
       if (!sessionActive) {
         toast.warning('Pour activer un compte, veuillez d\'abord ouvrir une session de caisse');
         return;

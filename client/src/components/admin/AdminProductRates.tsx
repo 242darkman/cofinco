@@ -22,6 +22,7 @@ import {
   Lock,
   ArrowUpDown,
   Search,
+  HelpCircle,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -31,12 +32,13 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '../../lib/utils';
+import Tooltip from '../ui/Tooltip';
 
 interface ProduitCompte {
   id: string;
   code: string;
   nom: string;
-  typeCompte: 'EPARGNE' | 'COURANT' | 'BLOQUE';
+  typeCompte: 'SAVINGS' | 'CURRENT' | 'BLOCKED';
   tauxInteret: string | null;
   frais: {
     ouverture?: number;
@@ -59,19 +61,19 @@ interface ProduitCompte {
 }
 
 const TYPE_CONFIG: Record<string, { label: string; badge: string; icon: React.ElementType; gradient: string }> = {
-  EPARGNE: {
+  SAVINGS: {
     label: 'Épargne',
     badge: 'ÉPARGNE',
     icon: PiggyBank,
     gradient: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30',
   },
-  COURANT: {
+  CURRENT: {
     label: 'Courant',
     badge: 'COURANT',
     icon: Wallet,
     gradient: 'from-blue-500/20 to-indigo-500/20 border-blue-500/30',
   },
-  BLOQUE: {
+  BLOCKED: {
     label: 'Bloqué',
     badge: 'BLOQUÉ',
     icon: Lock,
@@ -225,7 +227,7 @@ export default function AdminProductRates() {
   return (
     <div className="space-y-4">
       {/* Compact Header with Stats */}
-      <div className="bg-linear-to-r from-indigo-600/90 to-purple-600/90 rounded-xl p-4">
+      <div className="bg-linear-to-r from-teal-600/90 via-cyan-600/90 to-blue-600/90 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
@@ -327,21 +329,21 @@ export default function AdminProductRates() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {filteredProducts.map((product) => {
             const isEditing = editingId === product.id;
-            const config = TYPE_CONFIG[product.typeCompte] || TYPE_CONFIG.COURANT;
+            const config = TYPE_CONFIG[product.typeCompte] || TYPE_CONFIG.CURRENT;
             const TypeIcon = config.icon;
 
             return (
               <div
                 key={product.id}
                 className={cn(
-                  "bg-slate-900/50 border rounded-xl overflow-hidden transition-all",
+                  "bg-slate-900/50 border rounded-xl transition-all",
                   isEditing
                     ? "border-indigo-500 ring-1 ring-indigo-500/30"
                     : "border-slate-800 hover:border-slate-700"
                 )}
               >
                 {/* Product Header - Compact */}
-                <div className={cn("p-3 bg-linear-to-r border-b border-slate-800", config.gradient)}>
+                <div className={cn("p-3 bg-linear-to-r border-b border-slate-800 rounded-t-xl", config.gradient)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="p-1.5 bg-white/10 rounded-lg shrink-0">
@@ -398,6 +400,7 @@ export default function AdminProductRates() {
                   <div className="grid grid-cols-2 gap-2">
                     <FeeField
                       label="Ouverture"
+                      tooltipField="ouverture"
                       value={product.frais?.ouverture}
                       editValue={editValues.fraisOuverture}
                       isEditing={isEditing}
@@ -405,6 +408,7 @@ export default function AdminProductRates() {
                     />
                     <FeeField
                       label="Tenue/mois"
+                      tooltipField="tenue"
                       value={product.frais?.tenue}
                       editValue={editValues.fraisTenue}
                       isEditing={isEditing}
@@ -412,6 +416,7 @@ export default function AdminProductRates() {
                     />
                     <FeeField
                       label="Retrait"
+                      tooltipField="retrait"
                       value={product.frais?.retrait}
                       editValue={editValues.fraisRetrait}
                       isEditing={isEditing}
@@ -419,6 +424,7 @@ export default function AdminProductRates() {
                     />
                     <FeeField
                       label="Clôture"
+                      tooltipField="cloture"
                       value={product.frais?.cloture}
                       editValue={editValues.fraisCloture}
                       isEditing={isEditing}
@@ -429,7 +435,7 @@ export default function AdminProductRates() {
                   {/* Rules - Inline */}
                   <div className="mt-2 pt-2 border-t border-slate-800/50 grid grid-cols-2 gap-2">
                     <div className="text-[10px]">
-                      <span className="text-slate-500">Min: </span>
+                      <span className="text-slate-500 inline-flex items-center">Min:<InfoTooltip field="soldeMinimum" /> </span>
                       {isEditing ? (
                         <input
                           type="number"
@@ -444,7 +450,7 @@ export default function AdminProductRates() {
                       )}
                     </div>
                     <div className="text-[10px]">
-                      <span className="text-slate-500">Plafond: </span>
+                      <span className="text-slate-500 inline-flex items-center">Plafond:<InfoTooltip field="plafondDepot" /> </span>
                       {isEditing ? (
                         <input
                           type="number"
@@ -465,13 +471,14 @@ export default function AdminProductRates() {
                     <p className="text-[9px] text-slate-500 uppercase tracking-wide">Politique</p>
                     <PolicyToggle
                       label="Dépôt initial obligatoire"
+                      tooltipField="depotInitialObligatoire"
                       checked={isEditing ? editValues.depotInitialObligatoire : (product.regles?.depotInitialObligatoire ?? false)}
                       isEditing={isEditing}
                       onChange={(v) => setEditValues({ ...editValues, depotInitialObligatoire: v })}
                     />
                     {(isEditing ? editValues.depotInitialObligatoire : product.regles?.depotInitialObligatoire) && (
                       <div className="text-[10px] pl-5">
-                        <span className="text-slate-500">Dépôt min: </span>
+                        <span className="text-slate-500 inline-flex items-center">Dépôt min: <InfoTooltip field="depotInitialMinimum" /></span>
                         {isEditing ? (
                           <input
                             type="number"
@@ -489,12 +496,14 @@ export default function AdminProductRates() {
                     )}
                     <PolicyToggle
                       label="Validation ouverture requise"
+                      tooltipField="validationOuvertureRequise"
                       checked={isEditing ? editValues.validationOuvertureRequise : (product.regles?.validationOuvertureRequise ?? false)}
                       isEditing={isEditing}
                       onChange={(v) => setEditValues({ ...editValues, validationOuvertureRequise: v })}
                     />
                     <PolicyToggle
                       label="Autoriser clôture solde < frais"
+                      tooltipField="autoriserSoldeNegatifCloture"
                       checked={isEditing ? editValues.autoriserSoldeNegatifCloture : (product.regles?.autoriserSoldeNegatifCloture ?? false)}
                       isEditing={isEditing}
                       onChange={(v) => setEditValues({ ...editValues, autoriserSoldeNegatifCloture: v })}
@@ -503,7 +512,7 @@ export default function AdminProductRates() {
                 </div>
 
                 {/* Actions Footer */}
-                <div className="px-3 py-2 bg-slate-900/50 border-t border-slate-800 flex items-center justify-between">
+                <div className="px-3 py-2 bg-slate-900/50 border-t border-slate-800 rounded-b-xl flex items-center justify-between">
                   <span className="text-[9px] text-slate-600">
                     {format(new Date(product.createdAt), 'dd/MM/yy', { locale: fr })}
                   </span>
@@ -558,17 +567,44 @@ export default function AdminProductRates() {
   );
 }
 
+// Tooltip descriptions for each config field
+const FIELD_TOOLTIPS: Record<string, string> = {
+  ouverture: "Frais uniques prélevés à l'ouverture du compte. Débité en premier avant le dépôt initial.",
+  tenue: "Frais mensuels prélevés automatiquement le 1er de chaque mois sur le solde du compte.",
+  retrait: "Frais prélevés sur chaque opération de retrait effectuée sur ce type de compte.",
+  cloture: "Frais prélevés sur le solde lors de la clôture définitive du compte.",
+  depotInitialObligatoire: "Si activé, un dépôt minimum doit être effectué pour que le compte devienne actif.",
+  depotInitialMinimum: "Montant minimum du dépôt initial requis à l'ouverture.",
+  validationOuvertureRequise: "Si activé, un chef d'agence doit approuver l'ouverture avant l'activation du compte.",
+  autoriserSoldeNegatifCloture: "Si activé, permet la clôture même si le solde ne couvre pas les frais de clôture.",
+  soldeMinimum: "Solde minimum autorisé sur ce type de compte.",
+  plafondDepot: "Montant maximum de dépôt autorisé (∞ = illimité).",
+};
+
+// Inline tooltip component using shared Tooltip
+function InfoTooltip({ field }: { field: string }) {
+  const tip = FIELD_TOOLTIPS[field];
+  if (!tip) return null;
+  return (
+    <Tooltip content={tip} position="top" maxWidth={220}>
+      <HelpCircle size={10} className="ml-1 text-slate-500 hover:text-slate-300 cursor-help" />
+    </Tooltip>
+  );
+}
+
 // Policy Toggle Component
 function PolicyToggle({
   label,
   checked,
   isEditing,
   onChange,
+  tooltipField,
 }: {
   label: string;
   checked: boolean;
   isEditing: boolean;
   onChange: (value: boolean) => void;
+  tooltipField?: string;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -594,7 +630,7 @@ function PolicyToggle({
           checked ? "bg-emerald-400" : "bg-slate-600"
         )} />
       )}
-      <span className="text-[10px] text-slate-400">{label}</span>
+      <span className="text-[10px] text-slate-400 flex items-center">{label}{tooltipField && <InfoTooltip field={tooltipField} />}</span>
     </div>
   );
 }
@@ -606,16 +642,18 @@ function FeeField({
   editValue,
   isEditing,
   onChange,
+  tooltipField,
 }: {
   label: string;
   value?: number;
   editValue: string;
   isEditing: boolean;
   onChange: (value: string) => void;
+  tooltipField?: string;
 }) {
   return (
     <div className="bg-slate-800/40 rounded-lg px-2.5 py-2">
-      <p className="text-[9px] text-slate-500 uppercase tracking-wide mb-0.5">{label}</p>
+      <p className="text-[9px] text-slate-500 uppercase tracking-wide mb-0.5 flex items-center">{label}{tooltipField && <InfoTooltip field={tooltipField} />}</p>
       {isEditing ? (
         <input
           type="number"

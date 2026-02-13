@@ -104,7 +104,7 @@ export async function getGlobalStats(agenceId?: string): Promise<DashboardStats>
     .where(withAgence(credits)),
 
     // C. LIQUIDITÉ (Épargne Totale)
-    // CRITICAL: Exclude PENDING_ACTIVATION accounts - those funds are virtual/not yet deposited
+    // CRITICAL: Exclude pending accounts (PENDING_PAYMENT, PENDING_APPROVAL, etc.) - those funds are virtual/not yet deposited
     db.select({
       totalEpargne: sql<number>`COALESCE(SUM(CAST(${comptes.soldeCourant} AS DECIMAL)), 0)`
     }).from(comptes)
@@ -112,7 +112,7 @@ export async function getGlobalStats(agenceId?: string): Promise<DashboardStats>
       withAgence(comptes),
       // Use strict enum value check (TypeCompte.SAVINGS = 'SAVINGS')
       eq(comptes.typeCompte, TypeCompte.SAVINGS),
-      // ONLY count ACTIVE accounts - PENDING_ACTIVATION funds are not real yet
+      // ONLY count ACTIVE accounts - pending account funds are not real yet
       eq(comptes.statut, StatutCompte.ACTIVE)
     )),
 

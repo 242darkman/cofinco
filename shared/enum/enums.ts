@@ -379,6 +379,9 @@ export const statutCompteEnum = pgEnum("statut_compte_enum", [
   "PENDING_VALIDATION",
   "CANCELLED",
   "CLOSURE_PENDING",
+  "PENDING_PAYMENT",
+  "PENDING_APPROVAL",
+  "PENDING_PAYMENT_AND_APPROVAL",
 ]);
 
 // Motifs de suspension (lifecycle)

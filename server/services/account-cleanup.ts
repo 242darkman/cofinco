@@ -1,7 +1,7 @@
 
 import { db } from "../db";
 import { comptes, evenementsOutbox } from "@shared/schema";
-import { eq, and, lte, sql } from "drizzle-orm";
+import { eq, and, lte, sql, inArray } from "drizzle-orm";
 import { subDays } from "date-fns";
 import * as cron from "node-cron";
 import { StatutCompte } from "@shared/enum/status-constants";
@@ -65,17 +65,25 @@ export class AccountCleanupService {
         
         await db.transaction(async (tx) => {
              // 1. Identification
+             // Match all pending-payment statuses (new statuses + legacy for backward compatibility)
+             const pendingPaymentStatuses = [
+                StatutCompte.PENDING_PAYMENT,
+                StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+                StatutCompte.PENDING_ACTIVATION, // legacy
+             ];
+
              const pendingAccounts = await tx
                 .select({
                     id: comptes.id,
                     numeroCompte: comptes.numeroCompte,
+                    statut: comptes.statut,
                     clientId: comptes.clientId,
                     createdAt: comptes.createdAt
                 })
                 .from(comptes)
                 .where(
                     and(
-                        eq(comptes.statut, StatutCompte.PENDING_ACTIVATION),
+                        inArray(comptes.statut, pendingPaymentStatuses),
                         lte(comptes.createdAt, cutoffDate)
                     )
                 );
@@ -107,7 +115,7 @@ export class AccountCleanupService {
                           compteId: account.id,
                           action: 'ANNULATION_AUTOMATIQUE',
                           motif: 'Délai de paiement initial dépassé (7 jours)',
-                          ancienStatut: StatutCompte.PENDING_ACTIVATION,
+                          ancienStatut: account.statut,
                           nouveauStatut: StatutCompte.CANCELLED,
                           date: new Date().toISOString()
                       }

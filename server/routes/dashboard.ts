@@ -120,7 +120,7 @@ export function registerDashboardRoutes(app: Express) {
         }).from(credits).where(withAgence(credits)),
 
         // 3. Epargnes statistics - ONLY Savings accounts
-        // CRITICAL: montantTotal must EXCLUDE PENDING_ACTIVATION accounts (virtual funds)
+        // CRITICAL: montantTotal must EXCLUDE pending accounts (PENDING_PAYMENT, PENDING_APPROVAL, etc.) - virtual funds
         db.select({
           total: count(),
           actifs: sql<number>`COUNT(CASE WHEN ${comptes.statut} = ${StatutCompte.ACTIVE} THEN 1 END)`,

@@ -61,7 +61,10 @@ interface AccountsListProps {
 export const ACCOUNT_STATUS_FILTER_OPTIONS = [
   { value: 'all' as const, label: 'Tous les statuts' },
   { value: StatutCompte.ACTIVE, label: 'Actif' },
-  { value: StatutCompte.PENDING_ACTIVATION, label: 'En attente' },
+  { value: StatutCompte.PENDING_ACTIVATION, label: "En attente d'activation" },
+  { value: StatutCompte.PENDING_PAYMENT, label: 'En attente de paiement' },
+  { value: StatutCompte.PENDING_APPROVAL, label: 'En attente de validation' },
+  { value: StatutCompte.PENDING_PAYMENT_AND_APPROVAL, label: 'En attente paiement & validation' },
   { value: StatutCompte.SUSPENDED, label: 'Suspendu' },
   { value: StatutCompte.CLOSED, label: 'Clôturé' },
 ] as const;

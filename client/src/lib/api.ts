@@ -111,7 +111,7 @@ export interface Compte {
   numeroCompte: string;
   soldeCourant: string;
   tauxInteret?: number;
-  statut: 'ACTIVE' | 'SUSPENDED' | 'CLOSED' | 'PENDING_ACTIVATION' | 'CANCELLED';
+  statut: 'ACTIVE' | 'SUSPENDED' | 'CLOSED' | 'PENDING_ACTIVATION' | 'PENDING_VALIDATION' | 'PENDING_PAYMENT' | 'PENDING_APPROVAL' | 'PENDING_PAYMENT_AND_APPROVAL' | 'CANCELLED' | 'CLOSURE_PENDING';
   blocageActif?: boolean;
   blocageMotif?: string;
   blocageReference?: string;

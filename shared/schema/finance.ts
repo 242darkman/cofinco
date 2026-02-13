@@ -567,7 +567,19 @@ export const comptes = pgTable(
 
     statut: statutCompteEnum("statut").notNull().default("ACTIVE"),
 
-    // Blocage (utile même pour un compte non-bloqué “temporairement gelé”)
+    // Snapshot immuable de la config produit à l'ouverture
+    openingSnapshot: jsonb("opening_snapshot"),
+
+    // Cumuls des paiements d'ouverture
+    paidOpeningFee: numeric("paid_opening_fee").notNull().default("0"),
+    paidInitialDeposit: numeric("paid_initial_deposit").notNull().default("0"),
+
+    // Validation maker-checker ouverture
+    isApproved: boolean("is_approved").notNull().default(false),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+
+    // Blocage (utile même pour un compte non-bloqué "temporairement gelé")
     blocageActif: boolean("blocage_actif").notNull().default(false),
     blocageMotif: motifBlocageEnum("blocage_motif"),
     blocageReference: text("blocage_reference"), // ex: CREDIT:xxx / TONTINE:yyy / DECISION:...

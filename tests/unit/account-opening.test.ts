@@ -1,254 +1,320 @@
+import { describe, it, expect, vi } from 'vitest';
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import comptesService from 'server/services/comptes';
-import { db } from 'server/db';
-import { transactionsCompte, comptes, factures } from '@shared/schema';
-
-// --- Mocks Setup ---
-
-const mockTx = {
-  update: vi.fn(),
-  insert: vi.fn(),
-  select: vi.fn(),
-  execute: vi.fn(),
-  delete: vi.fn(),
-  query: {
-    comptes: { findFirst: vi.fn() },
-  }
-};
-
-let mockValuesSpy: any;
-let mockSetSpy: any;
-
-const createMockBuilder = (result: any = []) => {
-  const builder: any = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    leftJoin: vi.fn().mockReturnThis(),
-    orderBy: vi.fn().mockReturnThis(),
-    set: mockSetSpy,
-    values: mockValuesSpy,
-    returning: vi.fn().mockResolvedValue(Array.isArray(result) ? result : [result]),
-    then: (resolve: any) => resolve(Array.isArray(result) ? result : [result]),
-  };
-  return builder;
-};
-
-// Mock dependencies
+// Mock heavy dependencies so the module can load without a real DB / ledger.
 vi.mock('server/db', () => ({
-  db: {
-    query: {
-      comptes: { findFirst: vi.fn(), findMany: vi.fn() },
-      modelesFactures: { findFirst: vi.fn() },
-      factures: { findFirst: vi.fn() },
-    },
-    select: vi.fn(),
-    update: vi.fn(),
-    insert: vi.fn(),
-    delete: vi.fn(),
-    transaction: vi.fn((callback) => callback(mockTx)),
-  }
+  db: { query: {}, select: vi.fn(), update: vi.fn(), insert: vi.fn(), delete: vi.fn(), transaction: vi.fn() },
 }));
-
-// Mock Ledger to avoid real financial logic complexity in unit test
 vi.mock('server/services/ledger', () => ({
-  executeWithLedger: vi.fn(async (module, data, callback) => {
-    // Simulate ledger execution by calling callback
-    mockTx.update.mockReturnValue(createMockBuilder([{}]));
-    mockTx.insert.mockReturnValue(createMockBuilder([{}]));
-    return callback(mockTx, { id: 'mvt-ledger-123', reference: 'REF-LEDGER' });
-  }),
-  updateCompteSolde: vi.fn().mockResolvedValue('5000'),
-  updateSessionSolde: vi.fn().mockResolvedValue('55000'),
-  generateReference: vi.fn().mockReturnValue('REF-TEST-GEN'),
+  executeWithLedger: vi.fn(),
+  updateCompteSolde: vi.fn(),
+  updateSessionSolde: vi.fn(),
+  createOutboxEvent: vi.fn(),
+  generateReference: vi.fn(),
 }));
-
-// Mock finance storage functions used creating invoices
+vi.mock('server/services/accounting-posting-service', () => ({
+  postGlForMouvement: vi.fn(),
+}));
 vi.mock('server/storage/finance', () => ({
-  createFactureForDepotInitial: vi.fn().mockResolvedValue({ id: 'fac-1', reference: 'FAC-INIT' }),
   createFactureForDepot: vi.fn(),
-  createFactureForRetrait: vi.fn()
+  createFactureForRetrait: vi.fn(),
+  createFactureForDepotInitial: vi.fn(),
 }));
 
-describe('Account Opening & Activation Workflow', () => {
+import {
+  recomputeAccountStatus,
+  allocateOpeningPayment,
+  type OpeningSnapshot,
+} from 'server/services/comptes';
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-    // Initialize Spies
-    mockValuesSpy = vi.fn().mockImplementation(() => createMockBuilder([{ id: 'mock-id' }]));
-    mockSetSpy = vi.fn().mockImplementation(() => createMockBuilder([{ id: 'mock-id' }]));
+/** Build an OpeningSnapshot with sensible defaults, overridable per-test. */
+function makeSnapshot(overrides: Partial<OpeningSnapshot> = {}): OpeningSnapshot {
+  return {
+    openingFee: 0,
+    minInitialDeposit: 0,
+    initialDepositRequired: false,
+    requiresApproval: false,
+    maintenanceFee: 0,
+    closingFee: 0,
+    produitCode: 'CE',
+    produitNom: 'Compte Epargne',
+    ...overrides,
+  };
+}
 
-    // Default builder return
-    mockTx.insert.mockImplementation(() => createMockBuilder([{ id: 'new-compte-id', numeroCompte: 'CPT-NEW' }]));
-    mockTx.update.mockImplementation(() => createMockBuilder([{ id: 'mock-id' }]));
-    mockTx.select.mockImplementation(() => createMockBuilder([{ id: 'mock-id' }]));
-    
-    vi.mocked(db.insert).mockImplementation(() => createMockBuilder([{ id: 'new-compte-id' }]));
-    vi.mocked(db.update).mockImplementation(() => createMockBuilder([{ id: 'updated-id' }]));
-    vi.mocked(db.select).mockImplementation(() => createMockBuilder([]));
+/** Shorthand to call recomputeAccountStatus with explicit fields. */
+function computeStatus(
+  snapshot: OpeningSnapshot | null,
+  paidFee: number,
+  paidDeposit: number,
+  isApproved: boolean,
+): string {
+  return recomputeAccountStatus({
+    openingSnapshot: snapshot,
+    paidOpeningFee: String(paidFee),
+    paidInitialDeposit: String(paidDeposit),
+    isApproved,
   });
+}
 
-  describe('createCompteWithInitialDeposit', () => {
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
-    it('should create an account with PENDING_ACTIVATION status when mode is "CASH"', async () => {
-      // Setup - use correct function signature: (data, userId)
-      const payload = {
-        clientId: 'client-1',
-        typeCompte: 'SAVINGS' as const,
-        agenceId: 'agence-1',
-        montantInitial: 5000,
-        modePaiement: 'CASH' as const,
-      };
-
-      // Execute - createCompteWithInitialDeposit takes (data, userId) not (data, userId, agenceId)
-      await comptesService.createCompteWithInitialDeposit(payload, 'user-1');
-
-      // Assert
-      // 1. Verify db.insert was called for Comptes table (via tx)
-      expect(mockTx.insert).toHaveBeenCalledWith(comptes);
-
-      // 2. Verify values passed contain correct status
-      const insertCall = vi.mocked(mockValuesSpy).mock.calls[0];
-      const insertedData = insertCall[0];
-      expect(insertedData).toMatchObject({
-        statut: 'PENDING_ACTIVATION',
-        soldeCourant: '5000', // For PENDING_ACTIVATION, soldeCourant stores the expected initial deposit
+describe('Account Opening - pure functions', () => {
+  // -----------------------------------------------------------------------
+  // 1. recomputeAccountStatus: 8-combination matrix
+  // -----------------------------------------------------------------------
+  describe('recomputeAccountStatus - status matrix (8 combinations)', () => {
+    it('#1 fee=0, deposit=false, approval=false -> ACTIVE', () => {
+      const snap = makeSnapshot({
+        openingFee: 0,
+        initialDepositRequired: false,
+        minInitialDeposit: 0,
+        requiresApproval: false,
       });
+      expect(computeStatus(snap, 0, 0, false)).toBe('ACTIVE');
     });
 
-    it('should activate account immediately when mode is "TRANSFER"', async () => {
-       // Setup - use correct function signature
-       const payload = {
-         clientId: 'client-1',
-         typeCompte: 'SAVINGS' as const,
-         agenceId: 'agence-1',
-         montantInitial: 5000,
-         modePaiement: 'TRANSFER' as const,
-         compteSourceId: 'source-1'
-       };
-
-       const mockSourceAccount = {
-         id: 'source-1',
-         soldeCourant: '100000',
-         statut: 'ACTIVE',
-         numeroCompte: 'CE-12345678-0001'
-       };
-
-       // Mock finding source account via TX
-       mockTx.select.mockImplementation(() => createMockBuilder([mockSourceAccount]));
-
-       // Execute
-       await comptesService.createCompteWithInitialDeposit(payload, 'user-1');
-
-       // Assert
-       // 1. Check account creation Status = ACTIVE
-       const insertCalls = vi.mocked(mockValuesSpy).mock.calls;
-       // We expect multiple inserts? (Compte + Transaction?)
-       // Actually `executeWithLedger` is called for transfer.
-       // The account creation is likely the first insert.
-
-       const accountInsert = insertCalls.find((call: unknown[]) => (call[0] as Record<string, unknown>).clientId === 'client-1');
-       expect(accountInsert).toBeDefined();
-       expect((accountInsert as unknown[])[0]).toHaveProperty('statut', 'ACTIVE');
-
-       // 2. Check Debit/Credit Transactions Logic (Mocked Ledger)
-       // Since we verified status is ACTIVE and it didn't throw, and we mock ledger,
-       // we assume flow passed.
+    it('#2 fee=5000, deposit=false, approval=false -> PENDING_PAYMENT (nothing paid)', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: false,
+        minInitialDeposit: 0,
+        requiresApproval: false,
+      });
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_PAYMENT');
     });
 
-    it('should throw error if source account has insufficient funds for transfer', async () => {
-        // Setup
-        const payload = {
-          clientId: 'client-1',
-          typeCompte: 'SAVINGS' as const,
-          agenceId: 'agence-1',
-          montantInitial: 50000, // High amount
-          modePaiement: 'TRANSFER' as const,
-          compteSourceId: 'source-mini'
-        };
+    it('#3 fee=0, deposit=true (2500), approval=false -> PENDING_PAYMENT', () => {
+      const snap = makeSnapshot({
+        openingFee: 0,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+        requiresApproval: false,
+      });
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_PAYMENT');
+    });
 
-        const mockSourceAccount = {
-          id: 'source-mini',
-          soldeCourant: '1000', // Low balance
-          statut: 'ACTIVE',
-          numeroCompte: 'CE-87654321-0001'
-        };
+    it('#4 fee=5000, deposit=true (2500), approval=false -> PENDING_PAYMENT', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+        requiresApproval: false,
+      });
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_PAYMENT');
+    });
 
-        // Mock finding source account via TX
-        mockTx.select.mockImplementation(() => createMockBuilder([mockSourceAccount]));
+    it('#5 fee=0, deposit=false, approval=true -> PENDING_APPROVAL', () => {
+      const snap = makeSnapshot({
+        openingFee: 0,
+        initialDepositRequired: false,
+        minInitialDeposit: 0,
+        requiresApproval: true,
+      });
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_APPROVAL');
+    });
 
-        // Execute & Assert
-        await expect(comptesService.createCompteWithInitialDeposit(payload, 'user-1'))
-          .rejects.toThrow(/Solde insuffisant/);
+    it('#6 fee=5000, deposit=false, approval=true -> PENDING_PAYMENT_AND_APPROVAL', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: false,
+        minInitialDeposit: 0,
+        requiresApproval: true,
+      });
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_PAYMENT_AND_APPROVAL');
+    });
+
+    it('#7 fee=0, deposit=true (2500), approval=true -> PENDING_PAYMENT_AND_APPROVAL', () => {
+      const snap = makeSnapshot({
+        openingFee: 0,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+        requiresApproval: true,
+      });
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_PAYMENT_AND_APPROVAL');
+    });
+
+    it('#8 fee=5000, deposit=true (2500), approval=true -> PENDING_PAYMENT_AND_APPROVAL', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+        requiresApproval: true,
+      });
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_PAYMENT_AND_APPROVAL');
+    });
+
+    // Verify that fully-paid + approved variants of each row yield ACTIVE
+    it('#2 fully paid -> ACTIVE', () => {
+      const snap = makeSnapshot({ openingFee: 5000 });
+      expect(computeStatus(snap, 5000, 0, false)).toBe('ACTIVE');
+    });
+
+    it('#4 fully paid -> ACTIVE', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+      });
+      expect(computeStatus(snap, 5000, 2500, false)).toBe('ACTIVE');
+    });
+
+    it('#6 fully paid and approved -> ACTIVE', () => {
+      const snap = makeSnapshot({ openingFee: 5000, requiresApproval: true });
+      expect(computeStatus(snap, 5000, 0, true)).toBe('ACTIVE');
+    });
+
+    it('#8 fully paid and approved -> ACTIVE', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+        requiresApproval: true,
+      });
+      expect(computeStatus(snap, 5000, 2500, true)).toBe('ACTIVE');
     });
   });
 
-  describe('payerDepotInitialCompte', () => {
-      it('should activate account and create transaction', async () => {
-          // Setup
-          const compteId = 'pending-1';
-          const mockPendingAccount = {
-              id: compteId,
-              statut: 'PENDING_ACTIVATION',
-              clientId: 'client-1',
-              soldeCourant: '5000',
-              numeroCompte: 'CE-12345678-0001',
-              typeCompte: 'Épargne'
-          };
+  // -----------------------------------------------------------------------
+  // 2. recomputeAccountStatus: partial payment transitions
+  // -----------------------------------------------------------------------
+  describe('recomputeAccountStatus - partial payment transitions', () => {
+    // Scenario: fee=5000, deposit=2500, requiresApproval=true
+    const snap = makeSnapshot({
+      openingFee: 5000,
+      initialDepositRequired: true,
+      minInitialDeposit: 2500,
+      requiresApproval: true,
+    });
 
-          // Mock finding the account via TX
-          mockTx.select.mockImplementation(() => createMockBuilder([mockPendingAccount]));
+    it('starts at PENDING_PAYMENT_AND_APPROVAL with nothing paid', () => {
+      expect(computeStatus(snap, 0, 0, false)).toBe('PENDING_PAYMENT_AND_APPROVAL');
+    });
 
-          // Mock finding session caisse (if checked) - Mocking simple DB select
-          // Assuming service checks session validity?
+    it('partial fee payment (3000) -> still PENDING_PAYMENT_AND_APPROVAL', () => {
+      // Paid 3000 towards fee, 0 towards deposit, not approved
+      expect(computeStatus(snap, 3000, 0, false)).toBe('PENDING_PAYMENT_AND_APPROVAL');
+    });
 
-          // Execute - payerDepotInitialCompte takes (compteId, { montant, sessionCaisseId, userId })
-          const result = await comptesService.payerDepotInitialCompte(compteId, {
-              montant: 5000,
-              sessionCaisseId: 'session-1',
-              userId: 'user-admin'
-          });
+    it('fee fully paid (5000) but no deposit -> still PENDING_PAYMENT_AND_APPROVAL', () => {
+      // Fee done, deposit still 0, not approved
+      expect(computeStatus(snap, 5000, 0, false)).toBe('PENDING_PAYMENT_AND_APPROVAL');
+    });
 
-          // Assert
-          // 1. Account Update to ACTIVE
-          const updateCalls = mockTx.update.mock.calls;
-          expect(updateCalls.some((call: unknown[]) => call[0] === comptes)).toBe(true);
+    it('fee fully paid + approved but no deposit -> PENDING_PAYMENT', () => {
+      // Fee done, approved, but deposit still outstanding
+      expect(computeStatus(snap, 5000, 0, true)).toBe('PENDING_PAYMENT');
+    });
 
-          const setCalls = mockSetSpy.mock.calls;
-          const statusUpdate = setCalls.find((call: unknown[]) => (call[0] as Record<string, unknown>).statut === 'ACTIVE');
-          expect(statusUpdate).toBeDefined();
+    it('fee fully paid + deposit fully paid + approved -> ACTIVE', () => {
+      expect(computeStatus(snap, 5000, 2500, true)).toBe('ACTIVE');
+    });
 
-          // 2. Transaction Creation (via Ledger mock callback)
-          const insertCalls = mockTx.insert.mock.calls;
-          const txInsert = insertCalls.find((call: unknown[]) => call[0] === transactionsCompte);
-          expect(txInsert).toBeDefined();
-
-          // 3. Invoice Creation
-          // We mocked createFactureForDepotInitial to return { id: 'fac-1' }
-          // The service returns { facture: ... }
-          expect(result.facture).toBeDefined();
-          expect(result.facture.id).toBe('fac-1');
-      });
-
-      it('should throw if account is already active', async () => {
-          const mockActiveAccount = {
-              id: 'active-1',
-              statut: 'ACTIVE',
-              soldeCourant: '10000',
-              numeroCompte: 'CE-87654321-0001'
-          };
-          // Mock txn select
-          mockTx.select.mockImplementation(() => createMockBuilder([mockActiveAccount]));
-
-          // payerDepotInitialCompte takes (compteId, { montant, sessionCaisseId, userId })
-          await expect(comptesService.payerDepotInitialCompte('active-1', {
-              montant: 5000,
-              sessionCaisseId: 's1',
-              userId: 'u1'
-          })).rejects.toThrow();
-      });
+    it('all paid but not approved -> PENDING_APPROVAL', () => {
+      expect(computeStatus(snap, 5000, 2500, false)).toBe('PENDING_APPROVAL');
+    });
   });
 
+  // -----------------------------------------------------------------------
+  // 3. recomputeAccountStatus: legacy accounts (null snapshot)
+  // -----------------------------------------------------------------------
+  describe('recomputeAccountStatus - legacy accounts without snapshot', () => {
+    it('null snapshot -> ACTIVE', () => {
+      expect(computeStatus(null, 0, 0, false)).toBe('ACTIVE');
+    });
+
+    it('null snapshot -> ACTIVE regardless of other fields', () => {
+      // Even with "unpaid" values and no approval, a null snapshot means legacy -> ACTIVE
+      expect(computeStatus(null, 0, 0, true)).toBe('ACTIVE');
+      expect(computeStatus(null, 999, 999, false)).toBe('ACTIVE');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // 4. allocateOpeningPayment - fee-first allocation
+  // -----------------------------------------------------------------------
+  describe('allocateOpeningPayment - fee-first allocation', () => {
+    it('amount 3000, fee=5000, no prior payments -> all to fee', () => {
+      const snap = makeSnapshot({ openingFee: 5000 });
+      const result = allocateOpeningPayment(3000, snap, 0, 0);
+      expect(result.feePayment).toBe(3000);
+      expect(result.depositPayment).toBe(0);
+    });
+
+    it('amount 7000, fee=5000, already paid 2000 fee -> 3000 fee + 4000 deposit', () => {
+      const snap = makeSnapshot({ openingFee: 5000 });
+      const result = allocateOpeningPayment(7000, snap, 2000, 0);
+      expect(result.feePayment).toBe(3000);
+      expect(result.depositPayment).toBe(4000);
+    });
+
+    it('amount 5000, fee=0 -> all to deposit', () => {
+      const snap = makeSnapshot({ openingFee: 0 });
+      const result = allocateOpeningPayment(5000, snap, 0, 0);
+      expect(result.feePayment).toBe(0);
+      expect(result.depositPayment).toBe(5000);
+    });
+
+    it('amount exactly covers remaining fee -> feePayment=amount, deposit=0', () => {
+      const snap = makeSnapshot({ openingFee: 5000 });
+      const result = allocateOpeningPayment(5000, snap, 0, 0);
+      expect(result.feePayment).toBe(5000);
+      expect(result.depositPayment).toBe(0);
+    });
+
+    it('fee already fully paid -> entire amount goes to deposit', () => {
+      const snap = makeSnapshot({ openingFee: 5000 });
+      const result = allocateOpeningPayment(3000, snap, 5000, 0);
+      expect(result.feePayment).toBe(0);
+      expect(result.depositPayment).toBe(3000);
+    });
+
+    it('overpaid fee scenario -> no negative fee, excess to deposit', () => {
+      const snap = makeSnapshot({ openingFee: 5000 });
+      // Already paid 6000 in fee (overpaid) - remaining fee should clamp to 0
+      const result = allocateOpeningPayment(2000, snap, 6000, 0);
+      expect(result.feePayment).toBe(0);
+      expect(result.depositPayment).toBe(2000);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // 5. recomputeAccountStatus: approval before payment
+  // -----------------------------------------------------------------------
+  describe('recomputeAccountStatus - approval granted before full payment', () => {
+    it('fee=5000, approval required, approved but unpaid -> PENDING_PAYMENT', () => {
+      const snap = makeSnapshot({ openingFee: 5000, requiresApproval: true });
+      expect(computeStatus(snap, 0, 0, true)).toBe('PENDING_PAYMENT');
+    });
+
+    it('fee=5000, approval required, approved and fully paid -> ACTIVE', () => {
+      const snap = makeSnapshot({ openingFee: 5000, requiresApproval: true });
+      expect(computeStatus(snap, 5000, 0, true)).toBe('ACTIVE');
+    });
+
+    it('fee=5000 + deposit=2500, approved but only fee paid -> PENDING_PAYMENT', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+        requiresApproval: true,
+      });
+      expect(computeStatus(snap, 5000, 0, true)).toBe('PENDING_PAYMENT');
+    });
+
+    it('fee=5000 + deposit=2500, approved and fully paid -> ACTIVE', () => {
+      const snap = makeSnapshot({
+        openingFee: 5000,
+        initialDepositRequired: true,
+        minInitialDeposit: 2500,
+        requiresApproval: true,
+      });
+      expect(computeStatus(snap, 5000, 2500, true)).toBe('ACTIVE');
+    });
+  });
 });

@@ -2489,6 +2489,19 @@ export async function ensureCustomFunctions(): Promise<void> {
       console.warn('[DB] ⚠ Failed to create TRIGGER "trg_guard_mouvement_gl":', err instanceof Error ? err.message : err);
     }
 
+    // ── One-time data migration: legacy account statuses → new status system ──
+    try {
+      await db.execute(sql`
+        -- Migrate legacy account statuses to new status system
+        UPDATE comptes SET statut = 'PENDING_PAYMENT' WHERE statut = 'PENDING_ACTIVATION';
+        UPDATE comptes SET statut = 'PENDING_PAYMENT_AND_APPROVAL' WHERE statut = 'PENDING_VALIDATION';
+        UPDATE comptes SET is_approved = true WHERE statut = 'ACTIVE' AND is_approved = false;
+      `);
+      console.log('[DB] ✓ DATA MIGRATION: legacy account statuses migrated');
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed data migration "legacy account statuses":', err instanceof Error ? err.message : err);
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

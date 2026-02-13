@@ -49,7 +49,7 @@ import { duplicateDetection } from "../middleware/duplicate-detection";
 import { enqueueNotification } from "../services/notifications/notification-service";
 import { mouvementsFinanciers, operationsCaisse } from "@shared/schema/finance";
 import { storage } from "../storage";
-import { aliasedTable, and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { aliasedTable, and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
@@ -335,9 +335,14 @@ export function registerComptesRoutes(app: Express) {
           agenceId: parsed.agenceId,
         });
 
-        // Create caisse payment request for CASH PENDING_ACTIVATION accounts
+        // Create caisse payment request for CASH pending-payment accounts
+        const pendingPaymentStatuses = [
+          StatutCompte.PENDING_PAYMENT,
+          StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+          StatutCompte.PENDING_ACTIVATION, // legacy
+        ];
         if (
-          result.compte.statut === 'PENDING_ACTIVATION' &&
+          pendingPaymentStatuses.includes(result.compte.statut as any) &&
           parsed.modePaiement === 'CASH' &&
           parsed.soldeInitial > 0
         ) {
@@ -491,7 +496,8 @@ export function registerComptesRoutes(app: Express) {
   );
 
   /**
-   * GET /api/comptes/pending-activation - Lister les comptes en attente d'activation (pour encaissement)
+   * GET /api/comptes/pending-activation - Lister les comptes en attente de paiement (pour encaissement)
+   * Includes: PENDING_PAYMENT, PENDING_PAYMENT_AND_APPROVAL, and legacy PENDING_ACTIVATION
    * Tri: FIFO (plus ancien en premier)
    */
   app.get(
@@ -503,7 +509,12 @@ export function registerComptesRoutes(app: Express) {
     async (req, res) => {
         try {
             const agenceId = req.selectedAgenceId;
-            const conditions: any[] = [eq(comptes.statut, StatutCompte.PENDING_ACTIVATION)];
+            const pendingPaymentStatuses = [
+                StatutCompte.PENDING_PAYMENT,
+                StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+                StatutCompte.PENDING_ACTIVATION, // legacy backward compatibility
+            ];
+            const conditions: any[] = [inArray(comptes.statut, pendingPaymentStatuses)];
 
             if (agenceId) {
                 // Robust agency check: either the account is explicitly assigned to this agency
@@ -525,7 +536,11 @@ export function registerComptesRoutes(app: Express) {
                     id: comptes.id,
                     numeroCompte: comptes.numeroCompte,
                     typeCompte: comptes.typeCompte,
+                    statut: comptes.statut,
                     montantInitial: comptes.soldeCourant,
+                    openingSnapshot: comptes.openingSnapshot,
+                    paidOpeningFee: comptes.paidOpeningFee,
+                    paidInitialDeposit: comptes.paidInitialDeposit,
                     createdAt: comptes.createdAt,
                     clientId: clients.id,
                     // Architecture V3: nom/prenom proviennent de users
@@ -559,11 +574,21 @@ export function registerComptesRoutes(app: Express) {
                     }
                 }
 
+                // Compute remaining opening fee and deposit from snapshot
+                const snapshot = r.openingSnapshot as any;
+                const paidFee = parseFloat(r.paidOpeningFee || '0');
+                const paidDeposit = parseFloat(r.paidInitialDeposit || '0');
+                const requiredFee = snapshot?.openingFee || 0;
+                const requiredDeposit = (snapshot?.initialDepositRequired && snapshot?.minInitialDeposit) ? snapshot.minInitialDeposit : 0;
+
                 return {
                     id: r.id,
                     numeroCompte: r.numeroCompte,
                     typeCompte: r.typeCompte,
+                    statut: r.statut,
                     montantInitial: parseFloat(r.montantInitial || '0'),
+                    remainingOpeningFee: Math.max(0, requiredFee - paidFee),
+                    remainingDeposit: Math.max(0, requiredDeposit - paidDeposit),
                     createdAt: r.createdAt,
                     client: {
                         id: r.clientId,
@@ -1904,8 +1929,13 @@ export function registerComptesRoutes(app: Express) {
               continue;
             }
 
-            if (compte.statut !== 'PENDING_ACTIVATION') {
-              results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Compte pas en attente d'activation" });
+            const batchPendingStatuses = [
+              StatutCompte.PENDING_PAYMENT,
+              StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+              StatutCompte.PENDING_ACTIVATION, // legacy
+            ];
+            if (!batchPendingStatuses.includes(compte.statut as any)) {
+              results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Compte pas en attente de paiement" });
               continue;
             }
 

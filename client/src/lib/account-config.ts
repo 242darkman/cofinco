@@ -1,6 +1,6 @@
 import { PiggyBank, Wallet, Lock } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { StatutCompte } from '@shared/enum/status-constants';
+import { StatutCompte, type StatutCompteType } from '@shared/enum/status-constants';
 
 export type AccountType = 'Courant' | 'Épargne' | 'Bloqué';
 
@@ -29,6 +29,8 @@ export interface AccountUiConfig {
   canUnlock: boolean;
   interestRate: number;
   isPendingActivation?: boolean;
+  isPendingPayment?: boolean;
+  isPendingApproval?: boolean;
 }
 
 export type AccountViewRole = 'client' | 'staff';
@@ -80,6 +82,23 @@ export function getAccountUiConfig(account: AccountLike, role: AccountViewRole =
   const isActive = status === StatutCompte.ACTIVE;
   const isPendingActivation = status === StatutCompte.PENDING_ACTIVATION;
 
+  // New granular pending states (backward compat: PENDING_ACTIVATION is also payment-pending)
+  const isPendingPayment = [
+    StatutCompte.PENDING_PAYMENT,
+    StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+    StatutCompte.PENDING_ACTIVATION,
+  ].includes(status as StatutCompteType);
+
+  const isPendingApproval = [
+    StatutCompte.PENDING_APPROVAL,
+    StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+    StatutCompte.PENDING_VALIDATION,
+  ].includes(status as StatutCompteType);
+
+  // Any "pending" state (activation, payment, approval, validation)
+  const isAnyPending = isPendingActivation || isPendingPayment || isPendingApproval ||
+    status === StatutCompte.PENDING_VALIDATION;
+
   // Use centralized labels and colors
   const statusLabel = getStatusLabel(status, ACCOUNT_STATUS_LABELS);
 
@@ -97,33 +116,42 @@ export function getAccountUiConfig(account: AccountLike, role: AccountViewRole =
     accentClassName: TYPE_STYLES[type].accentClassName,
     statusLabel,
     isLocked,
-    // PENDING_ACTIVATION accounts cannot do transfers - funds are virtual
-    canTransferOut: isActive && !isLocked && !isPendingActivation,
-    canReceive: isPendingActivation ? true : (isLocked ? true : isActive),
+    // Pending accounts cannot do transfers - funds are virtual
+    canTransferOut: isActive && !isLocked && !isAnyPending,
+    canReceive: isAnyPending ? true : (isLocked ? true : isActive),
     canUnlock: role === 'staff' && isLocked,
     interestRate,
-    isPendingActivation,
+    isPendingActivation: isAnyPending, // backward compat: any pending state triggers "pending" UI
+    isPendingPayment,
+    isPendingApproval,
   };
 }
 
+/** Statuses where funds are virtual / not yet deposited */
+const PENDING_PAYMENT_STATUSES: StatutCompteType[] = [
+  StatutCompte.PENDING_ACTIVATION,
+  StatutCompte.PENDING_PAYMENT,
+  StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
+];
+
 /**
  * Get the "real" balance for display purposes.
- * PENDING_ACTIVATION accounts show 0 as real balance (funds not yet deposited).
+ * Accounts pending payment show 0 as real balance (funds not yet deposited).
  */
 export function getRealBalance(account: AccountLike): number {
   const status = String(account.statut || StatutCompte.ACTIVE);
-  if (status === StatutCompte.PENDING_ACTIVATION) {
+  if (PENDING_PAYMENT_STATUSES.includes(status as StatutCompteType)) {
     return 0; // Virtual funds - not yet encashed
   }
   return getAccountBalance(account);
 }
 
 /**
- * Get the pending deposit amount for PENDING_ACTIVATION accounts.
+ * Get the pending deposit amount for accounts awaiting payment.
  */
 export function getPendingDepositAmount(account: AccountLike): number {
   const status = String(account.statut || StatutCompte.ACTIVE);
-  if (status === StatutCompte.PENDING_ACTIVATION) {
+  if (PENDING_PAYMENT_STATUSES.includes(status as StatutCompteType)) {
     return getAccountBalance(account); // This is the amount to be deposited
   }
   return 0;

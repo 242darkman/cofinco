@@ -163,7 +163,8 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
 
   const uiConfig = compte ? getAccountUiConfig(compte, 'staff') : {
       theme: 'blue', type: 'Compte', interestRate: 0, statusLabel: 'Actif', isLocked: false,
-      accentClassName: '', bgClassName: '', badgeClassName: '', icon: CreditCard, isPendingActivation: false
+      accentClassName: '', bgClassName: '', badgeClassName: '', icon: CreditCard,
+      isPendingActivation: false, isPendingPayment: false, isPendingApproval: false
   };
 
   const balance = compte ? getAccountBalance(compte) : 0;

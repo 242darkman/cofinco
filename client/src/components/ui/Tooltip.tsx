@@ -5,6 +5,7 @@ export interface TooltipProps {
   children: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
   delay?: number;
+  maxWidth?: number;
 }
 
 function Tooltip({
@@ -12,6 +13,7 @@ function Tooltip({
   children,
   position = 'top',
   delay = 200,
+  maxWidth,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -52,7 +54,7 @@ function Tooltip({
   };
 
   return (
-    <div
+    <span
       className="relative inline-flex"
       onMouseEnter={showTooltip}
       onMouseLeave={hideTooltip}
@@ -61,19 +63,19 @@ function Tooltip({
     >
       {children}
       {isVisible && (
-        <div
+        <span
           className={`absolute z-50 ${positionClasses[position]} pointer-events-none`}
           role="tooltip"
         >
-          <div className="relative px-2.5 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg shadow-lg whitespace-nowrap">
+          <span className={`relative block px-2.5 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg shadow-lg normal-case tracking-normal ${maxWidth ? '' : 'whitespace-nowrap'}`} style={maxWidth ? { maxWidth, whiteSpace: 'normal' } : undefined}>
             {content}
-            <div
+            <span
               className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`}
             />
-          </div>
-        </div>
+          </span>
+        </span>
       )}
-    </div>
+    </span>
   );
 }
 

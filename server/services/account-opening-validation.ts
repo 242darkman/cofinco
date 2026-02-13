@@ -1,10 +1,10 @@
 /**
  * Service Validation Ouverture de Compte (Maker-Checker)
  *
- * Workflow pour comptes épargne / bloqué avec validation chef d'agence:
- * 1. Agent crée compte → PENDING_VALIDATION + opening request PENDING
- * 2. Chef d'agence approuve → PENDING_ACTIVATION (caissier peut encaisser)
- * 3. Chef d'agence rejette → CANCELLED + request REJECTED
+ * Workflow piloté par recomputeAccountStatus():
+ * 1. Agent crée compte → statut déterminé par snapshot (PENDING_PAYMENT_AND_APPROVAL, etc.)
+ * 2. Chef d'agence approuve → isApproved=true, recompute (→ PENDING_PAYMENT ou ACTIVE)
+ * 3. Chef d'agence rejette → CANCELLED
  */
 
 import { db } from "../db";
@@ -22,7 +22,7 @@ import { alias } from "drizzle-orm/pg-core";
 import {
   StatutCompte as StatutCompteConst,
 } from "@shared/enum/status-constants";
-import { CompteError } from "./comptes";
+import { CompteError, recomputeAccountStatus, type OpeningSnapshot } from "./comptes";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger("AccountOpeningValidation");
@@ -56,9 +56,14 @@ export async function approveOpeningRequest(
       );
     }
 
-    // Verify account is still in PENDING_VALIDATION
+    // Verify account is in a pending state that needs approval
     const [compte] = await tx.select().from(comptes).where(eq(comptes.id, request.compteId));
-    if (!compte || compte.statut !== StatutCompteConst.PENDING_VALIDATION) {
+    const approvalPendingStatuses = [
+      StatutCompteConst.PENDING_APPROVAL,
+      StatutCompteConst.PENDING_PAYMENT_AND_APPROVAL,
+      StatutCompteConst.PENDING_VALIDATION, // Legacy
+    ];
+    if (!compte || !approvalPendingStatuses.includes(compte.statut as any)) {
       throw new CompteError(
         "Le compte n'est plus en attente de validation",
         "INVALID_STATE"
@@ -77,13 +82,24 @@ export async function approveOpeningRequest(
       .where(eq(accountOpeningRequests.id, requestId))
       .returning();
 
-    // Transition account to PENDING_ACTIVATION (cashier can now collect payment)
+    // Set isApproved and recompute status
+    const snapshot = (compte as any).openingSnapshot as OpeningSnapshot | null;
+    const newStatus = recomputeAccountStatus({
+      openingSnapshot: snapshot,
+      paidOpeningFee: (compte as any).paidOpeningFee || "0",
+      paidInitialDeposit: (compte as any).paidInitialDeposit || "0",
+      isApproved: true,
+    });
+
     await tx
       .update(comptes)
       .set({
-        statut: StatutCompteConst.PENDING_ACTIVATION,
+        isApproved: true,
+        approvedBy: userId,
+        approvedAt: new Date(),
+        statut: newStatus,
         updatedAt: new Date(),
-      })
+      } as any)
       .where(eq(comptes.id, request.compteId));
 
     // Outbox event for real-time updates (Validations Center badges + list)
@@ -96,12 +112,13 @@ export async function approveOpeningRequest(
         action: "OPENING_APPROVED",
         requestId,
         approvedBy: userId,
+        newStatus,
       },
     });
 
     logger.info(
-      { requestId, compteId: request.compteId, approvedBy: userId },
-      "Opening request approved — account moved to PENDING_ACTIVATION"
+      { requestId, compteId: request.compteId, approvedBy: userId, newStatus },
+      `Opening request approved — account status: ${newStatus}`
     );
 
     return updated;

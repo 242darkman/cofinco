@@ -168,12 +168,9 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
 
     // Add sub-module to breadcrumb if present
     if (currentSubModule) {
-      // Format sub-module name for display
-      const subModuleName = currentSubModule
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      crumbs.push(subModuleName);
+      const route = getRouteByKey(currentModule);
+      const subRoute = route?.subRoutes?.find(sr => sr.subModule === currentSubModule);
+      crumbs.push(subRoute?.label ?? currentSubModule);
     }
 
     setBreadcrumbs(crumbs);
