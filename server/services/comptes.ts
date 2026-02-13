@@ -2012,6 +2012,9 @@ export async function payerDepotInitialCompte(
     }
 
     // 3. Create OPENING_FEE mouvement + GL posting (if fee portion > 0)
+    let feeMouvementId: string | undefined;
+    let depositMouvementId: string | undefined;
+
     if (feePayment > 0) {
       const feeReference = generateReference("FRAIS");
 
@@ -2036,6 +2039,8 @@ export async function payerDepotInitialCompte(
           ...(data.operateurMobile ? { provider: data.operateurMobile } : {}),
         },
       } as any).returning();
+
+      feeMouvementId = feeMouvement.id;
 
       // Fee transaction record (not on account balance — goes to revenue)
       await tx.insert(transactionsCompte).values({
@@ -2091,6 +2096,8 @@ export async function payerDepotInitialCompte(
           ...(data.operateurMobile ? { provider: data.operateurMobile } : {}),
         },
       } as any).returning();
+
+      depositMouvementId = depositMouvement.id;
 
       // Deposit transaction record
       [transaction] = await tx.insert(transactionsCompte).values({
@@ -2157,9 +2164,12 @@ export async function payerDepotInitialCompte(
     await updateSessionSolde(tx, data.sessionCaisseId, data.montant);
 
     // 7. Create Operation Caisse (full amount)
+    // Use the actual mouvements_financiers ID (deposit takes priority, fallback to fee)
+    const caisseOpMouvementId = depositMouvementId || feeMouvementId || null;
+
     await tx.insert(operationsCaisse).values({
       sessionId: data.sessionCaisseId,
-      mouvementId: transaction.id, // Link to main transaction
+      mouvementId: caisseOpMouvementId,
       typeOperation: "INITIAL_DEPOSIT",
       montant: data.montant.toString(),
       methodePaiement: paymentMethod,
