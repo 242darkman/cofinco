@@ -1,637 +1,1258 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Search, CreditCard, Users, CheckCircle, Loader, ArrowLeft, ArrowUpRight, ArrowDownLeft, Wallet, ShieldCheck } from 'lucide-react';
-import { Card, Button } from '../../ui';
-import { clientSearchApi, clientApi, creditApi, tontineApi, operationCaisseApi, compteEpargneApi } from '../../../lib/api-client';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft,
+  Loader, Coins, Phone, AlertCircle, Shield, Loader2
+} from 'lucide-react';
+import { PhysicalConfirmationStep, PhysicalConfirmationData } from '../../auth/PhysicalConfirmationStep';
+import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
+import { Card, Button, Badge } from '@/components/ui';
+import {
+  clientSearchApi, creditApi, tontineApi, sessionCaisseApi,
+  operationCaisseApi, echeanceCreditApi, compteEpargneApi,
+  securityConfigApi, SecurityConfigResponse
+} from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney, parseMoney } from '../../../lib/format';
-import { sanitizeInput } from '../../../lib/sanitize';
-import { TypeOperationCaisse, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
+import { formatMoney } from '../../../lib/format';
+import { VALIDATION_LIMITS } from '../../../lib/validation';
+import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
-import { ReceiptData, ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
-import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
-import { usePrinter } from '../../../hooks/useReceiptPrinter';
+import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
+import { PaymentStatusModal, PaymentStatus } from '../payments';
+import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { authService } from '../../../lib/auth';
+import { StatutCredit, TypeCompte, TypeOperationCaisse } from '@shared/enum/status-constants';
+import { useOperationInfo } from './hooks/useOperationInfo';
 import { currencySymbol } from '@shared/config/currency';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
 
-// Types and Interfaces
+// ─── Types ──────────────────────────────────────────────
 interface Client {
   id: string;
   nom: string;
   prenom: string;
+  numeroCompte?: string;
   numero_compte?: string;
   telephone: string;
   email?: string;
-  solde_epargne?: number;
   phone?: string;
   photo_url?: string;
+  securityLimits?: {
+    daily: { limit: number; used: number; remaining: number };
+    weekly: { limit: number; used: number; remaining: number };
+    monthly: { limit: number; used: number; remaining: number };
+  };
 }
 
-type DirectionOperation = 'Dépôt' | 'Retrait';
-type DestinationType = 'Compte' | 'Credit' | 'Tontine';
+type TypeOperation = 'Dépôt' | 'Retrait';
+type TypeDepot = 'Compte Courant' | 'Compte Épargne' | 'Compte Bloqué' | 'Cotisation Tontine' | 'Remboursement Crédit';
+type TypeRetrait = 'Retrait Compte Courant' | 'Retrait Épargne' | 'Décaissement Crédit' | 'Distribution Tontine';
+type MoyenPaiement = 'CASH' | 'MTN' | 'AIRTEL';
 
-const maskAccountNumber = (value?: string) => {
-  if (!value) return undefined;
-  if (value.includes('*')) return value;
-  const compact = value.replace(/\s+/g, '');
-  const last4 = compact.slice(-4);
-  if (!last4) return value;
-  return `**** ${last4}`;
+interface PaymentIntent {
+  id: string;
+  externalRef: string;
+  provider: 'MTN' | 'AIRTEL';
+  type: 'COLLECTION' | 'PAYOUT';
+  status: PaymentStatus;
+  amount: string;
+  phone: string;
+  providerTxnId?: string;
+  errorMessage?: string;
+  createdAt: string;
+  confirmedAt?: string;
+}
+
+// ─── Helpers ────────────────────────────────────────────
+const mapToOperationEnum = (typeOp: string | null, typeDetaille: string | null): string => {
+  if (!typeDetaille) return TypeOperationCaisse.MISC_COLLECTION;
+  const detail = typeDetaille.toLowerCase();
+
+  if (detail.includes('épargne') || detail.includes('epargne'))
+    return typeOp === 'Retrait' ? TypeOperationCaisse.WITHDRAWAL_SAVINGS : TypeOperationCaisse.DEPOSIT_SAVINGS;
+  if (detail.includes('courant'))
+    return typeOp === 'Retrait' ? TypeOperationCaisse.WITHDRAWAL_CURRENT : TypeOperationCaisse.DEPOSIT_CURRENT;
+  if (detail.includes('bloqué') || detail.includes('bloque'))
+    return typeOp === 'Retrait' ? TypeOperationCaisse.WITHDRAWAL_BLOCKED : TypeOperationCaisse.DEPOSIT_BLOCKED;
+  if (detail.includes('tontine') && detail.includes('cotisation'))
+    return TypeOperationCaisse.TONTINE_CONTRIBUTION;
+  if (detail.includes('tontine') && detail.includes('distribution'))
+    return TypeOperationCaisse.TONTINE_WITHDRAWAL;
+  if (detail.includes('remboursement') || detail.includes('crédit'))
+    return TypeOperationCaisse.LOAN_REPAYMENT;
+  if (detail.includes('décaissement') || detail.includes('decaissement'))
+    return TypeOperationCaisse.LOAN_DISBURSEMENT;
+
+  return typeOp === 'Retrait' ? TypeOperationCaisse.MISC_DISBURSEMENT : TypeOperationCaisse.MISC_COLLECTION;
 };
 
-const resolveTontineStatus = (amount: number, miseParTour: number) => {
-  if (miseParTour <= 0) return 'Indéfini';
-  if (amount < miseParTour) return 'Retard';
-  const reste = amount % miseParTour;
-  if (reste === 0 && amount === miseParTour) return 'À jour';
-  if (reste === 0 && amount > miseParTour) return 'Avance';
-  return 'Avance partielle';
+const getPaymentIntentType = (typeOperation: TypeOperation, subType: string): string => {
+  if (typeOperation === 'Dépôt') {
+    switch (subType) {
+      case 'Remboursement Crédit': return 'CREDIT_REPAYMENT';
+      case 'Cotisation Tontine': return 'TONTINE_CONTRIBUTION';
+      default: return 'DEPOSIT';
+    }
+  } else {
+    switch (subType) {
+      case 'Décaissement Crédit': return 'CREDIT_DISBURSEMENT';
+      case 'Distribution Tontine': return 'TONTINE_DISTRIBUTION';
+      default: return 'WITHDRAWAL';
+    }
+  }
 };
 
+const DENOMINATIONS = [
+  { value: 10000, label: '10.000' },
+  { value: 5000, label: '5.000' },
+  { value: 2000, label: '2.000' },
+  { value: 1000, label: '1.000' },
+  { value: 500, label: '500' },
+  { value: 100, label: '100' },
+];
+
+const PROVIDERS = [
+  { id: 'MTN' as const, name: 'MTN MoMo', logo: mtnLogo, color: 'text-status-warning', bg: 'bg-status-warning-bg', border: 'border-status-warning/50' },
+  { id: 'AIRTEL' as const, name: 'Airtel Money', logo: airtelLogo, color: 'text-status-danger', bg: 'bg-status-danger-bg', border: 'border-status-danger/50' },
+];
+
+// ─── Component ──────────────────────────────────────────
 interface CaisseOperationsProps {
-  sessionId?: string;
+  sessionId: string;
+  onTransactionComplete?: () => void;
 }
 
-export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
+export default function CaisseOperations({ sessionId, onTransactionComplete }: CaisseOperationsProps) {
+  const user = authService.getCurrentUser();
 
-  // Global State
-  const [successMessage, setSuccessMessage] = useState('');
-  
-  // Selection State
+  // ── Client Search ──
   const [searchTerm, setSearchTerm] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [selectedClientInitialData, setSelectedClientInitialData] = useState<Client | null>(null);
-  
-  // Operation State
-  const [direction, setDirection] = useState<DirectionOperation>('Dépôt');
-  const [selectedDestination, setSelectedDestination] = useState<{id: string, type: DestinationType, subType?: string, label: string} | null>(null);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
+  // ── Operation Form ──
+  const [typeOperation, setTypeOperation] = useState<TypeOperation | null>(null);
+  const [typeDepot, setTypeDepot] = useState<TypeDepot | null>(null);
+  const [typeRetrait, setTypeRetrait] = useState<TypeRetrait | null>(null);
+  const [moyenPaiement, setMoyenPaiement] = useState<MoyenPaiement | null>(null);
   const [montant, setMontant] = useState('');
-  
-  // Dialogs & Validation
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [montantError, setMontantError] = useState<string | null>(null);
-  const [lastOperationReference, setLastOperationReference] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const { componentRef, printData, print, isPrinting } = usePrinter();
-  const {
-    componentRef: invoiceRef,
-    printData: invoicePrintData,
-    print: printInvoice,
-    isPrinting: isInvoicePrinting
-  } = usePrinter();
-  
-  // Real-time Data fetching with React Query
-  const { data: selectedClient } = useQuery({
-    queryKey: ['client', selectedClientId],
-    queryFn: () => selectedClientId ? clientApi.getById(selectedClientId) : null,
-    enabled: !!selectedClientId,
-    initialData: selectedClientInitialData
+  // ── Cash-specific ──
+  const [showBilletage, setShowBilletage] = useState(false);
+  const [billetage, setBilletage] = useState<Record<number, number>>({});
+  const [showPhysicalConfirmation, setShowPhysicalConfirmation] = useState(false);
+  const [pendingOperationData, setPendingOperationData] = useState<any>(null);
+  const [confirmationData, setConfirmationData] = useState<PhysicalConfirmationData | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // ── Mobile Money-specific ──
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('CREATED');
+  const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
+  const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
+  const [showPresenceModal, setShowPresenceModal] = useState(false);
+  const [sandboxInfo, setSandboxInfo] = useState<{
+    isSandbox: boolean;
+    testNumbers?: Record<string, string>;
+    helpMessage?: string;
+  } | null>(null);
+  const [phoneValidation, setPhoneValidation] = useState<{
+    warning?: string;
+    suggestion?: string;
+    behavior?: { expectedStatus: string; expectedDelay?: number };
+  } | null>(null);
+
+  // ── Credit / Tontine / Comptes Data ──
+  const [creditsActifs, setCreditsActifs] = useState<any[]>([]);
+  const [creditSelectionne, setCreditSelectionne] = useState<any>(null);
+  const [prochaineEcheance, setProchaineEcheance] = useState<any>(null);
+  const [tontinesActives, setTontinesActives] = useState<any[]>([]);
+  const [tontineSelectionnee, setTontineSelectionnee] = useState<any>(null);
+  const [comptesClient, setComptesClient] = useState<any[]>([]);
+
+  // ── Receipt & Success ──
+  const [lastOperationData, setLastOperationData] = useState<any>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
+
+  // ── Dynamic Info Hook ──
+  const { infoCardData, suggestedAmount, loading: infoLoading } = useOperationInfo({
+    clientId: selectedClient?.id,
+    typeOperation,
+    subType: typeOperation === 'Dépôt' ? typeDepot : typeRetrait,
+    selectedClient,
+    tontinesActives,
+    creditsActifs,
+    comptesClient
   });
 
-  const { data: clientComptes = [] } = useQuery({
-    queryKey: ['comptes-epargne', selectedClientId],
-    queryFn: () => selectedClientId ? compteEpargneApi.getByClient(selectedClientId) : [],
-    enabled: !!selectedClientId
-  });
-
-  const { data: credits = [] } = useQuery({
-    queryKey: ['credits', selectedClientId],
-    queryFn: () => selectedClientId ? creditApi.getAll({ clientId: selectedClientId, statut: 'Approuvé,En cours,Actif' }) : [],
-    enabled: !!selectedClientId
-  });
-
-  const { data: rawTontines = [] } = useQuery({
-    queryKey: ['tontines', selectedClientId],
-    queryFn: () => selectedClientId ? tontineApi.getByClient(selectedClientId) : [],
-    enabled: !!selectedClientId
-  });
-
-  // Map tontine membership to tontine object
-  const tontines = useMemo(() => {
-    return rawTontines?.map((m: any) => m.tontine || m) || [];
-  }, [rawTontines]);
-
-  const [loading, setLoading] = useState(false); // Submission loading state
-
-
-  // Client Search & Data Loading
-  const rechercherClient = useCallback(async () => {
-    const trimmedSearch = sanitizeInput(searchTerm.trim());
-    if (!trimmedSearch) return;
-
-    setSearchLoading(true);
-    try {
-      const response = await clientSearchApi.search(trimmedSearch, { page: 1, perPage: 10 });
-      const data = response.data?.[0] || null;
-
-      if (data) {
-        setSelectedClientInitialData(data);
-        setSelectedClientId(data.id);
-        toast.success(`Client ${data.nom} sélectionné`);
-        setSearchTerm('');
-      } else {
-        toast.warning('Aucun client trouvé');
-      }
-    } catch (error) {
-      handleApiError(error, 'Erreur recherche');
-    } finally {
-      setSearchLoading(false);
+  // ── Auto-fill amount from suggestion ──
+  useEffect(() => {
+    if (suggestedAmount) {
+      setMontant(suggestedAmount);
+      setMontantError(null);
     }
-  }, [searchTerm]);
+  }, [suggestedAmount]);
 
+  // ── Auto-fill phone from client ──
+  useEffect(() => {
+    if (selectedClient) {
+      setPhoneNumber(selectedClient.telephone || selectedClient.phone || '');
+    }
+  }, [selectedClient]);
+
+  // ── Load security config (for mobile money presence checks) ──
+  useEffect(() => {
+    const loadSecurityConfig = async () => {
+      try {
+        const config = await securityConfigApi.getConfig();
+        setSecurityConfig(config);
+      } catch {
+        setSecurityConfig({
+          otpEnabled: false,
+          requireAccountHolderPresence: true,
+          operationsRequiringPresence: ['Retrait', 'Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine'],
+          presenceVerificationThreshold: 0
+        });
+      }
+    };
+    loadSecurityConfig();
+  }, []);
+
+  // ── Load sandbox info ──
+  useEffect(() => {
+    const loadSandboxInfo = async () => {
+      try {
+        const res = await fetch('/api/payments/sandbox-info', { credentials: 'include' });
+        if (res.ok) setSandboxInfo(await res.json());
+      } catch { /* silent */ }
+    };
+    loadSandboxInfo();
+  }, []);
+
+  // ── Payment status polling ──
+  useEffect(() => {
+    if (!paymentIntent || !showPaymentStatusModal) return;
+    if (['SUCCESS', 'FAILED', 'EXPIRED', 'REVERSED'].includes(paymentStatus)) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/payments/${paymentIntent.id}`, { credentials: 'include' });
+        if (res.ok) {
+          const intent: PaymentIntent = await res.json();
+          setPaymentStatus(intent.status);
+          setPaymentIntent(intent);
+
+          if (intent.status === 'SUCCESS') {
+            clearInterval(pollInterval);
+            handlePaymentSuccess(intent);
+          } else if (['FAILED', 'EXPIRED', 'REVERSED'].includes(intent.status)) {
+            clearInterval(pollInterval);
+            toast.error(`Paiement ${intent.status === 'FAILED' ? 'échoué' : intent.status === 'EXPIRED' ? 'expiré' : 'annulé'}`);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur polling paiement:', error);
+      }
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [paymentIntent?.id, paymentStatus, showPaymentStatusModal]);
+
+  // ── Phone validation (sandbox) ──
+  useEffect(() => {
+    if (!phoneNumber || !sandboxInfo?.isSandbox || moyenPaiement !== 'MTN') {
+      setPhoneValidation(null);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/payments/validate-phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ phone: phoneNumber, provider: moyenPaiement })
+        });
+        if (res.ok) setPhoneValidation(await res.json());
+      } catch { /* silent */ }
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [phoneNumber, sandboxInfo, moyenPaiement]);
+
+  // ── Auto-show receipt ──
+  useEffect(() => {
+    if (lastOperationData) handleShowReceipt();
+  }, [lastOperationData]);
+
+  // ─── Billetage ────────────────────────────────────────
+  const toggleBilletage = useCallback(() => setShowBilletage(prev => !prev), []);
+
+  const updateBilletage = useCallback((value: number, count: number) => {
+    const sanitizedCount = Math.max(0, Math.floor(count));
+    const newBilletage = { ...billetage, [value]: sanitizedCount };
+    setBilletage(newBilletage);
+
+    const total = Object.entries(newBilletage).reduce((acc, [val, qty]) => acc + (parseInt(val) * qty), 0);
+    if (total > 0) {
+      setMontant(total.toString());
+      setMontantError(null);
+    }
+  }, [billetage]);
+
+  // ─── Validation ───────────────────────────────────────
   const validateMontant = useCallback((value: string): boolean => {
     const numValue = parseFloat(value);
     if (isNaN(numValue) || numValue <= 0) {
-      setMontantError('Montant invalide');
+      setMontantError('Le montant doit être supérieur à 0');
+      return false;
+    }
+    if (numValue > VALIDATION_LIMITS.MAX_AMOUNT) {
+      setMontantError(`Le montant ne peut pas dépasser ${formatMoney(VALIDATION_LIMITS.MAX_AMOUNT)}`);
+      return false;
+    }
+    if (numValue < VALIDATION_LIMITS.MIN_AMOUNT) {
+      setMontantError(`Le montant minimum est ${formatMoney(VALIDATION_LIMITS.MIN_AMOUNT)}`);
       return false;
     }
     setMontantError(null);
     return true;
   }, []);
 
-  // Form Reset
-  const reinitialiserFormulaire = useCallback(() => {
-    setSelectedClientId(null);
-    setSelectedClientInitialData(null);
-    setDirection('Dépôt');
-    setSelectedDestination(null);
-    setMontant('');
-    setSearchTerm('');
-    setMontantError(null);
-    setSuccessMessage('');
-    setLastOperationReference(null);
-  }, []);
-
-  // Operation Preparation
-  const preparerOperation = useCallback(async () => {
-    if (!selectedClient || !selectedDestination || !montant) {
-      toast.warning('Formulaire incomplet');
+  // ─── Client Search ────────────────────────────────────
+  const rechercherClient = useCallback(async () => {
+    const trimmedSearch = sanitizeInput(searchTerm.trim());
+    if (!trimmedSearch) {
+      toast.warning('Veuillez entrer un terme de recherche');
       return;
     }
 
+    setSearchLoading(true);
+    try {
+      const response = await clientSearchApi.search(trimmedSearch, { page: 1, perPage: 10 });
+      const data = response.data?.length ? response.data[0] : null;
+
+      if (data) {
+        setSelectedClient(data);
+        // Load related data in parallel
+        const [credits, tontines, comptes] = await Promise.all([
+          creditApi.getAll({ clientId: data.id, statut: StatutCredit.ACTIVE }).catch(() => []),
+          tontineApi.getByClient(data.id).catch(() => []),
+          compteEpargneApi.getByClient(data.id).catch(() => [])
+        ]);
+        setCreditsActifs(credits || []);
+        setTontinesActives(tontines || []);
+        setComptesClient(comptes || []);
+        toast.success(`Client ${escapeHtml(data.nom)} ${escapeHtml(data.prenom || '')} sélectionné`);
+      } else {
+        toast.warning('Aucun client trouvé avec ces critères');
+      }
+    } catch (error) {
+      handleApiError(error, 'Erreur lors de la recherche');
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [searchTerm]);
+
+  // ─── Account ID Resolution ───────────────────────────
+  const getCompteIdForOperation = useCallback((typeOp: TypeDepot | TypeRetrait | null): string | undefined => {
+    if (!comptesClient.length) return undefined;
+    let targetType: string | null = null;
+    if (typeOp === 'Compte Courant' || typeOp === 'Retrait Compte Courant') targetType = TypeCompte.CURRENT;
+    else if (typeOp === 'Compte Épargne' || typeOp === 'Retrait Épargne') targetType = TypeCompte.SAVINGS;
+    else if (typeOp === 'Compte Bloqué') targetType = TypeCompte.BLOCKED;
+
+    if (targetType) {
+      const compte = comptesClient.find((c: any) => c.typeCompte === targetType);
+      return compte?.id;
+    }
+    return undefined;
+  }, [comptesClient]);
+
+  // ─── Credit schedule loader ───────────────────────────
+  const chargerProchaineEcheance = useCallback(async (creditId: string) => {
+    try {
+      const echeance = await echeanceCreditApi.getProchaine(creditId);
+      if (echeance) {
+        setProchaineEcheance(echeance);
+        setMontant(echeance.montantTotal.toString());
+        setMontantError(null);
+      } else {
+        setProchaineEcheance(null);
+      }
+    } catch {
+      setProchaineEcheance(null);
+    }
+  }, []);
+
+  // ─── Physical Confirmation Check ─────────────────────
+  const requiresPhysicalConfirmation = useCallback((opType: string, amount: number): boolean => {
+    if (opType === 'Retrait') return true;
+    if (amount >= 500_000) return true;
+    return false;
+  }, []);
+
+  // ─── Mobile Money: Presence Check ────────────────────
+  const requiresPresenceVerification = useCallback((opType: string, subType?: string): boolean => {
+    if (!securityConfig?.requireAccountHolderPresence) return false;
+    const typeToCheck = subType || opType;
+    return securityConfig.operationsRequiringPresence.some(
+      op => op.toLowerCase() === typeToCheck.toLowerCase() || opType.toLowerCase() === 'retrait'
+    );
+  }, [securityConfig]);
+
+  // ═══════════════════════════════════════════════════════
+  // CASH FLOW
+  // ═══════════════════════════════════════════════════════
+  const preparerOperationCash = useCallback(async () => {
+    if (!typeOperation || !montant) {
+      toast.warning("Sélectionnez un type d'opération et entrez un montant");
+      return;
+    }
     if (!validateMontant(montant)) return;
 
-    // Logic Check: Withdrawal amount vs Balance
-    if (direction === 'Retrait' && selectedDestination.type === 'Compte') {
-        const compte = clientComptes.find(c => c.id === selectedDestination.id);
-        if (compte && parseFloat(montant) > parseFloat(compte.solde)) {
-            setMontantError('Solde insuffisant');
-            return;
-        }
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    if (!subType) {
+      toast.warning(`Sélectionnez la ${typeOperation === 'Dépôt' ? 'destination' : 'source'}`);
+      return;
     }
-
     setShowConfirmDialog(true);
-  }, [selectedClient, selectedDestination, montant, direction, clientComptes, validateMontant]);
+  }, [typeOperation, montant, typeDepot, typeRetrait, validateMontant]);
 
-
-  // Operation Execution
-  const confirmerOperation = useCallback(async () => {
+  const confirmerPreparationCash = useCallback(async () => {
     setShowConfirmDialog(false);
     setLoading(true);
-    const loadingId = toast.loading(`Traitement du ${direction.toLowerCase()}...`);
 
     try {
-      // Determine Type Operation String using standardized enum values
-      let typeOperationStr = '';
-      if (selectedDestination?.type === 'Compte') {
-          const subType = selectedDestination.subType?.toLowerCase() || '';
-          if (subType.includes('epargne') || subType.includes('épargne')) {
-              typeOperationStr = direction === 'Dépôt'
-                  ? TypeOperationCaisse.DEPOSIT_SAVINGS
-                  : TypeOperationCaisse.WITHDRAWAL_SAVINGS;
-          } else if (subType.includes('courant')) {
-              typeOperationStr = direction === 'Dépôt'
-                  ? TypeOperationCaisse.DEPOSIT_CURRENT
-                  : TypeOperationCaisse.WITHDRAWAL_CURRENT;
-          } else if (subType.includes('bloqu')) {
-              typeOperationStr = direction === 'Dépôt'
-                  ? TypeOperationCaisse.DEPOSIT_BLOCKED
-                  : TypeOperationCaisse.WITHDRAWAL_BLOCKED;
-          } else {
-              // Default to savings for unknown account types
-              typeOperationStr = direction === 'Dépôt'
-                  ? TypeOperationCaisse.DEPOSIT_SAVINGS
-                  : TypeOperationCaisse.WITHDRAWAL_SAVINGS;
-          }
-      } else if (selectedDestination?.type === 'Credit') {
-          typeOperationStr = TypeOperationCaisse.LOAN_REPAYMENT;
-      } else if (selectedDestination?.type === 'Tontine') {
-          typeOperationStr = TypeOperationCaisse.TONTINE_CONTRIBUTION;
-      }
+      const reference = `ESP-${Date.now()}`;
+      const typeDetaille = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+      const compteId = getCompteIdForOperation(typeDetaille);
+      const parsedMontant = parseFloat(montant);
+      const typeOperationEnum = mapToOperationEnum(typeOperation, typeDetaille);
 
-      const operationPayload = {
+      const operationData = {
         session_id: sessionId,
         client_id: selectedClient!.id,
-        type_operation: typeOperationStr,
-        montant: montant,
-        description: `${direction} - ${selectedDestination?.label || ''}`,
-        // Optional links
-        compte_id: selectedDestination?.type === 'Compte' ? selectedDestination.id : undefined,
+        compte_id: compteId,
+        type_operation: typeOperationEnum,
+        montant: parsedMontant,
+        methode_paiement: 'CASH',
+        reference,
+        description: `${typeOperation} - ${typeDetaille}`,
         metadata: {
-          nom_client: `${selectedClient!.nom} ${selectedClient!.prenom}`,
-          telephone_client: selectedClient!.telephone,
-          destination_label: selectedDestination?.label,
-          direction: direction,
-          credit_id: selectedDestination?.type === 'Credit' ? selectedDestination.id : undefined,
-          tontine_id: selectedDestination?.type === 'Tontine' ? selectedDestination.id : undefined
+          sous_type_operation: typeDetaille,
+          type_paiement: 'CASH',
+          details_billetage: Object.keys(billetage).length > 0 ? billetage : undefined,
+          client_info: {
+            nom: selectedClient!.nom,
+            prenom: selectedClient!.prenom,
+            telephone: selectedClient!.telephone || selectedClient!.phone
+          }
         }
       };
 
-      const operationInserted = await operationCaisseApi.create(operationPayload);
-      setLastOperationReference(operationInserted.reference || `OP-${Date.now()}`);
+      setPendingOperationData(operationData);
 
-      // OTP désactivé - exécuter directement
-      toast.dismiss(loadingId);
-      await finaliserOperationSansOTP(operationInserted.id, typeOperationStr);
+      if (requiresPhysicalConfirmation(typeOperation!, parsedMontant)) {
+        setShowPhysicalConfirmation(true);
+        setLoading(false);
+      } else {
+        setLoading(false);
+        await executeCashOperation(operationData);
+      }
     } catch (error) {
-      toast.dismiss(loadingId);
-      handleApiError(error, `Erreur lors du ${direction.toLowerCase()}`);
+      handleApiError(error, 'Erreur lors de la préparation');
+      setLoading(false);
+    }
+  }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, billetage, getCompteIdForOperation, requiresPhysicalConfirmation]);
+
+  const executeCashOperation = useCallback(async (operationData: any, loadingId?: string | number) => {
+    try {
+      await operationCaisseApi.create(operationData);
+
+      const montantAjout = typeOperation === 'Dépôt' ? parseFloat(montant) : -parseFloat(montant);
+      await sessionCaisseApi.update(sessionId, { montant_ajout: montantAjout });
+
+      // Credit repayment secondary ops
+      if (typeDepot === 'Remboursement Crédit' && prochaineEcheance && creditSelectionne) {
+        const montantPaye = parseFloat(montant);
+        await echeanceCreditApi.update(prochaineEcheance.id, {
+          montant_paye: (prochaineEcheance.montantPaye || 0) + montantPaye,
+          status: montantPaye >= prochaineEcheance.montantTotal ? 'Payée' : 'Partielle',
+          date_paiement: montantPaye >= prochaineEcheance.montantTotal ? new Date().toISOString().split('T')[0] : null
+        });
+        await creditApi.addPayment(creditSelectionne.id, { montant: montantPaye });
+      }
+
+      // Tontine contribution secondary ops
+      if (typeDepot === 'Cotisation Tontine' && tontineSelectionnee && selectedClient) {
+        await tontineApi.addContribution(tontineSelectionnee.id, {
+          client_id: selectedClient.id,
+          montant: parseFloat(montant),
+          date_contribution: new Date().toISOString().split('T')[0]
+        });
+      }
+
+      if (loadingId) toast.dismiss(loadingId);
+      toast.success(`${typeOperation} de ${formatMoney(parseFloat(montant))} effectué avec succès !`);
+
+      setLastOperationData({
+        reference: operationData.reference,
+        typeOperation,
+        typeDetaille: typeOperation === 'Dépôt' ? typeDepot : typeRetrait,
+        montant: parseFloat(montant),
+        client: selectedClient,
+        date: new Date(),
+        modePaiement: 'CASH'
+      });
+
+      return true;
+    } catch (error) {
+      if (loadingId) toast.dismiss(loadingId);
+      handleApiError(error, "Erreur lors de l'opération");
+      return false;
+    }
+  }, [typeOperation, typeDepot, montant, sessionId, prochaineEcheance, creditSelectionne, tontineSelectionnee, selectedClient, typeRetrait]);
+
+  const validerOperationDirect = useCallback(async (operationData: any) => {
+    const loadingId = toast.loading("Traitement de l'opération en cours...");
+    setLoading(true);
+    try {
+      await executeCashOperation(operationData, loadingId);
     } finally {
       setLoading(false);
     }
-  }, [sessionId, selectedClient, selectedDestination, direction, montant]);
+  }, [executeCashOperation]);
 
-   const finaliserOperationSansOTP = async (opId: string, typeOp: string) => {
-       try {
-           await operationCaisseApi.update(opId, { statut_otp: 'Validé (sans SMS)' });
-           await processDependentOperations(typeOp);
-           
-           const message = `${typeOp} de ${formatMoney(parseFloat(montant))} validé avec succès.`;
-           setSuccessMessage(message);
-           toast.success(message);
-       } catch (e) { 
-           console.error(e);
-           toast.error("Erreur lors de la finalisation de l'opération");
-       }
-   };
-
-  const processDependentOperations = async (typeOp: string) => {
-    // Credit Payments & Tontine Contributions logic
-    // Note: Account updates are handled by backend finance.ts automatically now
-    if (typeOp === TypeOperationCaisse.LOAN_REPAYMENT && selectedDestination?.type === 'Credit') {
-        await creditApi.addPayment(selectedDestination.id, { montant: parseFloat(montant), client_id: selectedClient?.id });
+  const validerOperationAvecConfirmation = useCallback(async (physicalData: PhysicalConfirmationData) => {
+    const loadingId = toast.loading("Traitement de l'opération en cours...");
+    setShowPhysicalConfirmation(false);
+    setConfirmationData(physicalData);
+    setLoading(true);
+    try {
+      const operationAvecConfirmation = { ...pendingOperationData, physical_confirmation: physicalData };
+      await executeCashOperation(operationAvecConfirmation, loadingId);
+    } finally {
+      setLoading(false);
     }
-    if (typeOp === TypeOperationCaisse.TONTINE_CONTRIBUTION && selectedDestination?.type === 'Tontine') {
-        await tontineApi.addContribution(selectedDestination.id, { membre_id: selectedClient?.id, montant: parseFloat(montant) });
-    }
-    // TODO: Create Facture logic here if needed or keep existing logic
-  };
+  }, [pendingOperationData, executeCashOperation]);
 
-  const buildReceiptData = useCallback((): ReceiptData | null => {
-    if (!selectedClient || !montant || !selectedDestination) return null;
+  // ═══════════════════════════════════════════════════════
+  // MOBILE MONEY FLOW
+  // ═══════════════════════════════════════════════════════
+  const handlePaymentSuccess = useCallback(async (intent: PaymentIntent) => {
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    const provider = moyenPaiement as 'MTN' | 'AIRTEL';
 
-    const amountValue = parseMoney(montant);
-    const typeOp =
-      selectedDestination.type === 'Compte'
-        ? (direction === 'Dépôt' ? 'Versement' : 'Retrait')
-        : selectedDestination.type === 'Credit'
-          ? 'Remboursement Crédit'
-          : 'Cotisation Tontine';
-
-    const details: NonNullable<ReceiptData['details']> = [];
-    let numeroCompte: string | undefined;
-
-    if (selectedDestination.type === 'Compte') {
-      const compte = clientComptes.find(c => c.id === selectedDestination.id);
-      const ancienSolde = compte ? parseMoney(compte.solde) : 0;
-      const nouveauSolde =
-        direction === 'Dépôt' ? ancienSolde + amountValue : ancienSolde - amountValue;
-      numeroCompte = maskAccountNumber(compte?.numeroCompte || selectedClient.numeroCompte);
-      details.push({ label: 'Ancien Solde', value: formatMoney(ancienSolde) });
-      details.push({
-        label: 'Mouvement',
-        value: `${direction === 'Dépôt' ? '+' : '-'} ${formatMoney(amountValue)}`
-      });
-      details.push({
-        label: 'Nouveau Solde',
-        value: formatMoney(nouveauSolde),
-        isBold: true
-      });
-    } else if (selectedDestination.type === 'Tontine') {
-      const tontine = tontines.find(t => t.id === selectedDestination.id);
-      const miseParTour = tontine?.montant_contribution || 0;
-      const toursRegles = miseParTour > 0 ? Math.floor(amountValue / miseParTour) : 0;
-      const statut = resolveTontineStatus(amountValue, miseParTour);
-      details.push({ label: 'Mise par tour', value: formatMoney(miseParTour) });
-      details.push({
-        label: 'Tours réglés',
-        value: `${toursRegles} ${toursRegles > 1 ? 'tours' : 'tour'}`
-      });
-      details.push({ label: 'Avance/Retard', value: statut });
-    } else {
-      details.push({ label: 'Montant', value: formatMoney(amountValue), isBold: true });
-    }
-
-    return {
-      title: 'Reçu de Transaction',
-      reference: lastOperationReference || `OP-${Date.now()}`,
-      date: new Date(),
-      type: typeOp,
-      transaction: {
-        id: lastOperationReference || `OP-${Date.now()}`,
-        date: new Date(),
-        type:
-          selectedDestination.type === 'Compte'
-            ? (direction === 'Dépôt' ? 'DEPOT' : 'RETRAIT')
-            : selectedDestination.type === 'Credit'
-              ? 'REMBOURSEMENT'
-              : 'TONTINE',
-        amount: amountValue,
-        cashierName: 'Agent Caisse'
-      },
+    const rData: ReceiptData = {
+      title: `Reçu ${typeOperation} Mobile Money`,
+      reference: intent.externalRef,
+      date: new Date(intent.confirmedAt || intent.createdAt),
+      type: typeOperation || '',
       client: {
-        nom: selectedClient.nom,
-        prenom: selectedClient.prenom,
-        telephone: selectedClient.telephone,
-        numeroCompte: numeroCompte
+        nom: selectedClient?.nom || '',
+        prenom: selectedClient?.prenom || '',
+        telephone: intent.phone,
+        numeroCompte: selectedClient?.numeroCompte
       },
-      agent: { nom: 'Agent', prenom: 'Caisse' },
-      details,
-      items: [
-        {
-          description: typeOp,
-          details: selectedDestination.label || '',
-          montant: amountValue,
-          quantite: 1
-        }
-      ],
-      total: amountValue,
-      modePaiement: 'Espèces',
-      devise: currencySymbol()
+      items: [{
+        description: `${typeOperation} - ${subType}`,
+        details: `Via ${provider} Mobile Money`,
+        montant: parseFloat(intent.amount),
+        quantite: 1
+      }],
+      total: parseFloat(intent.amount),
+      modePaiement: `${provider} Mobile Money`,
+      notes: intent.providerTxnId ? `ID Transaction: ${intent.providerTxnId}` : undefined,
+      agent: { nom: user?.nom || 'Caissier', prenom: user?.prenom || '' }
     };
-  }, [selectedClient, montant, selectedDestination, direction, lastOperationReference, clientComptes, tontines]);
 
-  const handlePrintTicket = useCallback(() => {
-    const data = buildReceiptData();
-    if (!data) return;
-    print(data);
-  }, [buildReceiptData, print]);
+    setReceiptData(rData);
+    setShowPaymentStatusModal(false);
+    setShowSuccessModal(true);
+    onTransactionComplete?.();
+  }, [typeOperation, typeDepot, typeRetrait, moyenPaiement, selectedClient, user, onTransactionComplete]);
 
-  const handlePrintInvoice = useCallback(() => {
-    const data = buildReceiptData();
-    if (!data) return;
-    printInvoice(data);
-  }, [buildReceiptData, printInvoice]);
+  const initiatePayment = useCallback(async (presenceData?: PresenceConfirmationData) => {
+    if (!selectedClient || !typeOperation || !montant || parseFloat(montant) <= 0 || !phoneNumber) {
+      toast.warning('Veuillez remplir tous les champs requis');
+      return;
+    }
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    if (!subType) {
+      toast.warning(`Sélectionnez le type de ${typeOperation.toLowerCase()}`);
+      return;
+    }
 
+    const provider = moyenPaiement as 'MTN' | 'AIRTEL';
+    setLoading(true);
+    try {
+      const isCollection = typeOperation === 'Dépôt';
+      const endpoint = isCollection ? '/api/payments/collect' : '/api/payments/payout';
+      const paymentType = getPaymentIntentType(typeOperation, subType);
+      const idempotencyKey = crypto.randomUUID();
 
-  // Derived Data for UI
-  const availableDestinations = useMemo(() => {
-      const options: {id: string, type: DestinationType, label: string, subType: string, balance?: string}[] = [];
+      const payload: any = {
+        provider,
+        amount: parseFloat(montant),
+        phone: phoneNumber,
+        clientId: selectedClient.id,
+        agenceId: user?.agenceId,
+        idempotencyKey,
+        type: paymentType,
+        metadata: { sessionId, subType, presenceVerification: presenceData }
+      };
 
-      // 1. Accounts (Always available if they exist)
-      clientComptes.forEach(acc => {
-          if (acc.statut !== 'ACTIVE') return;
-          options.push({
-              id: acc.id,
-              type: 'Compte',
-              subType: acc.typeCompte,
-              label: TYPE_COMPTE_LABELS[acc.typeCompte as TypeCompteType] || acc.typeCompte, // "Compte Épargne", "Compte Courant"
-              balance: acc.solde
-          });
-      });
-
-      // 2. Credits (Only for Dépôt)
-      if (direction === 'Dépôt') {
-          credits.forEach(cred => {
-              options.push({
-                  id: cred.id,
-                  type: 'Credit',
-                  subType: 'Credit',
-                  label: 'Remboursement Crédit', //cred.type_credit || 'Crédit',
-                  balance: formatMoney(cred.solde_restant) + ' restant'
-              });
-          });
-
-          // 3. Tontines (Only for Dépôt)
-          tontines.forEach(tont => {
-              options.push({
-                  id: tont.id,
-                  type: 'Tontine',
-                  subType: 'Tontine',
-                  label: 'Cotisation Tontine', // tont.nom,
-                  balance: formatMoney(tont.montant_contribution) + '/mois'
-              });
-          });
+      if ((subType === 'Remboursement Crédit' || subType === 'Décaissement Crédit') && creditsActifs.length > 0) {
+        payload.creditId = creditsActifs[0].id;
+      }
+      if ((subType === 'Cotisation Tontine' || subType === 'Distribution Tontine') && tontinesActives.length > 0) {
+        payload.tontineId = tontinesActives[0].id;
+      }
+      if (comptesClient.length > 0 && !payload.creditId && !payload.tontineId) {
+        payload.compteId = comptesClient[0].id;
       }
 
-      return options;
-  }, [clientComptes, credits, tontines, direction]);
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
 
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Erreur lors du paiement');
+      }
 
-  // --- Render Components ---
+      const intent: PaymentIntent = await res.json();
+      setPaymentIntent(intent);
+      setPaymentStatus(intent.status);
+      setShowPaymentStatusModal(true);
 
-  const SuccessModal = () => {
-    if (!successMessage) return null;
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="bg-surface-base border border-edge w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-          <div className="p-6 relative flex flex-col items-center text-center space-y-6">
-             <div className="w-16 h-16 rounded-full bg-status-success-bg flex items-center justify-center ring-1 ring-status-success/50 mb-2">
-                 <CheckCircle className="text-status-success" size={32} />
-             </div>
-             <div>
-                <h3 className="text-2xl font-bold text-content-primary mb-2">Succès !</h3>
-                <p className="text-content-muted">Transaction enregistrée.</p>
-             </div>
-             <div className="space-y-3 w-full">
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="primary"
-                    onClick={handlePrintTicket}
-                    disabled={isPrinting}
-                    className="h-12 rounded-xl bg-status-success hover:bg-status-success text-white"
-                  >
-                    {isPrinting ? <Loader className="animate-spin" /> : 'Reçu Ticket'}
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handlePrintInvoice}
-                    disabled={isInvoicePrinting}
-                    className="h-12 rounded-xl bg-status-info hover:bg-status-info text-white"
-                  >
-                    {isInvoicePrinting ? <Loader className="animate-spin" /> : 'Facture A4'}
-                  </Button>
-                </div>
-                <Button variant="outline" onClick={reinitialiserFormulaire} className="h-12 rounded-xl">
-                  Fermer
-                </Button>
-             </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+      toast.info(isCollection
+        ? 'Demande envoyée. Le client doit valider sur son téléphone.'
+        : 'Décaissement en cours...');
+    } catch (error: any) {
+      toast.error(error.message || "Erreur lors de l'initiation du paiement");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedClient, typeOperation, typeDepot, typeRetrait, montant, phoneNumber, moyenPaiement, user, sessionId, creditsActifs, tontinesActives, comptesClient]);
 
+  const handleMoMoSubmit = useCallback(async () => {
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    if (requiresPresenceVerification(typeOperation!, subType || undefined)) {
+      setShowPresenceModal(true);
+    } else {
+      await initiatePayment();
+    }
+  }, [typeOperation, typeDepot, typeRetrait, requiresPresenceVerification, initiatePayment]);
+
+  const handlePresenceConfirm = useCallback(async (presenceData: PresenceConfirmationData) => {
+    setShowPresenceModal(false);
+    await initiatePayment(presenceData);
+  }, [initiatePayment]);
+
+  // ─── Receipt ──────────────────────────────────────────
+  const handleShowReceipt = useCallback(() => {
+    if (!lastOperationData) return;
+
+    const rData: ReceiptData = {
+      title: `Reçu de ${lastOperationData.typeOperation}`,
+      reference: lastOperationData.reference,
+      date: lastOperationData.date,
+      type: lastOperationData.typeDetaille || lastOperationData.typeOperation,
+      client: {
+        nom: lastOperationData.client?.nom || '',
+        prenom: lastOperationData.client?.prenom || '',
+        telephone: lastOperationData.client?.telephone || lastOperationData.client?.phone || '',
+        numeroCompte: lastOperationData.client?.numeroCompte
+      },
+      agent: { nom: user?.nom || 'Agent', prenom: user?.prenom || '', id: user?.id },
+      items: [{
+        description: `${lastOperationData.typeOperation} - ${lastOperationData.typeDetaille || lastOperationData.modePaiement}`,
+        montant: lastOperationData.montant,
+        quantite: 1
+      }],
+      total: lastOperationData.montant,
+      modePaiement: lastOperationData.modePaiement || 'CASH',
+      devise: currencySymbol()
+    };
+
+    setReceiptData(rData);
+    setShowSuccessModal(true);
+  }, [lastOperationData, user]);
+
+  // ─── Form Reset ───────────────────────────────────────
+  const reinitialiserFormulaire = useCallback(() => {
+    setSelectedClient(null);
+    setTypeOperation(null);
+    setTypeDepot(null);
+    setTypeRetrait(null);
+    setMoyenPaiement(null);
+    setMontant('');
+    setSearchTerm('');
+    setPendingOperationData(null);
+    setCreditSelectionne(null);
+    setTontineSelectionnee(null);
+    setProchaineEcheance(null);
+    setBilletage({});
+    setShowBilletage(false);
+    setMontantError(null);
+    setConfirmationData(null);
+    setPhoneNumber('');
+    setPaymentIntent(null);
+    setPaymentStatus('CREATED');
+  }, []);
+
+  // ─── Submit Dispatch ──────────────────────────────────
+  const handleSubmit = useCallback(() => {
+    if (moyenPaiement === 'CASH') {
+      preparerOperationCash();
+    } else {
+      handleMoMoSubmit();
+    }
+  }, [moyenPaiement, preparerOperationCash, handleMoMoSubmit]);
+
+  // ─── Confirmation Message ─────────────────────────────
+  const confirmationMessage = useMemo(() => {
+    if (!selectedClient || !typeOperation || !montant) return '';
+    const typeDetaille = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    return `Vous êtes sur le point d'effectuer un ${typeOperation?.toLowerCase()} de ${formatMoney(parseFloat(montant))} pour ${escapeHtml(selectedClient.nom)} ${escapeHtml(selectedClient.prenom || '')}${typeDetaille ? ` (${typeDetaille})` : ''}.`;
+  }, [selectedClient, typeOperation, typeDepot, typeRetrait, montant]);
+
+  // ─── Derived: current sub-type selected ───────────────
+  const currentSubType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+  const isFormComplete = !!selectedClient && !!typeOperation && !!currentSubType && !!moyenPaiement && !!montant && parseFloat(montant) > 0 && !montantError;
+
+  // ─── Limits ───────────────────────────────────────────
+  const limits = selectedClient?.securityLimits;
+
+  // ═══════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════
   return (
-    <div className="flex flex-col min-h-[85vh] font-sans selection:bg-accent-secondary/30">
-      {printData && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'fixed',
-            left: '-10000px',
-            top: '0',
-            width: '210mm',
-            background: 'white',
-            zIndex: -1,
-          }}
-        >
-          <ReceiptTemplate ref={componentRef} data={printData} />
-        </div>
-      )}
-      {invoicePrintData && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'fixed',
-            left: '-10000px',
-            top: '0',
-            width: '210mm',
-            background: 'white',
-            zIndex: -1,
-          }}
-        >
-          <InvoiceTemplate ref={invoiceRef} data={invoicePrintData} />
-        </div>
-      )}
-      <SuccessModal />
-      <ConfirmDialog isOpen={showConfirmDialog} title="Confirmer" message={`Valider le ${direction.toLowerCase()} de ${formatMoney(parseFloat(montant || '0'))} ?`} onConfirm={confirmerOperation} onClose={() => setShowConfirmDialog(false)} />
+    <div className="flex flex-col h-full font-sans selection:bg-accent-secondary/30 p-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 h-full">
 
-      <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-        <Card className="flex-1 flex flex-col bg-surface-base/95 backdrop-blur-xl border border-edge/50 shadow-2xl rounded-[32px] overflow-hidden">
-            
-            {/* Header */}
-            <div className="px-6 pt-8 pb-4 flex items-center justify-between">
-                {selectedClient ? (
-                     <button onClick={reinitialiserFormulaire} className="flex items-center gap-2 text-content-muted hover:text-content-primary transition-colors">
-                        <ArrowLeft size={20} /> <span className="text-sm font-medium">Retour</span>
-                     </button>
-                ) : (
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent"><Wallet size={16} /></div>
-                        <span className="font-bold text-content-secondary">Caisse Espèces</span>
-                    </div>
-                )}
-                {selectedClient && <div className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-bold uppercase tracking-wider">Mode Transaction</div>}
+        {/* ── LEFT PANEL: Client Search + Profile ── */}
+        <div className="lg:col-span-4 flex flex-col gap-2 h-full overflow-hidden">
+          {/* Search */}
+          <Card className="bg-surface-base/80 backdrop-blur-xl border border-edge p-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-content-muted shrink-0" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
+                placeholder="Nom, téléphone, compte..."
+                className="flex-1 bg-transparent border-none text-sm text-content-primary focus:ring-0 placeholder:text-content-muted p-0 outline-none"
+                autoFocus
+              />
+              <button
+                onClick={rechercherClient}
+                disabled={searchLoading || !searchTerm.trim()}
+                className="text-[9px] bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface-elevated text-content-primary px-2 py-1 rounded font-bold transition-colors shrink-0"
+              >
+                {searchLoading ? <Loader2 size={10} className="animate-spin" /> : 'OK'}
+              </button>
             </div>
+          </Card>
 
-            <div className="p-6 flex-1 flex flex-col space-y-6 overflow-y-auto custom-scrollbar">
-              
-              {!selectedClient ? (
-                /* Step 1: Search */
-                <div className="flex-1 flex flex-col justify-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h2 className="text-3xl font-bold text-content-primary text-center mb-2">Quel client ?</h2>
-                    <p className="text-content-muted text-center mb-8">Recherchez un client pour commencer</p>
-                    <div className="relative group mb-6">
-                        <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none"><Search className="text-content-muted" size={24} /></div>
-                        <input type="text" autoFocus value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && rechercherClient()} placeholder="Nom, téléphone, compte..." className="w-full pl-14 pr-6 py-6 bg-surface/50 border border-edge-subtle rounded-3xl focus:border-accent focus:bg-surface text-xl text-content-primary outline-none transition-all shadow-inner placeholder:text-content-muted" />
+          {/* Client Profile */}
+          {selectedClient ? (
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 custom-scrollbar">
+              <Card className="bg-surface/50 border border-edge-subtle p-3 relative animate-in fade-in zoom-in-95 duration-300">
+                <button
+                  onClick={reinitialiserFormulaire}
+                  className="absolute top-2 right-2 text-content-muted hover:text-status-danger transition"
+                >
+                  <XCircle size={14} />
+                </button>
+
+                {/* Avatar + Name */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-status-success to-accent shadow-lg shadow-status-success/20 p-0.5 shrink-0">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-surface-base flex items-center justify-center text-content-primary">
+                      <User size={18} />
                     </div>
-                    <Button onClick={rechercherClient} disabled={searchLoading || !searchTerm.trim()} className="w-full py-5 rounded-2xl text-lg font-bold shadow-lg shadow-accent/20 bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info transition-all active:scale-[0.98]">
-                        {searchLoading ? <Loader className="animate-spin mx-auto" /> : 'Continuer'}
-                    </Button>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-sm text-content-primary truncate">
+                      {escapeHtml(selectedClient.nom)} {escapeHtml(selectedClient.prenom || '')}
+                    </h3>
+                    <p className="text-xs text-content-muted truncate">{escapeHtml(selectedClient.telephone || '')}</p>
+                  </div>
                 </div>
-              ) : (
-                /* Step 2: Operation */
-                <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
-                    
-                    {/* Client Card */}
-                    <div className="p-4 rounded-3xl bg-surface/40 border border-edge-subtle flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-full bg-surface-elevated overflow-hidden flex-shrink-0 border-2 border-edge-strong">
-                             {selectedClient.photo_url ? <img src={selectedClient.photo_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-content-muted font-bold text-lg">{selectedClient.nom[0]}</div>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-content-primary truncate">{selectedClient.nom} {selectedClient.prenom}</h3>
-                            <p className="text-content-muted text-sm truncate">{selectedClient.telephone} • {selectedClient.numeroCompte || 'Sans compte'}</p>
-                        </div>
+
+                {selectedClient.numeroCompte && (
+                  <Badge variant="neutral" size="sm" className="bg-surface border-edge text-content-secondary text-[10px] mb-2" value={escapeHtml(selectedClient.numeroCompte)} />
+                )}
+
+                {/* Security Limits */}
+                {limits && (
+                  <div className="space-y-2 pt-2 border-t border-edge/50">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Shield size={10} className="text-content-muted" />
+                      <span className="text-[9px] uppercase tracking-wider text-content-muted font-bold">Limites retrait</span>
                     </div>
-
-                    {/* Direction Switch */}
-                    <div className="grid grid-cols-2 gap-3 p-1.5 bg-surface/50 rounded-2xl border border-edge">
-                        <button onClick={() => { setDirection('Dépôt'); setSelectedDestination(null); setMontant(''); }} className={`relative flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${direction === 'Dépôt' ? 'bg-status-success text-white shadow-lg shadow-status-success/20' : 'text-content-muted hover:text-status-success'}`}>
-                            <ArrowDownLeft size={20} /> Dépôt
-                        </button>
-                        <button onClick={() => { setDirection('Retrait'); setSelectedDestination(null); setMontant(''); }} className={`relative flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${direction === 'Retrait' ? 'bg-status-danger text-white shadow-lg shadow-status-danger/20' : 'text-content-muted hover:text-status-danger'}`}>
-                             Retrait <ArrowUpRight size={20} />
-                        </button>
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-0.5">
+                        <span className="text-content-muted">Jour</span>
+                        <span className="font-mono text-content-secondary">{new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(limits.daily.remaining)}</span>
+                      </div>
+                      <div className="h-1 bg-surface rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            (limits.daily.used / limits.daily.limit) > 0.8 ? 'bg-status-danger' :
+                            (limits.daily.used / limits.daily.limit) > 0.5 ? 'bg-status-warning' : 'bg-status-success'
+                          }`}
+                          style={{ width: `${Math.min(1, limits.daily.used / limits.daily.limit) * 100}%` }}
+                        />
+                      </div>
                     </div>
-
-                    {/* Dynamic Destination Grid */}
-                    <div className="space-y-3">
-                         <label className="text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Destination</label>
-                         <div className="grid grid-cols-2 gap-3">
-                            {availableDestinations.map(opt => (
-                                <button
-                                    key={opt.id}
-                                    onClick={() => {
-                                        setSelectedDestination(opt);
-                                        // Auto-fill amount for tontine?
-                                        if (opt.type === 'Tontine' && opt.balance) {
-                                             const val = parseFloat(opt.balance.replace(/[^0-9.]/g, ''));
-                                             if (!isNaN(val)) setMontant(val.toString());
-                                        }
-                                    }}
-                                    className={`relative p-4 rounded-2xl border-2 text-left transition-all duration-200 group overflow-hidden flex flex-col justify-between h-28 ${
-                                        selectedDestination?.id === opt.id
-                                        ? 'border-accent bg-accent/10 shadow-lg shadow-accent/20'
-                                        : 'border-edge bg-surface-base/50 hover:border-edge hover:bg-surface'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between w-full">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedDestination?.id === opt.id ? 'bg-accent-secondary text-content-primary' : 'bg-surface text-content-muted'}`}>
-                                            {opt.type === 'Compte' && <CreditCard size={16} />}
-                                            {opt.type === 'Credit' && <ShieldCheck size={16} />}
-                                            {opt.type === 'Tontine' && <Users size={16} />}
-                                        </div>
-                                        {selectedDestination?.id === opt.id && <CheckCircle size={18} className="text-accent" />}
-                                    </div>
-                                    <div>
-                                        <span className={`block font-bold text-sm leading-tight ${selectedDestination?.id === opt.id ? 'text-content-primary' : 'text-content-secondary'}`}>
-                                            {opt.label}
-                                        </span>
-                                        {opt.balance && <span className="text-[10px] text-content-muted font-medium truncate block mt-1">{opt.type === 'Compte' ? formatMoney(opt.balance) : opt.balance}</span>}
-                                    </div>
-                                </button>
-                            ))}
-                            
-                            {availableDestinations.length === 0 && (
-                                <div className="col-span-2 py-8 text-center text-content-muted border border-dashed border-edge rounded-2xl">
-                                    Aucune destination disponible pour ce mode.
-                                </div>
-                            )}
-                         </div>
-                    </div>
-
-                    {/* Amount Input */}
-                    {selectedDestination && (
-                        <div className="space-y-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
-                             <label className="text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Montant (FCFA)</label>
-                             <div className="relative">
-                                <input
-                                    type="number"
-                                    value={montant}
-                                    onChange={(e) => { setMontant(e.target.value); setMontantError(null); }}
-                                    placeholder="0"
-                                    className="w-full bg-surface-base border-2 border-edge focus:border-accent/50 rounded-2xl py-5 text-4xl font-mono font-bold text-content-primary text-center outline-none transition-colors"
-                                />
-                             </div>
-                             {montantError && <p className="text-status-danger text-xs text-center font-bold">{montantError}</p>}
-                             
-                             {/* Valid Button */}
-                            <Button
-                                onClick={preparerOperation}
-                                disabled={loading}
-                                className="w-full py-5 mt-4 text-base font-bold rounded-2xl shadow-xl shadow-accent/20 active:scale-[0.98] transition-all bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white"
-                            >
-                                {loading ? <Loader className="animate-spin mx-auto" /> : `Confirmer l'opération`}
-                            </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[8px] text-content-muted mb-0.5">Hebdo</p>
+                        <div className="h-0.5 bg-surface rounded-full overflow-hidden">
+                          <div className="h-full bg-status-info/70" style={{ width: `${Math.min(1, limits.weekly.used / limits.weekly.limit) * 100}%` }} />
                         </div>
-                    )}
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-content-muted mb-0.5">Mensuel</p>
+                        <div className="h-0.5 bg-surface rounded-full overflow-hidden">
+                          <div className="h-full bg-status-info/70" style={{ width: `${Math.min(1, limits.monthly.used / limits.monthly.limit) * 100}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Card>
 
+              {/* Info Card */}
+              {infoCardData && (
+                <div className={`p-2.5 rounded-lg border text-center transition-all duration-300 ${
+                  infoCardData.amount !== null && infoCardData.amount > 0
+                    ? 'bg-status-info-bg border-status-info/30'
+                    : 'bg-surface-base/50 border-edge'
+                }`}>
+                  <p className="text-[9px] text-content-muted uppercase tracking-wider mb-0.5 truncate">{infoCardData.title}</p>
+                  {infoLoading ? (
+                    <Loader className="w-3 h-3 animate-spin mx-auto text-status-success" />
+                  ) : (
+                    <>
+                      <p className={`font-mono text-sm font-bold ${infoCardData.amount !== null ? 'text-content-primary' : 'text-content-muted'}`}>
+                        {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
+                      </p>
+                      {infoCardData.subtitle && <p className="text-[8px] text-content-muted truncate">{infoCardData.subtitle}</p>}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {!infoCardData && currentSubType && (
+                <div className="p-2 rounded bg-surface-base/30 border border-edge/50 text-center">
+                  <p className="text-[10px] text-content-muted">Chargement...</p>
                 </div>
               )}
             </div>
-        </Card>
+          ) : (
+            <div className="flex-1 rounded-xl border-2 border-dashed border-edge bg-surface-base/20 flex flex-col items-center justify-center text-content-muted space-y-3 p-6">
+              <User size={28} className="opacity-20" />
+              <div className="text-center">
+                <p className="text-xs font-medium">Recherchez un client</p>
+                <p className="text-[10px] text-content-muted mt-0.5">pour commencer une opération</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── RIGHT PANEL: Operation Form ── */}
+        <div className="lg:col-span-8 h-full flex flex-col">
+          {selectedClient ? (
+            <Card className="bg-surface-base/80 backdrop-blur-xl border border-edge h-full p-0 flex flex-col overflow-hidden relative animate-in slide-in-from-right-4 duration-300">
+
+              {/* Step 1: Direction */}
+              <div className="p-3 border-b border-edge bg-surface-base/30 shrink-0 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-content-primary flex items-center gap-2">
+                    <Coins className="text-accent" size={16} />
+                    Opération
+                  </h2>
+                  <div className="flex bg-surface-base p-0.5 rounded-lg border border-edge">
+                    {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setTypeOperation(type);
+                          setTypeDepot(null);
+                          setTypeRetrait(null);
+                          setMoyenPaiement(null);
+                          setShowBilletage(false);
+                          setMontantError(null);
+                          setMontant('');
+                        }}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                          typeOperation === type
+                            ? type === 'Dépôt' ? 'bg-status-success text-white shadow-lg' : 'bg-status-danger text-white shadow-lg'
+                            : 'text-content-muted hover:text-content-secondary hover:bg-white/5'
+                        }`}
+                      >
+                        {type === 'Dépôt' ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Step 2: Sub-type pills */}
+                {typeOperation && (
+                  <div className="animate-in fade-in slide-in-from-top-2">
+                    <label className="text-[9px] uppercase tracking-wider text-content-muted font-bold mb-1.5 block">Destination</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(typeOperation === 'Dépôt'
+                        ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
+                        : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
+                      ).map((subType: string) => (
+                        <button
+                          key={subType}
+                          onClick={() => {
+                            if (typeOperation === 'Dépôt') setTypeDepot(subType as TypeDepot);
+                            else setTypeRetrait(subType as TypeRetrait);
+                            setCreditSelectionne(null);
+                            setTontineSelectionnee(null);
+                            setMontant('');
+                            setMontantError(null);
+                            setMoyenPaiement(null);
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all ${
+                            (typeDepot === subType || typeRetrait === subType)
+                              ? 'bg-surface-elevated text-content-primary border-edge-strong shadow-sm'
+                              : 'bg-transparent border-edge text-content-muted hover:border-edge'
+                          }`}
+                        >
+                          {subType}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Main Form Content */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                {/* Step 3: Payment Method */}
+                {currentSubType && (
+                  <div className="animate-in fade-in slide-in-from-bottom-2">
+                    <label className="text-[9px] uppercase tracking-wider text-content-muted font-bold mb-2 block">Moyen de paiement</label>
+                    <div className="flex gap-2">
+                      {/* Cash always available */}
+                      <button
+                        onClick={() => { setMoyenPaiement('CASH'); setPhoneNumber(''); }}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all ${
+                          moyenPaiement === 'CASH'
+                            ? 'border-accent bg-accent/10 shadow-lg shadow-accent/10'
+                            : 'border-edge bg-surface-base/50 hover:border-edge-strong'
+                        }`}
+                      >
+                        <Coins size={18} className={moyenPaiement === 'CASH' ? 'text-accent' : 'text-content-muted'} />
+                        <span className={`text-xs font-bold ${moyenPaiement === 'CASH' ? 'text-content-primary' : 'text-content-muted'}`}>Espèces</span>
+                      </button>
+
+                      {/* Mobile Money providers */}
+                      {PROVIDERS.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setMoyenPaiement(p.id);
+                            if (selectedClient) setPhoneNumber(selectedClient.telephone || selectedClient.phone || '');
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all ${
+                            moyenPaiement === p.id
+                              ? `${p.border} ${p.bg} shadow-lg`
+                              : 'border-edge bg-surface-base/50 hover:border-edge-strong'
+                          }`}
+                        >
+                          <img src={p.logo} className="w-5 h-5 object-contain" alt="" />
+                          <span className={`text-xs font-bold ${moyenPaiement === p.id ? p.color : 'text-content-muted'}`}>{p.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Details (dynamic based on payment method) */}
+                {moyenPaiement && (
+                  <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4">
+
+                    {/* Credits selector */}
+                    {typeDepot === 'Remboursement Crédit' && creditsActifs.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-content-muted uppercase tracking-wider">Crédit à rembourser</label>
+                        <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-thin scrollbar-thumb-edge">
+                          {creditsActifs.map((credit) => (
+                            <div
+                              key={credit.id}
+                              onClick={() => {
+                                setCreditSelectionne(credit);
+                                chargerProchaineEcheance(credit.id);
+                              }}
+                              className={`min-w-[160px] p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                creditSelectionne?.id === credit.id
+                                  ? 'border-status-info/50 bg-status-info-bg shadow-lg'
+                                  : 'border-edge bg-surface-base/50 hover:border-edge-strong'
+                              }`}
+                            >
+                              <div className="text-xs font-bold text-content-secondary"># {escapeHtml(credit.numeroCredit)}</div>
+                              <div className="text-[10px] text-content-muted mt-0.5">Reste: <span className="text-status-info font-bold">{formatMoney(credit.solde_restant)}</span></div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mobile Money: Phone input */}
+                    {(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') && (
+                      <div>
+                        <label className="text-[10px] text-content-muted font-medium mb-1 block">Numéro Mobile</label>
+                        <div className="relative">
+                          <Phone size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
+                          <input
+                            type="tel"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            className={`w-full bg-surface-base border rounded-lg py-2 pl-8 pr-3 text-sm text-content-primary focus:ring-1 focus:ring-accent/50 outline-none font-mono ${
+                              phoneValidation?.warning ? 'border-status-warning/50' : 'border-edge'
+                            }`}
+                            placeholder="+242..."
+                          />
+                        </div>
+                        {phoneValidation?.warning && (
+                          <div className="mt-1 p-1.5 rounded bg-status-warning-bg border border-status-warning/20 text-[9px] text-status-warning">
+                            <span className="font-bold">Sandbox:</span> {phoneValidation.warning}
+                            {phoneValidation.suggestion && <span className="block font-mono">{phoneValidation.suggestion}</span>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Sandbox Banner */}
+                    {(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') && sandboxInfo?.isSandbox && (
+                      <div className="bg-status-warning-bg border border-status-warning/20 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                        <AlertCircle size={12} className="text-status-warning shrink-0" />
+                        <p className="text-[9px] text-status-warning">
+                          <span className="font-bold">Sandbox:</span> Test avec {sandboxInfo.testNumbers?.SUCCESS_IMMEDIATE} (immédiat) ou {sandboxInfo.testNumbers?.SUCCESS_DELAYED} (30s)
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Amount Input */}
+                    <div className="bg-surface-base p-3 rounded-xl border border-edge">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-medium text-content-muted">Montant (FCFA)</label>
+                        {moyenPaiement === 'CASH' && (
+                          <button
+                            onClick={toggleBilletage}
+                            className={`text-[10px] font-bold flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
+                              showBilletage ? 'text-status-success bg-status-success-bg' : 'text-content-muted hover:text-status-success'
+                            }`}
+                          >
+                            <Coins size={11} />
+                            {showBilletage ? 'Masquer' : 'Billetage'}
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        value={montant}
+                        onChange={(e) => {
+                          setMontant(e.target.value);
+                          if (e.target.value) validateMontant(e.target.value);
+                          else setMontantError(null);
+                        }}
+                        disabled={typeDepot === 'Cotisation Tontine' || showBilletage}
+                        placeholder="0"
+                        className={`w-full py-2 text-3xl font-bold bg-transparent border-b-2 outline-none text-center transition-all font-mono ${
+                          montantError ? 'border-status-danger text-status-danger' : 'border-edge text-content-primary focus:border-accent'
+                        }`}
+                      />
+                      {montantError && <p className="text-[10px] text-status-danger text-center mt-1">{montantError}</p>}
+                    </div>
+
+                    {/* Billetage Grid (Cash only) */}
+                    {moyenPaiement === 'CASH' && showBilletage && (
+                      <div className="bg-surface-base/50 border border-edge rounded-xl p-3 animate-in fade-in slide-in-from-right-4">
+                        <div className="grid grid-cols-2 gap-2">
+                          {DENOMINATIONS.map((denom) => (
+                            <div key={denom.value} className="flex items-center gap-2">
+                              <span className="text-[10px] text-content-muted w-12 text-right font-mono">{denom.label}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={billetage[denom.value] || ''}
+                                onChange={(e) => updateBilletage(denom.value, parseInt(e.target.value) || 0)}
+                                className="flex-1 py-1 px-2 text-xs bg-surface-base border border-edge rounded text-right text-content-primary focus:border-accent outline-none font-mono"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Physical Confirmation Indicator */}
+                    {moyenPaiement === 'CASH' && confirmationData && (
+                      <div className="bg-status-info-bg border border-status-info/20 rounded-xl p-2.5 flex items-start gap-2">
+                        <CheckCircle size={14} className="text-status-info mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-status-info">Identité Confirmée</p>
+                          <p className="text-[10px] text-content-muted capitalize">Méthode: {confirmationData.verificationMethod.replace('_', ' ')}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MoMo confirmation info */}
+                    {(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') && typeOperation && montant && parseFloat(montant) > 0 && (
+                      <div className={`p-2.5 rounded-lg border flex items-start gap-2 ${
+                        typeOperation === 'Dépôt' ? 'bg-status-success/5 border-status-success/20' : 'bg-status-danger/5 border-status-danger/20'
+                      }`}>
+                        <AlertCircle size={14} className={`shrink-0 mt-0.5 ${typeOperation === 'Dépôt' ? 'text-status-success' : 'text-status-danger'}`} />
+                        <p className="text-[10px] text-content-muted leading-relaxed">
+                          {typeOperation === 'Dépôt'
+                            ? `Collecte de ${formatMoney(parseFloat(montant))} sur ${phoneNumber || '...'}. Validation PIN ${moyenPaiement} requise.`
+                            : `Envoi de ${formatMoney(parseFloat(montant))} vers ${phoneNumber || '...'}. Vérifiez l'identité du bénéficiaire.`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 5: Summary + Confirm (sticky bottom) */}
+              {isFormComplete && (
+                <div className="p-3 border-t border-edge bg-surface-base/50 mt-auto shrink-0 space-y-2 animate-in fade-in slide-in-from-bottom-2">
+                  {/* Summary line */}
+                  <p className="text-[10px] text-content-muted text-center truncate">
+                    {typeOperation} <span className="font-bold text-content-secondary">{formatMoney(parseFloat(montant))}</span> → {currentSubType} via{' '}
+                    <span className="font-bold">{moyenPaiement === 'CASH' ? 'Espèces' : moyenPaiement === 'MTN' ? 'MTN MoMo' : 'Airtel Money'}</span>
+                  </p>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={loading || (moyenPaiement !== 'CASH' && !phoneNumber)}
+                    className={`w-full py-3 text-sm font-bold tracking-wide shadow-xl transition-all ${
+                      typeOperation === 'Retrait'
+                        ? 'bg-status-danger hover:bg-status-danger shadow-status-danger/20'
+                        : 'bg-status-success hover:bg-status-success shadow-status-success/20'
+                    }`}
+                  >
+                    {loading ? (
+                      <Loader className="w-5 h-5 animate-spin mx-auto" />
+                    ) : moyenPaiement === 'CASH' ? (
+                      `CONFIRMER ${typeOperation?.toUpperCase()}`
+                    ) : typeOperation === 'Dépôt' ? (
+                      <span className="flex items-center justify-center gap-2">LANCER LA COLLECTE <ArrowUpRight size={16} /></span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">CONFIRMER L'ENVOI <ArrowUpRight size={16} /></span>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ) : (
+            <div className="h-full rounded-xl border-2 border-dashed border-edge bg-surface-base/20 flex flex-col items-center justify-center text-content-muted space-y-4 p-6">
+              <div className="w-16 h-16 rounded-full bg-surface-base flex items-center justify-center ring-4 ring-edge/50">
+                <Wallet size={24} className="opacity-50" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-content-muted">En attente de client</p>
+                <p className="text-xs text-content-muted mt-1">Utilisez la recherche à gauche pour commencer</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ── MODALS ── */}
+
+      {/* Cash: Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        title={`Confirmer le ${typeOperation?.toLowerCase() || 'opération'}`}
+        message={confirmationMessage}
+        onConfirm={confirmerPreparationCash}
+        onClose={() => setShowConfirmDialog(false)}
+        variant={typeOperation === 'Retrait' ? 'danger' : 'success'}
+        confirmText="Confirmer"
+        cancelText="Annuler"
+      />
+
+      {/* Cash: Physical Confirmation */}
+      {showPhysicalConfirmation && pendingOperationData && selectedClient && (
+        <PhysicalConfirmationStep
+          isOpen={showPhysicalConfirmation}
+          onClose={() => setShowPhysicalConfirmation(false)}
+          onConfirm={validerOperationAvecConfirmation}
+          clientName={`${selectedClient.nom} ${selectedClient.prenom || ''}`}
+          clientPhone={selectedClient.telephone || selectedClient.phone}
+          operationType={typeRetrait || typeDepot || typeOperation || 'Opération'}
+          amount={parseFloat(montant)}
+          isLoading={loading}
+        />
+      )}
+
+      {/* Mobile Money: Presence Verification */}
+      {showPresenceModal && selectedClient && (
+        <AccountHolderPresenceModal
+          isOpen={showPresenceModal}
+          onClose={() => setShowPresenceModal(false)}
+          onConfirm={handlePresenceConfirm}
+          clientName={`${selectedClient.nom} ${selectedClient.prenom}`}
+          clientPhone={selectedClient.telephone || selectedClient.phone}
+          operationType={typeOperation || 'Retrait'}
+          amount={parseFloat(montant)}
+          isLoading={loading}
+        />
+      )}
+
+      {/* Mobile Money: Payment Status Polling */}
+      <PaymentStatusModal
+        isOpen={showPaymentStatusModal}
+        onClose={() => {
+          setShowPaymentStatusModal(false);
+          if (paymentStatus === 'PENDING' || paymentStatus === 'CREATED') {
+            toast.info('Le paiement est toujours en attente de confirmation');
+          }
+        }}
+        status={paymentStatus}
+        provider={(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') ? moyenPaiement : 'MTN'}
+        amount={parseFloat(montant) || 0}
+        phone={phoneNumber}
+        reference={paymentIntent?.externalRef}
+        providerTxnId={paymentIntent?.providerTxnId}
+        errorMessage={paymentIntent?.errorMessage}
+        onRetry={() => {
+          setShowPaymentStatusModal(false);
+          setPaymentIntent(null);
+          setPaymentStatus('CREATED');
+        }}
+        onViewDetails={() => setShowPaymentStatusModal(false)}
+      />
+
+      {/* Universal Success / Receipt Modal */}
+      <UniversalPaymentSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setLastOperationData(null);
+          reinitialiserFormulaire();
+          onTransactionComplete?.();
+        }}
+        term="Terminer"
+        data={receiptData}
+      />
     </div>
   );
 }

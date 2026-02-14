@@ -295,7 +295,7 @@ export default function RessourcesHumaines() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface-base overflow-y-auto overflow-x-hidden">
+    <div className={`flex flex-col h-full bg-surface-base overflow-x-hidden ${activeTab === 'organigramme' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {/* Header & Tabs Section - Fixed */}
       <div className="shrink-0 space-y-2 p-2 sm:p-4 pb-0 bg-surface-base border-b border-edge/50">
         <FeatureHeader

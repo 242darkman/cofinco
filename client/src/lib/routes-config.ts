@@ -159,6 +159,7 @@ export const ROUTES: RouteConfig[] = [
     group: 'Opérations',
     subRoutes: [
       { path: '/caisse/demandes', subModule: 'demandes', label: 'Demandes' },
+      { path: '/caisse/operations', subModule: 'operations', label: 'Opérations' },
       { path: '/caisse/infos-client', subModule: 'infos-client', label: 'Info Client' },
       { path: '/caisse/especes', subModule: 'especes', label: 'Espèces' },
       { path: '/caisse/mobilemoney', subModule: 'mobilemoney', label: 'Mobile Money' },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet,
+  Activity, RefreshCw, ArrowRightLeft, Wallet,
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
   PiggyBank, ArrowUpRight, ArrowDownRight, Shield, Timer, AlertCircle,
   LockKeyhole, KeyRound, Package, Check, UserCheck, History, ScrollText, Scale, ClipboardList
@@ -25,8 +25,6 @@ const CaisseTransferts = lazy(() => import('./CaisseTransferts'));
 const CaisseEtats = lazy(() => import('./CaisseEtats'));
 const CaisseSupervision = lazy(() => import('./CaisseSupervision'));
 import CaissePaiementModal from './CaissePaiementModal';
-const CaisseEspeces = lazy(() => import('./CaisseEspeces'));
-const CaisseMobileMoney = lazy(() => import('./CaisseMobileMoney'));
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { SupervisionSession } from './shared/SupervisionConfirmModal';
@@ -37,7 +35,6 @@ import { usePendingSessionSync } from '../../../hooks/finance/usePendingSessionS
 const CaisseAuditLog = lazy(() => import('./CaisseAuditLog'));
 const WeightVerificationPanel = lazy(() => import('./WeightVerificationPanel'));
 const CaisseAccessControl = lazy(() => import('./CaisseAccessControl'));
-const CaisseClientInfos = lazy(() => import('./CaisseClientInfos'));
 const CaisseHistoriqueGlobal = lazy(() => import('./CaisseHistoriqueGlobal'));
 const CaisseDemandesTab = lazy(() => import('./CaisseDemandesTab'));
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
@@ -584,13 +581,13 @@ export default function CaisseDashboard({
 
   // Redirection automatique si on tente d'accéder à un onglet verrouillé
   useEffect(() => {
-    if (!isSessionOpen && activeTab !== 'dashboard' && activeTab !== 'supervision') {
+    if (!loadingSession && !isSessionOpen && activeTab !== 'dashboard' && activeTab !== 'supervision') {
       handleTabChange('dashboard');
       toast.error("Session fermée", {
         description: "Veuillez ouvrir une session pour accéder à ce module."
       });
     }
-  }, [isSessionOpen, activeTab]);
+  }, [loadingSession, isSessionOpen, activeTab]);
 
   // Check if session is in closing workflow (frozen - no new transactions allowed)
   const isClosingWorkflow = currentSession?.statut === 'CLOSING_COUNT' || currentSession?.statut === 'CLOSING_VALIDATION';
@@ -598,9 +595,7 @@ export default function CaisseDashboard({
   const tabs = [
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
     { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: (pendingCaisseRequestsCount + pendingDisbursementsCount) > 0 ? (pendingCaisseRequestsCount + pendingDisbursementsCount) : undefined, badgeClassName: 'bg-accent-secondary text-white animate-pulse' },
-    { key: 'infos-client', label: 'Info Client', icon: Users, disabled: !isSessionOpen },
-    { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen || isClosingWorkflow },
-    { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !isSessionOpen || isClosingWorkflow },
+    { key: 'operations', label: 'Opérations', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'etats', label: 'États', icon: FileText, disabled: !isSessionOpen },
@@ -645,7 +640,18 @@ export default function CaisseDashboard({
           </div>
         ) : null;
       case 'operations':
-        return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} /></div> : null;
+        return currentSession ? (
+          <div className="h-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <CaisseOperations
+              sessionId={currentSession.id}
+              onTransactionComplete={() => {
+                loadSessionActive();
+                loadTransactionsJour();
+                loadCaissesSeparees();
+              }}
+            />
+          </div>
+        ) : null;
       // prets-decaissement is now integrated in the 'demandes' tab
       case 'historique':
         return (
@@ -725,22 +731,6 @@ export default function CaisseDashboard({
           </div>
         );
 
-      case 'especes':
-        return currentSession ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <CaisseEspeces sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); }} />
-            </div>
-        ) : null;
-      case 'mobilemoney':
-        return currentSession ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <CaisseMobileMoney sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); loadCaissesSeparees(); }} />
-            </div>
-        ) : null;
-      case 'infos-client':
-        return (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseClientInfos /></div>
-        );
       case 'rapprochement':
         return currentSession ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
@@ -1200,7 +1190,7 @@ export default function CaisseDashboard({
             data={historyReceiptData}
         />
 
-      <div className={`w-full flex flex-col p-3 md:p-4 ${activeTab === 'historique' || activeTab === 'etats' ? 'h-full overflow-hidden' : 'min-h-full'}`}>
+      <div className={`w-full flex flex-col p-3 md:p-4 ${activeTab === 'historique' || activeTab === 'etats' || activeTab === 'operations' ? 'h-full overflow-hidden' : 'min-h-full'}`}>
         {/* App Header with contextual help */}
         <FeatureHeader
           featureKey="finance.caisse"
