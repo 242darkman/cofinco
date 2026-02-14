@@ -197,7 +197,9 @@ export const typeOperationCaisseEnum = pgEnum("type_operation_caisse", [
   "INITIAL_DEPOSIT",
   // Frais ouverture / clôture
   "OPENING_FEE",
-  "CLOSING_FEE"
+  "CLOSING_FEE",
+  // Restitution de frais
+  "FEE_REFUND",
 ]);
 
 export const statutTransfertCaisseEnum = pgEnum("statut_transfert_caisse_enum", [
