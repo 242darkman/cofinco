@@ -21,6 +21,7 @@ const DB_OPERATION_TIMEOUT_MS = 5000; // 5 secondes max par opération DB
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { StorageService } from "../services/storage-service";
 import { createLogger } from "../lib/logger";
+import { caisseAdminService } from "../services/caisse-admin-service";
 
 const logger = createLogger('Auth');
 
@@ -1083,6 +1084,15 @@ export function registerAuthRoutes(app: Express) {
         "success",
         "low"
       );
+    }
+
+    // Force-close any open caisse session for this user
+    if (userId) {
+      try {
+        await caisseAdminService.forceCloseOnLogout(userId);
+      } catch (err) {
+        logger.error({ err, userId }, 'Error force-closing caisse on logout');
+      }
     }
 
     // Delete from active_sessions table

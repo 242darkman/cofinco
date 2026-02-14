@@ -11,6 +11,7 @@ export type SessionComputedStatus = (typeof SessionComputedStatus)[keyof typeof 
 export const ForcedCloseReason = {
   TIMEOUT_AUTO: "TIMEOUT_AUTO",
   ADMIN_FORCE: "ADMIN_FORCE",
+  USER_LOGOUT: "USER_LOGOUT",
 } as const;
 
 export type ForcedCloseReason = (typeof ForcedCloseReason)[keyof typeof ForcedCloseReason];

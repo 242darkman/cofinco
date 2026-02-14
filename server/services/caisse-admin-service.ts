@@ -144,6 +144,91 @@ export class CaisseAdminService {
   }
 
   /**
+   * Fermeture forcée de la session de caisse lors du logout utilisateur.
+   * Reporte le solde théorique intégralement pour la prochaine ouverture.
+   * Non-bloquant : retourne silencieusement si aucune session ouverte.
+   */
+  async forceCloseOnLogout(userId: string): Promise<void> {
+    // 1. Trouver la session ouverte du user
+    const [session] = await db
+      .select()
+      .from(sessionsCaisse)
+      .where(and(
+        eq(sessionsCaisse.caissierId, userId),
+        isNull(sessionsCaisse.closedAt),
+        isNull(sessionsCaisse.deletedAt)
+      ));
+
+    if (!session) return; // Pas de session ouverte — rien à faire
+
+    const soldeTheorique = parseFloat(session.montantFermetureTheorique || "0");
+    const now = new Date();
+
+    await db.transaction(async (tx) => {
+      // 2. Fermer la session avec report intégral du solde
+      await tx
+        .update(sessionsCaisse)
+        .set({
+          statut: "CLOSED",
+          closedAt: now,
+          closingFinalizedAt: now,
+          forcedCloseReason: ForcedCloseReason.USER_LOGOUT,
+          forceClosedBy: userId,
+          forceClosedAt: now,
+          fundsKeptInCaisse: true,
+          montantFermetureDeclare: soldeTheorique.toString(),
+          montantPhysique: soldeTheorique.toString(),
+          montantReporte: soldeTheorique.toString(),
+          montantVersCoffre: "0",
+          ecart: "0",
+          updatedAt: now,
+        })
+        .where(eq(sessionsCaisse.id, session.id));
+
+      // 3. Mettre à jour le solde de la caisse physique (carry-over)
+      await tx
+        .update(caisses)
+        .set({
+          solde: soldeTheorique.toString(),
+          updatedAt: now,
+        })
+        .where(eq(caisses.id, session.caisseId));
+
+      // 4. Événement d'audit
+      await tx.insert(evenementsOutbox).values({
+        type: "SESSION_FORCE_CLOSED",
+        aggregateType: "session_caisse",
+        aggregateId: session.id,
+        payload: {
+          sessionId: session.id,
+          caisseId: session.caisseId,
+          caissierId: session.caissierId,
+          closedBy: userId,
+          reason: ForcedCloseReason.USER_LOGOUT,
+          soldeReporte: soldeTheorique.toString(),
+          timestamp: now.toISOString(),
+        },
+      });
+
+      // 5. Événement temps réel
+      await tx.insert(evenementsOutbox).values({
+        type: "CAISSE_STATUS_CHANGED",
+        aggregateType: "caisse",
+        aggregateId: session.caisseId,
+        payload: {
+          caisseId: session.caisseId,
+          status: "CLOSED",
+          forceClosed: true,
+          reason: ForcedCloseReason.USER_LOGOUT,
+          sessionId: session.id,
+        },
+      });
+    });
+
+    logger.info({ userId, sessionId: session.id, soldeReporte: soldeTheorique }, 'Caisse session force-closed on logout');
+  }
+
+  /**
    * Vérifie si une caisse peut être supprimée
    * Retourne le solde actuel et les destinations disponibles
    */
