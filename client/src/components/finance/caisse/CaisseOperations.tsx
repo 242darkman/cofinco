@@ -165,6 +165,17 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
     behavior?: { expectedStatus: string; expectedDelay?: number };
   } | null>(null);
 
+  // ── Fee estimation (mobile money) ──
+  const [feeOption, setFeeOption] = useState<'CLIENT_PAYS' | 'FEES_DEDUCTED' | ''>('');
+  const [feeEstimate, setFeeEstimate] = useState<{
+    feeAmount: number;
+    feeRate: number;
+    montantBrut: number;
+    montantNet: number;
+    feeOption: string;
+  } | null>(null);
+  const [loadingFeeEstimate, setLoadingFeeEstimate] = useState(false);
+
   // ── Credit / Tontine / Comptes Data ──
   const [creditsActifs, setCreditsActifs] = useState<any[]>([]);
   const [creditSelectionne, setCreditSelectionne] = useState<any>(null);
@@ -281,6 +292,52 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
     }, 500);
     return () => clearTimeout(timeout);
   }, [phoneNumber, sandboxInfo, moyenPaiement]);
+
+  // ── Reset fee state when payment method changes ──
+  useEffect(() => {
+    setFeeOption('');
+    setFeeEstimate(null);
+  }, [moyenPaiement]);
+
+  // ── Debounced fee estimation (mobile money) ──
+  useEffect(() => {
+    if (!moyenPaiement || moyenPaiement === 'CASH' || !feeOption || !montant) {
+      setFeeEstimate(null);
+      return;
+    }
+
+    const amount = parseFloat(montant);
+    if (isNaN(amount) || amount <= 0) {
+      setFeeEstimate(null);
+      return;
+    }
+
+    const provider = moyenPaiement as 'MTN' | 'AIRTEL';
+    const direction = typeOperation === 'Dépôt' ? 'COLLECTION' : 'PAYOUT';
+
+    const timer = setTimeout(async () => {
+      setLoadingFeeEstimate(true);
+      try {
+        const params = new URLSearchParams({
+          amount: amount.toString(),
+          provider,
+          direction,
+          feeOption,
+        });
+        const res = await fetch(`/api/payments/fee-estimate?${params}`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setFeeEstimate(data);
+        }
+      } catch (err) {
+        console.error('Fee estimate error:', err);
+      } finally {
+        setLoadingFeeEstimate(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [montant, moyenPaiement, typeOperation, feeOption]);
 
   // ── Auto-show receipt ──
   useEffect(() => {
@@ -602,7 +659,8 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
         agenceId: user?.agenceId,
         idempotencyKey,
         type: paymentType,
-        metadata: { sessionId, subType, presenceVerification: presenceData }
+        metadata: { sessionId, subType, presenceVerification: presenceData },
+        feeOption: feeOption || undefined
       };
 
       if ((subType === 'Remboursement Crédit' || subType === 'Décaissement Crédit') && creditsActifs.length > 0) {
@@ -706,6 +764,8 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
     setPhoneNumber('');
     setPaymentIntent(null);
     setPaymentStatus('CREATED');
+    setFeeOption('');
+    setFeeEstimate(null);
   }, []);
 
   // ─── Submit Dispatch ──────────────────────────────────
@@ -756,7 +816,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
               <button
                 onClick={rechercherClient}
                 disabled={searchLoading || !searchTerm.trim()}
-                className="text-[9px] bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface-elevated text-content-primary px-2 py-1 rounded font-bold transition-colors shrink-0"
+                className="text-[9px] bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface-elevated text-white px-2 py-1 rounded font-bold transition-colors shrink-0"
               >
                 {searchLoading ? <Loader2 size={10} className="animate-spin" /> : 'OK'}
               </button>
@@ -1067,11 +1127,13 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                         )}
                       </div>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={montant}
                         onChange={(e) => {
-                          setMontant(e.target.value);
-                          if (e.target.value) validateMontant(e.target.value);
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setMontant(val);
+                          if (val) validateMontant(val);
                           else setMontantError(null);
                         }}
                         disabled={typeDepot === 'Cotisation Tontine' || showBilletage}
@@ -1083,6 +1145,73 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                       {montantError && <p className="text-[10px] text-status-danger text-center mt-1">{montantError}</p>}
                     </div>
 
+                    {/* Fee Options (Mobile Money only) */}
+                    {(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') && montant && parseFloat(montant) > 0 && (
+                      <div className="animate-in fade-in slide-in-from-bottom-2">
+                        <label className="text-[9px] uppercase tracking-wider text-content-muted font-bold mb-2 block">Gestion des frais</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFeeOption(feeOption === 'CLIENT_PAYS' ? '' : 'CLIENT_PAYS')}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              feeOption === 'CLIENT_PAYS'
+                                ? 'border-accent/50 bg-accent/10'
+                                : 'border-edge bg-surface-base hover:border-edge-strong'
+                            }`}
+                          >
+                            <p className={`text-[11px] font-bold ${feeOption === 'CLIENT_PAYS' ? 'text-accent' : 'text-content-primary'}`}>
+                              Client paie en plus
+                            </p>
+                            <p className="text-[9px] text-content-muted mt-0.5">Frais ajoutés au montant</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFeeOption(feeOption === 'FEES_DEDUCTED' ? '' : 'FEES_DEDUCTED')}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              feeOption === 'FEES_DEDUCTED'
+                                ? 'border-accent/50 bg-accent/10'
+                                : 'border-edge bg-surface-base hover:border-edge-strong'
+                            }`}
+                          >
+                            <p className={`text-[11px] font-bold ${feeOption === 'FEES_DEDUCTED' ? 'text-accent' : 'text-content-primary'}`}>
+                              Frais déduits
+                            </p>
+                            <p className="text-[9px] text-content-muted mt-0.5">Frais déduits du montant</p>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fee Estimate Preview (Mobile Money) */}
+                    {(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') && feeOption && feeEstimate && (
+                      <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 space-y-1.5 animate-in fade-in">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-content-muted">Montant opération</span>
+                          <span className="text-content-primary font-medium">{Number(montant).toLocaleString()} {currencySymbol}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-content-muted">Frais {moyenPaiement} ({feeEstimate.feeRate}%)</span>
+                          <span className="text-status-warning font-medium">{feeEstimate.feeAmount.toLocaleString()} {currencySymbol}</span>
+                        </div>
+                        <div className="flex justify-between text-xs pt-1.5 border-t border-accent/20">
+                          <span className="text-content-muted font-semibold">
+                            {typeOperation === 'Dépôt'
+                              ? (feeOption === 'CLIENT_PAYS' ? 'Total débité du téléphone' : 'Crédité au compte')
+                              : (feeOption === 'CLIENT_PAYS' ? 'Débité du compte' : 'Reçu au téléphone')}
+                          </span>
+                          <span className="text-content-primary font-bold">
+                            {(feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : feeEstimate.montantNet).toLocaleString()} {currencySymbol}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') && feeOption && loadingFeeEstimate && (
+                      <div className="flex items-center gap-2 text-xs text-content-muted">
+                        <Loader2 size={12} className="animate-spin" />
+                        Calcul des frais...
+                      </div>
+                    )}
+
                     {/* Billetage Grid (Cash only) */}
                     {moyenPaiement === 'CASH' && showBilletage && (
                       <div className="bg-surface-base/50 border border-edge rounded-xl p-3 animate-in fade-in slide-in-from-right-4">
@@ -1091,10 +1220,13 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                             <div key={denom.value} className="flex items-center gap-2">
                               <span className="text-[10px] text-content-muted w-12 text-right font-mono">{denom.label}</span>
                               <input
-                                type="number"
-                                min="0"
+                                type="text"
+                                inputMode="numeric"
                                 value={billetage[denom.value] || ''}
-                                onChange={(e) => updateBilletage(denom.value, parseInt(e.target.value) || 0)}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^0-9]/g, '');
+                                  updateBilletage(denom.value, parseInt(val) || 0);
+                                }}
                                 className="flex-1 py-1 px-2 text-xs bg-surface-base border border-edge rounded text-right text-content-primary focus:border-accent outline-none font-mono"
                               />
                             </div>
@@ -1122,8 +1254,8 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                         <AlertCircle size={14} className={`shrink-0 mt-0.5 ${typeOperation === 'Dépôt' ? 'text-status-success' : 'text-status-danger'}`} />
                         <p className="text-[10px] text-content-muted leading-relaxed">
                           {typeOperation === 'Dépôt'
-                            ? `Collecte de ${formatMoney(parseFloat(montant))} sur ${phoneNumber || '...'}. Validation PIN ${moyenPaiement} requise.`
-                            : `Envoi de ${formatMoney(parseFloat(montant))} vers ${phoneNumber || '...'}. Vérifiez l'identité du bénéficiaire.`}
+                            ? `Collecte de ${formatMoney(feeEstimate && feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : parseFloat(montant))} sur ${phoneNumber || '...'}. Validation PIN ${moyenPaiement} requise.`
+                            : `Envoi de ${formatMoney(feeEstimate && feeOption === 'FEES_DEDUCTED' ? feeEstimate.montantNet : parseFloat(montant))} vers ${phoneNumber || '...'}. Vérifiez l'identité du bénéficiaire.`}
                         </p>
                       </div>
                     )}
@@ -1138,6 +1270,9 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                   <p className="text-[10px] text-content-muted text-center truncate">
                     {typeOperation} <span className="font-bold text-content-secondary">{formatMoney(parseFloat(montant))}</span> → {currentSubType} via{' '}
                     <span className="font-bold">{moyenPaiement === 'CASH' ? 'Espèces' : moyenPaiement === 'MTN' ? 'MTN MoMo' : 'Airtel Money'}</span>
+                    {feeEstimate && feeOption && moyenPaiement !== 'CASH' && (
+                      <span className="text-status-warning"> (frais: {formatMoney(feeEstimate.feeAmount)})</span>
+                    )}
                   </p>
                   <Button
                     onClick={handleSubmit}
@@ -1150,12 +1285,21 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                   >
                     {loading ? (
                       <Loader className="w-5 h-5 animate-spin mx-auto" />
-                    ) : moyenPaiement === 'CASH' ? (
-                      `CONFIRMER ${typeOperation?.toUpperCase()}`
-                    ) : typeOperation === 'Dépôt' ? (
-                      <span className="flex items-center justify-center gap-2">LANCER LA COLLECTE <ArrowUpRight size={16} /></span>
                     ) : (
-                      <span className="flex items-center justify-center gap-2">CONFIRMER L'ENVOI <ArrowUpRight size={16} /></span>
+                      <span className="flex items-center justify-center gap-2">
+                        {moyenPaiement === 'CASH'
+                          ? `CONFIRMER ${typeOperation?.toUpperCase()}`
+                          : typeOperation === 'Dépôt' ? 'LANCER LA COLLECTE' : "CONFIRMER L'ENVOI"}
+                        {montant && parseFloat(montant) > 0 && (
+                          <span className="font-black">
+                            ({formatMoney(
+                              feeEstimate && feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut
+                              : parseFloat(montant)
+                            )})
+                          </span>
+                        )}
+                        {moyenPaiement !== 'CASH' && <ArrowUpRight size={16} />}
+                      </span>
                     )}
                   </Button>
                 </div>
