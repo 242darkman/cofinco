@@ -55,7 +55,7 @@ const moneyFormatter = new Intl.NumberFormat('fr-FR');
 
 interface CaisseProps {
   userRole?: string;
-  onModuleChange?: (module: string) => void;
+  onModuleChange?: (module: string, subModule?: string, data?: any) => void;
   activeView?: string;
   initialShowPaiement?: boolean;
   onPaiementModalClose?: () => void;
@@ -107,6 +107,7 @@ export default function CaisseDashboard({
   }, [activeView]);
 
   const [showOuverture, setShowOuverture] = useState(false);
+  const [showRapprochement, setShowRapprochement] = useState(false);
   const [showPaiement, setShowPaiement] = useState(false);
   const [showActivationDrawer, setShowActivationDrawer] = useState(false);
   const [initialPaymentType, setInitialPaymentType] = useState<string | undefined>(undefined);
@@ -538,7 +539,7 @@ export default function CaisseDashboard({
     : 0;
 
   const handleFermetureCaisse = () => {
-    handleTabChange('rapprochement');
+    setShowRapprochement(true);
   };
 
   // Session inactivity timeout
@@ -731,13 +732,6 @@ export default function CaisseDashboard({
           </div>
         );
 
-      case 'rapprochement':
-        return currentSession ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
-              <CaisseRapprochement session={currentSession} onClose={() => { handleTabChange('dashboard'); loadSessionActive(); loadTransactionsJour(); }} soldeTheoriqueCalcule={soldeActuel} />
-              <WeightVerificationPanel compact />
-            </div>
-        ) : null;
       case 'transferts':
         return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => handleTabChange('dashboard')} /></div>;
       case 'etats':
@@ -1443,7 +1437,7 @@ export default function CaisseDashboard({
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  handleTabChange('rapprochement');
+                  setShowRapprochement(true);
                   resetSessionTimeout();
                 }}
                 className="flex-1 px-4 py-2 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg text-sm font-medium transition"
@@ -1457,6 +1451,24 @@ export default function CaisseDashboard({
                 Rester connecté
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rapprochement / Fermeture de caisse — modal overlay */}
+      {showRapprochement && currentSession && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto p-4">
+          <div className="w-full max-w-3xl my-8 animate-in slide-in-from-bottom-4 duration-200">
+            <CaisseRapprochement
+              session={currentSession}
+              onClose={() => {
+                setShowRapprochement(false);
+                loadSessionActive();
+                loadTransactionsJour();
+              }}
+              soldeTheoriqueCalcule={soldeActuel}
+            />
+            <WeightVerificationPanel compact />
           </div>
         </div>
       )}

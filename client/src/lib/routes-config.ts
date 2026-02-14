@@ -168,6 +168,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/caisse/etats', subModule: 'etats', label: 'États de caisse' },
       { path: '/caisse/supervision', subModule: 'supervision', label: 'Supervision' },
       { path: '/caisse/audit', subModule: 'audit', label: 'Audit' },
+      { path: '/caisse/rapprochement', subModule: 'rapprochement', label: 'Rapprochement' },
     ],
   },
   {
